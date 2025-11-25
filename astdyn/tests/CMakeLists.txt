@@ -297,3 +297,37 @@ target_link_libraries(astdyn_pompeja_validation
 
 gtest_discover_tests(astdyn_pompeja_validation)
 
+# ============================================================================
+# Pompeja Gauss IOD Test (Initial Orbit Determination)
+# ============================================================================
+
+add_executable(astdyn_pompeja_gauss_iod
+    test_pompeja_gauss_iod.cpp
+)
+
+target_link_libraries(astdyn_pompeja_gauss_iod
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_pompeja_gauss_iod)
+
+# ============================================================================
+# Pompeja Full Dynamics Test (Complete Perturbation Model)
+# ============================================================================
+
+add_executable(astdyn_pompeja_full_dynamics
+    test_pompeja_full_dynamics.cpp
+)
+
+target_link_libraries(astdyn_pompeja_full_dynamics
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_pompeja_full_dynamics)
+
