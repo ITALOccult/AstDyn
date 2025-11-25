@@ -369,6 +369,29 @@ bool load_leap_seconds(const std::string& filepath);
  */
 int get_leap_seconds(double mjd_utc);
 
+/**
+ * @brief Load ΔUT1 (UT1-UTC) data from IERS finals.data file
+ * 
+ * If filepath is empty, initializes with approximate values for 2020-2025.
+ * For production use, download finals.data from:
+ * https://datacenter.iers.org/data/latestVersion/finals.data
+ * 
+ * @param filepath Path to IERS finals.data file (empty for defaults)
+ * @return true if successful
+ */
+bool load_dut1_data(const std::string& filepath = "");
+
+/**
+ * @brief Get ΔUT1 (UT1-UTC) for a given date
+ * 
+ * Uses linear interpolation between loaded values.
+ * Auto-initializes with default values if not loaded.
+ * 
+ * @param mjd_utc MJD in UTC
+ * @return ΔUT1 in seconds
+ */
+double get_dut1(double mjd_utc);
+
 } // namespace time
 } // namespace orbfit
 

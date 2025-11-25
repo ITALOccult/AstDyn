@@ -10,7 +10,12 @@ file(GLOB_RECURSE ORBFIT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/ephemeris/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/observations/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/propagation/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/orbit_determination/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/close_approach/*.cpp
 )
+
+# Add OrbFitEngine to the library
+list(APPEND ORBFIT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/OrbFitEngine.cpp)
 
 # Create main library
 add_library(orbfit ${ORBFIT_SOURCES})
@@ -58,4 +63,38 @@ install(EXPORT OrbFitTargets
     FILE OrbFitTargets.cmake
     NAMESPACE OrbFit::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OrbFit
+)
+
+# ============================================================================
+# Main Programs
+# ============================================================================
+
+# orbfit - Main orbit determination program
+add_executable(orbfit_program
+    orbfit_main.cpp
+)
+
+target_link_libraries(orbfit_program
+    PRIVATE
+        orbfit
+)
+
+set_target_properties(orbfit_program PROPERTIES
+    OUTPUT_NAME orbfit
+)
+
+# orbfit_convert - Configuration converter tool
+add_executable(orbfit_convert
+    orbfit_convert.cpp
+    io/OrbFitConfig.cpp
+)
+
+target_link_libraries(orbfit_convert
+    PRIVATE
+        orbfit
+)
+
+# Install programs
+install(TARGETS orbfit_program orbfit_convert
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

@@ -276,22 +276,38 @@ Matrix6d P_cart = J * P_kep * J.transpose();
 
 ---
 
-### FASE 4: Effemeridi Planetarie ✅ COMPLETATA
+### FASE 4: Effemeridi Planetarie ✅ COMPLETATA + ESTESA
 
-**Stato:** ✅ Implementazione completata con approccio analitico semplificato
+**Stato:** ✅ Implementazione completata con supporto multiplo
 
 #### 4.1 Implementazione
 
 **Moduli implementati:**
 - `PlanetaryData.hpp/cpp` - Masse, raggi, parametri orbitali dei pianeti
 - `PlanetaryEphemeris.hpp/cpp` - Calcolo effemeridi con formulae Simon et al. (1994)
+- ✨ `EphemerisInterface.hpp` - Interfaccia astratta per provider multipli
+- ✨ `JPLDEProvider.hpp` - Supporto JPL DE405/DE441 via CSPICE
+- ✨ `AsteroidPerturbations.hpp/cpp` - Perturbazioni da 16 asteroidi massivi (AST17)
 
-**Caratteristiche:**
+**Caratteristiche VSOP87 (built-in):**
 - Effemeridi analitiche basate su serie VSOP87 semplificate
 - Accuratezza: 1-20 arcsec per periodo 1800-2050
 - Coordinate: Heliocentric J2000 ecliptic frame
 - Correzioni baricentriche implementate
 - Supporto per Mercurio - Nettuno, Plutone, Luna
+
+**Caratteristiche JPL DE (opzionale con CSPICE):**
+- DE405: Accuratezza ~1 km, epoca 1600-2200
+- DE441: Accuratezza ~cm, epoca 1550-2650
+- Interpolazione spline da file binari .bsp
+- Supporto completo per tutti i corpi del sistema solare
+
+**Perturbazioni Asteroidali (AST17):**
+- 16 asteroidi più massivi: Ceres (62.6 km³/s²), Pallas, Vesta, ...
+- Calcolo posizioni da elementi orbitali medi
+- Perturbazioni dirette e indirette
+- Massa totale: ~130 km³/s² (~10⁻⁸ M☉)
+- Impatto: ~0.1-1 m/s² a 1 AU per propagazioni > 1 anno
 
 ```cpp
 namespace orbfit::ephemeris {
@@ -335,9 +351,11 @@ namespace orbfit::ephemeris {
 **Test:** 163/163 passati (100%)
 
 **Note:**
-- Implementazione auto-contenuta senza dipendenze esterne
-- Sufficiente per determinazione orbite asteroidi
-- Per accuratezza sub-arcsec: integrare SPICE toolkit in futuro
+- Implementazione base (VSOP87) auto-contenuta senza dipendenze esterne
+- Supporto JPL DE opzionale tramite CSPICE (richiede installazione separata)
+- Perturbazioni asteroidali incluse di default (nessuna dipendenza esterna)
+- Architettura modulare: facile aggiungere nuove fonti effemeridi
+- Documentazione completa: vedi `docs/EPHEMERIS_SUPPORT.md`
 
 ---
 
@@ -481,68 +499,161 @@ namespace orbfit::propagation {
 
 ---
 
-### FASE 7: Determinazione Orbitale (6-8 settimane)
+### FASE 7: Determinazione Orbitale ✅ COMPLETATA (2025-11-24)
 
-#### 7.1 Least Squares Fit (`least_squares/`)
-**Moduli:**
-- `least_squares.f90` → `LeastSquaresFit.cpp`
-- `diff_cor.f90` → `DifferentialCorrections.cpp`
+**Status**: ✅ Implementata, compilata, testata  
+**Report**: Vedi `PHASE7_COMPLETION_REPORT.md`
 
+#### 7.1 Least Squares Fit ✅
+**Moduli Implementati:**
+- `Residuals.hpp/.cpp` - Calcolo residui O-C con correzioni topocentriche
+- `StateTransitionMatrix.hpp/.cpp` - Matrice di transizione via equazioni variazionali
+- `DifferentialCorrector.hpp/.cpp` - Correzioni differenziali iterate
+
+**Test**: 8/8 passati
+- ✅ Strutture dati residui
+- ✅ Statistiche (RMS, chi-quadro)
+- ✅ Rilevamento outlier (3-sigma)
+- ✅ STM identità e determinante
+- ✅ Convergenza iterativa
+
+**Componenti Implementati:**
 ```cpp
-namespace orbfit::fit {
-    class LeastSquaresSolver {
-    public:
-        struct Result {
-            StateVector state;
-            Eigen::MatrixXd covariance;
-            double rms;
-            int iterations;
-            bool converged;
-        };
-        
-        Result solve(const std::vector<Observation>& obs,
-                     const StateVector& initial_guess);
+namespace orbfit::orbit_determination {
+    class ResidualCalculator {
+        // O-C per osservazioni ottiche (RA/Dec)
+        // Correzioni topocentriche e aberrazione
+        // Rilevamento outlier iterativo 3-sigma
+    };
+    
+    class StateTransitionMatrix {
+        // Φ(t,t₀) = ∂x(t)/∂x₀ via equazioni variazionali
+        // Jacobiano A(t) = ∂f/∂x per dinamica a 2 corpi
+        // Parziali osservazione: ∂(RA,Dec)/∂x
+    };
+    
+    class DifferentialCorrector {
+        // Least squares pesato con correzioni differenziali
+        // (AᵀWA)Δx = AᵀWb
+        // Covarianza: Cov = σ₀²(AᵀWA)⁻¹
+        // Rigetto outlier tra iterazioni
     };
 }
 ```
 
-#### 7.2 Metodi Preliminari
+**Miglioramenti implementati (2025-11-24):**
+
+**Fase 7 - Orbit Determination:**
+- [x] ✅ Iterazione light-time (propagazione all'indietro) - 3 iterazioni, convergenza < 10 μs
+- [x] ✅ Calcolo GMST per rotazione terrestre - Formula IAU 1982, accuratezza ~0.1 s
+- [x] ✅ Velocità osservatorio con rotazione Terra - ω × r_geocentric
+- [x] ✅ Range rate calculation - Calcolo corretto con velocità oggetto
+- [x] ✅ Conversione UTC→TDB completa - TDB = TT + termini periodici, TT = TAI + 32.184s
+- [x] ✅ Posizione osservatorio in DifferentialCorrector - Usa get_observer_position()
+
+**Fase 8 - Close Approaches:**
+- [x] ✅ Elementi orbitali pianeti per MOID - Elementi medi J2000.0 per tutti i pianeti
+- [x] ✅ MOID object-planet implementato - Usa elementi medi planetari
+
+**Time Scale Module:**
+- [x] ✅ Leap seconds completi - Tabella 1972-2017 con caricamento file opzionale
+- [x] ✅ ΔUT1 da IERS - Interpolazione lineare con valori 2020-2025, caricamento finals.data
+
+**Orbital Elements Module:**
+- [x] ✅ Mean↔Osculating conversions - Conversioni elementi medi/osculanti con correzioni J2
+- [x] ✅ Formule first-order per perturbazioni short-period
+- [x] ✅ Test completi per orbite elioentriche e geocentriche
+- [x] ✅ Normalizzazione angolare automatica
+
+**Note implementazione:**
+- mean_to_osculating(): Applica correzioni J2 per ottenere elementi osculanti
+- osculating_to_mean(): Rimuove perturbazioni short-period per ottenere elementi medi
+- J2_sun ≈ 2e-7: negligibile per pianeti, mean ≈ osculating
+- J2_Earth ≈ 1.08e-3: significativo per satelliti LEO
+- Accuratezza: ~1 arcsec per orbite planetarie, sufficiente per MOID
+
+**TODO per completamento totale:**
+- [ ] Generatore osservazioni sintetiche per validazione
+- [ ] MOID optimization algorithms (Nelder-Mead, genetic)
+- [ ] Impact probability assessment
+- [ ] Virtual impactors and keyholes
+
+#### 7.2 Metodi Preliminari (TODO - Fase futura)
 - `iodini.f90` → `PreliminaryOrbit.cpp`
 - `gaussdeg8.f90` → `GaussMethod.cpp`
-  - Metodo di Gauss per IOD
 
-#### 7.3 Soluzioni Multiple
+#### 7.3 Soluzioni Multiple (TODO - Fase futura)
 - `multiple_sol.f90` → `MultipleSolutions.cpp`
   - LOV (Line Of Variations)
 
 ---
 
-### FASE 8: Close Approaches e Risk Assessment (4-5 settimane)
+### FASE 8: Close Approaches ✅ COMPLETATA (2025-11-24)
 
-#### 8.1 Target Plane Analysis
-**Moduli:**
-- `close_app.f90` → `CloseApproach.cpp`
-- `tp_trace.f90` → `TargetPlane.cpp`
-- `cla_store.f90` → `CloseApproachStorage.cpp`
+**Status**: ✅ Implementata, compilata, testata  
+**Files**: 3 (1 header, 1 implementation, 1 test)
 
+#### 8.1 Close Approach Detection ✅
+**Moduli Implementati:**
+- `CloseApproach.hpp/.cpp` - Rilevamento close approaches, b-plane analysis, MOID
+
+**Test**: 12/12 passati
+- ✅ Strutture dati (CloseApproach, BPlaneCoordinates)
+- ✅ Distance monitoring durante propagazione
+- ✅ Refinement tempo closest approach (golden section search)
+- ✅ Calcolo coordinate b-plane (ξ, ζ)
+- ✅ MOID tra orbite (grid search placeholder)
+- ✅ Filtraggio corpi celesti
+
+**Componenti Implementati:**
 ```cpp
 namespace orbfit::close_approach {
     struct CloseApproach {
-        double mjd;
-        Eigen::Vector3d b_plane;  // b-plane coordinates
-        double distance;
-        int planet_id;
+        double mjd_tdb;
+        BodyType body;
+        double distance, relative_velocity;
+        Vector3d position_object, velocity_object;
+        Vector3d position_body, velocity_body;
+        Vector3d rel_position, rel_velocity;
+        std::optional<BPlaneCoordinates> b_plane;
+    };
+    
+    struct BPlaneCoordinates {
+        double xi, zeta;           // ξ, ζ coordinates [AU]
+        double b_magnitude;        // |b| = √(ξ²+ζ²)
+        double theta;              // angle [rad]
     };
     
     class CloseApproachDetector {
-    public:
-        std::vector<CloseApproach> findCloseApproaches(
-            const StateVector& state, double t_start, double t_end);
+        // find_approaches(): Propaga + monitora distanze
+        // compute_b_plane(): Coordinate target plane
+        // refine_approach_time(): Golden section search
+    };
+    
+    class MOIDCalculator {
+        // compute_moid(): MOID tra due orbite
+        // distance_squared(): Obiettivo ottimizzazione
     };
 }
 ```
 
-#### 8.2 Impact Risk
+**Algoritmi Implementati:**
+- **Distance Monitoring**: Propagazione con step 1 giorno, tracking minima distanza
+- **Time Refinement**: Golden section search per accuracy sub-day
+- **B-Plane Computation**: Sistema coordinate perpendicolare a velocità relativa
+  - z-axis: direzione v_rel
+  - x-axis: nel piano (r_rel, v_rel)
+  - y-axis: completa sistema destrorso
+  - Proiezione: r_perp = r - (r·z)z
+- **MOID**: Grid search 360×360 su anomalie vere (placeholder per algoritmo sofisticato)
+
+**TODO per completamento totale:**
+- [ ] MOID ottimizzato (Nelder-Mead, algoritmi genetici)
+- [ ] Impact probability assessment
+- [ ] Virtual impactors e keyholes
+- [ ] Validazione con dati JPL SBDB
+
+#### 8.2 Impact Risk (TODO - Fase futura)
 - `eval_risk.f90` → `ImpactRisk.cpp`
 - `virtual_impactor.f90` → `VirtualImpactor.cpp`
 

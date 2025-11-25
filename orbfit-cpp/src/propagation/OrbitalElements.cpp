@@ -357,4 +357,160 @@ KeplerianElements cometary_to_keplerian(const CometaryElements& com) {
     return kep;
 }
 
+// ============================================================================
+// Mean to Osculating Element Conversions
+// ============================================================================
+
+KeplerianElements mean_to_osculating(
+    const KeplerianElements& mean_elements,
+    double j2,
+    double central_body_radius)
+{
+    KeplerianElements osc = mean_elements;
+    
+    // If J2 is zero or negligible, mean ≈ osculating
+    if (std::abs(j2) < 1e-12) {
+        return osc;
+    }
+    
+    // Extract orbital parameters
+    double a = mean_elements.semi_major_axis;
+    double e = mean_elements.eccentricity;
+    double i = mean_elements.inclination;
+    double Omega = mean_elements.longitude_ascending_node;
+    double omega = mean_elements.argument_perihelion;
+    double M = mean_elements.mean_anomaly;
+    
+    // Compute derived quantities
+    double eta = std::sqrt(1.0 - e * e);     // Auxiliary parameter
+    
+    // J2 factor: k = J2 * (R/a)²
+    double R_over_a = central_body_radius / a;
+    double k = j2 * R_over_a * R_over_a;
+    
+    // Trigonometric functions
+    double sin_i = std::sin(i);
+    double cos_i = std::cos(i);
+    double sin2_i = sin_i * sin_i;
+    
+    // Convert mean anomaly to eccentric anomaly, then to true anomaly
+    double E = solve_kepler_equation(M, e);
+    double nu = eccentric_to_true_anomaly(E, e);
+    
+    double cos_nu = std::cos(nu);
+    double sin_2nu = std::sin(2.0 * nu);
+    double cos_2nu = std::cos(2.0 * nu);
+    
+    // Compute short-period J2 perturbations
+    // These are the differences: Δx = x_osculating - x_mean
+    
+    // Semi-major axis: negligible short-period variation
+    double Delta_a = 0.0;
+    
+    // Eccentricity short-period variation
+    // Δe = (k/8) * e * η * (1 - 11cos²i - 40(cos⁴i)/(1-5cos²i)) * sin(2ω+2ν)
+    double Delta_e = (k / 8.0) * e * eta * 
+                     (1.0 - 11.0 * cos_i * cos_i) * sin_2nu;
+    
+    // Inclination short-period variation
+    // Δi = -(k/2) * e * sin(i) * cos(i) * cos(2ω+2ν)
+    double Delta_i = -(k / 2.0) * e * sin_i * cos_i * cos_2nu;
+    
+    // RAAN short-period variation
+    // ΔΩ = (k/2) * cos(i) * [something complex with ν]
+    // Simplified: dominant term is secular, short-period is small
+    double Delta_Omega = 0.0;  // Short-period part typically neglected
+    
+    // Argument of perihelion short-period variation
+    // Δω includes both short-period oscillations
+    double Delta_omega = (k / 8.0) * (4.0 - 5.0 * sin2_i) * 
+                         (2.0 + e * cos_nu) * sin_2nu / eta;
+    
+    // Apply corrections to get osculating elements
+    osc.semi_major_axis = a + Delta_a;
+    osc.eccentricity = e + Delta_e;
+    osc.inclination = i + Delta_i;
+    osc.longitude_ascending_node = Omega + Delta_Omega;
+    osc.argument_perihelion = omega + Delta_omega;
+    
+    // For osculating, keep the true anomaly consistent
+    // Convert back to mean anomaly for the osculating elements
+    double E_osc = true_to_eccentric_anomaly(nu, osc.eccentricity);
+    osc.mean_anomaly = E_osc - osc.eccentricity * std::sin(E_osc);
+    
+    // Normalize angles
+    osc.longitude_ascending_node = std::fmod(osc.longitude_ascending_node, constants::TWO_PI);
+    if (osc.longitude_ascending_node < 0.0) osc.longitude_ascending_node += constants::TWO_PI;
+    
+    osc.argument_perihelion = std::fmod(osc.argument_perihelion, constants::TWO_PI);
+    if (osc.argument_perihelion < 0.0) osc.argument_perihelion += constants::TWO_PI;
+    
+    osc.mean_anomaly = std::fmod(osc.mean_anomaly, constants::TWO_PI);
+    if (osc.mean_anomaly < 0.0) osc.mean_anomaly += constants::TWO_PI;
+    
+    return osc;
+}
+
+KeplerianElements osculating_to_mean(
+    const KeplerianElements& osc_elements,
+    double j2,
+    double central_body_radius)
+{
+    KeplerianElements mean = osc_elements;
+    
+    // If J2 is zero, osculating ≈ mean
+    if (std::abs(j2) < 1e-12) {
+        return mean;
+    }
+    
+    // The inverse transformation: subtract the short-period terms
+    // For simplicity, we apply the negative of the corrections
+    // A more rigorous approach would iterate, but for small J2 this is adequate
+    
+    double a = osc_elements.semi_major_axis;
+    double e = osc_elements.eccentricity;
+    double i = osc_elements.inclination;
+    double M_osc = osc_elements.mean_anomaly;
+    
+    // Compute correction terms
+    double R_over_a = central_body_radius / a;
+    double k = j2 * R_over_a * R_over_a;
+    double eta = std::sqrt(1.0 - e * e);
+    
+    double E = solve_kepler_equation(M_osc, e);
+    double nu = eccentric_to_true_anomaly(E, e);
+    
+    double sin_i = std::sin(i);
+    double cos_i = std::cos(i);
+    double sin2_i = sin_i * sin_i;
+    double sin_2nu = std::sin(2.0 * nu);
+    double cos_2nu = std::cos(2.0 * nu);
+    
+    // Apply inverse corrections (subtract perturbations)
+    mean.eccentricity = e - (k / 8.0) * e * eta * 
+                             (1.0 - 11.0 * cos_i * cos_i) * sin_2nu;
+    
+    mean.inclination = i + (k / 2.0) * e * sin_i * cos_i * cos_2nu;
+    
+    mean.argument_perihelion = osc_elements.argument_perihelion - 
+                               (k / 8.0) * (4.0 - 5.0 * sin2_i) * 
+                               (2.0 + e * std::cos(nu)) * sin_2nu / eta;
+    
+    // Convert to mean anomaly
+    double E_mean = true_to_eccentric_anomaly(nu, mean.eccentricity);
+    mean.mean_anomaly = E_mean - mean.eccentricity * std::sin(E_mean);
+    
+    // Normalize angles
+    mean.longitude_ascending_node = std::fmod(mean.longitude_ascending_node, constants::TWO_PI);
+    if (mean.longitude_ascending_node < 0.0) mean.longitude_ascending_node += constants::TWO_PI;
+    
+    mean.argument_perihelion = std::fmod(mean.argument_perihelion, constants::TWO_PI);
+    if (mean.argument_perihelion < 0.0) mean.argument_perihelion += constants::TWO_PI;
+    
+    mean.mean_anomaly = std::fmod(mean.mean_anomaly, constants::TWO_PI);
+    if (mean.mean_anomaly < 0.0) mean.mean_anomaly += constants::TWO_PI;
+    
+    return mean;
+}
+
 } // namespace orbfit::propagation

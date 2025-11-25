@@ -133,6 +133,7 @@ gtest_discover_tests(orbfit_validation_tests)
 
 add_executable(orbfit_ephemeris_tests
     test_ephemeris.cpp
+    test_asteroid_perturbations.cpp
 )
 
 target_link_libraries(orbfit_ephemeris_tests
@@ -143,6 +144,73 @@ target_link_libraries(orbfit_ephemeris_tests
 )
 
 gtest_discover_tests(orbfit_ephemeris_tests)
+
+# ============================================================================
+# Propagator with Asteroids Integration Tests
+# ============================================================================
+
+add_executable(orbfit_propagator_asteroids_tests
+    test_propagator_asteroids.cpp
+)
+
+target_link_libraries(orbfit_propagator_asteroids_tests
+    PRIVATE
+        orbfit
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(orbfit_propagator_asteroids_tests)
+
+# ============================================================================
+# OrbFit Engine Tests
+# ============================================================================
+
+add_executable(orbfit_engine_tests
+    test_orbfit_engine.cpp
+)
+
+target_link_libraries(orbfit_engine_tests
+    PRIVATE
+        orbfit
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(orbfit_engine_tests)
+
+# ============================================================================
+# Validation Tests
+# ============================================================================
+
+# Ceres validation test
+add_executable(validation_ceres
+    validation_ceres.cpp
+)
+
+target_link_libraries(validation_ceres
+    PRIVATE
+        orbfit
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(validation_ceres)
+
+# OrbFit configuration tests
+add_executable(orbfit_config_tests
+    test_orbfit_config.cpp
+    ../src/io/OrbFitConfig.cpp
+)
+
+target_link_libraries(orbfit_config_tests
+    PRIVATE
+        orbfit
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(orbfit_config_tests)
 
 # ============================================================================
 # RKF78 Debug Tests
@@ -160,3 +228,72 @@ target_link_libraries(orbfit_rkf78_debug
 )
 
 gtest_discover_tests(orbfit_rkf78_debug)
+
+# ============================================================================
+# Orbit Determination Tests (Phase 7)
+# ============================================================================
+
+add_executable(orbfit_orbit_determination_tests
+    test_orbit_determination.cpp
+)
+
+target_link_libraries(orbfit_orbit_determination_tests
+    PRIVATE
+        orbfit
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(orbfit_orbit_determination_tests)
+
+# ============================================================================
+# Close Approach Tests (Phase 8)
+# ============================================================================
+
+add_executable(orbfit_close_approach_tests
+    test_close_approach.cpp
+)
+
+target_link_libraries(orbfit_close_approach_tests
+    PRIVATE
+        orbfit
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(orbfit_close_approach_tests)
+
+# ============================================================================
+# Mean-Osculating Conversion Tests
+# ============================================================================
+
+add_executable(orbfit_mean_osculating_tests
+    test_mean_osculating.cpp
+)
+
+target_link_libraries(orbfit_mean_osculating_tests
+    PRIVATE
+        orbfit
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(orbfit_mean_osculating_tests)
+
+# ============================================================================
+# Pompeja Validation Test (Real Asteroid)
+# ============================================================================
+
+add_executable(orbfit_pompeja_validation
+    test_pompeja_validation.cpp
+)
+
+target_link_libraries(orbfit_pompeja_validation
+    PRIVATE
+        orbfit
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(orbfit_pompeja_validation)
+

@@ -176,6 +176,9 @@ bool RKF78Integrator::adaptive_step(const DerivativeFunction& f,
     int n = y.size();
     std::vector<Eigen::VectorXd> k(13);
     
+    // Determine direction for backward/forward integration
+    double direction = (h >= 0.0) ? 1.0 : -1.0;
+    
     // Compute stages
     k[0] = f(t, y);
     stats_.num_function_evals++;
@@ -211,13 +214,13 @@ bool RKF78Integrator::adaptive_step(const DerivativeFunction& f,
     
     // Step size control
     double safety_factor = 0.9;
-    double h_new = h;
+    double h_new_abs = std::abs(h);
     
     if (relative_error > tolerance_) {
         // Reject step, reduce step size
-        h_new = safety_factor * h * std::pow(tolerance_ / relative_error, 1.0 / 8.0);
-        h_new = std::max(h_new, h_min_);
-        h = h_new;
+        h_new_abs = safety_factor * std::abs(h) * std::pow(tolerance_ / relative_error, 1.0 / 8.0);
+        h_new_abs = std::max(h_new_abs, h_min_);
+        h = direction * h_new_abs;  // Preserve direction
         stats_.num_rejected_steps++;
         return false;
     } else {
@@ -228,18 +231,18 @@ bool RKF78Integrator::adaptive_step(const DerivativeFunction& f,
         
         // Increase step size for next iteration
         if (relative_error > 0.0) {
-            h_new = safety_factor * h * std::pow(tolerance_ / relative_error, 1.0 / 8.0);
+            h_new_abs = safety_factor * std::abs(h) * std::pow(tolerance_ / relative_error, 1.0 / 8.0);
         } else {
-            h_new = h_max_;
+            h_new_abs = h_max_;
         }
-        h_new = std::min(h_new, h_max_);
-        h_new = std::max(h_new, h_min_);
+        h_new_abs = std::min(h_new_abs, h_max_);
+        h_new_abs = std::max(h_new_abs, h_min_);
         
         // Update statistics
         stats_.min_step_size = std::min(stats_.min_step_size, std::abs(h));
         stats_.max_step_size = std::max(stats_.max_step_size, std::abs(h));
         
-        h = h_new;
+        h = direction * h_new_abs;  // Preserve direction
         return true;
     }
 }

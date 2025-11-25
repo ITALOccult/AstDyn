@@ -278,6 +278,81 @@ double eccentric_to_true_anomaly(double E, double e);
  */
 double true_to_eccentric_anomaly(double nu, double e);
 
+// ============================================================================
+// Mean to Osculating Element Conversions
+// ============================================================================
+
+/**
+ * @brief Convert mean Keplerian elements to osculating elements
+ * 
+ * Applies first-order J2 perturbation corrections to convert from mean
+ * elements (averaged over short-period perturbations) to osculating elements
+ * (instantaneous orbital elements).
+ * 
+ * This is primarily useful for planetary orbits where mean elements are
+ * provided (e.g., from JPL ephemeris approximations) but osculating elements
+ * are needed for accurate MOID calculations or propagation.
+ * 
+ * **Theory:**
+ * Mean elements are averaged over short-period perturbations (one orbital period).
+ * Osculating elements are instantaneous and include these short-period variations.
+ * 
+ * The main perturbation for Solar System bodies is the J2 oblateness term of the Sun,
+ * though it's very small. For Earth satellites, J2 corrections are much larger.
+ * 
+ * **First-order corrections:**
+ * - Δa = 0 (semi-major axis secular term only)
+ * - Δe ≈ J2 terms (small for planets)
+ * - Δi ≈ J2 terms (small for planets)
+ * - ΔΩ = -3/2 * n * J2 * (R/a)² * cos(i) * t (secular + short-period)
+ * - Δω = 3/4 * n * J2 * (R/a)² * (4 - 5sin²i) * t (secular + short-period)
+ * - ΔM = 3/4 * n * J2 * (R/a)² * √(1-e²) * (2 - 3sin²i) * t
+ * 
+ * where:
+ * - n = mean motion
+ * - J2 = second zonal harmonic (~1e-7 for Sun, ~1e-3 for Earth)
+ * - R = equatorial radius of central body
+ * - a = semi-major axis
+ * - t = time since epoch
+ * 
+ * **Note:** For Solar System planets around the Sun, J2 effects are negligible
+ * (~1 arcsecond over decades). This function includes the formalism for completeness
+ * and can be extended for Earth satellites where J2 is significant.
+ * 
+ * @param mean_elements Mean Keplerian elements
+ * @param j2 Second zonal harmonic coefficient (default: 0 for heliocentric, use 0.00108263 for geocentric)
+ * @param central_body_radius Equatorial radius of central body [AU] (default: Sun radius)
+ * @return Osculating Keplerian elements
+ */
+KeplerianElements mean_to_osculating(
+    const KeplerianElements& mean_elements,
+    double j2 = 0.0,
+    double central_body_radius = 0.00465047); // Sun radius in AU
+
+/**
+ * @brief Convert osculating Keplerian elements to mean elements
+ * 
+ * Inverse of mean_to_osculating(). Removes short-period perturbations to
+ * produce averaged mean elements.
+ * 
+ * This is less commonly needed than the forward conversion, but useful when:
+ * - Comparing orbits with published mean elements
+ * - Long-term orbital evolution studies
+ * - Generating mean element ephemerides
+ * 
+ * The conversion applies inverse J2 corrections. For heliocentric orbits,
+ * the corrections are tiny and osculating ≈ mean to high precision.
+ * 
+ * @param osc_elements Osculating Keplerian elements
+ * @param j2 Second zonal harmonic coefficient (default: 0)
+ * @param central_body_radius Equatorial radius of central body [AU]
+ * @return Mean Keplerian elements
+ */
+KeplerianElements osculating_to_mean(
+    const KeplerianElements& osc_elements,
+    double j2 = 0.0,
+    double central_body_radius = 0.00465047);
+
 } // namespace orbfit::propagation
 
 #endif // ORBFIT_ORBITAL_ELEMENTS_HPP

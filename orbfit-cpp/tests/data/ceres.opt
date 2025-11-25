@@ -1,0 +1,35 @@
+# OrbFit Configuration File
+# Generated for Ceres orbit determination
+
+[propagator]
+integrator = RKF78
+tolerance = 1.0e-12
+initial_step = 0.01
+max_step = 10.0
+include_planets = true
+include_asteroids = true
+
+[differential_correction]
+max_iterations = 20
+convergence_threshold = 1.0e-6
+outlier_sigma = 3.0
+rejection_criterion = chauvenet
+
+[observation_weighting]
+default_weight_ra = 1.0
+default_weight_dec = 1.0
+use_catalog_accuracy = true
+
+[output]
+verbose = true
+save_residuals = true
+save_covariance = true
+ephemeris_step = 1.0
+
+[element_conversion]
+# Input element type (MEAN, OSCULATING, PROPER)
+input_type = MEAN
+# Output element type
+output_type = OSCULATING
+# Apply J2 corrections
+use_j2 = true

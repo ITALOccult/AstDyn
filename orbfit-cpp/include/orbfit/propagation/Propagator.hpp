@@ -18,6 +18,7 @@
 #include "orbfit/propagation/OrbitalElements.hpp"
 #include "orbfit/propagation/Integrator.hpp"
 #include "orbfit/ephemeris/PlanetaryEphemeris.hpp"
+#include "orbfit/ephemeris/AsteroidPerturbations.hpp"
 #include <memory>
 
 namespace orbfit::propagation {
@@ -29,6 +30,7 @@ struct PropagatorSettings {
     bool include_planets = true;        ///< Include planetary perturbations
     bool include_relativity = false;    ///< Include GR corrections
     bool include_moon = false;          ///< Include Moon separately
+    bool include_asteroids = false;     ///< Include asteroid perturbations (AST17)
     
     // Planetary perturbations to include (if include_planets=true)
     bool perturb_mercury = false;
@@ -122,18 +124,21 @@ public:
     }
     
     const PropagatorSettings& settings() const { return settings_; }
+    PropagatorSettings& settings() { return settings_; }
     
-private:
     /**
      * @brief Compute accelerations for equations of motion
      * 
      * Computes d²r/dt² from gravitational forces.
+     * Exposed for use in State Transition Matrix calculations.
      * 
      * @param t Time (MJD TDB)
      * @param state State vector [x, y, z, vx, vy, vz] in AU, AU/day
      * @return Derivative [vx, vy, vz, ax, ay, az]
      */
     Eigen::VectorXd compute_derivatives(double t, const Eigen::VectorXd& state);
+    
+private:
     
     /**
      * @brief Compute two-body acceleration (central body only)
@@ -165,8 +170,19 @@ private:
     Eigen::Vector3d relativistic_correction(const Eigen::Vector3d& position,
                                            const Eigen::Vector3d& velocity) const;
     
+    /**
+     * @brief Compute asteroid perturbations
+     * 
+     * @param position Position of small body [AU]
+     * @param mjd_tdb Time (MJD TDB)
+     * @return Perturbation acceleration [AU/day²]
+     */
+    Eigen::Vector3d asteroid_perturbations(const Eigen::Vector3d& position,
+                                          double mjd_tdb);
+    
     std::unique_ptr<Integrator> integrator_;
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
+    std::shared_ptr<ephemeris::AsteroidPerturbations> asteroids_;
     PropagatorSettings settings_;
 };
 

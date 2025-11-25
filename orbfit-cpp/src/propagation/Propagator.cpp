@@ -19,7 +19,14 @@ Propagator::Propagator(std::unique_ptr<Integrator> integrator,
                       const PropagatorSettings& settings)
     : integrator_(std::move(integrator)),
       ephemeris_(std::move(ephemeris)),
-      settings_(settings) {}
+      settings_(settings) {
+    
+    // Initialize asteroid perturbations if enabled
+    if (settings_.include_asteroids) {
+        asteroids_ = std::make_shared<ephemeris::AsteroidPerturbations>();
+        asteroids_->loadDefaultAsteroids();
+    }
+}
 
 Eigen::VectorXd Propagator::compute_derivatives(double t, const Eigen::VectorXd& state) {
     // State vector: [x, y, z, vx, vy, vz]
@@ -35,6 +42,10 @@ Eigen::VectorXd Propagator::compute_derivatives(double t, const Eigen::VectorXd&
     
     if (settings_.include_relativity) {
         acceleration += relativistic_correction(position, velocity);
+    }
+    
+    if (settings_.include_asteroids && asteroids_) {
+        acceleration += asteroid_perturbations(position, t);
     }
     
     // Derivative: [velocity, acceleration]
@@ -126,6 +137,17 @@ Eigen::Vector3d Propagator::relativistic_correction(const Eigen::Vector3d& posit
     Eigen::Vector3d term2 = 4.0 * rdot * velocity;
     
     return (mu / (r * r * r * c2)) * (term1 + term2);
+}
+
+Eigen::Vector3d Propagator::asteroid_perturbations(const Eigen::Vector3d& position,
+                                                   double mjd_tdb) {
+    if (!asteroids_) {
+        return Eigen::Vector3d::Zero();
+    }
+    
+    // Compute perturbation from all enabled asteroids
+    // AsteroidPerturbations already handles direct + indirect terms
+    return asteroids_->computePerturbation(position, mjd_tdb);
 }
 
 CartesianElements Propagator::propagate_cartesian(const CartesianElements& initial,
