@@ -6,8 +6,10 @@
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
+#include "astdyn/orbit_determination/GaussIOD.hpp"
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/observations/MPCReader.hpp"
+#include "astdyn/coordinates/KeplerianElements.hpp"
 #include "astdyn/time/TimeScale.hpp"
 #include <iostream>
 #include <iomanip>
@@ -144,10 +146,96 @@ KeplerianElements AstDynEngine::initial_orbit_determination() {
                  << " observations\n";
     }
     
-    // TODO: Implement Gauss method for IOD
-    // For now, throw error - requires implementation of preliminary orbit determination
-    throw std::runtime_error(
-        "IOD not yet implemented - please provide initial orbit via set_initial_orbit()");
+    // Convert observations to optical format
+    std::vector<observations::OpticalObservation> optical_obs;
+    for (const auto& obs : observations_) {
+        observations::OpticalObservation opt_obs;
+        opt_obs.mjd_utc = obs.mjd_utc;
+        opt_obs.ra = obs.ra;
+        opt_obs.dec = obs.dec;
+        opt_obs.sigma_ra = 1.0 / 206265.0;  // ~1 arcsec default
+        opt_obs.sigma_dec = 1.0 / 206265.0;
+        // Copy observatory code
+        optical_obs.push_back(opt_obs);
+    }
+    
+    // Setup Gauss IOD
+    orbit_determination::GaussIODSettings gauss_settings;
+    gauss_settings.verbose = config_.verbose;
+    gauss_settings.max_iterations = 50;
+    gauss_settings.tolerance = 1e-8;
+    
+    orbit_determination::GaussIOD gauss(gauss_settings);
+    
+    // Compute preliminary orbit
+    auto result = gauss.compute(optical_obs);
+    
+    if (!result.success) {
+        throw std::runtime_error("Gauss IOD failed: " + result.error_message);
+    }
+    
+    if (config_.verbose) {
+        result.print_summary();
+    }
+    
+    // Store the Cartesian state and compute basic Keplerian elements
+    has_orbit_ = true;
+    
+    // Simple conversion to Keplerian elements for initial orbit
+    const auto& r = result.state.position;
+    const auto& v = result.state.velocity;
+    
+    double r_mag = r.norm();
+    double v_mag = v.norm();
+    
+    // Specific angular momentum
+    Vector3d h = r.cross(v);
+    double h_mag = h.norm();
+    
+    // Inclination
+    double i = std::acos(h[2] / h_mag);
+    
+    // Node vector
+    Vector3d n = Vector3d(0, 0, 1).cross(h);
+    double n_mag = n.norm();
+    
+    // Longitude of ascending node
+    double Omega = (n_mag > 1e-10) ? std::atan2(n[1], n[0]) : 0.0;
+    if (Omega < 0) Omega += 2.0 * constants::PI;
+    
+    // Eccentricity vector
+    Vector3d e_vec = ((v_mag*v_mag - constants::GMS/r_mag) * r - r.dot(v) * v) / constants::GMS;
+    double e = e_vec.norm();
+    
+    // Argument of periapsis
+    double omega = (n_mag > 1e-10 && e > 1e-10) ? std::acos(n.dot(e_vec) / (n_mag * e)) : 0.0;
+    if (e_vec[2] < 0) omega = 2.0 * constants::PI - omega;
+    
+    // True anomaly
+    double nu = (e > 1e-10) ? std::acos(e_vec.dot(r) / (e * r_mag)) : 0.0;
+    if (r.dot(v) < 0) nu = 2.0 * constants::PI - nu;
+    
+    // Semi-major axis
+    double a = 1.0 / (2.0/r_mag - v_mag*v_mag/constants::GMS);
+    
+    // Eccentric anomaly and mean anomaly
+    double E = 2.0 * std::atan(std::sqrt((1-e)/(1+e)) * std::tan(nu/2.0));
+    double M = E - e * std::sin(E);
+    
+    // Create Keplerian elements
+    KeplerianElements kep_result;
+    kep_result.semi_major_axis = a;
+    kep_result.eccentricity = e;
+    kep_result.inclination = i;
+    kep_result.longitude_ascending_node = Omega;
+    kep_result.argument_perihelion = omega;
+    kep_result.mean_anomaly = M;
+    kep_result.epoch_mjd_tdb = result.epoch_mjd_tdb;
+    kep_result.gravitational_parameter = constants::GMS;
+    
+    current_orbit_ = kep_result;
+    
+    return kep_result;
 }
 
 OrbitDeterminationResult AstDynEngine::fit_orbit() {
