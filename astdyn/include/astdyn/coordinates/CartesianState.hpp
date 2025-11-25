@@ -1,15 +1,15 @@
 /**
  * @file CartesianState.hpp
  * @brief Cartesian state representation (position and velocity)
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Represents orbital state in Cartesian coordinates (r, v).
  * Provides utilities for computing orbital properties and conversions.
  */
 
-#ifndef ORBFIT_COORDINATES_CARTESIANSTATE_HPP
-#define ORBFIT_COORDINATES_CARTESIANSTATE_HPP
+#ifndef ASTDYN_COORDINATES_CARTESIANSTATE_HPP
+#define ASTDYN_COORDINATES_CARTESIANSTATE_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -356,4 +356,4 @@ inline double relative_velocity(const CartesianState& state1,
 } // namespace coordinates
 } // namespace astdyn
 
-#endif // ORBFIT_COORDINATES_CARTESIANSTATE_HPP
+#endif // ASTDYN_COORDINATES_CARTESIANSTATE_HPP

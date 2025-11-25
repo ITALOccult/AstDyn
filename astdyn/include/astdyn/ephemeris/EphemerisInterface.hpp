@@ -8,8 +8,8 @@
  * - Custom implementations
  */
 
-#ifndef ORBFIT_EPHEMERIS_INTERFACE_HPP
-#define ORBFIT_EPHEMERIS_INTERFACE_HPP
+#ifndef ASTDYN_EPHEMERIS_INTERFACE_HPP
+#define ASTDYN_EPHEMERIS_INTERFACE_HPP
 
 #include <astdyn/coordinates/CartesianState.hpp>
 #include <Eigen/Dense>
@@ -129,4 +129,4 @@ public:
 } // namespace ephemeris
 } // namespace astdyn
 
-#endif // ORBFIT_EPHEMERIS_INTERFACE_HPP
+#endif // ASTDYN_EPHEMERIS_INTERFACE_HPP

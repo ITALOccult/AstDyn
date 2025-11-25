@@ -1,10 +1,10 @@
 /**
  * @file AstDynEngine.hpp
  * @brief Main OrbFit engine for orbit determination
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  * 
- * This class replicates the main workflow of the original Fortran OrbFit program:
+ * This class replicates the main workflow of the original Fortran orbit fitting software program:
  * - Load observations
  * - Initial orbit determination (IOD)
  * - Differential correction (least squares fit)
@@ -13,8 +13,8 @@
  * - Close approach analysis
  */
 
-#ifndef ORBFIT_ORBFITENGINE_HPP
-#define ORBFIT_ORBFITENGINE_HPP
+#ifndef ASTDYN_ORBFITENGINE_HPP
+#define ASTDYN_ORBFITENGINE_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
@@ -330,4 +330,4 @@ private:
 
 } // namespace astdyn
 
-#endif // ORBFIT_ORBFITENGINE_HPP
+#endif // ASTDYN_ORBFITENGINE_HPP

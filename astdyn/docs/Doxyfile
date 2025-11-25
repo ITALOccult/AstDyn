@@ -60,7 +60,7 @@ MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = NO
 SEARCH_INCLUDES        = YES
 INCLUDE_PATH           = ../include
-PREDEFINED             = ORBFIT_USE_SPICE
+PREDEFINED             = ASTDYN_USE_SPICE
 
 # External references
 ALLEXTERNALS           = NO

@@ -1,12 +1,12 @@
 /**
  * @file Types.hpp
  * @brief Common type definitions for OrbFit
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 
-#ifndef ORBFIT_CORE_TYPES_HPP
-#define ORBFIT_CORE_TYPES_HPP
+#ifndef ASTDYN_CORE_TYPES_HPP
+#define ASTDYN_CORE_TYPES_HPP
 
 #include <Eigen/Dense>
 #include <string>
@@ -209,4 +209,4 @@ using PlanetID = int;
 
 } // namespace astdyn
 
-#endif // ORBFIT_CORE_TYPES_HPP
+#endif // ASTDYN_CORE_TYPES_HPP

@@ -1,7 +1,7 @@
 /**
  * @file DifferentialCorrector.hpp
  * @brief Differential corrections for orbit determination
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  * 
  * Implements least squares differential corrections to refine orbital elements
@@ -15,8 +15,8 @@
  * 5. Iterate until convergence
  */
 
-#ifndef ORBFIT_ORBIT_DETERMINATION_DIFFERENTIAL_CORRECTOR_HPP
-#define ORBFIT_ORBIT_DETERMINATION_DIFFERENTIAL_CORRECTOR_HPP
+#ifndef ASTDYN_ORBIT_DETERMINATION_DIFFERENTIAL_CORRECTOR_HPP
+#define ASTDYN_ORBIT_DETERMINATION_DIFFERENTIAL_CORRECTOR_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/orbit_determination/Residuals.hpp"
@@ -215,4 +215,4 @@ private:
 
 } // namespace astdyn::orbit_determination
 
-#endif // ORBFIT_ORBIT_DETERMINATION_DIFFERENTIAL_CORRECTOR_HPP
+#endif // ASTDYN_ORBIT_DETERMINATION_DIFFERENTIAL_CORRECTOR_HPP

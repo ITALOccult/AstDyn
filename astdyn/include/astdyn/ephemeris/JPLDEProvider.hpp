@@ -14,8 +14,8 @@
  *   auto pos = provider->getPosition(CelestialBody::EARTH, jd_tdb);
  */
 
-#ifndef ORBFIT_JPL_DE_PROVIDER_HPP
-#define ORBFIT_JPL_DE_PROVIDER_HPP
+#ifndef ASTDYN_JPL_DE_PROVIDER_HPP
+#define ASTDYN_JPL_DE_PROVIDER_HPP
 
 #include <astdyn/ephemeris/EphemerisInterface.hpp>
 #include <string>
@@ -95,4 +95,4 @@ private:
 } // namespace ephemeris
 } // namespace astdyn
 
-#endif // ORBFIT_JPL_DE_PROVIDER_HPP
+#endif // ASTDYN_JPL_DE_PROVIDER_HPP

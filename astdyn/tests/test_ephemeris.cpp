@@ -1,7 +1,7 @@
 /**
  * @file test_ephemeris.cpp
  * @brief Unit tests for planetary ephemeris calculations
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 

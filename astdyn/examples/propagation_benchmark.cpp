@@ -361,7 +361,7 @@ int main() {
     
     std::cout << "\n";
     std::cout << "╔════════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║      ORBFIT C++ - Propagation Methods Benchmark Report        ║\n";
+    std::cout << "║      ASTDYN C++ - Propagation Methods Benchmark Report        ║\n";
     std::cout << "╠════════════════════════════════════════════════════════════════╣\n";
     std::cout << "║ Phase 6: Orbital Propagation Module                           ║\n";
     std::cout << "║ Date: 24 November 2025                                        ║\n";

@@ -1,20 +1,20 @@
-#ifndef ORBFIT_VERSION_HPP
-#define ORBFIT_VERSION_HPP
+#ifndef ASTDYN_VERSION_HPP
+#define ASTDYN_VERSION_HPP
 
-#define ORBFIT_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
-#define ORBFIT_VERSION_MINOR @PROJECT_VERSION_MINOR@
-#define ORBFIT_VERSION_PATCH @PROJECT_VERSION_PATCH@
-#define ORBFIT_VERSION_STRING "@PROJECT_VERSION@"
+#define ASTDYN_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define ASTDYN_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define ASTDYN_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define ASTDYN_VERSION_STRING "@PROJECT_VERSION@"
 
-namespace orbfit {
+namespace astdyn {
 
 struct Version {
-    static constexpr int major = ORBFIT_VERSION_MAJOR;
-    static constexpr int minor = ORBFIT_VERSION_MINOR;
-    static constexpr int patch = ORBFIT_VERSION_PATCH;
-    static constexpr const char* string = ORBFIT_VERSION_STRING;
+    static constexpr int major = ASTDYN_VERSION_MAJOR;
+    static constexpr int minor = ASTDYN_VERSION_MINOR;
+    static constexpr int patch = ASTDYN_VERSION_PATCH;
+    static constexpr const char* string = ASTDYN_VERSION_STRING;
 };
 
-} // namespace orbfit
+} // namespace astdyn
 
-#endif // ORBFIT_VERSION_HPP
+#endif // ASTDYN_VERSION_HPP

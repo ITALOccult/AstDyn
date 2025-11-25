@@ -1,6 +1,6 @@
 /**
  * @file AstDynConfig.cpp
- * @brief Implementation of OrbFit configuration parsers
+ * @brief Implementation of AstDyn configuration parsers
  */
 
 #include "astdyn/io/AstDynConfig.hpp"
@@ -398,7 +398,7 @@ bool AstDynConfigManager::saveConfiguration(const std::string& base_path,
     }
 }
 
-bool AstDynConfigManager::exportForFortranOrbFit(const std::string& output_dir, 
+bool AstDynConfigManager::exportForLegacyFortran(const std::string& output_dir, 
                                                  const std::string& object_name) const {
     return saveConfiguration(output_dir, object_name);
 }

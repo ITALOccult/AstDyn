@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-# Example: Basic usage of OrbFit constants and types
+# Example: Basic usage of AstDyn constants and types
 add_executable(example_basic basic_usage.cpp)
 target_link_libraries(example_basic PRIVATE astdyn)
 

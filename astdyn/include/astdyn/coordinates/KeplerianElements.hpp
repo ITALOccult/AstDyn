@@ -1,15 +1,15 @@
 /**
  * @file KeplerianElements.hpp
  * @brief Keplerian orbital elements representation
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Classical Keplerian orbital elements: a, e, i, Ω, ω, M (or ν, E).
  * Includes conversions to/from Cartesian coordinates.
  */
 
-#ifndef ORBFIT_COORDINATES_KEPLERIANELEMENTS_HPP
-#define ORBFIT_COORDINATES_KEPLERIANELEMENTS_HPP
+#ifndef ASTDYN_COORDINATES_KEPLERIANELEMENTS_HPP
+#define ASTDYN_COORDINATES_KEPLERIANELEMENTS_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -334,4 +334,4 @@ private:
 } // namespace coordinates
 } // namespace astdyn
 
-#endif // ORBFIT_COORDINATES_KEPLERIANELEMENTS_HPP
+#endif // ASTDYN_COORDINATES_KEPLERIANELEMENTS_HPP

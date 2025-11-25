@@ -1,5 +1,5 @@
 #!/bin/bash
-# Quick build script for OrbFit C++
+# Quick build script for AstDyn C++
 
 set -e  # Exit on error
 
@@ -10,7 +10,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}╔════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║    OrbFit C++ - Quick Build Script        ║${NC}"
+echo -e "${GREEN}║    AstDyn C++ - Quick Build Script        ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -81,9 +81,9 @@ cd build
 echo -e "${YELLOW}Configuring CMake...${NC}"
 cmake .. \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-    -DORBFIT_BUILD_TESTS=$BUILD_TESTS \
-    -DORBFIT_BUILD_EXAMPLES=$BUILD_EXAMPLES \
-    -DORBFIT_BUILD_DOCS=$BUILD_DOCS \
+    -DASTDYN_BUILD_TESTS=$BUILD_TESTS \
+    -DASTDYN_BUILD_EXAMPLES=$BUILD_EXAMPLES \
+    -DASTDYN_BUILD_DOCS=$BUILD_DOCS \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Build

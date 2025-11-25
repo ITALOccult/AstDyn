@@ -1,7 +1,7 @@
 /**
  * @file ObservatoryDatabase.hpp
  * @brief Observatory location database
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Manages observatory locations using MPC observatory codes.
@@ -13,8 +13,8 @@
  * - IAU SOFA: Standards of Fundamental Astronomy
  */
 
-#ifndef ORBFIT_OBSERVATIONS_OBSERVATORYDATABASE_HPP
-#define ORBFIT_OBSERVATIONS_OBSERVATORYDATABASE_HPP
+#ifndef ASTDYN_OBSERVATIONS_OBSERVATORYDATABASE_HPP
+#define ASTDYN_OBSERVATIONS_OBSERVATORYDATABASE_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -168,4 +168,4 @@ void computeParallaxConstants(
 } // namespace observations
 } // namespace astdyn
 
-#endif // ORBFIT_OBSERVATIONS_OBSERVATORYDATABASE_HPP
+#endif // ASTDYN_OBSERVATIONS_OBSERVATORYDATABASE_HPP

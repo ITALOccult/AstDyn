@@ -1,7 +1,7 @@
 /**
  * @file EquinoctialElements.hpp
  * @brief Equinoctial orbital elements (non-singular representation)
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Equinoctial elements avoid singularities for circular and equatorial orbits.
@@ -18,8 +18,8 @@
  * Reference: Battin, "An Introduction to the Mathematics and Methods of Astrodynamics"
  */
 
-#ifndef ORBFIT_COORDINATES_EQUINOCTIALELEMENTS_HPP
-#define ORBFIT_COORDINATES_EQUINOCTIALELEMENTS_HPP
+#ifndef ASTDYN_COORDINATES_EQUINOCTIALELEMENTS_HPP
+#define ASTDYN_COORDINATES_EQUINOCTIALELEMENTS_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -283,4 +283,4 @@ private:
 } // namespace coordinates
 } // namespace astdyn
 
-#endif // ORBFIT_COORDINATES_EQUINOCTIALELEMENTS_HPP
+#endif // ASTDYN_COORDINATES_EQUINOCTIALELEMENTS_HPP

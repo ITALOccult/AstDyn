@@ -1,31 +1,31 @@
-#ifndef ORBFIT_CONFIG_HPP
-#define ORBFIT_CONFIG_HPP
+#ifndef ASTDYN_CONFIG_HPP
+#define ASTDYN_CONFIG_HPP
 
 // Build configuration
-#cmakedefine ORBFIT_USE_SPICE
-#cmakedefine ORBFIT_ENABLE_PROFILING
+#cmakedefine ASTDYN_USE_SPICE
+#cmakedefine ASTDYN_ENABLE_PROFILING
 
 // Build type
-#define ORBFIT_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
+#define ASTDYN_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
 
-namespace orbfit {
+namespace astdyn {
 
 struct Config {
-    static constexpr const char* build_type = ORBFIT_BUILD_TYPE;
+    static constexpr const char* build_type = ASTDYN_BUILD_TYPE;
     
-#ifdef ORBFIT_USE_SPICE
+#ifdef ASTDYN_USE_SPICE
     static constexpr bool use_spice = true;
 #else
     static constexpr bool use_spice = false;
 #endif
 
-#ifdef ORBFIT_ENABLE_PROFILING
+#ifdef ASTDYN_ENABLE_PROFILING
     static constexpr bool profiling_enabled = true;
 #else
     static constexpr bool profiling_enabled = false;
 #endif
 };
 
-} // namespace orbfit
+} // namespace astdyn
 
-#endif // ORBFIT_CONFIG_HPP
+#endif // ASTDYN_CONFIG_HPP

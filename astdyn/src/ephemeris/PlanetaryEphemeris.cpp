@@ -1,7 +1,7 @@
 /**
  * @file PlanetaryEphemeris.cpp
  * @brief Implementation of planetary ephemeris calculations
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Low-precision planetary positions using Simon et al. (1994) formulae.

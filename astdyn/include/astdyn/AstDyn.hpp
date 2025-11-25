@@ -1,14 +1,14 @@
 /**
  * @file AstDyn.hpp
- * @brief Main include file for OrbFit library
- * @author OrbFit C++ Conversion Team
+ * @brief Main include file for AstDyn library
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Include this file to access all OrbFit functionality.
  */
 
-#ifndef ORBFIT_HPP
-#define ORBFIT_HPP
+#ifndef ASTDYN_HPP
+#define ASTDYN_HPP
 
 // Version and configuration
 #include "astdyn/Version.hpp"
@@ -48,7 +48,7 @@
 namespace astdyn {
 
 /**
- * @brief Initialize OrbFit library
+ * @brief Initialize AstDyn library
  * 
  * Call this function once at program startup to initialize
  * the library and set up any global state.
@@ -61,7 +61,7 @@ inline bool initialize() {
 }
 
 /**
- * @brief Shutdown OrbFit library
+ * @brief Shutdown AstDyn library
  * 
  * Call this function at program exit to clean up resources.
  */
@@ -71,4 +71,4 @@ inline void shutdown() {
 
 } // namespace astdyn
 
-#endif // ORBFIT_HPP
+#endif // ASTDYN_HPP

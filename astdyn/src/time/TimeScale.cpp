@@ -1,7 +1,7 @@
 /**
  * @file TimeScale.cpp
  * @brief Implementation of time scale conversions
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 

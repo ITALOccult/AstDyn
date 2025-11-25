@@ -1,7 +1,7 @@
 /**
  * @file PlanetaryEphemeris.hpp
  * @brief Planetary ephemerides using analytical approximations
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Provides heliocentric positions and velocities for solar system planets.
@@ -18,8 +18,8 @@
  * - VSOP87 theory (Bretagnon & Francou, 1988)
  */
 
-#ifndef ORBFIT_EPHEMERIS_PLANETARYEPHEMERIS_HPP
-#define ORBFIT_EPHEMERIS_PLANETARYEPHEMERIS_HPP
+#ifndef ASTDYN_EPHEMERIS_PLANETARYEPHEMERIS_HPP
+#define ASTDYN_EPHEMERIS_PLANETARYEPHEMERIS_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -155,4 +155,4 @@ private:
 } // namespace ephemeris
 } // namespace astdyn
 
-#endif // ORBFIT_EPHEMERIS_PLANETARYEPHEMERIS_HPP
+#endif // ASTDYN_EPHEMERIS_PLANETARYEPHEMERIS_HPP

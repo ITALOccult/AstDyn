@@ -1,7 +1,7 @@
 /**
  * @file Observation.hpp
  * @brief Astrometric observation data structures
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Defines structures for various types of observations:
@@ -12,8 +12,8 @@
  * Supports MPC and ADES formats.
  */
 
-#ifndef ORBFIT_OBSERVATIONS_OBSERVATION_HPP
-#define ORBFIT_OBSERVATIONS_OBSERVATION_HPP
+#ifndef ASTDYN_OBSERVATIONS_OBSERVATION_HPP
+#define ASTDYN_OBSERVATIONS_OBSERVATION_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -325,4 +325,4 @@ std::string observationTypeToString(ObservationType type);
 } // namespace observations
 } // namespace astdyn
 
-#endif // ORBFIT_OBSERVATIONS_OBSERVATION_HPP
+#endif // ASTDYN_OBSERVATIONS_OBSERVATION_HPP

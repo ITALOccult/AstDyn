@@ -1,14 +1,14 @@
 /**
  * @file StringUtils.hpp
  * @brief String manipulation utilities
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Replaces Fortran char_str.f90 module functionality.
  */
 
-#ifndef ORBFIT_UTILS_STRINGUTILS_HPP
-#define ORBFIT_UTILS_STRINGUTILS_HPP
+#ifndef ASTDYN_UTILS_STRINGUTILS_HPP
+#define ASTDYN_UTILS_STRINGUTILS_HPP
 
 #include <string>
 #include <vector>
@@ -120,4 +120,4 @@ inline std::string pad_right(const std::string& str, size_t width, char fill = '
 } // namespace utils
 } // namespace astdyn
 
-#endif // ORBFIT_UTILS_STRINGUTILS_HPP
+#endif // ASTDYN_UTILS_STRINGUTILS_HPP

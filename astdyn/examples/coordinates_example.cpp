@@ -1,7 +1,7 @@
 /**
  * @file coordinates_example.cpp
  * @brief Demonstrate coordinate systems and reference frame transformations
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * This example shows:
@@ -282,7 +282,7 @@ void example_orbit_classification() {
 
 int main() {
     std::cout << std::string(70, '=') << "\n";
-    std::cout << "  OrbFit C++ Coordinates & Reference Frames Examples\n";
+    std::cout << "  AstDyn C++ Coordinates & Reference Frames Examples\n";
     std::cout << std::string(70, '=') << "\n";
     
     try {

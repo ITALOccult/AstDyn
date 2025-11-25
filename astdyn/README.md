@@ -72,11 +72,11 @@ sudo cmake --install .
 Configure the build with these options:
 
 ```bash
-cmake -DORBFIT_BUILD_TESTS=ON \          # Build unit tests (default: ON)
-      -DORBFIT_BUILD_EXAMPLES=ON \       # Build examples (default: ON)
-      -DORBFIT_BUILD_DOCS=OFF \          # Build documentation (default: OFF)
-      -DORBFIT_USE_SPICE=ON \            # Use SPICE toolkit (default: ON)
-      -DORBFIT_ENABLE_PROFILING=OFF \    # Enable profiling (default: OFF)
+cmake -DASTDYN_BUILD_TESTS=ON \          # Build unit tests (default: ON)
+      -DASTDYN_BUILD_EXAMPLES=ON \       # Build examples (default: ON)
+      -DASTDYN_BUILD_DOCS=OFF \          # Build documentation (default: OFF)
+      -DASTDYN_USE_SPICE=ON \            # Use SPICE toolkit (default: ON)
+      -DASTDYN_ENABLE_PROFILING=OFF \    # Enable profiling (default: OFF)
       -DCMAKE_BUILD_TYPE=Release \       # Build type (Debug/Release)
       ..
 ```
@@ -86,16 +86,16 @@ cmake -DORBFIT_BUILD_TESTS=ON \          # Build unit tests (default: ON)
 **Debug build with all features:**
 ```bash
 cmake -DCMAKE_BUILD_TYPE=Debug \
-      -DORBFIT_BUILD_TESTS=ON \
-      -DORBFIT_BUILD_EXAMPLES=ON \
+      -DASTDYN_BUILD_TESTS=ON \
+      -DASTDYN_BUILD_EXAMPLES=ON \
       ..
 ```
 
 **Optimized release build:**
 ```bash
 cmake -DCMAKE_BUILD_TYPE=Release \
-      -DORBFIT_BUILD_TESTS=OFF \
-      -DORBFIT_BUILD_EXAMPLES=OFF \
+      -DASTDYN_BUILD_TESTS=OFF \
+      -DASTDYN_BUILD_EXAMPLES=OFF \
       ..
 cmake --build . -j$(nproc)
 ```
@@ -103,7 +103,7 @@ cmake --build . -j$(nproc)
 **With SPICE support:**
 ```bash
 export CSPICE_ROOT=/path/to/cspice
-cmake -DORBFIT_USE_SPICE=ON ..
+cmake -DASTDYN_USE_SPICE=ON ..
 ```
 
 ## 📦 Installing Dependencies
@@ -300,7 +300,7 @@ Original Fortran AstDyn © 1997-2020 AstDyn Consortium
 - [ ] **Phase 10**: Testing & Validation
 - [ ] **Phase 11**: Documentation & Release
 
-See [ORBFIT_CPP_CONVERSION_PLAN.md](ORBFIT_CPP_CONVERSION_PLAN.md) for detailed roadmap.
+See [ASTDYN_CPP_CONVERSION_PLAN.md](ASTDYN_CPP_CONVERSION_PLAN.md) for detailed roadmap.
 
 ---
 

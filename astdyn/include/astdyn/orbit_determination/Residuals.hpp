@@ -1,15 +1,15 @@
 /**
  * @file Residuals.hpp
  * @brief Observation residual calculations (O-C)
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  * 
  * Computes residuals (Observed minus Computed) for various observation types.
  * This is the foundation for orbit determination via differential corrections.
  */
 
-#ifndef ORBFIT_ORBIT_DETERMINATION_RESIDUALS_HPP
-#define ORBFIT_ORBIT_DETERMINATION_RESIDUALS_HPP
+#ifndef ASTDYN_ORBIT_DETERMINATION_RESIDUALS_HPP
+#define ASTDYN_ORBIT_DETERMINATION_RESIDUALS_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/observations/Observation.hpp"
@@ -214,4 +214,4 @@ private:
 
 } // namespace astdyn::orbit_determination
 
-#endif // ORBFIT_ORBIT_DETERMINATION_RESIDUALS_HPP
+#endif // ASTDYN_ORBIT_DETERMINATION_RESIDUALS_HPP

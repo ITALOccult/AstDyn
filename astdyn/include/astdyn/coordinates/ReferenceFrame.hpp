@@ -1,7 +1,7 @@
 /**
  * @file ReferenceFrame.hpp
  * @brief Reference frame definitions and transformations
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Provides transformation matrices between various astronomical reference frames:
@@ -16,8 +16,8 @@
  * - Vallado, "Fundamentals of Astrodynamics and Applications"
  */
 
-#ifndef ORBFIT_COORDINATES_REFERENCEFRAME_HPP
-#define ORBFIT_COORDINATES_REFERENCEFRAME_HPP
+#ifndef ASTDYN_COORDINATES_REFERENCEFRAME_HPP
+#define ASTDYN_COORDINATES_REFERENCEFRAME_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -411,4 +411,4 @@ public:
 } // namespace coordinates
 } // namespace astdyn
 
-#endif // ORBFIT_COORDINATES_REFERENCEFRAME_HPP
+#endif // ASTDYN_COORDINATES_REFERENCEFRAME_HPP

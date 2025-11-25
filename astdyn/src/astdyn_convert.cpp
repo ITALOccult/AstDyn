@@ -1,9 +1,9 @@
 /**
- * @file orbfit_convert.cpp
- * @brief Tool to convert OrbFit Fortran configuration to C++ format
+ * @file astdyn_convert.cpp
+ * @brief Tool to convert Fortran orbit fitting configuration to C++ format
  * 
  * Usage:
- *   orbfit_convert --input path/to/object.oef [options]
+ *   astdyn_convert --input path/to/object.oef [options]
  * 
  * Converts:
  * - MEAN elements → OSCULATING elements
@@ -21,12 +21,12 @@ using namespace astdyn::config;
 
 void print_usage() {
     std::cout << R"(
-OrbFit Configuration Converter
+AstDyn Configuration Converter
 ===============================
 
 Usage:
-  orbfit_convert --config <path/to/config>
-  orbfit_convert --oef <file.oef> --obs <file.obs>
+  astdyn_convert --config <path/to/config>
+  astdyn_convert --oef <file.oef> --obs <file.obs>
   
 Options:
   --config <dir>       Directory with object.oef, object.obs, object.opt
@@ -39,13 +39,13 @@ Options:
 
 Examples:
   # Load complete configuration
-  orbfit_convert --config ./data --object ceres
+  astdyn_convert --config ./data --object ceres
   
   # Convert mean elements
-  orbfit_convert --oef ceres_mean.oef --convert-mean --output ./output
+  astdyn_convert --oef ceres_mean.oef --convert-mean --output ./output
   
   # Process observations
-  orbfit_convert --oef ceres.oef --obs ceres.rwo --output ./results
+  astdyn_convert --oef ceres.oef --obs ceres.rwo --output ./results
 
 )" << std::endl;
 }
@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
     
     auto opts = parse_args(argc, argv);
     
-    std::cout << "OrbFit Configuration Converter\n";
+    std::cout << "AstDyn Configuration Converter\n";
     std::cout << "==============================\n\n";
     
     try {

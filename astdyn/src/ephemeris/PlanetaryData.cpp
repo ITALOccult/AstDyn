@@ -1,7 +1,7 @@
 /**
  * @file PlanetaryData.cpp
  * @brief Implementation of planetary data functions
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 

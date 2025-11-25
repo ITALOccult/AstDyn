@@ -1,7 +1,7 @@
 /**
  * @file basic_usage.cpp
- * @brief Basic example showing OrbFit library usage
- * @author OrbFit C++ Team
+ * @brief Basic example showing AstDyn library usage
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 
@@ -165,17 +165,17 @@ void demonstrate_special_values() {
 int main() {
     // Initialize library
     if (!initialize()) {
-        std::cerr << "ERROR: Failed to initialize OrbFit library\n";
+        std::cerr << "ERROR: Failed to initialize AstDyn library\n";
         return 1;
     }
     
     // Print header
     std::cout << "\n";
     print_separator();
-    std::cout << "OrbFit C++ - Basic Usage Example\n";
-    std::cout << "Version: " << Version::string << "\n";
-    std::cout << "Build Type: " << Config::build_type << "\n";
-    std::cout << "SPICE Support: " << (Config::use_spice ? "Enabled" : "Disabled") << "\n";
+    std::cout << "AstDyn C++ - Basic Usage Example\n";
+    std::cout << "Version: " << astdyn::Version::string << "\n";
+    std::cout << "Build Type: " << astdyn::Config::build_type << "\n";
+    std::cout << "SPICE Support: " << (astdyn::Config::use_spice ? "Enabled" : "Disabled") << "\n";
     print_separator();
     std::cout << "\n";
     

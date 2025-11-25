@@ -1,7 +1,7 @@
 /**
  * @file CloseApproach.cpp
  * @brief Implementation of close approach detection
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  */
 

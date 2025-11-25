@@ -1,7 +1,7 @@
 /**
  * @file DifferentialCorrector.cpp
  * @brief Implementation of differential corrections for orbit determination
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  */
 

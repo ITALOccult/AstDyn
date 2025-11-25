@@ -1,7 +1,7 @@
 /**
  * @file ephemeris_example.cpp
  * @brief Demonstration of planetary ephemeris calculations
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Examples:
@@ -244,7 +244,7 @@ void example5_planetary_configurations() {
 int main() {
     std::cout << "\n";
     std::cout << "╔═══════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║         PLANETARY EPHEMERIS EXAMPLES - ORBFIT C++             ║\n";
+    std::cout << "║         PLANETARY EPHEMERIS EXAMPLES - ASTDYN C++             ║\n";
     std::cout << "║                                                               ║\n";
     std::cout << "║  Demonstrates calculation of planetary positions/velocities   ║\n";
     std::cout << "║  using simplified VSOP87 analytical approximations            ║\n";

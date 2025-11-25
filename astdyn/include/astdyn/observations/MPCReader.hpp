@@ -1,7 +1,7 @@
 /**
  * @file MPCReader.hpp
  * @brief Parser for MPC 80-column observation format
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Reads astrometric observations in MPC's classic 80-column format.
@@ -24,8 +24,8 @@
  *  78-80: Observatory code
  */
 
-#ifndef ORBFIT_OBSERVATIONS_MPCREADER_HPP
-#define ORBFIT_OBSERVATIONS_MPCREADER_HPP
+#ifndef ASTDYN_OBSERVATIONS_MPCREADER_HPP
+#define ASTDYN_OBSERVATIONS_MPCREADER_HPP
 
 #include "astdyn/observations/Observation.hpp"
 #include <string>
@@ -170,4 +170,4 @@ private:
 } // namespace observations
 } // namespace astdyn
 
-#endif // ORBFIT_OBSERVATIONS_MPCREADER_HPP
+#endif // ASTDYN_OBSERVATIONS_MPCREADER_HPP

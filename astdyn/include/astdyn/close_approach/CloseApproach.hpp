@@ -1,7 +1,7 @@
 /**
  * @file CloseApproach.hpp
  * @brief Close approach detection and analysis
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  * 
  * Detects and characterizes close approaches between small bodies and planets.
@@ -18,8 +18,8 @@
  * - Impact parameter mapping for uncertainty propagation
  */
 
-#ifndef ORBFIT_CLOSE_APPROACH_HPP
-#define ORBFIT_CLOSE_APPROACH_HPP
+#ifndef ASTDYN_CLOSE_APPROACH_HPP
+#define ASTDYN_CLOSE_APPROACH_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
@@ -301,4 +301,4 @@ private:
 
 } // namespace astdyn::close_approach
 
-#endif // ORBFIT_CLOSE_APPROACH_HPP
+#endif // ASTDYN_CLOSE_APPROACH_HPP

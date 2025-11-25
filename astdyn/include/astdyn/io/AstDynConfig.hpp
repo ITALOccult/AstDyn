@@ -2,7 +2,7 @@
  * @file AstDynConfig.hpp
  * @brief OrbFit configuration file parser and manager
  * 
- * Handles configuration compatible with Fortran OrbFit:
+ * Handles configuration compatible with Fortran orbit fitting software:
  * - .opt files (options)
  * - .key files (keywords)
  * - .rwo files (observations with weights)
@@ -12,8 +12,8 @@
  * Reference: OrbFit Software (Milani et al.)
  */
 
-#ifndef ORBFIT_CONFIG_PARSER_HPP
-#define ORBFIT_CONFIG_PARSER_HPP
+#ifndef ASTDYN_CONFIG_PARSER_HPP
+#define ASTDYN_CONFIG_PARSER_HPP
 
 #include <string>
 #include <map>
@@ -277,9 +277,9 @@ public:
     bool saveConfiguration(const std::string& base_path, const std::string& object_name) const;
     
     /**
-     * @brief Export to Fortran OrbFit format
+     * @brief Export to legacy Fortran format for compatibility
      */
-    bool exportForFortranOrbFit(const std::string& output_dir, 
+    bool exportForLegacyFortran(const std::string& output_dir, 
                                 const std::string& object_name) const;
     
 private:
@@ -295,4 +295,4 @@ private:
 
 } // namespace astdyn::config
 
-#endif // ORBFIT_CONFIG_PARSER_HPP
+#endif // ASTDYN_CONFIG_PARSER_HPP

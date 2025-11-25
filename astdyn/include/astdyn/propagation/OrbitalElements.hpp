@@ -11,8 +11,8 @@
  * Conversions between representations are provided.
  */
 
-#ifndef ORBFIT_ORBITAL_ELEMENTS_HPP
-#define ORBFIT_ORBITAL_ELEMENTS_HPP
+#ifndef ASTDYN_ORBITAL_ELEMENTS_HPP
+#define ASTDYN_ORBITAL_ELEMENTS_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -355,4 +355,4 @@ KeplerianElements osculating_to_mean(
 
 } // namespace astdyn::propagation
 
-#endif // ORBFIT_ORBITAL_ELEMENTS_HPP
+#endif // ASTDYN_ORBITAL_ELEMENTS_HPP

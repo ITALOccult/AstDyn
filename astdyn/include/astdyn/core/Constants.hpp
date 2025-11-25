@@ -1,15 +1,15 @@
 /**
  * @file Constants.hpp
  * @brief Physical and astronomical constants for orbital mechanics
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Constants converted from Fortran fund_const module.
  * Values from IAU 2015 and JPL DE431 ephemeris.
  */
 
-#ifndef ORBFIT_CORE_CONSTANTS_HPP
-#define ORBFIT_CORE_CONSTANTS_HPP
+#ifndef ASTDYN_CORE_CONSTANTS_HPP
+#define ASTDYN_CORE_CONSTANTS_HPP
 
 #include <cmath>
 
@@ -249,4 +249,4 @@ constexpr double DEFAULT_TOLERANCE = 1.0e-14;
 } // namespace constants
 } // namespace astdyn
 
-#endif // ORBFIT_CORE_CONSTANTS_HPP
+#endif // ASTDYN_CORE_CONSTANTS_HPP

@@ -12,8 +12,8 @@
  * integrates the equations of motion, and converts back.
  */
 
-#ifndef ORBFIT_PROPAGATOR_HPP
-#define ORBFIT_PROPAGATOR_HPP
+#ifndef ASTDYN_PROPAGATOR_HPP
+#define ASTDYN_PROPAGATOR_HPP
 
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "astdyn/propagation/Integrator.hpp"
@@ -217,4 +217,4 @@ public:
 
 } // namespace astdyn::propagation
 
-#endif // ORBFIT_PROPAGATOR_HPP
+#endif // ASTDYN_PROPAGATOR_HPP

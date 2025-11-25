@@ -1,15 +1,15 @@
 /**
  * @file LinearAlgebra.hpp
  * @brief Advanced linear algebra operations for OrbFit
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Additional linear algebra routines beyond basic MathUtils.
  * Includes QR decomposition, eigenvalue problems, least squares, etc.
  */
 
-#ifndef ORBFIT_MATH_LINEARALGEBRA_HPP
-#define ORBFIT_MATH_LINEARALGEBRA_HPP
+#ifndef ASTDYN_MATH_LINEARALGEBRA_HPP
+#define ASTDYN_MATH_LINEARALGEBRA_HPP
 
 #include <astdyn/core/Types.hpp>
 #include <Eigen/Dense>
@@ -305,4 +305,4 @@ MatrixXd kronecker_product(const MatrixXd& A, const MatrixXd& B);
 } // namespace math
 } // namespace astdyn
 
-#endif // ORBFIT_MATH_LINEARALGEBRA_HPP
+#endif // ASTDYN_MATH_LINEARALGEBRA_HPP

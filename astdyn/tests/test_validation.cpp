@@ -1,10 +1,10 @@
 /**
  * @file test_validation.cpp
  * @brief Validation tests against known reference data
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
- * This test suite validates OrbFit C++ against:
+ * This test suite validates AstDyn C++ against:
  * 1. Published orbital elements (MPC, JPL)
  * 2. Well-known orbits (ISS, GPS, GEO satellites)
  * 3. IAU standard test cases

@@ -16,8 +16,8 @@
  * 511 Davida, 704 Interamnia, 324 Bamberga, 451 Patientia, 107 Camilla
  */
 
-#ifndef ORBFIT_ASTEROID_PERTURBATIONS_HPP
-#define ORBFIT_ASTEROID_PERTURBATIONS_HPP
+#ifndef ASTDYN_ASTEROID_PERTURBATIONS_HPP
+#define ASTDYN_ASTEROID_PERTURBATIONS_HPP
 
 #include <astdyn/coordinates/CartesianState.hpp>
 #include <astdyn/core/Constants.hpp>
@@ -175,4 +175,4 @@ namespace ast17 {
 } // namespace ephemeris
 } // namespace astdyn
 
-#endif // ORBFIT_ASTEROID_PERTURBATIONS_HPP
+#endif // ASTDYN_ASTEROID_PERTURBATIONS_HPP

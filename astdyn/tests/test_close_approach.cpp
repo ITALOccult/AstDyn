@@ -1,7 +1,7 @@
 /**
  * @file test_close_approach.cpp
  * @brief Unit tests for close approach detection
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  */
 

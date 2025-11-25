@@ -1,7 +1,7 @@
 /**
  * @file StateTransitionMatrix.hpp
  * @brief State transition matrix (STM) computation
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  * 
  * Computes the state transition matrix Φ(t,t₀) = ∂x(t)/∂x₀
@@ -10,8 +10,8 @@
  * Essential for differential corrections in orbit determination.
  */
 
-#ifndef ORBFIT_ORBIT_DETERMINATION_STATE_TRANSITION_MATRIX_HPP
-#define ORBFIT_ORBIT_DETERMINATION_STATE_TRANSITION_MATRIX_HPP
+#ifndef ASTDYN_ORBIT_DETERMINATION_STATE_TRANSITION_MATRIX_HPP
+#define ASTDYN_ORBIT_DETERMINATION_STATE_TRANSITION_MATRIX_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
@@ -179,4 +179,4 @@ private:
 
 } // namespace astdyn::orbit_determination
 
-#endif // ORBFIT_ORBIT_DETERMINATION_STATE_TRANSITION_MATRIX_HPP
+#endif // ASTDYN_ORBIT_DETERMINATION_STATE_TRANSITION_MATRIX_HPP

@@ -1,5 +1,5 @@
 # Collect all source files
-file(GLOB_RECURSE ORBFIT_SOURCES
+file(GLOB_RECURSE ASTDYN_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/math/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/time/*.cpp
@@ -15,10 +15,10 @@ file(GLOB_RECURSE ORBFIT_SOURCES
 )
 
 # Add AstDynEngine to the library
-list(APPEND ORBFIT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AstDynEngine.cpp)
+list(APPEND ASTDYN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AstDynEngine.cpp)
 
 # Create main library
-add_library(astdyn ${ORBFIT_SOURCES})
+add_library(astdyn ${ASTDYN_SOURCES})
 
 # Set library properties
 set_target_properties(astdyn PROPERTIES
@@ -37,7 +37,7 @@ target_link_libraries(astdyn
 )
 
 # Optionally link CSPICE
-if(ORBFIT_USE_SPICE AND CSPICE_FOUND)
+if(ASTDYN_USE_SPICE AND CSPICE_FOUND)
     target_link_libraries(astdyn PUBLIC CSPICE::CSPICE)
 endif()
 
@@ -51,7 +51,7 @@ target_include_directories(astdyn
 
 # Install library
 install(TARGETS astdyn
-    EXPORT OrbFitTargets
+    EXPORT AstDynTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -59,10 +59,10 @@ install(TARGETS astdyn
 )
 
 # Install export targets
-install(EXPORT OrbFitTargets
-    FILE OrbFitTargets.cmake
-    NAMESPACE OrbFit::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OrbFit
+install(EXPORT AstDynTargets
+    FILE AstDynTargets.cmake
+    NAMESPACE AstDyn::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/AstDyn
 )
 
 # ============================================================================

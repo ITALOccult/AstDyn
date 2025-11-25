@@ -1,7 +1,7 @@
 /**
  * @file TimeScale.hpp
  * @brief Time scale conversions and utilities
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Conversion from Fortran time_scales.f90 module.
@@ -9,8 +9,8 @@
  * UTC, UT1, TAI, TT (TDT), TDB, GPS, etc.
  */
 
-#ifndef ORBFIT_TIME_TIMESCALE_HPP
-#define ORBFIT_TIME_TIMESCALE_HPP
+#ifndef ASTDYN_TIME_TIMESCALE_HPP
+#define ASTDYN_TIME_TIMESCALE_HPP
 
 #include <astdyn/core/Types.hpp>
 #include <astdyn/core/Constants.hpp>
@@ -395,4 +395,4 @@ double get_dut1(double mjd_utc);
 } // namespace time
 } // namespace astdyn
 
-#endif // ORBFIT_TIME_TIMESCALE_HPP
+#endif // ASTDYN_TIME_TIMESCALE_HPP

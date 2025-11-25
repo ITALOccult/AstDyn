@@ -1,12 +1,12 @@
 /**
  * @file Logger.hpp
  * @brief Simple logging system for OrbFit
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 
-#ifndef ORBFIT_UTILS_LOGGER_HPP
-#define ORBFIT_UTILS_LOGGER_HPP
+#ifndef ASTDYN_UTILS_LOGGER_HPP
+#define ASTDYN_UTILS_LOGGER_HPP
 
 #include <string>
 #include <iostream>
@@ -101,4 +101,4 @@ private:
 } // namespace utils
 } // namespace astdyn
 
-#endif // ORBFIT_UTILS_LOGGER_HPP
+#endif // ASTDYN_UTILS_LOGGER_HPP

@@ -1,7 +1,7 @@
 /**
  * @file Observation.cpp
  * @brief Implementation of observation utilities
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 

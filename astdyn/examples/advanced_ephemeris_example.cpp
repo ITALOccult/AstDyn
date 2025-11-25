@@ -248,7 +248,7 @@ void example5_ephemeris_selection() {
 
 int main() {
     std::cout << "╔══════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║   OrbFit C++ - Advanced Ephemeris Examples                   ║\n";
+    std::cout << "║   AstDyn C++ - Advanced Ephemeris Examples                   ║\n";
     std::cout << "║   JPL DE & Asteroid Perturbations                            ║\n";
     std::cout << "╚══════════════════════════════════════════════════════════════╝\n";
     

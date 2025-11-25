@@ -1,7 +1,7 @@
 /**
  * @file PlanetaryData.hpp
  * @brief Planetary masses, radii, and physical constants
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Provides physical and orbital data for solar system bodies.
@@ -12,8 +12,8 @@
  * - Horizons System (JPL/NASA)
  */
 
-#ifndef ORBFIT_EPHEMERIS_PLANETARYDATA_HPP
-#define ORBFIT_EPHEMERIS_PLANETARYDATA_HPP
+#ifndef ASTDYN_EPHEMERIS_PLANETARYDATA_HPP
+#define ASTDYN_EPHEMERIS_PLANETARYDATA_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -212,4 +212,4 @@ public:
 } // namespace ephemeris
 } // namespace astdyn
 
-#endif // ORBFIT_EPHEMERIS_PLANETARYDATA_HPP
+#endif // ASTDYN_EPHEMERIS_PLANETARYDATA_HPP

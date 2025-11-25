@@ -1,6 +1,6 @@
 /**
  * @file AstDynEngine.cpp
- * @brief Implementation of main OrbFit engine
+ * @brief Implementation of main AstDyn engine
  */
 
 #include "astdyn/AstDynEngine.hpp"
@@ -323,7 +323,7 @@ double AstDynEngine::compute_moid(ephemeris::CelestialBody planet) {
                  << static_cast<int>(planet) << "\n";
     }
     
-    // TODO: Implement MOID computation from Fortran orbfit
+    // TODO: Implement MOID computation from original Fortran software
     // For now, use a simplified approach: search minimum distance over orbit period
     double moid = 999.0;  // Placeholder
     
@@ -388,9 +388,9 @@ void AstDynEngine::export_orbit(const std::string& filename,
     }
     
     if (format == "oef" || format == "OEF") {
-        // OrbFit Orbit Element Format
+        // AstDyn Orbit Element Format
         file << std::fixed << std::setprecision(9);
-        file << "! OrbFit orbit elements\n";
+        file << "! AstDyn orbit elements\n";
         file << "! Epoch (MJD TDB): " << current_orbit_.epoch_mjd_tdb << "\n";
         file << current_orbit_.semi_major_axis << "  ! a (AU)\n";
         file << current_orbit_.eccentricity << "  ! e\n";

@@ -1,7 +1,7 @@
 /**
  * @file MathUtils.cpp
  * @brief Implementation of mathematical utility functions
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 

@@ -1,10 +1,10 @@
 /**
- * @file orbfit_main.cpp
- * @brief Main OrbFit program - orbit determination from observations
- * @author OrbFit C++ Conversion Team
+ * @file astdyn_main.cpp
+ * @brief Main AstDyn program - orbit determination from observations
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  * 
- * This program replicates the functionality of the original Fortran OrbFit:
+ * This program replicates the functionality of the original Fortran orbit fitting software:
  * - Reads optical observations (MPC format)
  * - Performs orbit determination via differential correction
  * - Generates ephemeris
@@ -29,7 +29,7 @@ using namespace astdyn;
 
 struct ProgramOptions {
     std::string obs_file;                  ///< Observations file
-    std::string output_prefix = "orbfit";  ///< Output file prefix
+    std::string output_prefix = "astdyn";  ///< Output file prefix
     
     // Initial orbit (if provided)
     bool have_initial_orbit = false;
@@ -62,7 +62,7 @@ struct ProgramOptions {
 void print_usage(const char* program_name) {
     std::cout << "\nUSAGE: " << program_name << " [options] <observations_file>\n\n";
     std::cout << "OPTIONS:\n";
-    std::cout << "  -o PREFIX       Output file prefix (default: orbfit)\n";
+    std::cout << "  -o PREFIX       Output file prefix (default: astdyn)\n";
     std::cout << "  -v              Verbose output (default: on)\n";
     std::cout << "  -q              Quiet mode\n";
     std::cout << "  -i N            Maximum iterations (default: 10)\n";
@@ -184,10 +184,10 @@ bool parse_args(int argc, char** argv, ProgramOptions& opts) {
 int main(int argc, char** argv) {
     std::cout << "\n";
     std::cout << "╔═══════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║                         ORBFIT C++                            ║\n";
+    std::cout << "║                         ASTDYN C++                            ║\n";
     std::cout << "║          Orbit Determination from Observations                ║\n";
     std::cout << "║                                                               ║\n";
-    std::cout << "║  Conversion from Fortran OrbFit (Milani & Gronchi)           ║\n";
+    std::cout << "║  Conversion from Fortran orbit fitting software (Milani & Gronchi)           ║\n";
     std::cout << "╚═══════════════════════════════════════════════════════════════╝\n\n";
     
     // Parse command line
@@ -299,7 +299,7 @@ int main(int argc, char** argv) {
             // Save ephemeris to file
             std::string ephem_file = opts.output_prefix + "_ephemeris.txt";
             std::ofstream file(ephem_file);
-            file << "# OrbFit Ephemeris\n";
+            file << "# AstDyn Ephemeris\n";
             file << "# MJD_TDB   X(AU)   Y(AU)   Z(AU)   VX(AU/day)   VY(AU/day)   VZ(AU/day)\n";
             file << std::fixed << std::setprecision(9);
             
@@ -345,11 +345,20 @@ int main(int argc, char** argv) {
                 file << std::fixed << std::setprecision(6);
                 
                 for (const auto& ca : approaches) {
+                    // Convert velocity from AU/day to km/s
+                    const double km_per_au = 149597870.7;
+                    const double sec_per_day = 86400.0;
+                    double vel_kms = ca.relative_velocity * km_per_au / sec_per_day;
+                    
+                    // Need to know planet radius for distance in radii - use Earth as default
+                    double earth_radius_km = 6378.137;
+                    double earth_radius_au = earth_radius_km / km_per_au;
+                    
                     file << static_cast<int>(ca.body) << "  "
-                         << ca.time_mjd_tdb << "  "
-                         << ca.distance_au << "  "
-                         << ca.distance_in_radii << "  "
-                         << ca.relative_velocity_kms << "\n";
+                         << ca.mjd_tdb << "  "
+                         << ca.distance << "  "
+                         << ca.distance_in_radii(earth_radius_au) << "  "
+                         << vel_kms << "\n";
                 }
                 
                 std::cout << "Close approaches saved to: " << ca_file << "\n";
@@ -390,7 +399,7 @@ int main(int argc, char** argv) {
         std::cout << "✓ Orbit saved: " << orbit_file << "\n";
         
         std::cout << "\n═══════════════════════════════════════════════════════════\n";
-        std::cout << "OrbFit completed successfully!\n";
+        std::cout << "AstDyn completed successfully!\n";
         std::cout << "═══════════════════════════════════════════════════════════\n\n";
         
         return 0;

@@ -58,11 +58,11 @@ astdyn/
 - ✅ Configurazione multi-piattaforma (Linux, macOS, Windows)
 - ✅ Gestione dipendenze automatica (FetchContent)
 - ✅ Opzioni configurabili:
-  - `ORBFIT_BUILD_TESTS` (default: ON)
-  - `ORBFIT_BUILD_EXAMPLES` (default: ON)
-  - `ORBFIT_BUILD_DOCS` (default: OFF)
-  - `ORBFIT_USE_SPICE` (default: ON)
-  - `ORBFIT_ENABLE_PROFILING` (default: OFF)
+  - `ASTDYN_BUILD_TESTS` (default: ON)
+  - `ASTDYN_BUILD_EXAMPLES` (default: ON)
+  - `ASTDYN_BUILD_DOCS` (default: OFF)
+  - `ASTDYN_USE_SPICE` (default: ON)
+  - `ASTDYN_ENABLE_PROFILING` (default: OFF)
 
 #### 2. **Dipendenze Configurate**
 - ✅ **Eigen3** 3.4+ (algebra lineare)
@@ -212,7 +212,7 @@ Nessuno. La Fase 1 è completa e funzionale.
 ### Risorse
 
 - Repository originale: https://github.com/Fenu24/AstDyn
-- Piano completo: `ORBFIT_CPP_CONVERSION_PLAN.md`
+- Piano completo: `ASTDYN_CPP_CONVERSION_PLAN.md`
 - Documentazione API: Eseguire `make docs` (richiede Doxygen)
 
 ---

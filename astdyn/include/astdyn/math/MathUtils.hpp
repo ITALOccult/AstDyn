@@ -1,7 +1,7 @@
 /**
  * @file MathUtils.hpp
  * @brief Mathematical utility functions for OrbFit
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Conversion from Fortran math_lib.f90 module.
@@ -9,8 +9,8 @@
  * and various mathematical utilities for orbit determination.
  */
 
-#ifndef ORBFIT_MATH_MATHUTILS_HPP
-#define ORBFIT_MATH_MATHUTILS_HPP
+#ifndef ASTDYN_MATH_MATHUTILS_HPP
+#define ASTDYN_MATH_MATHUTILS_HPP
 
 #include <astdyn/core/Types.hpp>
 #include <astdyn/core/Constants.hpp>
@@ -332,4 +332,4 @@ double angular_difference(double angle1, double angle2);
 } // namespace math
 } // namespace astdyn
 
-#endif // ORBFIT_MATH_MATHUTILS_HPP
+#endif // ASTDYN_MATH_MATHUTILS_HPP

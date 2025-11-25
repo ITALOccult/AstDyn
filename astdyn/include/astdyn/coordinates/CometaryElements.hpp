@@ -1,7 +1,7 @@
 /**
  * @file CometaryElements.hpp
  * @brief Cometary orbital elements (perihelion-based representation)
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  * 
  * Cometary elements are particularly suited for:
@@ -21,8 +21,8 @@
  * Reference: Murray & Dermott, "Solar System Dynamics"
  */
 
-#ifndef ORBFIT_COORDINATES_COMETARYELEMENTS_HPP
-#define ORBFIT_COORDINATES_COMETARYELEMENTS_HPP
+#ifndef ASTDYN_COORDINATES_COMETARYELEMENTS_HPP
+#define ASTDYN_COORDINATES_COMETARYELEMENTS_HPP
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -296,4 +296,4 @@ private:
 } // namespace coordinates
 } // namespace astdyn
 
-#endif // ORBFIT_COORDINATES_COMETARYELEMENTS_HPP
+#endif // ASTDYN_COORDINATES_COMETARYELEMENTS_HPP

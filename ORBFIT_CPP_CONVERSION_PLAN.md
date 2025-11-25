@@ -1,9 +1,11 @@
-# Piano di Conversione OrbFit da Fortran 90 a C++
+# Piano di Conversione da Software Fortran di Orbit Fitting a AstDyn C++
 
 ## Analisi del Progetto Originale
 
 ### Descrizione
-**OrbFit** è un software scientifico per la determinazione orbitale e propagazione di orbite di asteroidi e oggetti celesti, scritto in Fortran 90.
+Il software originale è un sistema scientifico per la determinazione orbitale e propagazione di orbite di asteroidi e oggetti celesti, scritto in Fortran 90. 
+
+**AstDyn** (Astrodynamics) è la moderna reimplementazione in C++ con funzionalità estese.
 
 ### Struttura Principale del Progetto
 

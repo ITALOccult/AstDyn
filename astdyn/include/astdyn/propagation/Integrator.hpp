@@ -11,8 +11,8 @@
  * - RKF78: Runge-Kutta-Fehlberg 7(8) (adaptive step)
  */
 
-#ifndef ORBFIT_INTEGRATOR_HPP
-#define ORBFIT_INTEGRATOR_HPP
+#ifndef ASTDYN_INTEGRATOR_HPP
+#define ASTDYN_INTEGRATOR_HPP
 
 #include "astdyn/core/Types.hpp"
 #include <Eigen/Dense>
@@ -236,4 +236,4 @@ private:
 
 } // namespace astdyn::propagation
 
-#endif // ORBFIT_INTEGRATOR_HPP
+#endif // ASTDYN_INTEGRATOR_HPP

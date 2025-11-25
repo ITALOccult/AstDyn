@@ -1,7 +1,7 @@
 /**
  * @file test_orbit_determination.cpp
  * @brief Unit tests for orbit determination module (Phase 7)
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-24
  */
 

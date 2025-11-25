@@ -1,7 +1,7 @@
 /**
  * @file ObservatoryDatabase.cpp
  * @brief Implementation of observatory database
- * @author OrbFit C++ Conversion Team
+ * @author ITALOccult AstDyn Team
  * @date 2025-11-23
  */
 

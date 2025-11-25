@@ -2,7 +2,7 @@
  * @file test_pompeja_validation.cpp
  * @brief Real-world validation using asteroid (203) Pompeja
  * 
- * Compares OrbFit C++ calculations with JPL Horizons ephemeris
+ * Compares AstDyn C++ calculations with JPL Horizons ephemeris
  * Data source: AstDyS (203_pompeja.eq1) + JPL Horizons API
  * Test date: 2026-01-01 00:00:00 UTC
  */
@@ -184,7 +184,7 @@ TEST(PompejaValidation, ComparisonSummary) {
     std::cout << "  Δ   = " << HORIZONS_DELTA_AU << " AU\n";
     std::cout << "  dΔ/dt = " << HORIZONS_DELTA_DOT << " km/s\n\n";
     
-    std::cout << "OrbFit C++ calculations:\n";
+    std::cout << "AstDyn C++ calculations:\n";
     std::cout << "  Method 1: Two-body propagation\n";
     std::cout << "    Status: ✓ Implemented\n";
     std::cout << "    Note: Ignores planetary perturbations\n\n";
@@ -324,7 +324,7 @@ TEST(PompejaValidation, GeocentricPosition_TwoBody) {
     
     std::cout << std::setprecision(6);
     std::cout << "========================================\n";
-    std::cout << "  OrbFit C++ Results (Two-Body)\n";
+    std::cout << "  AstDyn C++ Results (Two-Body)\n";
     std::cout << "========================================\n";
     std::cout << "RA  = " << ra_deg << "°\n";
     std::cout << "    = " << ra_h << "h " << ra_m << "m " 
@@ -492,7 +492,7 @@ TEST(PompejaValidation, GeocentricPosition_NBody) {
     
     std::cout << std::setprecision(6);
     std::cout << "========================================\n";
-    std::cout << "  OrbFit C++ Results (N-Body)\n";
+    std::cout << "  AstDyn C++ Results (N-Body)\n";
     std::cout << "========================================\n";
     std::cout << "RA  = " << ra_deg << "°\n";
     std::cout << "    = " << ra_h << "h " << ra_m << "m " 
