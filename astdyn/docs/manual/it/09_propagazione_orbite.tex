@@ -1,0 +1,538 @@
+\chapter{Propagazione delle Orbite}
+\label{ch:propagazione_orbite}
+
+\section{Introduzione}
+
+La \textbf{propagazione orbitale} è il processo di calcolo della posizione e velocità di un corpo celeste in epoche future (o passate), dati il suo stato iniziale e le forze agenti su di esso. Questo è fondamentale per:
+
+\begin{itemize}
+    \item Prevedere dove puntare i telescopi per osservazioni di asteroidi
+    \item Pianificare manovre di veicoli spaziali
+    \item Calcolare effemeridi per almanacchi
+    \item Analizzare l'evoluzione orbitale a lungo termine
+    \item Valutare rischi di collisione
+\end{itemize}
+
+Basandosi sui metodi di integrazione del Capitolo~\ref{ch:integrazione_numerica}, questo capitolo descrive la propagazione orbitale pratica in AstDyn.
+
+\section{Formulazione del Problema}
+
+\subsection{Il Compito di Propagazione}
+
+Dati:
+\begin{itemize}
+    \item Epoca iniziale $t_0$ (in una scala temporale, tipicamente TDB)
+    \item Stato iniziale $\mathbf{y}_0 = [\mathbf{r}_0, \mathbf{v}_0]$ (posizione e velocità)
+    \item Modello di forza $\mathbf{f}(t, \mathbf{r}, \mathbf{v})$ (accelerazioni)
+    \item Epoca finale $t_f$
+\end{itemize}
+
+Calcolare:
+\begin{itemize}
+    \item Stato finale $\mathbf{y}_f = [\mathbf{r}_f, \mathbf{v}_f]$
+    \item Opzionalmente: matrice di transizione di stato $\Phi(t_f, t_0)$
+\end{itemize}
+
+\subsection{Vettore di Stato}
+
+Per orbite eliocentriche, il vettore di stato è:
+
+\begin{equation}
+    \mathbf{y} = \begin{bmatrix} x \\ y \\ z \\ \dot{x} \\ \dot{y} \\ \dot{z} \end{bmatrix}
+\end{equation}
+
+Unità in AstDyn:
+\begin{itemize}
+    \item Posizione: AU (unità astronomiche)
+    \item Velocità: AU/giorno
+    \item Tempo: giorni (MJD o JD)
+\end{itemize}
+
+\subsection{Equazioni del Moto}
+
+La forma generale è:
+
+\begin{equation}
+    \frac{d}{dt}\begin{bmatrix} \mathbf{r} \\ \mathbf{v} \end{bmatrix} = \begin{bmatrix} \mathbf{v} \\ \mathbf{a}(t, \mathbf{r}, \mathbf{v}) \end{bmatrix}
+\end{equation}
+
+dove l'accelerazione include:
+
+\begin{equation}
+    \mathbf{a} = \mathbf{a}_{\text{centrale}} + \mathbf{a}_{\text{pianeti}} + \mathbf{a}_{\text{relatività}} + \mathbf{a}_{\text{SRP}} + \ldots
+\end{equation}
+
+\section{Modelli di Forza}
+
+\subsection{Gravità del Corpo Centrale}
+
+Il termine dominante per le orbite del sistema solare:
+
+\begin{equation}
+    \mathbf{a}_{\text{Sole}} = -\frac{\mu_\odot}{r^3}\mathbf{r}
+\end{equation}
+
+dove $\mu_\odot = 1.32712440018 \times 10^{20}$ m$^3$/s$^2$ = $0.295912208286$ AU$^3$/giorno$^2$.
+
+\subsection{Perturbazioni Planetarie}
+
+Per ogni pianeta perturbatore $p$:
+
+\begin{equation}
+    \mathbf{a}_p = \mu_p \left[\frac{\mathbf{r}_p - \mathbf{r}}{|\mathbf{r}_p - \mathbf{r}|^3} - \frac{\mathbf{r}_p}{r_p^3}\right]
+\end{equation}
+
+Il primo termine è l'attrazione diretta, il secondo è l'effetto indiretto (accelerazione del Sole verso il pianeta).
+
+Le posizioni planetarie $\mathbf{r}_p(t)$ sono ottenute da:
+\begin{itemize}
+    \item Kernel SPICE (JPL DE440/441)
+    \item Teoria analitica VSOP87
+    \item Effemeridi kepleriane semplificate (precisione inferiore)
+\end{itemize}
+
+\subsection{Correzione Relativistica}
+
+Termine post-Newtoniano (1PN):
+
+\begin{equation}
+    \mathbf{a}_{\text{GR}} = \frac{\mu_\odot}{c^2 r^3}\left[4\frac{\mu_\odot}{r}\mathbf{r} - v^2\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
+\end{equation}
+
+Questo è tipicamente $\sim 10^{-10}$ m/s$^2$ per gli asteroidi, ma si accumula su scale temporali lunghe.
+
+\subsection{Pressione di Radiazione Solare}
+
+Per piccoli corpi o veicoli spaziali:
+
+\begin{equation}
+    \mathbf{a}_{\text{SRP}} = P_\odot \frac{A}{m} C_R \left(\frac{r_0}{r}\right)^2 \hat{\mathbf{r}}_\odot
+\end{equation}
+
+dove:
+\begin{itemize}
+    \item $P_\odot = 4.56 \times 10^{-6}$ N/m$^2$ a 1 AU
+    \item $A/m$ è il rapporto area-massa (m$^2$/kg)
+    \item $C_R \approx 1.3$ è il coefficiente di pressione di radiazione
+\end{itemize}
+
+\subsection{Perturbazioni Asteroidali}
+
+Per lavori di precisione, gli asteroidi massicci (Cerere, Vesta, Pallade) possono perturbare le orbite di particelle test:
+
+\begin{equation}
+    \mathbf{a}_{\text{ast}} = \sum_{i} \mu_i \left[\frac{\mathbf{r}_i - \mathbf{r}}{|\mathbf{r}_i - \mathbf{r}|^3} - \frac{\mathbf{r}_i}{r_i^3}\right]
+\end{equation}
+
+Masse dei più grandi asteroidi:
+\begin{itemize}
+    \item Cerere: $9.384 \times 10^{20}$ kg ($\sim 0.0001$ masse terrestri)
+    \item Vesta: $2.59 \times 10^{20}$ kg
+    \item Pallade: $2.04 \times 10^{20}$ kg
+\end{itemize}
+
+\section{Sistemi di Coordinate}
+
+\subsection{Sistemi di Riferimento}
+
+AstDyn supporta multipli sistemi di riferimento:
+
+\begin{description}
+    \item[Eclittico Eliocentrico J2000] Standard per orbite asteroidali (predefinito)
+    \item[Equatoriale Eliocentrico J2000] Comune per lavori planetari
+    \item[Baricentrico] Baricentro del sistema solare (per alta precisione)
+    \item[Topocentrico] Centrato sull'osservatore (per osservazioni)
+\end{description}
+
+\subsection{Trasformazioni di Sistema}
+
+La rotazione eclittica-equatoriale è:
+
+\begin{equation}
+    \mathbf{R}_{\text{ecl} \to \text{eq}} = \begin{bmatrix}
+        1 & 0 & 0 \\
+        0 & \cos\epsilon & -\sin\epsilon \\
+        0 & \sin\epsilon & \cos\epsilon
+    \end{bmatrix}
+\end{equation}
+
+dove $\epsilon = 23.43929111^\circ$ è l'obliquità a J2000.0.
+
+\section{Strategia di Integrazione}
+
+\subsection{Scelta del Passo}
+
+Per integratori adattativi (DOPRI54), stima del passo iniziale:
+
+\begin{equation}
+    h_0 = 0.01 \times \min\left(\frac{r}{v}, \frac{v}{a}\right)
+\end{equation}
+
+Passi tipici:
+\begin{itemize}
+    \item Asteroidi vicini alla Terra: 0.1-1 giorno
+    \item Asteroidi della fascia principale: 5-20 giorni
+    \item Troiani di Giove: 10-30 giorni
+    \item Comete (vicino al perielio): 0.01-0.1 giorno
+\end{itemize}
+
+\subsection{Selezione della Tolleranza}
+
+Tolleranza di posizione per determinazione orbitale:
+\begin{itemize}
+    \item Orbite preliminari: $10^{-9}$ AU ($\sim$150 m)
+    \item Orbite finali: $10^{-12}$ AU ($\sim$15 cm)
+    \item Precisione molto alta: $10^{-14}$ AU ($\sim$1.5 mm)
+\end{itemize}
+
+La tolleranza di velocità è tipicamente $10^{-3} \times$ tolleranza di posizione.
+
+\subsection{Punti di Output}
+
+Tre strategie per l'output:
+
+\begin{enumerate}
+    \item \textbf{Output denso}: Memorizza lo stato ad ogni passo di integrazione (molta memoria)
+    \item \textbf{Interpolazione}: Usa interpolazione Hermite tra i passi
+    \item \textbf{Output fisso}: Specifica tempi di output, l'integratore si ferma lì
+\end{enumerate}
+
+AstDyn supporta tutte tre le modalità.
+
+\section{Modalità di Propagazione}
+
+\subsection{Propagazione in Avanti e all'Indietro}
+
+\textbf{Propagazione in avanti} ($t_f > t_0$):
+\begin{itemize}
+    \item Generazione standard di effemeridi
+    \item Pianificazione missioni
+    \item Previsione impatti
+\end{itemize}
+
+\textbf{Propagazione all'indietro} ($t_f < t_0$):
+\begin{itemize}
+    \item Ricostruzione storia orbitale
+    \item Ricerca di avvicinamenti passati
+    \item Validazione determinazione orbitale
+\end{itemize}
+
+Gli integratori numerici funzionano ugualmente bene in entrambe le direzioni se il sistema è reversibile nel tempo.
+
+\subsection{Epoca Singola vs Multi-Epoca}
+
+\textbf{Propagazione epoca singola}:
+\begin{lstlisting}[language=C++,caption={Propagazione epoca singola}]
+Vector6d y0 = ...;  // Stato iniziale
+double t0 = 60000.0;  // MJD TDB
+double tf = 60365.0;  // 1 anno dopo
+
+Propagator prop(force_model);
+Vector6d yf = prop.propagate(y0, t0, tf);
+\end{lstlisting}
+
+\textbf{Propagazione multi-epoca}:
+\begin{lstlisting}[language=C++,caption={Propagazione multi-epoca}]
+std::vector<double> epochs = {60000, 60100, 60200, 60300};
+std::vector<Vector6d> states = prop.propagate_multi(y0, t0, epochs);
+\end{lstlisting}
+
+\section{Generazione di Effemeridi}
+
+\subsection{Effemeridi Tabulate}
+
+Per ricerche ripetute efficienti, creare una tabella:
+
+\begin{lstlisting}[language=C++,caption={Generazione tabella effemeridi}]
+EphemerisTable ephem;
+double t_start = 60000.0;
+double t_end = 61000.0;
+double dt = 1.0;  // Intervalli di 1 giorno
+
+for (double t = t_start; t <= t_end; t += dt) {
+    Vector6d state = prop.propagate(y0, t0, t);
+    ephem.add_entry(t, state);
+}
+
+// Successivamente: interpola a tempo arbitrario
+Vector6d state_interp = ephem.interpolate(60123.5);
+\end{lstlisting}
+
+\subsection{Interpolazione di Chebyshev}
+
+Per effemeridi ad alta precisione, il JPL usa polinomi di Chebyshev:
+
+\begin{equation}
+    \mathbf{r}(t) = \sum_{k=0}^{n} c_k T_k(t')
+\end{equation}
+
+dove $T_k$ sono polinomi di Chebyshev e $t'$ è normalizzato a $[-1, 1]$.
+
+Vantaggi:
+\begin{itemize}
+    \item Proprietà minimax (minimizza l'errore massimo)
+    \item Stabile per polinomi di alto grado
+    \item Valutazione veloce
+\end{itemize}
+
+\section{Matrice di Transizione di Stato}
+
+\subsection{Definizione}
+
+La \textbf{matrice di transizione di stato} (STM) $\Phi(t, t_0)$ relaziona le perturbazioni:
+
+\begin{equation}
+    \delta\mathbf{y}(t) = \Phi(t, t_0) \delta\mathbf{y}(t_0)
+\end{equation}
+
+È una matrice $6 \times 6$ che soddisfa:
+
+\begin{equation}
+    \frac{d\Phi}{dt} = \mathbf{A}(t)\Phi, \quad \Phi(t_0, t_0) = \mathbf{I}
+\end{equation}
+
+dove $\mathbf{A} = \partial\mathbf{f}/\partial\mathbf{y}$ è lo Jacobiano.
+
+\subsection{Applicazioni}
+
+La STM è essenziale per:
+\begin{itemize}
+    \item Determinazione orbitale (correzione differenziale)
+    \item Propagazione covarianza (quantificazione incertezza)
+    \item Analisi di sensibilità
+    \item Ottimizzazione manovre
+\end{itemize}
+
+\subsection{Calcolo}
+
+Aumentare il vettore di stato:
+
+\begin{equation}
+    \tilde{\mathbf{y}} = \begin{bmatrix} \mathbf{y} \\ \text{vec}(\Phi) \end{bmatrix}
+\end{equation}
+
+dove $\text{vec}(\Phi)$ impila i 36 elementi di $\Phi$ in un vettore.
+
+Il sistema aumentato è:
+
+\begin{equation}
+    \frac{d\tilde{\mathbf{y}}}{dt} = \begin{bmatrix} \mathbf{f}(\mathbf{y}) \\ \mathbf{A}(\mathbf{y})\text{vec}(\Phi) \end{bmatrix}
+\end{equation}
+
+\section{Esempi Pratici}
+
+\subsection{Esempio 1: Asteroide della Fascia Principale}
+
+Propagare l'asteroide 203 Pompeja per 1 anno:
+
+\begin{lstlisting}[language=C++,caption={Propagazione di Pompeja}]
+#include <astdyn/propagation/Propagator.hpp>
+
+using namespace astdyn;
+
+// Elementi orbitali iniziali (da OrbFit)
+OrbitalElements elements;
+elements.epoch = 60000.0;  // MJD TDB
+elements.a = 2.743;  // AU
+elements.e = 0.0698;
+elements.i = 11.78 * DEG_TO_RAD;
+elements.Omega = 347.60 * DEG_TO_RAD;
+elements.omega = 59.96 * DEG_TO_RAD;
+elements.M = 164.35 * DEG_TO_RAD;
+
+// Converti in Cartesiane
+Vector6d state0 = elements.to_cartesian();
+
+// Imposta modello di forza
+ForceModel forces;
+forces.enable_planets({"Jupiter", "Saturn", "Mars", "Earth"});
+forces.enable_relativity(true);
+
+// Crea propagatore
+Propagator prop(forces);
+prop.set_integrator("DOPRI54");
+prop.set_tolerance(1e-12);
+
+// Propaga 1 anno
+double t0 = elements.epoch;
+double tf = t0 + 365.25;
+
+Vector6d state_final = prop.propagate(state0, t0, tf);
+
+// Riconverti in elementi
+OrbitalElements final_elements = 
+    OrbitalElements::from_cartesian(state_final, tf);
+
+std::cout << "a iniziale: " << elements.a << " AU\n";
+std::cout << "a finale:   " << final_elements.a << " AU\n";
+std::cout << "Variazione: " << (final_elements.a - elements.a) * 1e6 
+          << " km\n";
+\end{lstlisting}
+
+\subsection{Esempio 2: Analisi Avvicinamento Ravvicinato}
+
+Trovare la distanza minima dalla Terra:
+
+\begin{lstlisting}[language=C++,caption={Rilevamento avvicinamento ravvicinato}]
+double min_distance = 1e99;
+double closest_time = 0;
+
+// Propaga con piccoli passi vicino all'incontro con la Terra
+for (double t = t_start; t <= t_end; t += 0.01) {
+    Vector6d asteroid_state = prop.propagate(y0, t0, t);
+    Vector6d earth_state = ephemeris.get_planet("Earth", t);
+    
+    Vector3d rel_pos = asteroid_state.head<3>() - earth_state.head<3>();
+    double distance = rel_pos.norm();
+    
+    if (distance < min_distance) {
+        min_distance = distance;
+        closest_time = t;
+    }
+}
+
+std::cout << "Avvicinamento minimo: " << min_distance << " AU\n";
+std::cout << "                      " << min_distance * 149597870.7 << " km\n";
+std::cout << "All'epoca: " << closest_time << " MJD\n";
+\end{lstlisting}
+
+\subsection{Esempio 3: Propagazione di Cometa}
+
+Gestire grande eccentricità vicino al perielio:
+
+\begin{lstlisting}[language=C++,caption={Propagazione cometa}]
+// Cometa con e = 0.995, q = 0.1 AU
+OrbitalElements comet;
+comet.a = 20.0;  // AU (molto eccentrica)
+comet.e = 0.995;
+comet.q = comet.a * (1 - comet.e);  // distanza perielica
+
+// Usa passo variabile, tolleranza piu' stretta
+prop.set_tolerance(1e-14);
+prop.set_min_step(1e-4);  // Permetti passi molto piccoli vicino al perielio
+prop.set_max_step(30.0);   // Passi grandi all'afelio
+
+Vector6d state0 = comet.to_cartesian();
+Vector6d state_post_perihelion = prop.propagate(state0, t0, t0 + 180);
+\end{lstlisting}
+
+\section{Ottimizzazione delle Prestazioni}
+
+\subsection{Selezione del Modello di Forza}
+
+Includere solo le perturbazioni necessarie:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Oggetto} & \textbf{Forze Essenziali} & \textbf{Opzionali} \\
+\midrule
+Asteroide fascia principale & Sole, Gio, Sat & Marte, Terra, relatività \\
+Asteroide vicino alla Terra & Sole, tutti pianeti & Relatività, asteroidi \\
+Troiano di Giove & Sole, Gio, Sat & Urano, Nettuno \\
+Trans-Nettuniano & Sole, Gio, Sat, Ura, Net & Relatività \\
+\bottomrule
+\end{tabular}
+\caption{Modelli di forza raccomandati per diversi tipi di oggetti.}
+\label{tab:modelli_forza}
+\end{table}
+
+\subsection{Passo Adattativo vs Fisso}
+
+\textbf{Passo adattativo} (DOPRI54, RK78):
+\begin{itemize}
+    \item Pro: Controllo errore automatico, efficiente
+    \item Contro: Sequenza passi non deterministica
+    \item Uso: Determinazione orbitale, generazione effemeridi
+\end{itemize}
+
+\textbf{Passo fisso} (RK4, Leapfrog):
+\begin{itemize}
+    \item Pro: Prevedibile, parallelizzabile
+    \item Contro: Deve scegliere passo attentamente
+    \item Uso: Evoluzione lungo termine, simulazioni ensemble
+\end{itemize}
+
+\subsection{Parallelizzazione}
+
+Per propagare molti oggetti:
+
+\begin{lstlisting}[language=C++,caption={Propagazione parallela}]
+#include <omp.h>
+
+std::vector<Vector6d> initial_states = ...;
+std::vector<Vector6d> final_states(initial_states.size());
+
+#pragma omp parallel for
+for (size_t i = 0; i < initial_states.size(); ++i) {
+    Propagator prop(forces);  // Ogni thread ha il suo propagatore
+    final_states[i] = prop.propagate(initial_states[i], t0, tf);
+}
+\end{lstlisting}
+
+\section{Validazione dell'Accuratezza}
+
+\subsection{Conservazione dell'Energia}
+
+Per sistemi conservativi (no SRP, attrito), l'energia deve essere conservata:
+
+\begin{equation}
+    E = \frac{v^2}{2} - \frac{\mu}{r} = \text{costante}
+\end{equation}
+
+Controllo errore energia:
+\begin{lstlisting}[language=C++,caption={Controllo energia}]
+double E0 = 0.5 * v0.squaredNorm() - MU_SUN / r0.norm();
+double Ef = 0.5 * vf.squaredNorm() - MU_SUN / rf.norm();
+double dE = std::abs(Ef - E0);
+std::cout << "Errore energia: " << dE / std::abs(E0) * 100 << "%\n";
+\end{lstlisting}
+
+Per integratori di alta qualità: $\Delta E / E < 10^{-10}$
+
+\subsection{Confronto Problema a Due Corpi}
+
+Validare contro soluzione kepleriana analitica:
+
+\begin{lstlisting}[language=C++,caption={Confronto kepleriano}]
+// Propagazione numerica (con perturbazioni spente)
+Vector6d state_num = prop.propagate(y0, t0, tf);
+
+// Propagazione kepleriana analitica
+OrbitalElements elem0 = OrbitalElements::from_cartesian(y0, t0);
+elem0.propagate_mean_anomaly(tf - t0);
+Vector6d state_kep = elem0.to_cartesian();
+
+// Confronta
+Vector3d pos_diff = state_num.head<3>() - state_kep.head<3>();
+std::cout << "Differenza posizione: " << pos_diff.norm() * AU_TO_KM 
+          << " km\n";
+\end{lstlisting}
+
+Atteso: $< 1$ km per archi brevi, $< 100$ km per 1 anno.
+
+\section{Riepilogo}
+
+Concetti chiave sulla propagazione orbitale:
+
+\begin{enumerate}
+    \item La \textbf{propagazione} calcola stati futuri/passati da condizioni iniziali
+    \item I \textbf{modelli di forza} devono includere tutte le perturbazioni significative
+    \item Gli \textbf{integratori adattativi} (DOPRI54) bilanciano accuratezza ed efficienza
+    \item Il \textbf{passo} dipende dal periodo orbitale e dall'eccentricità
+    \item La \textbf{matrice di transizione di stato} abilita la determinazione orbitale
+    \item I \textbf{sistemi di riferimento} devono essere consistenti
+    \item \textbf{Validazione} tramite conservazione energia e confronti analitici
+\end{enumerate}
+
+Comprendere la propagazione orbitale è essenziale per:
+\begin{itemize}
+    \item Generare effemeridi accurate
+    \item Pianificare osservazioni e missioni
+    \item Valutare rischi di collisione
+    \item Studiare dinamica a lungo termine
+    \item Determinazione orbitale (prossimo capitolo)
+\end{itemize}
+
+Nel prossimo capitolo, useremo la propagazione con la matrice di transizione di stato per la determinazione orbitale precisa dalle osservazioni.

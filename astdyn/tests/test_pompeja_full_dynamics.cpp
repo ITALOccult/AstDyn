@@ -189,7 +189,9 @@ TEST_F(PompejaFullDynamicsTest, PropagateWithFullDynamics) {
     settings.include_asteroids = true;
     
     auto ephemeris = std::make_shared<PlanetaryEphemeris>();
-    auto integrator = std::make_unique<RKF78Integrator>(0.1, 1e-12);
+    // Use tighter tolerance (1e-14 instead of 1e-12) and smaller max step (0.01 days)
+    // to match OrbFit precision better
+    auto integrator = std::make_unique<RKF78Integrator>(0.01, 1e-14);
     Propagator propagator(std::move(integrator), ephemeris, settings);
     
     // Propagate forward 192 days (like OrbFit output.epoch)

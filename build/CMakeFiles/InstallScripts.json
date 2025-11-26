@@ -1,0 +1,13 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/cmake_install.cmake",
+		"/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/cmake_install.cmake",
+		"/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/cmake_install.cmake",
+		"/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/cmake_install.cmake",
+		"/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/cmake_install.cmake",
+		"/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/cmake_install.cmake",
+		"/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

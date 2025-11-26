@@ -1,0 +1,12 @@
+! OrbFit orbital elements for 203 Pompeja
+! Equinoctial elements
+! Epoch: MJD 61192.0 (TDT)
+format  = 'EQU'
+recordtype = 'ML'
+MJD     61192.0
+a       2.736871
+h       -0.060876
+k       -0.008834
+p       0.027689
+q       -0.000459
+lambda  5.350841

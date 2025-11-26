@@ -1,0 +1,506 @@
+\chapter{Ephemeris Computation}
+\label{ch:ephemeris}
+
+\section{Introduction}
+
+An \textbf{ephemeris} (plural: \emph{ephemerides}) is a table or function providing positions (and optionally velocities) of celestial bodies at specific times. Accurate ephemerides are essential for:
+
+\begin{itemize}
+    \item Computing predicted positions for observations
+    \item Reducing astrometric measurements
+    \item Planning space missions
+    \item Analyzing close approaches
+    \item Studying orbital dynamics
+\end{itemize}
+
+This chapter covers methods for generating, storing, and interpolating ephemerides efficiently.
+
+\section{Types of Ephemerides}
+
+\subsection{Planetary Ephemerides}
+
+Major planets require the highest accuracy:
+
+\begin{description}
+    \item[JPL Development Ephemerides (DE)] Numerical integration of solar system, including Moon and large asteroids. Current: DE440 (Earth-Moon optimization), DE441 (outer solar system).
+    
+    \item[VSOP87] Analytical theory by Bureau des Longitudes. Series expansion in orbital elements. Accuracy: $\sim$1 arcsec over millennia.
+    
+    \item[INPOP] French ephemeris from IMCCE, optimized for planetary radar ranging.
+\end{description}
+
+\subsection{Small Body Ephemerides}
+
+Asteroids and comets:
+\begin{itemize}
+    \item Computed from orbital elements via propagation
+    \item Archived in MPC (Minor Planet Center) database
+    \item Precision varies: 0.1 arcsec (well-observed) to 10 arcmin (single-opposition)
+\end{itemize}
+
+\subsection{Spacecraft Ephemerides}
+
+Interplanetary missions:
+\begin{itemize}
+    \item SPICE kernels (SPK files) from navigation teams
+    \item Chebyshev polynomial segments
+    \item Meter-level accuracy for close-approach phases
+\end{itemize}
+
+\section{Ephemeris Representations}
+
+\subsection{Tabulated Format}
+
+Simplest representation: discrete time-state pairs.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{ccccccc}
+\toprule
+\textbf{MJD (TDB)} & $x$ (AU) & $y$ (AU) & $z$ (AU) & $\dot{x}$ & $\dot{y}$ & $\dot{z}$ \\
+\midrule
+60000.0 & 1.234 & 0.567 & 0.123 & $-0.012$ & 0.015 & 0.003 \\
+60001.0 & 1.222 & 0.582 & 0.126 & $-0.012$ & 0.015 & 0.003 \\
+60002.0 & 1.210 & 0.597 & 0.129 & $-0.012$ & 0.015 & 0.003 \\
+\vdots & \vdots & \vdots & \vdots & \vdots & \vdots & \vdots \\
+\bottomrule
+\end{tabular}
+\caption{Example tabulated ephemeris with 1-day spacing.}
+\label{tab:ephemeris_table}
+\end{table}
+
+\textbf{Advantages}:
+\begin{itemize}
+    \item Easy to implement
+    \item Direct lookup for tabulated times
+\end{itemize}
+
+\textbf{Disadvantages}:
+\begin{itemize}
+    \item Large storage for high cadence
+    \item Requires interpolation between points
+    \item Fixed time grid (inefficient for eccentric orbits)
+\end{itemize}
+
+\subsection{Polynomial Representation}
+
+Represent position as polynomial:
+
+\begin{equation}
+    \mathbf{r}(t) = \sum_{k=0}^{n} \mathbf{c}_k (t - t_0)^k
+\end{equation}
+
+Typically used piecewise over segments (splines).
+
+\subsection{Chebyshev Polynomials}
+
+JPL's preferred method. For time interval $[t_a, t_b]$, represent:
+
+\begin{equation}
+    \mathbf{r}(t) = \sum_{k=0}^{n} \mathbf{a}_k T_k\left(\frac{2t - t_a - t_b}{t_b - t_a}\right)
+\end{equation}
+
+where $T_k(x)$ are Chebyshev polynomials:
+
+\begin{equation}
+    T_0(x) = 1, \quad T_1(x) = x, \quad T_k(x) = 2xT_{k-1}(x) - T_{k-2}(x)
+\end{equation}
+
+\textbf{Properties}:
+\begin{itemize}
+    \item Minimax error distribution (optimal approximation)
+    \item Stable for high degrees ($n \sim 15$)
+    \item Efficient evaluation via recurrence
+\end{itemize}
+
+\subsection{Fourier Series}
+
+For nearly circular orbits:
+
+\begin{equation}
+    \mathbf{r}(t) = \sum_{k=-N}^{N} \mathbf{c}_k e^{ik\omega t}
+\end{equation}
+
+Used in analytical planetary theories (VSOP87).
+
+\section{Interpolation Methods}
+
+\subsection{Linear Interpolation}
+
+Given points $(t_1, \mathbf{r}_1)$ and $(t_2, \mathbf{r}_2)$:
+
+\begin{equation}
+    \mathbf{r}(t) = \mathbf{r}_1 + \frac{t - t_1}{t_2 - t_1}(\mathbf{r}_2 - \mathbf{r}_1)
+\end{equation}
+
+\textbf{Accuracy}: First-order, $O(h^2)$ error where $h = t_2 - t_1$.
+
+\textbf{Use}: Quick lookups when high precision not required ($>$1 km acceptable).
+
+\subsection{Lagrange Interpolation}
+
+Use $n+1$ points to construct polynomial of degree $n$:
+
+\begin{equation}
+    \mathbf{r}(t) = \sum_{i=0}^{n} \mathbf{r}_i L_i(t)
+\end{equation}
+
+where the Lagrange basis polynomials are:
+
+\begin{equation}
+    L_i(t) = \prod_{\substack{j=0\\j\neq i}}^{n} \frac{t - t_j}{t_i - t_j}
+\end{equation}
+
+\textbf{Typical choice}: $n = 6$ to 10 (7th to 11th order).
+
+\textbf{Accuracy}: For 8th-order with 1-day spacing, error $\sim$10 m for typical asteroid orbits.
+
+\subsection{Hermite Interpolation}
+
+Uses both positions and velocities. For interval $[t_1, t_2]$:
+
+\begin{equation}
+    \mathbf{r}(t) = \mathbf{r}_1 H_0(s) + \mathbf{r}_2 H_1(s) + h\dot{\mathbf{r}}_1 H_2(s) + h\dot{\mathbf{r}}_2 H_3(s)
+\end{equation}
+
+where $s = (t - t_1)/h$, $h = t_2 - t_1$, and the Hermite basis functions are:
+
+\begin{align}
+    H_0(s) &= (1 + 2s)(1-s)^2 \\
+    H_1(s) &= s^2(3 - 2s) \\
+    H_2(s) &= s(1-s)^2 \\
+    H_3(s) &= s^2(s-1)
+\end{align}
+
+\textbf{Advantages}:
+\begin{itemize}
+    \item Cubic accuracy ($O(h^4)$)
+    \item Smooth velocities (continuous first derivative)
+    \item Only requires two points
+\end{itemize}
+
+\textbf{Accuracy}: With 1-day spacing, error $\sim$1 m for well-behaved orbits.
+
+\subsection{Spline Interpolation}
+
+Cubic splines provide smooth interpolation through all points with continuous second derivatives.
+
+For points $(t_i, \mathbf{r}_i)$, $i = 0, \ldots, n$, construct piecewise cubics $\mathbf{s}_i(t)$ on $[t_i, t_{i+1}]$ such that:
+
+\begin{itemize}
+    \item $\mathbf{s}_i(t_i) = \mathbf{r}_i$ (interpolation)
+    \item $\mathbf{s}_i'(t_{i+1}) = \mathbf{s}_{i+1}'(t_{i+1})$ (continuous first derivative)
+    \item $\mathbf{s}_i''(t_{i+1}) = \mathbf{s}_{i+1}''(t_{i+1})$ (continuous second derivative)
+\end{itemize}
+
+\textbf{Use}: When smooth acceleration is important (covariance propagation).
+
+\section{SPICE System}
+
+\subsection{Overview}
+
+SPICE (Spacecraft Planet Instrument C-matrix Events) is NASA's toolkit for space mission geometry:
+
+\begin{description}
+    \item[SPK] (Ephemeris kernels) Position and velocity
+    \item[CK] (Orientation kernels) Spacecraft attitude
+    \item[PCK] (Constants kernels) Physical parameters, body shapes
+    \item[IK] (Instrument kernels) FOV, boresight
+    \item[FK] (Frame kernels) Reference frame definitions
+    \item[LSK] (Leapsecond kernels) Time conversions
+\end{description}
+
+\subsection{SPK Files}
+
+Binary files containing Chebyshev or Hermite polynomial segments.
+
+\textbf{Usage in AstDyn}:
+\begin{lstlisting}[language=C++,caption={Loading SPICE kernel}]
+#include <astdyn/ephemeris/SpiceInterface.hpp>
+
+SpiceInterface spice;
+spice.load_kernel("de440.bsp");  // Planetary ephemeris
+spice.load_kernel("codes_300ast_20100725.bsp");  // Asteroids
+
+// Query Jupiter position at epoch
+double et = spice.mjd_to_et(60000.0);  // Convert MJD to ET
+Vector6d jupiter_state = spice.get_state("JUPITER", et, "ECLIPJ2000", "SUN");
+
+std::cout << "Jupiter position: " << jupiter_state.head<3>().transpose() 
+          << " km\n";
+\end{lstlisting}
+
+\subsection{NAIF IDs}
+
+SPICE uses integer IDs:
+\begin{itemize}
+    \item Sun: 10
+    \item Planets: 199 (Mercury), 299 (Venus), 399 (Earth), 499 (Mars), 599 (Jupiter), etc.
+    \item Moon: 301
+    \item Asteroids: 2000001 (Ceres), 2000004 (Vesta), 2000203 (Pompeja)
+\end{itemize}
+
+\section{Planetary Ephemerides}
+
+\subsection{JPL Development Ephemerides}
+
+\textbf{DE440/441} (released 2020):
+\begin{itemize}
+    \item Covers years 1550--2650
+    \item Includes Sun, planets, Moon, Pluto, 343 asteroids
+    \item Fit to ranging data (Mars missions), VLBI, LLR
+    \item Accuracy: $\sim$1 km for inner planets, $\sim$10 km for outer planets
+\end{itemize}
+
+\textbf{File sizes}:
+\begin{itemize}
+    \item DE440: 114 MB (standard)
+    \item DE441: 3.2 GB (includes high-rate Moon)
+\end{itemize}
+
+\subsection{VSOP87}
+
+Analytical series developed by Bretagnon \& Francou (1988).
+
+\textbf{Variants}:
+\begin{description}
+    \item[VSOP87A] Heliocentric rectangular, J2000 ecliptic
+    \item[VSOP87B] Heliocentric rectangular, J2000 equatorial  
+    \item[VSOP87C] Heliocentric spherical (mean ecliptic/equinox of date)
+    \item[VSOP87D] Heliocentric spherical (J2000 ecliptic)
+    \item[VSOP87E] Barycentric rectangular, J2000 ecliptic
+\end{description}
+
+\textbf{Implementation}:
+\begin{lstlisting}[language=C++,caption={VSOP87 usage}]
+#include <astdyn/ephemeris/VSOP87.hpp>
+
+VSOP87 vsop;
+double jd = 2460000.5;  // Julian date
+
+// Earth position (VSOP87A: heliocentric J2000 ecliptic)
+Vector3d earth_pos = vsop.get_position("Earth", jd, VSOP87_A);
+std::cout << "Earth position: " << earth_pos.transpose() << " AU\n";
+
+// Accuracy estimate
+double error_km = vsop.estimated_error("Earth", jd);
+std::cout << "Position error: ~" << error_km << " km\n";
+\end{lstlisting}
+
+\textbf{Accuracy}: $\sim$1 km for inner planets over $\pm$2000 years from J2000.
+
+\subsection{Comparison}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Accuracy} & \textbf{Speed} & \textbf{File Size} \\
+\midrule
+DE440 (SPICE) & 1--10 km & Fast & 114 MB \\
+VSOP87 & 1--5 km & Medium & $\sim$1 MB (code) \\
+Keplerian & 100--1000 km & Very fast & Negligible \\
+\bottomrule
+\end{tabular}
+\caption{Planetary ephemeris comparison.}
+\label{tab:planetary_eph}
+\end{table}
+
+\section{Light-Time Corrections}
+
+\subsection{Geometric vs Apparent Position}
+
+Light travels at finite speed $c = 299792.458$ km/s, so we observe planets where they \emph{were}, not where they \emph{are}.
+
+\textbf{Light-time}:
+
+\begin{equation}
+    \tau = \frac{|\mathbf{r}_{\text{planet}} - \mathbf{r}_{\text{obs}}|}{c}
+\end{equation}
+
+Typical values:
+\begin{itemize}
+    \item Sun: 8.3 minutes
+    \item Jupiter: 30--50 minutes
+    \item Saturn: 70--90 minutes
+    \item Neptune: 4 hours
+\end{itemize}
+
+\subsection{Iterative Correction}
+
+To find the \textbf{apparent position} at observation time $t_{\text{obs}}$:
+
+\begin{enumerate}
+    \item Start with geometric position: $\mathbf{r}_0 = \mathbf{r}_{\text{planet}}(t_{\text{obs}})$
+    \item Compute light-time: $\tau_0 = |\mathbf{r}_0 - \mathbf{r}_{\text{obs}}|/c$
+    \item Update: $\mathbf{r}_1 = \mathbf{r}_{\text{planet}}(t_{\text{obs}} - \tau_0)$
+    \item Iterate until convergence: $|\tau_{i+1} - \tau_i| < 10^{-6}$ s
+\end{enumerate}
+
+Typically converges in 2--3 iterations.
+
+\subsection{Implementation}
+
+\begin{lstlisting}[language=C++,caption={Light-time correction}]
+Vector3d compute_apparent_position(
+    const EphemerisInterface& ephem,
+    const std::string& target,
+    double t_obs,
+    const Vector3d& observer_pos)
+{
+    const double c_AU_per_day = 173.1446326846693;  // Speed of light
+    
+    Vector3d r_geom = ephem.get_position(target, t_obs);
+    double tau = (r_geom - observer_pos).norm() / c_AU_per_day;
+    
+    // Iterate light-time correction
+    for (int iter = 0; iter < 5; ++iter) {
+        Vector3d r_new = ephem.get_position(target, t_obs - tau);
+        double tau_new = (r_new - observer_pos).norm() / c_AU_per_day;
+        
+        if (std::abs(tau_new - tau) < 1e-10) break;  // Converged
+        tau = tau_new;
+    }
+    
+    return ephem.get_position(target, t_obs - tau);
+}
+\end{lstlisting}
+
+\subsection{Aberration}
+
+Observer motion causes additional \textbf{stellar aberration}:
+
+\begin{equation}
+    \Delta\theta \approx \frac{v_{\text{obs}}}{c}
+\end{equation}
+
+For Earth's orbital motion ($v \approx 30$ km/s): $\Delta\theta \approx 20.5$ arcsec (annual aberration).
+
+Correction:
+
+\begin{equation}
+    \hat{\mathbf{r}}_{\text{aberrated}} = \hat{\mathbf{r}} + \frac{\mathbf{v}_{\text{obs}}}{c}
+\end{equation}
+
+\section{Practical Ephemeris Generation}
+
+\subsection{Design Considerations}
+
+Choose ephemeris parameters based on requirements:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Application} & \textbf{Spacing} & \textbf{Interpolation} & \textbf{Accuracy} \\
+\midrule
+Visual magnitude & 10 days & Linear & 0.1 mag \\
+Telescope pointing & 1 day & Hermite & 1 arcsec \\
+Orbit determination & 1 hour & Lagrange-9 & 0.01 arcsec \\
+Close approach & 1 minute & Chebyshev & 1 meter \\
+\bottomrule
+\end{tabular}
+\caption{Ephemeris requirements for different applications.}
+\label{tab:ephemeris_req}
+\end{table}
+
+\subsection{Generation Workflow}
+
+\begin{lstlisting}[language=C++,caption={Ephemeris generation}]
+#include <astdyn/ephemeris/EphemerisGenerator.hpp>
+
+// Define time span
+double t_start = 60000.0;  // MJD
+double t_end = 60365.0;    // 1 year
+double dt = 1.0;           // 1-day spacing
+
+// Setup propagator
+ForceModel forces;
+forces.enable_planets({"Jupiter", "Saturn", "Mars"});
+Propagator prop(forces);
+
+// Initial state from orbital elements
+OrbitalElements elem = load_orbit("203_Pompeja.oe");
+Vector6d y0 = elem.to_cartesian();
+
+// Generate ephemeris
+EphemerisGenerator gen(prop);
+auto ephem = gen.generate(y0, elem.epoch, t_start, t_end, dt);
+
+// Save to file
+ephem.save("pompeja_ephemeris.txt");
+
+// Later: interpolate to arbitrary time
+Vector6d state_interp = ephem.interpolate(60123.456, HERMITE);
+\end{lstlisting}
+
+\subsection{Validation}
+
+Always validate ephemerides:
+
+\begin{enumerate}
+    \item Compare with published ephemerides (MPC, JPL Horizons)
+    \item Check energy conservation (if applicable)
+    \item Verify smooth velocities (no jumps)
+    \item Test interpolation error against propagation
+\end{enumerate}
+
+\section{Efficient Storage}
+
+\subsection{Binary Formats}
+
+For large ephemerides, use binary:
+
+\begin{itemize}
+    \item HDF5: Hierarchical, compressed, self-describing
+    \item FITS: Standard in astronomy, good tool support
+    \item Custom binary: Maximum efficiency, requires documentation
+\end{itemize}
+
+\textbf{Example sizes} (1 year, 1-day spacing):
+\begin{itemize}
+    \item ASCII: 350 KB
+    \item Binary (doubles): 18 KB
+    \item Compressed binary: 5 KB
+\end{itemize}
+
+\subsection{Adaptive Spacing}
+
+For eccentric orbits, use variable spacing:
+\begin{itemize}
+    \item Fine spacing near perihelion (fast motion)
+    \item Coarse spacing near aphelion (slow motion)
+\end{itemize}
+
+Spacing proportional to true anomaly rate:
+
+\begin{equation}
+    \Delta t \propto \frac{r^2}{\sqrt{\mu a(1-e^2)}}
+\end{equation}
+
+This maintains constant position error.
+
+\section{Summary}
+
+Key concepts about ephemeris computation:
+
+\begin{enumerate}
+    \item \textbf{Ephemerides} provide positions/velocities at specified times
+    \item \textbf{Representations}: tabulated, polynomial (Chebyshev), analytical (VSOP87)
+    \item \textbf{Interpolation}: Hermite for accuracy, Lagrange for flexibility
+    \item \textbf{SPICE} is NASA's standard for planetary/spacecraft ephemerides
+    \item \textbf{Light-time} correction accounts for finite light speed
+    \item \textbf{Aberration} corrects for observer motion
+    \item \textbf{Adaptive spacing} improves efficiency for eccentric orbits
+\end{enumerate}
+
+Practical recommendations:
+\begin{itemize}
+    \item Use DE440/441 for planets (via SPICE)
+    \item Use VSOP87 if SPICE unavailable or for historical epochs
+    \item Generate custom ephemerides for asteroids
+    \item Hermite interpolation for 1-meter accuracy with 1-day spacing
+    \item Always apply light-time corrections for precise work
+\end{itemize}
+
+The next chapter begins Part III (Orbit Determination), using ephemerides to predict observations and fit orbits to data.

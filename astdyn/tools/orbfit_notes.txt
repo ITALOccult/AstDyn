@@ -1,0 +1,12 @@
+Il problema principale è nel calcolo dei residui. L'errore iniziale RMS=555153 arcsec (154°) indica un problema fondamentale.
+
+Possibili cause:
+1. **COORDINATE FRAME MISMATCH**: Gli elementi orbitali sono in ECLM J2000, le osservazioni in equatoriale J2000
+2. Mancata conversione da eclittica a equatoriale nella posizione dell'asteroide
+3. Bug nella funzione cartesian_to_radec()
+4. Problema nella posizione dell'osservatore
+
+Verifichiamo i sistemi di coordinate:
+- OrbFit usa elementi in ECLM J2000 (eclittica mean J2000)
+- Osservazioni sono sempre in equatoriale J2000 (RA/Dec)
+- SERVE conversione eclittica→equatoriale per la posizione dell'asteroide!

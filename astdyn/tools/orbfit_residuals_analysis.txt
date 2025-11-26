@@ -1,0 +1,18 @@
+ANALISI CALCOLO RESIDUI IN ORBFIT
+==================================
+
+Le osservazioni astrometriche sono TOPOCENTRICHE (dal punto di vista dell'osservatorio).
+
+Passaggi per calcolare i residui O-C:
+
+1. Posizione dell'asteroide (heliocentric) in ECLIPTIC J2000 
+2. Posizione della Terra (heliocentric) in ECLIPTIC J2000
+3. Posizione osservatorio = Terra + offset geocentrico
+4. Vettore topocentrico = Asteroide - Osservatorio (in ECLIPTIC)
+5. CONVERTIRE vettore topocentrico in EQUATORIAL J2000
+6. Calcolare RA/Dec dal vettore in coordinate equatoriali
+7. Residuo = Osservato - Calcolato
+
+ERRORE ATTUALE:
+- Stiamo convertendo le posizioni heliocentriche (Terra, Asteroide) 
+- Ma dobbiamo convertire il VETTORE TOPOCENTRICO prima di calcolare RA/Dec!

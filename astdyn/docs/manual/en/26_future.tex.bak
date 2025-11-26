@@ -1,0 +1,665 @@
+\chapter{Future Developments}
+\label{ch:future}
+
+\section{Introduction}
+
+This chapter outlines planned enhancements and future research directions for AstDyn. While the current v1.0 release provides production-grade orbit determination capabilities, several extensions would expand functionality and performance.
+
+\section{Non-Gravitational Forces}
+
+\subsection{Solar Radiation Pressure}
+
+\textbf{Status}: Partial implementation exists (example in Chapter 20).
+
+\textbf{Planned}:
+\begin{itemize}
+    \item Full integration into force model framework
+    \item Shadowing model (Earth/Moon occultation)
+    \item Thermal re-radiation (Yarkovsky effect)
+    \item Parameter estimation in differential correction
+\end{itemize}
+
+\textbf{Implementation sketch}:
+\begin{lstlisting}[language=C++]
+class SolarRadiationPressure : public ForceModel {
+public:
+    SolarRadiationPressure(
+        double area_mass_ratio,
+        double reflectivity = 1.0,
+        bool include_yarkovsky = false
+    );
+    
+    Vector3d acceleration(double t, const Vector3d& pos, 
+                         const Vector3d& vel) const override;
+    
+    // For differential correction
+    bool supports_partials() const override { return true; }
+    std::pair<Matrix3d, Matrix3d> partials(...) const override;
+    
+private:
+    double area_mass_ratio_;
+    double reflectivity_;
+    bool include_yarkovsky_;
+    
+    // Shadow computation
+    double shadow_function(double t, const Vector3d& pos) const;
+};
+\end{lstlisting}
+
+\textbf{Scientific impact}: Critical for small NEAs and space debris tracking.
+
+\subsection{Cometary Outgassing}
+
+\textbf{Motivation}: Comets exhibit non-gravitational accelerations from sublimating volatiles.
+
+\textbf{Planned model}:
+\begin{itemize}
+    \item Marsden's formulation: $A_1/r^2 + A_2/r^3 + A_3$ terms
+    \item Radial, transverse, and normal components
+    \item Temperature-dependent activity curve
+\end{itemize}
+
+\begin{lstlisting}[language=C++]
+class CometaryOutgassing : public ForceModel {
+public:
+    CometaryOutgassing(double A1, double A2, double A3);
+    
+    Vector3d acceleration(double t, const Vector3d& pos, 
+                         const Vector3d& vel) const override {
+        Vector3d r_sun = pos;  // Heliocentric position
+        double r = r_sun.norm();
+        
+        // Marsden model
+        Vector3d radial = r_sun.normalized();
+        Vector3d transverse = /* compute from velocity */;
+        Vector3d normal = radial.cross(transverse);
+        
+        double g = activity_function(r);  // Activity curve
+        
+        return g * (A1_ * radial + A2_ * transverse + A3_ * normal) / (r * r);
+    }
+    
+private:
+    double A1_, A2_, A3_;
+    double activity_function(double r) const;
+};
+\end{lstlisting}
+
+\textbf{Use case}: Long-period comets, short-period comets with significant outgassing.
+
+\subsection{General Relativity}
+
+\textbf{Current limitation}: Post-Newtonian effects neglected.
+
+\textbf{Planned}: First-order relativistic corrections.
+
+\textbf{Formulation}:
+\[
+\mathbf{a}_{\text{rel}} = \frac{GM_\odot}{c^2 r^3} \left[ 4 \frac{GM_\odot}{r} - v^2 \right] \mathbf{r} + 4 \frac{GM_\odot}{c^2 r^3} (\mathbf{r} \cdot \mathbf{v}) \mathbf{v}
+\]
+
+\textbf{Implementation}:
+\begin{lstlisting}[language=C++]
+class RelativisticCorrection : public ForceModel {
+public:
+    Vector3d acceleration(double t, const Vector3d& pos, 
+                         const Vector3d& vel) const override {
+        double r = pos.norm();
+        double v2 = vel.squaredNorm();
+        double rdotv = pos.dot(vel);
+        
+        double factor1 = 4.0 * GM_SUN / r - v2;
+        double factor2 = 4.0 * rdotv;
+        
+        return (GM_SUN / (C * C * r * r * r)) * 
+               (factor1 * pos + factor2 * vel);
+    }
+};
+\end{lstlisting}
+
+\textbf{Magnitude}: $\sim 10^{-8}$ m/s$^2$ at 1 AU—affects Mercury significantly, negligible for asteroids beyond Mars.
+
+\section{Uncertainty Propagation}
+
+\subsection{Covariance Propagation}
+
+\textbf{Current}: Single STM per iteration.
+
+\textbf{Planned}: Full covariance matrix propagation with process noise.
+
+\begin{lstlisting}[language=C++]
+class CovariancePropagator {
+public:
+    struct Result {
+        CartesianState mean_state;
+        Matrix6d covariance;
+    };
+    
+    Result propagate_with_covariance(
+        const CartesianState& initial_state,
+        const Matrix6d& initial_covariance,
+        double target_epoch,
+        const Matrix6d& process_noise
+    );
+};
+\end{lstlisting}
+
+\textbf{Application}: Uncertainty forecasting, collision probability.
+
+\subsection{Monte Carlo Methods}
+
+\textbf{Motivation}: Non-linear uncertainty propagation.
+
+\textbf{Planned}:
+\begin{lstlisting}[language=C++]
+class MonteCarloUncertainty {
+public:
+    struct Sample {
+        orbit::KeplerianElements elements;
+        double weight;
+    };
+    
+    std::vector<Sample> generate_samples(
+        const orbit::KeplerianElements& nominal,
+        const Matrix6d& covariance,
+        size_t n_samples = 10000
+    );
+    
+    std::vector<CartesianState> propagate_ensemble(
+        const std::vector<Sample>& samples,
+        double target_epoch
+    );
+    
+    // Statistical summary
+    struct Statistics {
+        CartesianState mean;
+        CartesianState median;
+        Matrix6d covariance;
+        double position_rms;
+    };
+    
+    Statistics compute_statistics(
+        const std::vector<CartesianState>& ensemble
+    );
+};
+\end{lstlisting}
+
+\textbf{Use case}: Collision avoidance, close approach analysis.
+
+\section{Close Encounter Handling}
+
+\subsection{Regularization Techniques}
+
+\textbf{Problem}: Standard integrators struggle with close planetary encounters ($< 0.1$ AU).
+
+\textbf{Planned}: Kustaanheimo-Stiefel (KS) regularization for singularity removal.
+
+\textbf{KS Transformation}:
+\[
+\mathbf{r} = \mathbf{u}^T L \mathbf{u}, \quad d\tau = r \, dt
+\]
+
+Transforms singular two-body problem into regular harmonic oscillator.
+
+\textbf{Implementation outline}:
+\begin{lstlisting}[language=C++]
+class KSRegularizedIntegrator : public IIntegrator {
+public:
+    void integrate(double t0, double tf, std::vector<double>& y,
+                  const std::function<...>& derivs) override {
+        // Detect close approach
+        if (is_close_approach(y)) {
+            // Switch to KS coordinates
+            auto u = cartesian_to_ks(y);
+            // Integrate in regularized space
+            integrate_ks(t0, tf, u);
+            // Transform back
+            y = ks_to_cartesian(u);
+        } else {
+            // Standard integration
+            standard_integrate(t0, tf, y, derivs);
+        }
+    }
+};
+\end{lstlisting}
+
+\textbf{Benefit}: Stable integration through planet flybys.
+
+\subsection{Hyperbolic Encounter Analysis}
+
+\textbf{Planned features}:
+\begin{itemize}
+    \item Automatic detection of close encounters
+    \item B-plane targeting parameters
+    \item Encounter velocity and geometry computation
+    \item Post-encounter orbital element prediction
+\end{itemize}
+
+\section{Parallel Processing}
+
+\subsection{OpenMP Parallelization}
+
+\textbf{Current limitation}: Single-threaded only.
+
+\textbf{Target operations}:
+\begin{enumerate}
+    \item Batch orbit propagation
+    \item Observation residual computation
+    \item Monte Carlo sampling
+    \item Parameter grid search
+\end{enumerate}
+
+\textbf{Implementation}:
+\begin{lstlisting}[language=C++]
+// Parallel batch propagation
+#pragma omp parallel for schedule(dynamic)
+for (int i = 0; i < n_orbits; ++i) {
+    auto state = propagator.propagate(initial_states[i], target_epoch);
+    results[i] = state;
+}
+
+// Parallel residual computation in differential correction
+#pragma omp parallel for
+for (int i = 0; i < n_observations; ++i) {
+    auto computed = compute_predicted_observation(obs[i]);
+    residuals[2*i] = obs[i].ra - computed.ra;
+    residuals[2*i+1] = obs[i].dec - computed.dec;
+}
+\end{lstlisting}
+
+\textbf{Expected speedup}: 6-7$\times$ on 8-core CPU for batch operations.
+
+\subsection{GPU Acceleration}
+
+\textbf{Long-term goal}: CUDA/OpenCL for massive parallelism.
+
+\textbf{Suitable tasks}:
+\begin{itemize}
+    \item Monte Carlo uncertainty (10,000+ samples)
+    \item Ephemeris table generation
+    \item Batch least-squares solving
+\end{itemize}
+
+\textbf{Challenge}: Integration step size adaptivity difficult on GPU.
+
+\section{Additional Integrators}
+
+\subsection{Symplectic Integrators}
+
+\textbf{Motivation}: Energy-conserving for long-term stability studies.
+
+\textbf{Planned}: Wisdom-Holman symplectic map for hierarchical systems.
+
+\begin{lstlisting}[language=C++]
+class SymplecticIntegrator : public IIntegrator {
+public:
+    SymplecticIntegrator(double fixed_step_size);
+    
+    // Operator splitting: H = H_Kepler + H_interaction
+    void step(double t, std::vector<double>& y, ...) override;
+    
+private:
+    void drift_step(std::vector<double>& y, double dt);
+    void kick_step(std::vector<double>& y, double dt);
+};
+\end{lstlisting}
+
+\textbf{Use case}: Million-year asteroid dynamics, planetary system stability.
+
+\subsection{Implicit Methods}
+
+\textbf{Planned}: Radau IIA for stiff problems.
+
+\textbf{Advantage}: Unconditional stability, good for tightly-bound systems.
+
+\textbf{Disadvantage}: Requires Jacobian computation, slower per step.
+
+\section{Python Bindings}
+
+\subsection{pybind11 Interface}
+
+\textbf{Goal}: Seamless Python access to AstDyn.
+
+\textbf{Planned API}:
+\begin{lstlisting}[language=Python]
+import astdyn
+
+# Create orbital elements
+elem = astdyn.KeplerianElements(
+    a=2.7436, e=0.0624, i=11.74,
+    Omega=339.86, omega=258.03, M=45.32,
+    epoch=2460000.5
+)
+
+# Setup propagator
+eph = astdyn.SPICEEphemeris("de440.bsp")
+forces = astdyn.PointMassGravity(eph, ["JUPITER", "SATURN"])
+integrator = astdyn.RKF78(tolerance=1e-12)
+prop = astdyn.Propagator(integrator, forces, eph)
+
+# Propagate
+state0 = elem.to_cartesian()
+state60 = prop.propagate(state0, 2460060.5)
+
+print(f"Position: {state60.position}")
+print(f"Velocity: {state60.velocity}")
+
+# Orbit determination
+observations = astdyn.read_mpc_file("observations.txt")
+corrector = astdyn.DifferentialCorrector(prop)
+result = corrector.solve(elem, observations)
+
+print(f"RMS residual: {result.rms_residual} arcsec")
+print(f"Converged: {result.converged}")
+\end{lstlisting}
+
+\textbf{Integration}: Jupyter notebooks, NumPy arrays, matplotlib plotting.
+
+\subsection{Package Distribution}
+
+\textbf{Planned}:
+\begin{itemize}
+    \item PyPI package: \texttt{pip install astdyn}
+    \item Conda package: \texttt{conda install -c conda-forge astdyn}
+    \item Pre-built wheels for Linux, macOS, Windows
+\end{itemize}
+
+\section{Machine Learning Integration}
+
+\subsection{Neural Network Surrogate Models}
+
+\textbf{Research direction}: Train neural networks to approximate expensive computations.
+
+\textbf{Potential applications}:
+\begin{enumerate}
+    \item \textbf{Fast propagation}: NN approximates integrator for real-time applications
+    \item \textbf{Outlier detection}: ML identifies bad observations automatically
+    \item \textbf{Initial orbit}: NN provides better IOD guess from limited observations
+\end{enumerate}
+
+\textbf{Preliminary concept}:
+\begin{lstlisting}[language=C++]
+class NeuralPropagator : public IIntegrator {
+public:
+    NeuralPropagator(const std::string& model_file);
+    
+    // Use NN for short-term propagation
+    CartesianState propagate(const CartesianState& initial, 
+                            double dt) {
+        if (dt < 10.0) {  // Use NN for short arcs
+            return nn_predict(initial, dt);
+        } else {  // Fall back to numerical integration
+            return numerical_propagate(initial, dt);
+        }
+    }
+    
+private:
+    NeuralNetwork model_;
+};
+\end{lstlisting}
+
+\textbf{Challenge}: Ensuring accuracy guarantees for scientific use.
+
+\section{Enhanced Observations}
+
+\subsection{Radar Observations}
+
+\textbf{Planned}: Support for range and range-rate measurements.
+
+\begin{lstlisting}[language=C++]
+struct RadarObservation {
+    double epoch;
+    double range;           // km
+    double range_rate;      // km/s
+    double sigma_range;
+    double sigma_range_rate;
+    std::string station_code;
+    
+    Vector3d observer_position() const;
+};
+\end{lstlisting}
+
+\textbf{Integration**: Add radar residuals to least-squares:
+\[
+\chi^2 = \sum_i \frac{(\rho_i^{\text{obs}} - \rho_i^{\text{comp}})^2}{\sigma_{\rho,i}^2} + \frac{(\dot{\rho}_i^{\text{obs}} - \dot{\rho}_i^{\text{comp}})^2}{\sigma_{\dot{\rho},i}^2}
+\]
+
+\textbf{Benefit**: Orders-of-magnitude better range accuracy than optical.
+
+\subsection{Gaia Astrometry}
+
+\textbf{Planned**: Native support for Gaia spacecraft observations.
+
+\textbf{Features**:
+\begin{itemize}
+    \item Along-scan and across-scan measurements
+    \item Gaia reference frame (ICRF3)
+    \item Parallax corrections
+    \item Light-time and aberration at $\mu$as level
+\end{itemize}
+
+\section{Web Service / Cloud Deployment}
+
+\subsection{RESTful API}
+
+\textbf{Vision**: Cloud-based orbit determination service.
+
+\textbf{Planned endpoints**:
+\begin{verbatim}
+POST /api/v1/propagate
+  Body: { "elements": {...}, "target_epoch": 2460100.5 }
+  Returns: { "state": {...}, "elapsed_ms": 1.82 }
+
+POST /api/v1/orbit_determination
+  Body: { "observations": [...], "method": "differential_correction" }
+  Returns: { "elements": {...}, "rms": 0.658, "iterations": 4 }
+
+GET /api/v1/ephemeris?object=pompeja&start=2460000&end=2460100&step=1
+  Returns: [ { "epoch": 2460000.5, "position": [...], ...}, ... ]
+\end{verbatim}
+
+\textbf{Technology stack**:
+\begin{itemize}
+    \item Backend: C++ service with REST wrapper
+    \item Queue: Redis for job management
+    \item Database: PostgreSQL for results storage
+    \item Container: Docker deployment
+\end{itemize}
+
+\subsection{Web Interface}
+
+\textbf{Features**:
+\begin{itemize}
+    \item Upload MPC observation files
+    \item Interactive orbit visualization (3D)
+    \item Download results (CSV, JSON, OrbFit format)
+    \item Compare with JPL Horizons
+    \item Batch processing interface
+\end{itemize}
+
+\section{Data Pipeline Integration}
+
+\subsection{Automated Survey Processing}
+
+\textbf{Goal**: Process LSST/Pan-STARRS data streams automatically.
+
+\textbf{Pipeline**:
+\begin{enumerate}
+    \item Ingest: Receive new observations from survey
+    \item Match: Link to known objects or detect new
+    \item IOD: Quick orbit for new detections
+    \item Refine: Differential correction with archival data
+    \item Publish: Update orbital elements database
+    \item Alert: Flag interesting objects (NEAs, unusual orbits)
+\end{enumerate}
+
+\textbf{Scalability**: Process 1000+ objects per night.
+
+\section{Improved Error Models}
+
+\subsection{Robust Estimation}
+
+\textbf{Current**: Least-squares assumes Gaussian errors.
+
+\textbf{Planned**: Huber loss and iteratively reweighted least squares.
+
+\begin{lstlisting}[language=C++]
+class RobustDifferentialCorrector : public DifferentialCorrector {
+public:
+    Result solve(...) override {
+        // Initial least-squares
+        auto result = standard_solve(...);
+        
+        // Robust iteration
+        for (int iter = 0; iter < max_robust_iters; ++iter) {
+            // Compute weights based on residuals
+            update_weights_huber(result.residuals);
+            
+            // Weighted least-squares
+            result = weighted_solve(...);
+        }
+        
+        return result;
+    }
+};
+\end{lstlisting}
+
+\textbf{Benefit**: Automatic outlier downweighting.
+
+\section{Cross-Platform Support}
+
+\subsection{WebAssembly Build}
+
+\textbf{Goal**: Run AstDyn in web browser.
+
+\textbf{Use cases**:
+\begin{itemize}
+    \item Educational tools (interactive orbit calculator)
+    \item Client-side orbit visualization
+    \item No server required for simple calculations
+\end{itemize}
+
+\textbf{Build**:
+\begin{lstlisting}[language=bash]
+emcc -O3 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 \
+     astdyn.cpp -o astdyn.js
+\end{lstlisting}
+
+\subsection{Mobile Platforms}
+
+\textbf{Planned**: iOS and Android native libraries.
+
+\textbf{Applications**:
+\begin{itemize}
+    \item Observer planning apps
+    \item Real-time satellite tracking
+    \item Educational astronomy apps
+\end{itemize}
+
+\section{Development Roadmap}
+
+\subsection{Version 1.1 (Q2 2026)}
+
+Priority features:
+\begin{itemize}
+    \item OpenMP parallelization
+    \item Python bindings (pybind11)
+    \item Solar radiation pressure
+    \item Radar observations support
+\end{itemize}
+
+\subsection{Version 1.2 (Q4 2026)}
+
+Extended capabilities:
+\begin{itemize}
+    \item Covariance propagation
+    \item Monte Carlo uncertainty
+    \item Cometary outgassing model
+    \item Symplectic integrator
+\end{itemize}
+
+\subsection{Version 2.0 (2027)}
+
+Major enhancements:
+\begin{itemize}
+    \item Close encounter handling (KS regularization)
+    \item General relativity corrections
+    \item GPU acceleration (CUDA)
+    \item Web service deployment
+\end{itemize}
+
+\section{Community Contributions}
+
+\subsection{Open Source Development}
+
+AstDyn welcomes community contributions:
+
+\textbf{GitHub repository**: \url{https://github.com/user/astdyn}
+
+\textbf{Contribution areas**:
+\begin{itemize}
+    \item New integrators (Dormand-Prince, Radau)
+    \item Additional parsers (JPL, SPICE SPK)
+    \item Force models (tidal forces, GR)
+    \item Documentation improvements
+    \item Test cases and validation
+    \item Performance optimizations
+\end{itemize}
+
+\textbf{Guidelines**: See CONTRIBUTING.md in repository.
+
+\subsection{Citing AstDyn}
+
+If using AstDyn in research, please cite:
+
+\begin{verbatim}
+@software{astdyn2025,
+  author = {Bigi, Michele and Contributors},
+  title = {AstDyn: Modern C++ Library for Asteroid Orbit Determination},
+  year = {2025},
+  version = {1.0.0},
+  url = {https://github.com/user/astdyn}
+}
+\end{verbatim}
+
+\section{Research Directions}
+
+\subsection{Novel Algorithms}
+
+Future research topics:
+\begin{enumerate}
+    \item \textbf{Deep learning IOD**: Neural networks for initial orbit from 2 observations
+    \item \textbf{Kalman filtering**: Sequential orbit determination
+    \item \textbf{Bayesian methods**: Probabilistic orbit solutions
+    \item \textbf{Collision probability**: Fast Monte Carlo for conjunction analysis
+    \item \textbf{Multi-object tracking**: Simultaneous orbit determination for multiple asteroids
+\end{enumerate}
+
+\subsection{Interdisciplinary Applications}
+
+Beyond asteroids:
+\begin{itemize}
+    \item \textbf{Space debris tracking}: LEO/GEO orbit determination
+    \item \textbf{Binary asteroids**: Mutual orbit dynamics
+    \item \textbf{Planetary moons**: Satellite orbit determination
+    \item \textbf{Exoplanet transits**: Timing analysis
+\end{itemize}
+
+\section{Summary}
+
+Planned developments for AstDyn include:
+
+\begin{enumerate}
+    \item \textbf{Physics}: Non-gravitational forces, relativity, close encounters
+    \item \textbf{Algorithms**: Uncertainty propagation, robust estimation, new integrators
+    \item \textbf{Performance}: OpenMP, GPU acceleration, cloud deployment
+    \item \textbf{Interfaces**: Python bindings, web service, mobile platforms
+    \item \textbf{Data**: Radar observations, Gaia astrometry, survey pipelines
+    \item \textbf{Community**: Open source contributions, research collaborations
+\end{enumerate}
+
+These enhancements will expand AstDyn's capabilities while maintaining the core design principles of accuracy, reliability, and ease of use.
+
+\vspace{1cm}
+
+\textit{Contributions and suggestions are welcome. Visit the GitHub repository to participate in AstDyn's development.}

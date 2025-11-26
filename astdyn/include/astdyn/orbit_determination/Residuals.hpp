@@ -17,6 +17,13 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include <vector>
 #include <optional>
+#include <memory>
+
+namespace astdyn {
+    namespace propagation {
+        class Propagator;
+    }
+}
 
 namespace astdyn::orbit_determination {
 
@@ -92,9 +99,11 @@ public:
     /**
      * @brief Constructor
      * @param ephemeris Planetary ephemeris for Earth position
+     * @param propagator Orbit propagator (optional, for automatic propagation)
      */
     explicit ResidualCalculator(
-        std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris);
+        std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
+        std::shared_ptr<astdyn::propagation::Propagator> propagator = nullptr);
     
     /**
      * @brief Compute residuals for all observations
@@ -173,6 +182,14 @@ public:
      */
     std::optional<astdyn::Vector3d> get_observer_velocity(
         const astdyn::observations::OpticalObservation& obs) const;
+    
+    /**
+     * @brief Convert UTC to TDB time scale
+     * 
+     * @param mjd_utc Modified Julian Date in UTC
+     * @return MJD in TDB time scale
+     */
+    static double utc_to_tdb(double mjd_utc);
 
 private:
     /**
@@ -206,6 +223,7 @@ private:
 
 private:
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
+    std::shared_ptr<astdyn::propagation::Propagator> propagator_;
     
     // Correction flags
     bool light_time_correction_ = true;

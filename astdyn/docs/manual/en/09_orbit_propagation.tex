@@ -1,0 +1,538 @@
+\chapter{Orbit Propagation}
+\label{ch:orbit_propagation}
+
+\section{Introduction}
+
+\textbf{Orbit propagation} is the process of computing the position and velocity of a celestial body at future (or past) times, given its initial state and the forces acting on it. This is fundamental to:
+
+\begin{itemize}
+    \item Predicting where to point telescopes for asteroid observations
+    \item Planning spacecraft maneuvers
+    \item Computing ephemerides for almanacs
+    \item Analyzing long-term orbital evolution
+    \item Assessing collision risks
+\end{itemize}
+
+Building on the integration methods from Chapter~\ref{ch:numerical_integration}, this chapter describes practical orbit propagation in AstDyn.
+
+\section{Problem Formulation}
+
+\subsection{The Propagation Task}
+
+Given:
+\begin{itemize}
+    \item Initial epoch $t_0$ (in some time scale, usually TDB)
+    \item Initial state $\mathbf{y}_0 = [\mathbf{r}_0, \mathbf{v}_0]$ (position and velocity)
+    \item Force model $\mathbf{f}(t, \mathbf{r}, \mathbf{v})$ (accelerations)
+    \item Target epoch $t_f$
+\end{itemize}
+
+Compute:
+\begin{itemize}
+    \item Final state $\mathbf{y}_f = [\mathbf{r}_f, \mathbf{v}_f]$
+    \item Optionally: state transition matrix $\Phi(t_f, t_0)$
+\end{itemize}
+
+\subsection{State Vector}
+
+For heliocentric orbits, the state vector is:
+
+\begin{equation}
+    \mathbf{y} = \begin{bmatrix} x \\ y \\ z \\ \dot{x} \\ \dot{y} \\ \dot{z} \end{bmatrix}
+\end{equation}
+
+Units in AstDyn:
+\begin{itemize}
+    \item Position: AU (astronomical units)
+    \item Velocity: AU/day
+    \item Time: days (MJD or JD)
+\end{itemize}
+
+\subsection{Equations of Motion}
+
+The general form is:
+
+\begin{equation}
+    \frac{d}{dt}\begin{bmatrix} \mathbf{r} \\ \mathbf{v} \end{bmatrix} = \begin{bmatrix} \mathbf{v} \\ \mathbf{a}(t, \mathbf{r}, \mathbf{v}) \end{bmatrix}
+\end{equation}
+
+where the acceleration includes:
+
+\begin{equation}
+    \mathbf{a} = \mathbf{a}_{\text{central}} + \mathbf{a}_{\text{planets}} + \mathbf{a}_{\text{relativity}} + \mathbf{a}_{\text{SRP}} + \ldots
+\end{equation}
+
+\section{Force Models}
+
+\subsection{Central Body Gravity}
+
+The dominant term for solar system orbits:
+
+\begin{equation}
+    \mathbf{a}_{\text{Sun}} = -\frac{\mu_\odot}{r^3}\mathbf{r}
+\end{equation}
+
+where $\mu_\odot = 1.32712440018 \times 10^{20}$ m$^3$/s$^2$ = $0.295912208286$ AU$^3$/day$^2$.
+
+\subsection{Planetary Perturbations}
+
+For each perturbing planet $p$:
+
+\begin{equation}
+    \mathbf{a}_p = \mu_p \left[\frac{\mathbf{r}_p - \mathbf{r}}{|\mathbf{r}_p - \mathbf{r}|^3} - \frac{\mathbf{r}_p}{r_p^3}\right]
+\end{equation}
+
+The first term is the direct attraction, the second is the indirect effect (Sun's acceleration toward the planet).
+
+Planetary positions $\mathbf{r}_p(t)$ are obtained from:
+\begin{itemize}
+    \item SPICE kernels (JPL DE440/441)
+    \item VSOP87 analytical theory
+    \item Simplified Keplerian ephemerides (lower accuracy)
+\end{itemize}
+
+\subsection{Relativistic Correction}
+
+Post-Newtonian (1PN) term:
+
+\begin{equation}
+    \mathbf{a}_{\text{GR}} = \frac{\mu_\odot}{c^2 r^3}\left[4\frac{\mu_\odot}{r}\mathbf{r} - v^2\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
+\end{equation}
+
+This is typically $\sim 10^{-10}$ m/s$^2$ for asteroids, but accumulates over long timescales.
+
+\subsection{Solar Radiation Pressure}
+
+For small bodies or spacecraft:
+
+\begin{equation}
+    \mathbf{a}_{\text{SRP}} = P_\odot \frac{A}{m} C_R \left(\frac{r_0}{r}\right)^2 \hat{\mathbf{r}}_\odot
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $P_\odot = 4.56 \times 10^{-6}$ N/m$^2$ at 1 AU
+    \item $A/m$ is the area-to-mass ratio (m$^2$/kg)
+    \item $C_R \approx 1.3$ is the radiation pressure coefficient
+\end{itemize}
+
+\subsection{Asteroid Perturbations}
+
+For precise work, massive asteroids (Ceres, Vesta, Pallas) can perturb test particle orbits:
+
+\begin{equation}
+    \mathbf{a}_{\text{ast}} = \sum_{i} \mu_i \left[\frac{\mathbf{r}_i - \mathbf{r}}{|\mathbf{r}_i - \mathbf{r}|^3} - \frac{\mathbf{r}_i}{r_i^3}\right]
+\end{equation}
+
+Masses of largest asteroids:
+\begin{itemize}
+    \item Ceres: $9.384 \times 10^{20}$ kg ($\sim 0.0001$ Earth masses)
+    \item Vesta: $2.59 \times 10^{20}$ kg
+    \item Pallas: $2.04 \times 10^{20}$ kg
+\end{itemize}
+
+\section{Coordinate Systems}
+
+\subsection{Reference Frames}
+
+AstDyn supports multiple reference frames:
+
+\begin{description}
+    \item[Heliocentric Ecliptic J2000] Standard for asteroid orbits (default)
+    \item[Heliocentric Equatorial J2000] Common for planetary work
+    \item[Barycentric] Solar system barycenter (for high precision)
+    \item[Topocentric] Observer-centric (for observations)
+\end{description}
+
+\subsection{Frame Transformations}
+
+The ecliptic-to-equatorial rotation is:
+
+\begin{equation}
+    \mathbf{R}_{\text{ecl} \to \text{eq}} = \begin{bmatrix}
+        1 & 0 & 0 \\
+        0 & \cos\epsilon & -\sin\epsilon \\
+        0 & \sin\epsilon & \cos\epsilon
+    \end{bmatrix}
+\end{equation}
+
+where $\epsilon = 23.43929111^\circ$ is the obliquity at J2000.0.
+
+\section{Integration Strategy}
+
+\subsection{Choosing Step Size}
+
+For adaptive integrators (DOPRI54), initial step size estimate:
+
+\begin{equation}
+    h_0 = 0.01 \times \min\left(\frac{r}{v}, \frac{v}{a}\right)
+\end{equation}
+
+Typical step sizes:
+\begin{itemize}
+    \item Near-Earth asteroids: 0.1-1 day
+    \item Main-belt asteroids: 5-20 days
+    \item Jupiter Trojans: 10-30 days
+    \item Comets (near perihelion): 0.01-0.1 day
+\end{itemize}
+
+\subsection{Tolerance Selection}
+
+Position tolerance for orbit determination:
+\begin{itemize}
+    \item Preliminary orbits: $10^{-9}$ AU ($\sim$150 m)
+    \item Final orbits: $10^{-12}$ AU ($\sim$15 cm)
+    \item Very high precision: $10^{-14}$ AU ($\sim$1.5 mm)
+\end{itemize}
+
+The velocity tolerance is typically $10^{-3} \times$ position tolerance.
+
+\subsection{Output Points}
+
+Three strategies for output:
+
+\begin{enumerate}
+    \item \textbf{Dense output}: Store state at every integration step (large memory)
+    \item \textbf{Interpolation}: Use Hermite interpolation between steps
+    \item \textbf{Fixed output}: Specify output times, integrator stops there
+\end{enumerate}
+
+AstDyn supports all three modes.
+
+\section{Propagation Modes}
+
+\subsection{Forward and Backward Propagation}
+
+\textbf{Forward propagation} ($t_f > t_0$):
+\begin{itemize}
+    \item Standard ephemeris generation
+    \item Mission planning
+    \item Impact prediction
+\end{itemize}
+
+\textbf{Backward propagation} ($t_f < t_0$):
+\begin{itemize}
+    \item Orbital history reconstruction
+    \item Finding past close approaches
+    \item Validating orbit determination
+\end{itemize}
+
+Numerical integrators work equally well in both directions if the system is time-reversible.
+
+\subsection{Single Epoch vs Multi-Epoch}
+
+\textbf{Single epoch propagation}:
+\begin{lstlisting}[language=C++,caption={Single epoch propagation}]
+Vector6d y0 = ...;  // Initial state
+double t0 = 60000.0;  // MJD TDB
+double tf = 60365.0;  // 1 year later
+
+Propagator prop(force_model);
+Vector6d yf = prop.propagate(y0, t0, tf);
+\end{lstlisting}
+
+\textbf{Multi-epoch propagation}:
+\begin{lstlisting}[language=C++,caption={Multi-epoch propagation}]
+std::vector<double> epochs = {60000, 60100, 60200, 60300};
+std::vector<Vector6d> states = prop.propagate_multi(y0, t0, epochs);
+\end{lstlisting}
+
+\section{Ephemeris Generation}
+
+\subsection{Tabulated Ephemerides}
+
+For efficient repeated lookups, create a table:
+
+\begin{lstlisting}[language=C++,caption={Generating ephemeris table}]
+EphemerisTable ephem;
+double t_start = 60000.0;
+double t_end = 61000.0;
+double dt = 1.0;  // 1-day intervals
+
+for (double t = t_start; t <= t_end; t += dt) {
+    Vector6d state = prop.propagate(y0, t0, t);
+    ephem.add_entry(t, state);
+}
+
+// Later: interpolate to arbitrary time
+Vector6d state_interp = ephem.interpolate(60123.5);
+\end{lstlisting}
+
+\subsection{Chebyshev Interpolation}
+
+For high-precision ephemerides, JPL uses Chebyshev polynomials:
+
+\begin{equation}
+    \mathbf{r}(t) = \sum_{k=0}^{n} c_k T_k(t')
+\end{equation}
+
+where $T_k$ are Chebyshev polynomials and $t'$ is normalized to $[-1, 1]$.
+
+Advantages:
+\begin{itemize}
+    \item Minimax property (minimizes maximum error)
+    \item Stable for high-degree polynomials
+    \item Fast evaluation
+\end{itemize}
+
+\section{State Transition Matrix}
+
+\subsection{Definition}
+
+The \textbf{state transition matrix} (STM) $\Phi(t, t_0)$ relates perturbations:
+
+\begin{equation}
+    \delta\mathbf{y}(t) = \Phi(t, t_0) \delta\mathbf{y}(t_0)
+\end{equation}
+
+It is a $6 \times 6$ matrix satisfying:
+
+\begin{equation}
+    \frac{d\Phi}{dt} = \mathbf{A}(t)\Phi, \quad \Phi(t_0, t_0) = \mathbf{I}
+\end{equation}
+
+where $\mathbf{A} = \partial\mathbf{f}/\partial\mathbf{y}$ is the Jacobian.
+
+\subsection{Applications}
+
+The STM is essential for:
+\begin{itemize}
+    \item Orbit determination (differential correction)
+    \item Covariance propagation (uncertainty quantification)
+    \item Sensitivity analysis
+    \item Maneuver optimization
+\end{itemize}
+
+\subsection{Computation}
+
+Augment the state vector:
+
+\begin{equation}
+    \tilde{\mathbf{y}} = \begin{bmatrix} \mathbf{y} \\ \text{vec}(\Phi) \end{bmatrix}
+\end{equation}
+
+where $\text{vec}(\Phi)$ stacks the 36 elements of $\Phi$ into a vector.
+
+The augmented system is:
+
+\begin{equation}
+    \frac{d\tilde{\mathbf{y}}}{dt} = \begin{bmatrix} \mathbf{f}(\mathbf{y}) \\ \mathbf{A}(\mathbf{y})\text{vec}(\Phi) \end{bmatrix}
+\end{equation}
+
+\section{Practical Examples}
+
+\subsection{Example 1: Main-Belt Asteroid}
+
+Propagate asteroid 203 Pompeja for 1 year:
+
+\begin{lstlisting}[language=C++,caption={Propagating Pompeja}]
+#include <astdyn/propagation/Propagator.hpp>
+
+using namespace astdyn;
+
+// Initial orbital elements (from OrbFit)
+OrbitalElements elements;
+elements.epoch = 60000.0;  // MJD TDB
+elements.a = 2.743;  // AU
+elements.e = 0.0698;
+elements.i = 11.78 * DEG_TO_RAD;
+elements.Omega = 347.60 * DEG_TO_RAD;
+elements.omega = 59.96 * DEG_TO_RAD;
+elements.M = 164.35 * DEG_TO_RAD;
+
+// Convert to Cartesian
+Vector6d state0 = elements.to_cartesian();
+
+// Setup force model
+ForceModel forces;
+forces.enable_planets({"Jupiter", "Saturn", "Mars", "Earth"});
+forces.enable_relativity(true);
+
+// Create propagator
+Propagator prop(forces);
+prop.set_integrator("DOPRI54");
+prop.set_tolerance(1e-12);
+
+// Propagate 1 year
+double t0 = elements.epoch;
+double tf = t0 + 365.25;
+
+Vector6d state_final = prop.propagate(state0, t0, tf);
+
+// Convert back to elements
+OrbitalElements final_elements = 
+    OrbitalElements::from_cartesian(state_final, tf);
+
+std::cout << "Initial a: " << elements.a << " AU\n";
+std::cout << "Final a:   " << final_elements.a << " AU\n";
+std::cout << "Change:    " << (final_elements.a - elements.a) * 1e6 
+          << " km\n";
+\end{lstlisting}
+
+\subsection{Example 2: Close Approach Analysis}
+
+Find minimum distance to Earth:
+
+\begin{lstlisting}[language=C++,caption={Close approach detection}]
+double min_distance = 1e99;
+double closest_time = 0;
+
+// Propagate with small steps near Earth encounter
+for (double t = t_start; t <= t_end; t += 0.01) {
+    Vector6d asteroid_state = prop.propagate(y0, t0, t);
+    Vector6d earth_state = ephemeris.get_planet("Earth", t);
+    
+    Vector3d rel_pos = asteroid_state.head<3>() - earth_state.head<3>();
+    double distance = rel_pos.norm();
+    
+    if (distance < min_distance) {
+        min_distance = distance;
+        closest_time = t;
+    }
+}
+
+std::cout << "Closest approach: " << min_distance << " AU\n";
+std::cout << "                  " << min_distance * 149597870.7 << " km\n";
+std::cout << "At epoch: " << closest_time << " MJD\n";
+\end{lstlisting}
+
+\subsection{Example 3: Comet Propagation}
+
+Handle large eccentricity near perihelion:
+
+\begin{lstlisting}[language=C++,caption={Comet propagation}]
+// Comet with e = 0.995, q = 0.1 AU
+OrbitalElements comet;
+comet.a = 20.0;  // AU (very eccentric)
+comet.e = 0.995;
+comet.q = comet.a * (1 - comet.e);  // perihelion distance
+
+// Use variable step size, tighter tolerance
+prop.set_tolerance(1e-14);
+prop.set_min_step(1e-4);  // Allow very small steps near perihelion
+prop.set_max_step(30.0);   // Large steps at aphelion
+
+Vector6d state0 = comet.to_cartesian();
+Vector6d state_post_perihelion = prop.propagate(state0, t0, t0 + 180);
+\end{lstlisting}
+
+\section{Performance Optimization}
+
+\subsection{Force Model Selection}
+
+Include only necessary perturbations:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Object} & \textbf{Essential Forces} & \textbf{Optional} \\
+\midrule
+Main-belt asteroid & Sun, Jup, Sat & Mars, Earth, relativity \\
+Near-Earth asteroid & Sun, all planets & Relativity, asteroids \\
+Jupiter Trojan & Sun, Jup, Sat & Uranus, Neptune \\
+Trans-Neptunian & Sun, Jup, Sat, Ura, Nep & Relativity \\
+\bottomrule
+\end{tabular}
+\caption{Recommended force models for different object types.}
+\label{tab:force_models}
+\end{table}
+
+\subsection{Adaptive vs Fixed Step}
+
+\textbf{Adaptive step} (DOPRI54, RK78):
+\begin{itemize}
+    \item Pros: Automatic error control, efficient
+    \item Cons: Non-deterministic step sequence
+    \item Use for: Orbit determination, ephemeris generation
+\end{itemize}
+
+\textbf{Fixed step} (RK4, Leapfrog):
+\begin{itemize}
+    \item Pros: Predictable, parallelizable
+    \item Cons: Must choose step size carefully
+    \item Use for: Long-term evolution, ensemble simulations
+\end{itemize}
+
+\subsection{Parallelization}
+
+For propagating many objects:
+
+\begin{lstlisting}[language=C++,caption={Parallel propagation}]
+#include <omp.h>
+
+std::vector<Vector6d> initial_states = ...;
+std::vector<Vector6d> final_states(initial_states.size());
+
+#pragma omp parallel for
+for (size_t i = 0; i < initial_states.size(); ++i) {
+    Propagator prop(forces);  // Each thread has its own propagator
+    final_states[i] = prop.propagate(initial_states[i], t0, tf);
+}
+\end{lstlisting}
+
+\section{Accuracy Validation}
+
+\subsection{Energy Conservation}
+
+For conservative systems (no SRP, drag), energy should be conserved:
+
+\begin{equation}
+    E = \frac{v^2}{2} - \frac{\mu}{r} = \text{constant}
+\end{equation}
+
+Check energy error:
+\begin{lstlisting}[language=C++,caption={Energy check}]
+double E0 = 0.5 * v0.squaredNorm() - MU_SUN / r0.norm();
+double Ef = 0.5 * vf.squaredNorm() - MU_SUN / rf.norm();
+double dE = std::abs(Ef - E0);
+std::cout << "Energy error: " << dE / std::abs(E0) * 100 << "%\n";
+\end{lstlisting}
+
+For high-quality integrators: $\Delta E / E < 10^{-10}$
+
+\subsection{Two-Body Comparison}
+
+Validate against analytical Keplerian solution:
+
+\begin{lstlisting}[language=C++,caption={Keplerian comparison}]
+// Numerical propagation (with perturbations off)
+Vector6d state_num = prop.propagate(y0, t0, tf);
+
+// Analytical Keplerian propagation
+OrbitalElements elem0 = OrbitalElements::from_cartesian(y0, t0);
+elem0.propagate_mean_anomaly(tf - t0);
+Vector6d state_kep = elem0.to_cartesian();
+
+// Compare
+Vector3d pos_diff = state_num.head<3>() - state_kep.head<3>();
+std::cout << "Position difference: " << pos_diff.norm() * AU_TO_KM 
+          << " km\n";
+\end{lstlisting}
+
+Expected: $< 1$ km for short arcs, $< 100$ km for 1 year.
+
+\section{Summary}
+
+Key concepts about orbit propagation:
+
+\begin{enumerate}
+    \item \textbf{Propagation} computes future/past states from initial conditions
+    \item \textbf{Force models} must include all significant perturbations
+    \item \textbf{Adaptive integrators} (DOPRI54) balance accuracy and efficiency
+    \item \textbf{Step size} depends on orbital period and eccentricity
+    \item \textbf{State transition matrix} enables orbit determination
+    \item \textbf{Reference frames} must be consistent throughout
+    \item \textbf{Validation} through energy conservation and analytical comparisons
+\end{enumerate}
+
+Understanding orbit propagation is essential for:
+\begin{itemize}
+    \item Generating accurate ephemerides
+    \item Planning observations and missions
+    \item Assessing collision risks
+    \item Studying long-term dynamics
+    \item Orbit determination (next chapter)
+\end{itemize}
+
+In the next chapter, we will use propagation with the state transition matrix for precise orbit determination from observations.

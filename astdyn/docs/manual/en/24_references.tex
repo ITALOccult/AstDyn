@@ -1,0 +1,521 @@
+\chapter{Best Practices}
+\label{ch:best_practices}
+
+\section{Introduction}
+
+This chapter provides practical guidelines for using AstDyn effectively, covering configuration choices, workflow patterns, and common pitfalls to avoid.
+
+\section{Integration Settings}
+
+\subsection{Choosing Tolerance}
+
+Match tolerance to your accuracy requirements:
+
+\begin{table}[h]
+\centering
+\caption{Recommended integration tolerances}
+\begin{tabular}{lcp{6cm}}
+\hline
+\textbf{Application} & \textbf{Tolerance} & \textbf{Rationale} \\
+\hline
+Preliminary studies & $10^{-10}$ & Fast, 50 km accuracy over 60 days \\
+Standard orbit determination & $10^{-12}$ & Default, 3 km accuracy \\
+High-precision ephemerides & $10^{-14}$ & Research-grade, sub-km accuracy \\
+Numerical experiments & $10^{-16}$ & Maximum precision, slow \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Rule of thumb}: Tighter tolerance $\Rightarrow$ more steps $\Rightarrow$ slower but more accurate.
+
+\subsection{Step Size Limits}
+
+Configure adaptive step size bounds:
+
+\begin{lstlisting}[language=C++]
+auto integrator = std::make_shared<RKF78>(
+    1e-12,      // tolerance
+    1e-6,       // min step (days) - prevents excessive refinement
+    100.0       // max step (days) - limits coarse steps
+);
+\end{lstlisting}
+
+\textbf{Guidelines}:
+\begin{itemize}
+    \item \textbf{Min step}: Set to $10^{-6}$ days (0.1 seconds) to prevent near-singular behavior
+    \item \textbf{Max step}: Limit to orbital period / 100 for smooth sampling
+    \item \textbf{High eccentricity}: Reduce max step near perihelion
+\end{itemize}
+
+\subsection{Handling Extreme Eccentricity}
+
+For $e > 0.9$:
+
+\begin{lstlisting}[language=C++]
+// Tighter tolerance near perihelion
+double tol = (elem.e > 0.9) ? 1e-14 : 1e-12;
+
+// Smaller max step
+double max_step = elem.period() / 1000.0;  // 1000 steps per orbit
+
+auto integrator = std::make_shared<RKF78>(tol, 1e-6, max_step);
+\end{lstlisting}
+
+\section{Force Model Selection}
+
+\subsection{Main-Belt Asteroids}
+
+Standard configuration:
+
+\begin{lstlisting}[language=C++]
+auto forces = std::make_shared<PointMassGravity>(
+    ephemeris, 
+    std::vector<std::string>{"JUPITER", "SATURN"}
+);
+\end{lstlisting}
+
+\textbf{Rationale}:
+\begin{itemize}
+    \item Jupiter: Dominates perturbations ($\sim$99\% of effect)
+    \item Saturn: Next largest ($\sim$1\%)
+    \item Uranus, Neptune: Negligible ($< 0.01\%$)
+    \item Inner planets: Minimal for main-belt
+\end{itemize}
+
+\subsection{Near-Earth Asteroids}
+
+Include Earth and Mars:
+
+\begin{lstlisting}[language=C++]
+auto forces = std::make_shared<PointMassGravity>(
+    ephemeris,
+    std::vector<std::string>{"EARTH", "JUPITER", "MARS", "VENUS"}
+);
+\end{lstlisting}
+
+\textbf{Priority}: Earth $>$ Jupiter $>$ Mars $>$ Venus for typical NEAs.
+
+\subsection{Outer Solar System}
+
+Include all giant planets:
+
+\begin{lstlisting}[language=C++]
+auto forces = std::make_shared<PointMassGravity>(
+    ephemeris,
+    std::vector<std::string>{"JUPITER", "SATURN", "URANUS", "NEPTUNE"}
+);
+\end{lstlisting}
+
+\subsection{Performance Considerations}
+
+\begin{table}[h]
+\centering
+\caption{Force model cost vs. benefit}
+\begin{tabular}{lccc}
+\hline
+\textbf{Bodies} & \textbf{Time} & \textbf{Accuracy (60d)} & \textbf{Use When} \\
+\hline
+Sun only & 1.0$\times$ & 15,000 km & Never (educational) \\
++ Jupiter & 1.4$\times$ & 150 km & Quick estimates \\
++ Saturn & 1.6$\times$ & 3 km & Standard \\
++ 4 giants & 2.0$\times$ & 2 km & High precision \\
++ all planets & 2.6$\times$ & 1 km & Research \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Recommendation}: Sun + Jupiter + Saturn for production work.
+
+\section{Observation Handling}
+
+\subsection{Weighting Strategy}
+
+Use inverse-variance weighting:
+
+\begin{lstlisting}[language=C++]
+// Default: uniform 0.5 arcsec uncertainty
+for (auto& obs : observations) {
+    if (obs.sigma_ra == 0.0) {
+        obs.sigma_ra = 0.5 * ARCSEC_TO_RAD;
+        obs.sigma_dec = 0.5 * ARCSEC_TO_RAD;
+    }
+}
+\end{lstlisting}
+
+\textbf{Guidelines}:
+\begin{itemize}
+    \item \textbf{Modern CCD (Pan-STARRS, etc.)}: 0.1-0.3 arcsec
+    \item \textbf{Older CCD}: 0.5-1.0 arcsec
+    \item \textbf{Photographic plates}: 1-3 arcsec
+    \item \textbf{Visual observations}: 5-10 arcsec (avoid if possible)
+\end{itemize}
+
+\subsection{Outlier Detection}
+
+Implement 3-sigma rejection:
+
+\begin{lstlisting}[language=C++]
+// After initial solution
+auto result = diff_corrector.solve(initial_guess, observations, obs_coords);
+
+// Compute 3-sigma threshold
+double threshold = 3.0 * result.rms_residual;
+
+// Filter outliers
+std::vector<Observation> filtered_obs;
+for (size_t i = 0; i < observations.size(); ++i) {
+    double residual = result.residuals(i);
+    if (std::abs(residual) < threshold) {
+        filtered_obs.push_back(observations[i]);
+    }
+}
+
+// Re-solve with filtered observations
+result = diff_corrector.solve(result.elements, filtered_obs, obs_coords);
+\end{lstlisting}
+
+\subsection{Arc Length Selection}
+
+\begin{table}[h]
+\centering
+\caption{Optimal arc length by object type}
+\begin{tabular}{lcc}
+\hline
+\textbf{Object Type} & \textbf{Minimum Arc} & \textbf{Optimal Arc} \\
+\hline
+NEA (fast motion) & 3 days & 7-14 days \\
+Main-belt asteroid & 14 days & 30-60 days \\
+Outer main-belt & 30 days & 60-90 days \\
+Trojan/Centaur & 60 days & 90-180 days \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Principle}: Arc should span $\geq 3°$ of sky motion for good orbit determination.
+
+\section{Convergence Criteria}
+
+\subsection{Differential Correction Settings}
+
+\begin{lstlisting}[language=C++]
+DifferentialCorrector corrector(
+    propagator,
+    20,      // max_iterations
+    1e-8     // convergence_tol (AU for position)
+);
+\end{lstlisting}
+
+\textbf{Guidelines}:
+\begin{itemize}
+    \item \textbf{Max iterations}: 20 sufficient for well-conditioned problems
+    \item \textbf{Convergence tolerance}: $10^{-8}$ AU $\approx$ 1.5 km (typical)
+    \item \textbf{Good initial guess}: Converges in 3-5 iterations
+    \item \textbf{Poor initial guess}: May need 10-15 iterations
+\end{itemize}
+
+\subsection{Monitoring Convergence}
+
+Check iteration metrics:
+
+\begin{lstlisting}[language=C++]
+auto result = corrector.solve(initial_guess, observations, obs_coords);
+
+if (!result.converged) {
+    std::cerr << "Warning: Did not converge in " 
+              << result.iterations << " iterations\n";
+    std::cerr << "Final RMS: " << result.rms_residual << " arcsec\n";
+    
+    // Possible causes:
+    // - Poor initial guess (try different IOD method)
+    // - Observation outliers (filter and retry)
+    // - Insufficient arc (need more data)
+    // - Force model mismatch (add perturbations)
+}
+\end{lstlisting}
+
+\subsection{Handling Non-Convergence}
+
+Troubleshooting steps:
+
+\begin{enumerate}
+    \item \textbf{Check initial guess}: $|\Delta a| < 0.1$ AU from true orbit?
+    \item \textbf{Filter outliers}: Remove observations with residuals $> 3\sigma$
+    \item \textbf{Adjust tolerance}: Temporarily loosen to $10^{-6}$ AU
+    \item \textbf{Try different IOD}: Gauss, Laplace, or Gooding method
+    \item \textbf{Split arc}: Try shorter arc to diagnose problem
+\end{enumerate}
+
+\section{Initial Orbit Determination}
+
+\subsection{Observation Selection}
+
+Gauss method requires 3 well-separated observations:
+
+\begin{lstlisting}[language=C++]
+// Select observations: first, middle, last
+auto obs1 = observations.front();
+auto obs2 = observations[observations.size() / 2];
+auto obs3 = observations.back();
+
+GaussIOD gauss;
+auto initial_elements = gauss.solve(obs1, obs2, obs3);
+\end{lstlisting}
+
+\textbf{Guidelines}:
+\begin{itemize}
+    \item Observations should span $> 50\%$ of total arc
+    \item Avoid clustered observations (poor geometry)
+    \item Prefer observations with good SNR
+\end{itemize}
+
+\subsection{Validating IOD Solution}
+
+\begin{lstlisting}[language=C++]
+auto elem = gauss.solve(obs1, obs2, obs3);
+
+// Sanity checks
+if (!elem.is_valid()) {
+    std::cerr << "Invalid orbital elements from Gauss IOD\n";
+    // Try different observation triplet
+}
+
+if (elem.e >= 1.0) {
+    std::cerr << "Warning: Hyperbolic orbit (e >= 1)\n";
+    // May indicate poor observation geometry
+}
+
+if (elem.a < 0.5 || elem.a > 50.0) {
+    std::cerr << "Warning: Unusual semimajor axis: " << elem.a << " AU\n";
+    // Outside typical asteroid range
+}
+\end{lstlisting}
+
+\section{Ephemeris Configuration}
+
+\subsection{Choosing Ephemeris Provider}
+
+\begin{table}[h]
+\centering
+\caption{Ephemeris comparison}
+\begin{tabular}{lccc}
+\hline
+\textbf{Provider} & \textbf{Accuracy} & \textbf{Speed} & \textbf{Use Case} \\
+\hline
+SPICE (DE440) & $< 1$ km & Slow & Production \\
+SPICE (DE440s) & $< 1$ km & Medium & Limited time span \\
+Analytic & $\sim 100$ km & Fast & Quick estimates \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{SPICE Configuration}
+
+\begin{lstlisting}[language=C++]
+// Load appropriate kernel
+auto ephemeris = std::make_shared<SPICEEphemeris>();
+
+// Standard kernel (1850-2150)
+ephemeris->load_kernel("de440.bsp");
+
+// Optionally: leapseconds kernel for UTC conversion
+ephemeris->load_kernel("naif0012.tls");
+\end{lstlisting}
+
+\textbf{Kernel selection}:
+\begin{itemize}
+    \item \textbf{de440s.bsp}: 1849-2150, 18 MB (recommended)
+    \item \textbf{de440.bsp}: 1550-2650, 115 MB (extended)
+    \item \textbf{de441.bsp}: -13200-17191, 302 MB (research)
+\end{itemize}
+
+\section{Error Handling}
+
+\subsection{Exception Strategy}
+
+\begin{lstlisting}[language=C++]
+try {
+    // Parse orbital elements
+    auto parser = ParserFactory::create(filename);
+    auto elements = parser->parse(filename);
+    
+    // Setup and propagate
+    auto state = propagator.propagate(elements.to_cartesian(), target_epoch);
+    
+} catch (const ParseError& e) {
+    std::cerr << "Parse error: " << e.what() << "\n";
+    // Handle: check file format, try different parser
+    
+} catch (const PropagationError& e) {
+    std::cerr << "Propagation error: " << e.what() << "\n";
+    // Handle: check integration settings, force model
+    
+} catch (const ConvergenceError& e) {
+    std::cerr << "Convergence error: " << e.what() << "\n";
+    // Handle: adjust settings, filter outliers
+    
+} catch (const std::exception& e) {
+    std::cerr << "Unexpected error: " << e.what() << "\n";
+    // General error handling
+}
+\end{lstlisting}
+
+\subsection{Logging Best Practices}
+
+\begin{lstlisting}[language=C++]
+// Enable diagnostic output
+std::ofstream logfile("astdyn.log");
+
+logfile << "Starting orbit determination for " << object_name << "\n";
+logfile << "Observations: " << observations.size() << "\n";
+logfile << "Arc: " << (observations.back().epoch - observations.front().epoch) 
+        << " days\n";
+
+// Log iteration progress
+for (int iter = 0; iter < max_iterations; ++iter) {
+    logfile << "Iteration " << iter << ": RMS = " 
+            << current_rms << " arcsec\n";
+}
+
+logfile << "Converged: " << (result.converged ? "Yes" : "No") << "\n";
+logfile << "Final RMS: " << result.rms_residual << " arcsec\n";
+\end{lstlisting}
+
+\section{Performance Optimization}
+
+\subsection{Compilation Flags}
+
+Always compile with optimization:
+
+\begin{lstlisting}[language=bash]
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_FLAGS="-O3 -march=native -DEIGEN_VECTORIZE" \
+    -DEIGEN_NO_DEBUG=ON
+\end{lstlisting}
+
+\textbf{Impact}: 7-8$\times$ speedup vs. debug build.
+
+\subsection{Batch Processing}
+
+Process multiple objects efficiently:
+
+\begin{lstlisting}[language=C++]
+// Setup once, reuse for all objects
+auto ephemeris = std::make_shared<SPICEEphemeris>();
+ephemeris->load_kernel("de440s.bsp");
+
+auto forces = std::make_shared<PointMassGravity>(
+    ephemeris, std::vector<std::string>{"JUPITER", "SATURN"});
+
+auto integrator = std::make_shared<RKF78>(1e-12);
+Propagator propagator(integrator, forces, ephemeris);
+
+// Process each object
+for (const auto& object_file : object_files) {
+    auto observations = MPCReader::read_file(object_file);
+    // ... orbit determination ...
+}
+\end{lstlisting}
+
+\textbf{Benefit}: Avoid repeated ephemeris loading (saves $\sim$700 ms per object).
+
+\section{Validation Checklist}
+
+Before trusting results:
+
+\begin{itemize}
+    \item[$\square$] RMS residual $< 2\sigma$ of assumed observation uncertainty
+    \item[$\square$] No systematic trends in residuals vs. time
+    \item[$\square$] Residuals approximately Gaussian distributed
+    \item[$\square$] Orbital elements physically reasonable ($e < 1$, $a > 0$)
+    \item[$\square$] Parameter uncertainties consistent with arc length
+    \item[$\square$] Compare with published orbit (if available)
+    \item[$\square$] Check for outliers ($> 3\sigma$)
+    \item[$\square$] Verify convergence achieved
+\end{itemize}
+
+\section{Common Workflows}
+
+\subsection{Standard Orbit Determination}
+
+\begin{lstlisting}[language=C++]
+// 1. Load observations
+auto observations = MPCReader::read_file("observations.txt");
+
+// 2. Load observatory coordinates
+std::vector<ObservatoryCoordinates> obs_coords = 
+    load_observatory_database();
+
+// 3. Initial orbit (Gauss)
+GaussIOD gauss;
+auto initial_elem = gauss.solve(
+    observations[0], 
+    observations[observations.size()/2], 
+    observations.back()
+);
+
+// 4. Setup propagator
+auto eph = std::make_shared<SPICEEphemeris>();
+eph->load_kernel("de440s.bsp");
+auto forces = std::make_shared<PointMassGravity>(
+    eph, std::vector<std::string>{"JUPITER", "SATURN"});
+auto integrator = std::make_shared<RKF78>(1e-12);
+auto prop = std::make_shared<Propagator>(integrator, forces, eph);
+
+// 5. Differential correction
+DifferentialCorrector dc(prop, 20, 1e-8);
+auto result = dc.solve(initial_elem, observations, obs_coords);
+
+// 6. Validate
+if (result.converged && result.rms_residual < 2.0) {
+    std::cout << "Success!\n";
+    std::cout << "a = " << result.elements.a << " AU\n";
+    std::cout << "e = " << result.elements.e << "\n";
+    std::cout << "RMS = " << result.rms_residual << " arcsec\n";
+} else {
+    std::cerr << "Solution questionable\n";
+}
+\end{lstlisting}
+
+\subsection{Ephemeris Generation}
+
+\begin{lstlisting}[language=C++]
+// Generate 1-year ephemeris at daily intervals
+auto state0 = elements.to_cartesian();
+double start = elements.epoch;
+double end = elements.epoch + 365.0;
+double step = 1.0;  // days
+
+auto ephemeris_table = propagator.generate_ephemeris(
+    state0, start, end, step);
+
+// Write to file
+std::ofstream outfile("ephemeris.txt");
+for (const auto& state : ephemeris_table) {
+    outfile << std::fixed << std::setprecision(6)
+            << state.epoch << " "
+            << state.position[0] << " "
+            << state.position[1] << " "
+            << state.position[2] << "\n";
+}
+\end{lstlisting}
+
+\section{Troubleshooting Guide}
+
+See Chapter 25 for detailed troubleshooting procedures.
+
+\section{Summary}
+
+Key recommendations:
+
+\begin{enumerate}
+    \item \textbf{Integration}: Use $10^{-12}$ tolerance, Sun+Jupiter+Saturn for main-belt
+    \item \textbf{Observations}: Weight by inverse variance, filter 3-sigma outliers
+    \item \textbf{Arc length}: 30-60 days optimal for main-belt asteroids
+    \item \textbf{Convergence}: Monitor RMS, expect 3-5 iterations for good IOD
+    \item \textbf{Validation}: Check residuals, compare with published orbits
+    \item \textbf{Performance}: Compile with -O3, reuse ephemeris objects
+    \item \textbf{Error handling}: Use exceptions, log diagnostics
+\end{enumerate}
+
+Following these practices ensures reliable, efficient orbit determination.

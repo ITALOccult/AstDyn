@@ -1,0 +1,366 @@
+\chapter{Sistemi di Riferimento}
+\label{ch:sistemi_riferimento}
+
+\section{Introduzione ai Sistemi di Riferimento}
+
+In meccanica celeste, un \textbf{sistema di riferimento} (o \textbf{frame di riferimento}) è un sistema di coordinate utilizzato per specificare le posizioni e le velocità dei corpi celesti. La scelta del sistema di riferimento è cruciale perché:
+
+\begin{itemize}
+    \item Gli elementi orbitali sono definiti rispetto a un sistema specifico
+    \item Le trasformazioni tra sistemi sono necessarie per le osservazioni
+    \item Applicazioni diverse possono preferire sistemi diversi
+    \item L'accuratezza numerica dipende dalla scelta del sistema
+\end{itemize}
+
+Un sistema di riferimento è costituito da:
+\begin{enumerate}
+    \item Un'\textbf{origine} (es. centro della Terra, baricentro del Sistema Solare)
+    \item Un \textbf{piano fondamentale} (es. equatore, eclittica)
+    \item Una \textbf{direzione di riferimento} (es. punto vernale)
+    \item Un'\textbf{epoca} per l'orientamento (es. J2000.0)
+\end{enumerate}
+
+\section{Il Sistema di Riferimento Celeste Internazionale (ICRS)}
+
+L'\textbf{ICRS} è l'attuale sistema di riferimento celeste standard adottato dall'Unione Astronomica Internazionale (IAU) nel 1998. Rappresenta la realizzazione più precisa di un sistema di riferimento inerziale.
+
+\subsection{Definizione dell'ICRS}
+
+L'ICRS è definito da:
+\begin{itemize}
+    \item \textbf{Origine}: Baricentro del Sistema Solare
+    \item \textbf{Piano fondamentale}: Equatore medio terrestre a J2000.0 (con correzioni)
+    \item \textbf{Direzione di riferimento}: Punto vernale medio a J2000.0 (con correzioni)
+    \item \textbf{Realizzazione}: Posizioni di 212 sorgenti radio extragalattiche (quasar)
+\end{itemize}
+
+L'ICRS è un sistema cinematicamente non rotante con assi definiti con precisione del microarcosecondo utilizzando osservazioni VLBI (Very Long Baseline Interferometry) di quasar.
+
+\subsection{Relazione con J2000.0}
+
+L'ICRS è strettamente allineato con il sistema equatoriale J2000.0 ma differisce per:
+\begin{itemize}
+    \item Bias del sistema: $\sim$20 milliarcsec di orientamento
+    \item Nessuna velocità di rotazione (veramente inerziale)
+    \item Definizione basata su sorgenti extragalattiche (non sulla rotazione terrestre)
+\end{itemize}
+
+Per la maggior parte delle applicazioni nella dinamica asteroidale, la differenza tra ICRS e J2000.0 è trascurabile ($<0.1$ arcsec su secoli).
+
+\section{Il Sistema Equatoriale J2000.0}
+
+Il sistema \textbf{J2000.0} è il sistema di riferimento più comunemente utilizzato in meccanica celeste ed è il sistema predefinito in AstDyn.
+
+\subsection{Definizione di J2000.0}
+
+\begin{itemize}
+    \item \textbf{Epoca}: 1 gennaio 2000, 12:00 TT (JD 2451545.0)
+    \item \textbf{Origine}: Baricentro del Sistema Solare (o centro della Terra per geocentrico)
+    \item \textbf{Piano fondamentale}: Equatore medio terrestre a J2000.0
+    \item \textbf{Asse X}: Punta verso il punto vernale medio a J2000.0
+    \item \textbf{Asse Z}: Perpendicolare all'equatore, verso il polo celeste nord
+    \item \textbf{Asse Y}: Completa il sistema destrorso ($\mathbf{Y} = \mathbf{Z} \times \mathbf{X}$)
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.5]
+    % Piano fondamentale (equatore)
+    \draw[thick,blue!30,fill=blue!5] (0,0) ellipse (3cm and 1cm);
+    \node[blue] at (3.2,0.5) {Equatore};
+    
+    % Origine
+    \filldraw[black] (0,0) circle (2pt);
+    \node[below] at (0,-0.2) {Origine};
+    
+    % Asse X (verso punto vernale)
+    \draw[->,thick,red] (0,0) -- (3.5,0);
+    \node[red,right] at (3.5,0) {$\mathbf{X}$ (verso $\gamma$)};
+    
+    % Asse Y
+    \draw[->,thick,green!60!black] (0,0) -- (0,2);
+    \node[green!60!black,above] at (0,2) {$\mathbf{Y}$};
+    
+    % Asse Z (verso PCN)
+    \draw[->,thick,blue] (0,0) -- (-1.5,2.5);
+    \node[blue,left] at (-1.5,2.5) {$\mathbf{Z}$ (PCN)};
+    
+    % Simbolo punto vernale
+    \node[red] at (3.2,-0.3) {$\gamma$};
+    
+    % Oggetto celeste
+    \filldraw[orange] (2,1.8) circle (3pt);
+    \draw[->,dashed] (0,0) -- (2,1.8);
+    \node[orange,right] at (2,1.8) {Oggetto celeste};
+    
+    % Arco ascensione retta
+    \draw[->,purple] (0.8,0) arc (0:40:0.8);
+    \node[purple] at (1.2,0.4) {$\alpha$};
+    
+    % Arco declinazione
+    \draw[->,purple] (1.5,0) -- (1.5,1.35);
+    \node[purple,right] at (1.5,0.7) {$\delta$};
+\end{tikzpicture}
+\caption{Sistema di riferimento equatoriale J2000.0 che mostra i tre assi e la definizione dell'ascensione retta ($\alpha$) e della declinazione ($\delta$).}
+\label{fig:j2000_frame_it}
+\end{figure}
+
+\subsection{Sistemi Eliocentrici vs. Baricentrici}
+
+Per le orbite asteroidali, utilizziamo tipicamente:
+\begin{itemize}
+    \item \textbf{Sistema eliocentrico}: Origine al centro del Sole. Adatto per oggetti del sistema solare interno dove il Sole domina la dinamica gravitazionale.
+    \item \textbf{Sistema baricentrico}: Origine al baricentro del Sistema Solare. Richiesto per calcoli precisi che coinvolgono Giove e i pianeti esterni, poiché il baricentro Sole-Giove si trova al di fuori della superficie solare.
+\end{itemize}
+
+La trasformazione tra sistemi eliocentrici e baricentrici coinvolge la posizione del Sole rispetto al baricentro:
+\begin{equation}
+    \mathbf{r}_{\text{bary}} = \mathbf{r}_{\text{helio}} + \mathbf{r}_{\text{Sole,bary}}
+\end{equation}
+
+Per asteroidi con $a < 10$ UA, la differenza è tipicamente $< 10^{-6}$ UA.
+
+\section{Il Sistema di Riferimento Eclittico}
+
+Il \textbf{sistema eclittico} utilizza il piano dell'orbita terrestre come piano fondamentale.
+
+\subsection{Definizione dell'Eclittica}
+
+\begin{itemize}
+    \item \textbf{Piano fondamentale}: Eclittica media a J2000.0
+    \item \textbf{Asse X}: Verso il punto vernale medio a J2000.0
+    \item \textbf{Asse Z}: Perpendicolare all'eclittica, verso il polo eclittico nord
+    \item \textbf{Asse Y}: Completa il sistema destrorso
+\end{itemize}
+
+Il sistema eclittico è naturale per descrivere le orbite planetarie e asteroidali perché:
+\begin{itemize}
+    \item La maggior parte delle orbite giace vicino al piano eclittico
+    \item Le inclinazioni sono tipicamente piccole ($i < 30^\circ$)
+    \item I modelli di formazione del sistema solare prevedono l'allineamento eclittico
+\end{itemize}
+
+\subsection{Coordinate Eclittiche}
+
+Nel sistema eclittico, le posizioni sono specificate da:
+\begin{itemize}
+    \item \textbf{Longitudine eclittica} ($\lambda$): Angolo dal punto vernale lungo l'eclittica
+    \item \textbf{Latitudine eclittica} ($\beta$): Angolo perpendicolare all'eclittica
+    \item \textbf{Distanza} ($r$): Distanza radiale dall'origine
+\end{itemize}
+
+Conversione da coordinate cartesiane eclittiche:
+\begin{align}
+    \lambda &= \arctan\left(\frac{Y_{\text{ecl}}}{X_{\text{ecl}}}\right) \\
+    \beta &= \arctan\left(\frac{Z_{\text{ecl}}}{\sqrt{X_{\text{ecl}}^2 + Y_{\text{ecl}}^2}}\right) \\
+    r &= \sqrt{X_{\text{ecl}}^2 + Y_{\text{ecl}}^2 + Z_{\text{ecl}}^2}
+\end{align}
+
+\section{Trasformazioni tra Sistemi di Riferimento}
+
+\subsection{Trasformazione Equatoriale-Eclittica}
+
+La trasformazione dalle coordinate equatoriali J2000.0 alle coordinate eclittiche J2000.0 è una rotazione attorno all'asse X dell'\textbf{obliquità dell'eclittica} ($\varepsilon_0$):
+
+\begin{equation}
+    \begin{pmatrix}
+        X_{\text{ecl}} \\
+        Y_{\text{ecl}} \\
+        Z_{\text{ecl}}
+    \end{pmatrix}
+    =
+    \begin{pmatrix}
+        1 & 0 & 0 \\
+        0 & \cos\varepsilon_0 & \sin\varepsilon_0 \\
+        0 & -\sin\varepsilon_0 & \cos\varepsilon_0
+    \end{pmatrix}
+    \begin{pmatrix}
+        X_{\text{eq}} \\
+        Y_{\text{eq}} \\
+        Z_{\text{eq}}
+    \end{pmatrix}
+\end{equation}
+
+A J2000.0, l'obliquità è:
+\begin{equation}
+    \varepsilon_0 = 23^\circ26'21.406'' = 23.4392911^\circ
+\end{equation}
+
+La trasformazione inversa è semplicemente una rotazione di $-\varepsilon_0$:
+\begin{equation}
+    \mathbf{R}_{\text{ecl}\to\text{eq}} = \mathbf{R}_{\text{eq}\to\text{ecl}}^T
+\end{equation}
+
+\subsection{Precessione: Trasformazioni Dipendenti dal Tempo}
+
+L'asse di rotazione terrestre precede a causa delle coppie esercitate dalla Luna e dal Sole sul rigonfiamento equatoriale terrestre. Questo causa un cambiamento dell'orientamento del piano equatoriale nel tempo.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.2]
+    % Piano eclittico
+    \draw[thick,blue!30,fill=blue!5] (-3,0) -- (3,0) -- (3,0.5) -- (-3,0.5) -- cycle;
+    \node[blue] at (3.3,0.25) {Eclittica};
+    
+    % Equatore all'epoca 1
+    \draw[thick,red!50,dashed] (-2.5,-1) -- (2.5,1);
+    \node[red!50] at (2.8,1.2) {Equatore (t_1)};
+    
+    % Equatore all'epoca 2
+    \draw[thick,red,dashed] (-2.5,-0.5) -- (2.5,1.5);
+    \node[red] at (2.8,1.7) {Equatore (t_2)};
+    
+    % Precessione polo celeste
+    \draw[->,thick,purple] (0,2) arc (90:70:2);
+    \node[purple] at (-0.8,2.2) {Precessione};
+    
+    % Precessione punto vernale
+    \draw[->,thick,orange] (1.5,0.25) arc (0:-15:1.5);
+    \node[orange] at (1.2,-0.5) {$\gamma$ si muove};
+    
+    % Angolo obliquità
+    \draw[<->,dashed] (1.5,0.25) -- (1.5,1);
+    \node[right] at (1.6,0.6) {$\varepsilon$};
+\end{tikzpicture}
+\caption{La precessione causa il cambiamento dell'orientamento del piano equatoriale nel tempo. Il punto vernale $\gamma$ si sposta verso ovest lungo l'eclittica a circa 50.3 arcosecondi all'anno.}
+\label{fig:precession_it}
+\end{figure}
+
+Il tasso di precessione è approssimativamente:
+\begin{equation}
+    \frac{d\alpha}{dt} \approx 50.3'' \text{ all'anno (in ascensione retta)}
+\end{equation}
+
+Per trasformazioni tra epoche diverse (es. da J2000.0 alla data), devono essere applicate matrici di precessione. Il modello di precessione IAU 2006 è l'attuale standard.
+
+\subsection{Implementazione in AstDyn}
+
+In AstDyn, la classe \texttt{ReferenceFrame} gestisce le trasformazioni di coordinate:
+
+\begin{lstlisting}[language=C++,caption={Trasformazioni di coordinate in AstDyn}]
+#include <astdyn/core/ReferenceFrame.hpp>
+
+using namespace astdyn;
+
+// Trasformazione equatoriale -> eclittica
+Vector3d r_eq(1.0, 0.5, 0.3);  // UA, J2000.0 equatoriale
+Vector3d r_ecl = ReferenceFrame::equatorial_to_ecliptic(r_eq);
+
+// Eclittica -> equatoriale
+Vector3d r_eq2 = ReferenceFrame::ecliptic_to_equatorial(r_ecl);
+
+// Verifica round-trip: r_eq ~~ r_eq2
+std::cout << "Errore round-trip: " 
+          << (r_eq - r_eq2).norm() << " UA\n";
+// Output: Errore round-trip: 1.23e-16 UA
+
+// Precessione da J2000.0 alla data
+double jd_now = 2460000.0;  // Epoca corrente
+Matrix3d precession_matrix = 
+    ReferenceFrame::precession_matrix_j2000_to_date(jd_now);
+    
+Vector3d r_now = precession_matrix * r_eq;
+\end{lstlisting}
+
+\section{Altri Importanti Sistemi di Riferimento}
+
+\subsection{Il Sistema FK5}
+
+Il \textbf{Fifth Fundamental Catalogue (FK5)} era il sistema di riferimento standard prima dell'ICRS. È basato su osservazioni di stelle brillanti ed è equivalente a J2000.0 per la maggior parte degli scopi.
+
+\begin{itemize}
+    \item \textbf{Epoca}: J2000.0
+    \item \textbf{Realizzazione}: 1535 stelle fondamentali
+    \item \textbf{Accuratezza}: $\sim$10 milliarcsec
+    \item \textbf{Relazione con ICRS}: Piccole differenze sistematiche
+\end{itemize}
+
+Per il lavoro con gli asteroidi, FK5 e ICRS sono intercambiabili entro le incertezze osservative.
+
+\subsection{Il Piano Invariabile}
+
+Il \textbf{piano invariabile} è perpendicolare al vettore momento angolare totale del sistema solare. È veramente inerziale (nessuna coppia esterna) e fornisce un riferimento dinamicamente naturale.
+
+\begin{itemize}
+    \item \textbf{Inclinazione rispetto all'eclittica}: $\sim1.58^\circ$
+    \item \textbf{Dominato da}: Momento angolare orbitale di Giove ($\sim60\%$ del totale)
+    \item \textbf{Uso}: Studi dinamici, analisi di stabilità a lungo termine
+\end{itemize}
+
+Il piano invariabile non è utilizzato per le osservazioni ma è prezioso per gli studi teorici.
+
+\subsection{Sistemi Corpo-Centrici}
+
+Per la dinamica satellitare o gli avvicinamenti ravvicinati, si usano sistemi corpo-centrici:
+
+\begin{itemize}
+    \item \textbf{Origine}: Centro di massa del corpo (es. Terra, Marte)
+    \item \textbf{Orientamento}: Spesso allineato con l'asse di rotazione del corpo
+    \item \textbf{Esempi}: Earth-centered inertial (ECI), sistemi planetocentrici
+\end{itemize}
+
+\section{Considerazioni Pratiche}
+
+\subsection{Precisione Numerica}
+
+Quando si lavora con sistemi di riferimento:
+\begin{itemize}
+    \item Usare precisione doppia (64-bit) per coordinate in UA
+    \item Errori di precessione accumulati: $\sim10^{-10}$ UA per trasformazione
+    \item Per $\Delta t > 100$ anni, includere correzioni di precessione
+    \item Per $\Delta t > 1000$ anni, usare modelli completi di precessione/nutazione
+\end{itemize}
+
+\subsection{Scelta del Sistema per la Propagazione Orbitale}
+
+Per la propagazione orbitale asteroidale in AstDyn:
+\begin{itemize}
+    \item \textbf{Predefinito}: Eliocentrico J2000.0 equatoriale
+    \item \textbf{Motivazioni}: 
+    \begin{itemize}
+        \item Corrisponde alla maggior parte dei cataloghi osservativi
+        \item Stabile su secoli
+        \item Semplifica il confronto con altri software
+    \end{itemize}
+    \item \textbf{Alternativa}: Sistema eclittico per orbite a inclinazione molto bassa
+\end{itemize}
+
+\subsection{Conversione delle Osservazioni}
+
+Le osservazioni ottiche sono tipicamente riportate in:
+\begin{itemize}
+    \item \textbf{Ascensione retta} ($\alpha$) e \textbf{declinazione} ($\delta$): Sistema equatoriale
+    \item \textbf{Coordinate topocentriche}: Dalla posizione dell'osservatore sulla Terra
+\end{itemize}
+
+Per utilizzarle nella determinazione orbitale:
+\begin{enumerate}
+    \item Convertire da topocentrico a geocentrico (correggere per la rotazione terrestre)
+    \item Convertire da geocentrico a eliocentrico (aggiungere la posizione della Terra)
+    \item Esprimere nel sistema equatoriale J2000.0
+\end{enumerate}
+
+La classe \texttt{OpticalObservation} di AstDyn gestisce automaticamente queste trasformazioni.
+
+\section{Riepilogo}
+
+Punti chiave sui sistemi di riferimento:
+
+\begin{enumerate}
+    \item \textbf{ICRS} è lo standard moderno, strettamente allineato con J2000.0
+    \item \textbf{J2000.0 equatoriale} è il sistema pratico per la dinamica asteroidale
+    \item \textbf{Sistema eclittico} è naturale per oggetti del sistema solare
+    \item Le trasformazioni tra sistemi sono rotazioni definite dall'obliquità
+    \item La \textbf{precessione} causa rotazioni del sistema dipendenti dal tempo
+    \item AstDyn usa per default il sistema eliocentrico J2000.0 equatoriale
+\end{enumerate}
+
+Comprendere i sistemi di riferimento è essenziale per:
+\begin{itemize}
+    \item Interpretare gli elementi orbitali
+    \item Elaborare le osservazioni
+    \item Confrontare risultati tra diversi software
+    \item Propagazione orbitale a lungo termine
+\end{itemize}
+
+Nel prossimo capitolo, discuteremo gli elementi orbitali—i sei parametri che specificano univocamente un'orbita in un dato sistema di riferimento.

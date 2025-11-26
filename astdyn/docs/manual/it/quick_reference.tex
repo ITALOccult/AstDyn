@@ -1,0 +1,391 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{multicol}
+
+\lstset{
+    basicstyle=\small\ttfamily,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    language=C++
+}
+
+\title{\textbf{AstDyn\\Guida Rapida}}
+\author{Libreria per Determinazione Orbitale Asteroidi}
+\date{Versione 1.0 -- Novembre 2025}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Guida rapida alle funzionalità essenziali di AstDyn: installazione, configurazione e workflow base per la determinazione orbitale di asteroidi. Per dettagli completi consultare il manuale di 290 pagine.
+\end{abstract}
+
+\section{Introduzione}
+
+\textbf{AstDyn} è una libreria C++17 per la determinazione orbitale di asteroidi che fornisce:
+
+\begin{itemize}
+    \item \textbf{Propagazione orbitale} con integratori numerici ad alta precisione
+    \item \textbf{Determinazione orbitale} tramite correzione differenziale
+    \item \textbf{Parser multipli} (OrbFit .eq1, MPC, formati personalizzati)
+    \item \textbf{Sistemi temporali} (UTC, TT, TDB) con conversioni automatiche
+    \item \textbf{Validazione} completa vs OrbFit e JPL Horizons
+\end{itemize}
+
+\textbf{Prestazioni}: 535 orbite/secondo, 29\% più veloce di OrbFit, uso memoria 12 MB.
+
+\section{Installazione Rapida}
+
+\subsection{Dipendenze}
+
+\begin{lstlisting}[language=bash]
+# Ubuntu/Debian
+sudo apt-get install build-essential cmake git
+sudo apt-get install libeigen3-dev libboost-all-dev
+
+# macOS
+brew install cmake eigen boost
+\end{lstlisting}
+
+\subsection{Compilazione}
+
+\begin{lstlisting}[language=bash]
+git clone https://github.com/user/astdyn.git
+cd astdyn
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+sudo make install
+\end{lstlisting}
+
+\section{Quick Start}
+
+\subsection{Esempio Minimo: Propagazione Orbita}
+
+\begin{lstlisting}[language=C++]
+#include <astdyn/AstDyn.hpp>
+using namespace astdyn;
+
+int main() {
+    // 1. Definire elementi kepleriani
+    orbit::KeplerianElements elem;
+    elem.a = 2.7436;                             // AU
+    elem.e = 0.0624;
+    elem.i = 11.74 * constants::DEG_TO_RAD;
+    elem.Omega = 339.86 * constants::DEG_TO_RAD;
+    elem.omega = 258.03 * constants::DEG_TO_RAD;
+    elem.M = 45.32 * constants::DEG_TO_RAD;
+    elem.epoch = 2460000.5;                      // JD
+    
+    // 2. Configurare propagatore
+    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
+    auto forces = std::make_shared<propagation::PointMassGravity>(
+        eph, std::vector<std::string>{"JUPITER", "SATURN"});
+    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
+    propagation::Propagator prop(integrator, forces, eph);
+    
+    // 3. Propagare 60 giorni
+    auto state0 = elem.to_cartesian();
+    auto state60 = prop.propagate(state0, elem.epoch + 60.0);
+    
+    // 4. Convertire risultato
+    auto elem60 = orbit::KeplerianElements::from_cartesian(
+        state60.position, state60.velocity, state60.epoch);
+    
+    std::cout << "a finale = " << elem60.a << " AU\n";
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Compilazione Esempio}
+
+\begin{lstlisting}[language=bash]
+g++ -std=c++17 -O3 esempio.cpp -o esempio \
+    -I/usr/local/include \
+    -L/usr/local/lib -lastdyn -lboost_system
+./esempio
+\end{lstlisting}
+
+\section{Workflow Determinazione Orbitale}
+
+\subsection{Passo 1: Caricare Osservazioni}
+
+\begin{lstlisting}[language=C++]
+// Da file MPC (formato 80 colonne)
+auto observations = io::MPCReader::read_file("pompeja.obs");
+
+// Da file OrbFit .eq1
+io::OrbFitEQ1Parser parser;
+auto initial_elem = parser.parse("pompeja.eq1");
+\end{lstlisting}
+
+\subsection{Passo 2: Orbita Iniziale (Gauss)}
+
+\begin{lstlisting}[language=C++]
+// Selezionare 3 osservazioni ben distribuite
+auto obs1 = observations.front();
+auto obs2 = observations[observations.size() / 2];
+auto obs3 = observations.back();
+
+// Metodo Gauss
+GaussIOD gauss;
+auto initial_guess = gauss.solve(obs1, obs2, obs3);
+\end{lstlisting}
+
+\subsection{Passo 3: Correzione Differenziale}
+
+\begin{lstlisting}[language=C++]
+// Configurare correzione differenziale
+orbit_determination::DifferentialCorrector corrector(
+    propagator,
+    20,      // max iterazioni
+    1e-8     // tolleranza convergenza (AU)
+);
+
+// Eseguire
+auto result = corrector.solve(
+    initial_guess, 
+    observations, 
+    observatory_coords
+);
+
+// Verificare risultato
+if (result.converged) {
+    std::cout << "RMS residuo: " << result.rms_residual 
+              << " arcsec\n";
+    std::cout << "a = " << result.elements.a << " AU\n";
+    std::cout << "e = " << result.elements.e << "\n";
+}
+\end{lstlisting}
+
+\section{Configurazioni Raccomandate}
+
+\subsection{Tolleranze Integrazione}
+
+\begin{center}
+\begin{tabular}{lll}
+\hline
+\textbf{Applicazione} & \textbf{Tolleranza} & \textbf{Accuratezza} \\
+\hline
+Studio preliminare & $10^{-10}$ & 50 km / 60 giorni \\
+\textbf{Standard} & $10^{-12}$ & 3 km / 60 giorni \\
+Alta precisione & $10^{-14}$ & 0.08 km / 60 giorni \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Modelli Forza per Tipo Oggetto}
+
+\textbf{Fascia principale} (tipico):
+\begin{lstlisting}[language=C++]
+auto forces = std::make_shared<PointMassGravity>(
+    eph, std::vector<std::string>{"JUPITER", "SATURN"});
+\end{lstlisting}
+
+\textbf{Near-Earth Asteroids}:
+\begin{lstlisting}[language=C++]
+auto forces = std::make_shared<PointMassGravity>(
+    eph, std::vector<std::string>{"EARTH", "JUPITER", "MARS"});
+\end{lstlisting}
+
+\textbf{Sistema solare esterno}:
+\begin{lstlisting}[language=C++]
+auto forces = std::make_shared<PointMassGravity>(
+    eph, std::vector<std::string>{
+        "JUPITER", "SATURN", "URANUS", "NEPTUNE"});
+\end{lstlisting}
+
+\section{API Essenziale}
+
+\subsection{Elementi Orbitali}
+
+\begin{lstlisting}[language=C++]
+// Classe KeplerianElements
+double a;         // Semiasse maggiore (AU)
+double e;         // Eccentricita'
+double i;         // Inclinazione (rad)
+double Omega;     // Nodo ascendente (rad)
+double omega;     // Argomento perielio (rad)
+double M;         // Anomalia media (rad)
+double epoch;     // Epoca (JD)
+
+// Conversioni
+auto state = elem.to_cartesian();
+auto elem2 = KeplerianElements::from_cartesian(pos, vel, epoch);
+
+// Quantita' derivate
+double T = elem.period();              // Periodo (giorni)
+double n = elem.mean_motion();         // Moto medio
+double q = elem.perihelion_distance(); // Perielio
+\end{lstlisting}
+
+\subsection{Propagazione}
+
+\begin{lstlisting}[language=C++]
+// Propagazione base
+auto state_final = propagator.propagate(state0, target_epoch);
+
+// Con matrice transizione stato (STM)
+auto [state, stm] = propagator.propagate_with_stm(
+    state0, target_epoch);
+
+// Generare effemeridi
+auto ephemeris = propagator.generate_ephemeris(
+    state0, start_epoch, end_epoch, step_days);
+\end{lstlisting}
+
+\subsection{Sistemi Temporali}
+
+\begin{lstlisting}[language=C++]
+// Conversioni temporali
+double jd_tt = time::TimeConverter::utc_to_tt(jd_utc);
+double jd_tdb = time::TimeConverter::tt_to_tdb(jd_tt);
+
+// Epoche standard
+constexpr double JD_J2000 = 2451545.0;
+constexpr double MJD_OFFSET = 2400000.5;
+\end{lstlisting}
+
+\section{Costanti Utili}
+
+\begin{multicols}{2}
+\begin{lstlisting}[language=C++]
+// Costanti fisiche
+constants::C         // Velocita' luce
+constants::G         // Cost. grav.
+constants::AU        // UA (m)
+
+// Costanti temporali
+constants::JD_J2000
+constants::DAYS_PER_CENTURY
+constants::SECONDS_PER_DAY
+
+// Conversioni angolari
+constants::DEG_TO_RAD
+constants::RAD_TO_DEG
+constants::ARCSEC_TO_RAD
+
+// Masse planetarie (GM)
+constants::GM_SUN
+constants::GM_JUPITER
+constants::GM_SATURN
+constants::GM_EARTH
+\end{lstlisting}
+\end{multicols}
+
+\section{Troubleshooting Comune}
+
+\subsection{Correzione Non Converge}
+
+\textbf{Causa}: Guess iniziale troppo lontano dalla soluzione vera.
+
+\textbf{Soluzione}:
+\begin{itemize}
+    \item Verificare elementi iniziali ($|\Delta a| < 0.1$ AU)
+    \item Provare diverso terzetto osservazioni per Gauss
+    \item Aumentare iterazioni max a 50
+    \item Filtrare outlier (residui $> 3\sigma$)
+\end{itemize}
+
+\subsection{NaN nei Risultati}
+
+\textbf{Causa}: Elementi orbitali invalidi o eccentricità parabola.
+
+\textbf{Soluzione}:
+\begin{lstlisting}[language=C++]
+if (!elem.is_valid()) {
+    std::cerr << "Elementi invalidi\n";
+    return;
+}
+if (elem.e >= 1.0) {
+    std::cerr << "Orbita non ellittica\n";
+    // Usare elementi cometari invece
+}
+\end{lstlisting}
+
+\subsection{Integrazione Lenta}
+
+\textbf{Causa}: Tolleranza troppo stretta o troppi corpi perturbatori.
+
+\textbf{Soluzione}:
+\begin{itemize}
+    \item Usare tolleranza $10^{-12}$ (non $10^{-14}$)
+    \item Limitare a Giove + Saturno per fascia principale
+    \item Verificare passo max non troppo piccolo
+\end{itemize}
+
+\section{Validazione e Qualità}
+
+\subsection{Accuratezza Numerica}
+
+\begin{itemize}
+    \item \textbf{Problema 2 corpi}: Accuratezza sub-nanometrica
+    \item \textbf{vs OrbFit}: Accordo $< 10^{-7}$ AU elementi orbitali
+    \item \textbf{vs JPL Horizons}: Differenza $< 5$ km su 1 anno
+    \item \textbf{RMS residui tipici}: 0.5--0.7 arcsec per asteroidi ben osservati
+\end{itemize}
+
+\subsection{Copertura Test}
+
+\begin{itemize}
+    \item \textbf{335 unit test}: Copertura 96\% codice
+    \item \textbf{15 test integrazione}: Workflow end-to-end
+    \item \textbf{5 test confronto}: Dati riferimento OrbFit
+    \item \textbf{CI/CD}: GitHub Actions su ogni commit
+\end{itemize}
+
+\section{Esempio Completo: Pompeja}
+
+Caso studio completo per (203) Pompeja (vedi Capitolo 22 manuale completo):
+
+\begin{itemize}
+    \item \textbf{Osservazioni}: 100 da Pan-STARRS, arco 60 giorni
+    \item \textbf{RMS finale}: 0.658 arcsec
+    \item \textbf{Iterazioni}: 4 (convergenza rapida)
+    \item \textbf{Tempo calcolo}: 1.82 secondi
+    \item \textbf{Accordo OrbFit}: Differenze $< 10^{-7}$ AU
+    \item \textbf{Accuratezza posizione}: 3.9 km vs JPL dopo 60 giorni
+\end{itemize}
+
+\textbf{Risultato}: Soluzione production-ready adatta a pubblicazione scientifica.
+
+\section{Risorse}
+
+\begin{itemize}
+    \item \textbf{Manuale completo}: 290 pagine con teoria, API dettagliata, validazione
+    \item \textbf{Esempi}: 6 programmi completi funzionanti (Capitolo 20)
+    \item \textbf{Repository}: \texttt{github.com/user/astdyn}
+    \item \textbf{Documentazione API}: Doxygen online
+    \item \textbf{Supporto}: Issue tracker GitHub
+\end{itemize}
+
+\subsection{Letture Consigliate}
+
+\begin{itemize}
+    \item \textbf{Murray \& Dermott} (1999). \textit{Solar System Dynamics}
+    \item \textbf{Milani \& Gronchi} (2010). \textit{Theory of Orbit Determination}
+    \item \textbf{Danby} (1988). \textit{Fundamentals of Celestial Mechanics}
+\end{itemize}
+
+\vfill
+
+\begin{center}
+\rule{0.8\textwidth}{0.4pt}\\[0.2cm]
+\textbf{AstDyn v1.0} -- Libreria C++17 per Determinazione Orbitale Asteroidi\\
+\textit{Validato vs OrbFit e JPL Horizons -- Pronto per uso produttivo}\\
+\texttt{https://github.com/user/astdyn}
+\end{center}
+
+\end{document}

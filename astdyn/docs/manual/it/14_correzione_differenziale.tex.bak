@@ -1,0 +1,465 @@
+\chapter{Correzione Differenziale}
+\label{ch:differential_correction}
+
+\section{Introduzione}
+
+La \textbf{correzione differenziale} (Differential Correction, DC) è il raffinamento iterativo ai minimi quadrati di un'orbita usando tutte le osservazioni disponibili. È la pietra angolare della determinazione orbitale.
+
+\textbf{Input}: Orbita iniziale + osservazioni
+
+\textbf{Output}: Orbita migliorata + matrice di covarianza + residui
+
+\textbf{Metodo}: Minimi quadrati pesati minimizzando i residui O-C (osservato meno calcolato).
+
+\section{Il Problema dei Minimi Quadrati}
+
+\subsection{Equazione di Osservazione}
+
+Per l'osservazione $i$:
+
+\begin{equation}
+    \mathbf{o}_i = \mathbf{h}(\mathbf{y}_0, t_i) + \boldsymbol{\epsilon}_i
+\end{equation}
+
+dove:
+\begin{itemize}
+    \item $\mathbf{o}_i$: Valore osservato (es., RA, Dec)
+    \item $\mathbf{h}$: Modello di osservazione (trasformazione coordinate)
+    \item $\mathbf{y}_0$: Stato all'epoca $t_0$
+    \item $\boldsymbol{\epsilon}_i \sim \mathcal{N}(0, \mathbf{W}_i^{-1})$: Errore di misura
+\end{itemize}
+
+\subsection{Linearizzazione}
+
+Linearizzare attorno alla stima corrente $\mathbf{y}_0^{(k)}$:
+
+\begin{equation}
+    \mathbf{o}_i - \mathbf{c}_i = \mathbf{H}_i \Delta\mathbf{y}_0 + \boldsymbol{\epsilon}_i
+\end{equation}
+
+dove:
+\begin{itemize}
+    \item $\mathbf{c}_i = \mathbf{h}(\mathbf{y}_0^{(k)}, t_i)$: Valore calcolato
+    \item $\mathbf{H}_i = \frac{\partial \mathbf{h}}{\partial \mathbf{y}_0}$: Matrice di disegno (derivate parziali osservazione)
+    \item $\Delta\mathbf{y}_0 = \mathbf{y}_0 - \mathbf{y}_0^{(k)}$: Correzione allo stato
+\end{itemize}
+
+\subsection{Equazioni Normali}
+
+Minimizzare la somma pesata dei quadrati dei residui:
+
+\begin{equation}
+    \chi^2 = \sum_{i=1}^m (\mathbf{o}_i - \mathbf{c}_i - \mathbf{H}_i \Delta\mathbf{y}_0)^T \mathbf{W}_i (\mathbf{o}_i - \mathbf{c}_i - \mathbf{H}_i \Delta\mathbf{y}_0)
+\end{equation}
+
+Soluzione:
+
+\begin{equation}
+    (\mathbf{H}^T \mathbf{W} \mathbf{H}) \Delta\mathbf{y}_0 = \mathbf{H}^T \mathbf{W} (\mathbf{o} - \mathbf{c})
+\end{equation}
+
+Definire:
+\begin{align}
+    \mathbf{N} &= \mathbf{H}^T \mathbf{W} \mathbf{H} \quad \text{(matrice normale)} \\
+    \mathbf{b} &= \mathbf{H}^T \mathbf{W} (\mathbf{o} - \mathbf{c}) \quad \text{(termine noto)}
+\end{align}
+
+Soluzione: $\mathbf{N} \Delta\mathbf{y}_0 = \mathbf{b}$
+
+Covarianza: $\mathbf{C} = \mathbf{N}^{-1}$
+
+\section{Calcolo delle Derivate Parziali}
+
+\subsection{Regola della Catena con STM}
+
+Per osservazioni RA/Dec al tempo $t_i$:
+
+\begin{equation}
+    \mathbf{H}_i = \frac{\partial (\alpha, \delta)}{\partial \mathbf{y}_0} = \frac{\partial (\alpha, \delta)}{\partial \mathbf{y}(t_i)} \frac{\partial \mathbf{y}(t_i)}{\partial \mathbf{y}_0}
+\end{equation}
+
+dove $\Phi(t_i, t_0) = \frac{\partial \mathbf{y}(t_i)}{\partial \mathbf{y}_0}$ è la matrice di transizione di stato (Capitolo 10).
+
+\subsection{Derivate Geometriche}
+
+Dalla posizione topocentrica $\boldsymbol{\rho} = \mathbf{r} - \mathbf{R}$:
+
+\begin{align}
+    \alpha &= \arctan2(\rho_y, \rho_x) \\
+    \delta &= \arcsin(\rho_z / \rho)
+\end{align}
+
+Derivate:
+
+\begin{align}
+    \frac{\partial \alpha}{\partial \rho_x} &= -\frac{\rho_y}{\rho_x^2 + \rho_y^2} \\
+    \frac{\partial \alpha}{\partial \rho_y} &= \frac{\rho_x}{\rho_x^2 + \rho_y^2} \\
+    \frac{\partial \alpha}{\partial \rho_z} &= 0 \\
+    \frac{\partial \delta}{\partial \rho_x} &= -\frac{\rho_x \rho_z}{\rho^2 \sqrt{\rho_x^2 + \rho_y^2}} \\
+    \frac{\partial \delta}{\partial \rho_y} &= -\frac{\rho_y \rho_z}{\rho^2 \sqrt{\rho_x^2 + \rho_y^2}} \\
+    \frac{\partial \delta}{\partial \rho_z} &= \frac{\sqrt{\rho_x^2 + \rho_y^2}}{\rho^2}
+\end{align}
+
+\subsection{Derivate Complete}
+
+Combinare le derivate geometriche con $\Phi$:
+
+\begin{equation}
+    \mathbf{H}_i = \begin{bmatrix}
+        \frac{\partial \alpha}{\partial x} & \frac{\partial \alpha}{\partial y} & \frac{\partial \alpha}{\partial z} & 0 & 0 & 0 \\
+        \frac{\partial \delta}{\partial x} & \frac{\partial \delta}{\partial y} & \frac{\partial \delta}{\partial z} & 0 & 0 & 0
+    \end{bmatrix} \Phi(t_i, t_0)
+\end{equation}
+
+Nota: RA/Dec dipendono solo dalla posizione, non dalla velocità, nelle derivate geometriche. La velocità influenza le osservazioni attraverso la propagazione ($\Phi$).
+
+\section{Algoritmo}
+
+\textbf{Input}: Orbita iniziale $\mathbf{y}_0^{(0)}$, osservazioni $\{(\mathbf{o}_i, t_i, \mathbf{W}_i)\}$
+
+\textbf{Iterare}:
+\begin{enumerate}
+    \item Per ogni osservazione $i$:
+    \begin{enumerate}
+        \item Propagare a $t_i$ con STM: $[\mathbf{y}(t_i), \Phi(t_i, t_0)]$
+        \item Calcolare predizione $\mathbf{c}_i = \mathbf{h}(\mathbf{y}(t_i))$
+        \item Calcolare derivate geometriche
+        \item Calcolare derivate complete $\mathbf{H}_i$ usando STM
+    \end{enumerate}
+    \item Formare matrice normale: $\mathbf{N} = \sum_i \mathbf{H}_i^T \mathbf{W}_i \mathbf{H}_i$
+    \item Formare termine noto: $\mathbf{b} = \sum_i \mathbf{H}_i^T \mathbf{W}_i (\mathbf{o}_i - \mathbf{c}_i)$
+    \item Risolvere: $\mathbf{N} \Delta\mathbf{y}_0 = \mathbf{b}$
+    \item Aggiornare: $\mathbf{y}_0^{(k+1)} = \mathbf{y}_0^{(k)} + \Delta\mathbf{y}_0$
+    \item Calcolare RMS: $\text{RMS} = \sqrt{\frac{1}{m-n} \sum_i w_i r_i^2}$ dove $r_i = \mathbf{o}_i - \mathbf{c}_i$
+    \item Verificare convergenza: $|\Delta\mathbf{y}_0| < \epsilon$ e $|\Delta\text{RMS}| < \epsilon_{\text{RMS}}$
+\end{enumerate}
+
+\textbf{Output}: Stato converso $\mathbf{y}_0^*$, covarianza $\mathbf{C} = \mathbf{N}^{-1}$, residui
+
+\section{Criteri di Convergenza}
+
+\subsection{Correzione allo Stato}
+
+\begin{equation}
+    ||\Delta\mathbf{y}_0|| < 10^{-8} \text{ AU, AU/giorno}
+\end{equation}
+
+\subsection{Variazione RMS}
+
+\begin{equation}
+    \frac{|\text{RMS}^{(k+1)} - \text{RMS}^{(k)}|}{\text{RMS}^{(k)}} < 10^{-6}
+\end{equation}
+
+\subsection{Iterazioni Massime}
+
+Converge tipicamente in 3-10 iterazioni. Se non converge dopo 20 iterazioni, sospettare:
+\begin{itemize}
+    \item Orbita iniziale scadente
+    \item Osservazioni errate (outlier)
+    \item Modello inadeguato (perturbazioni mancanti)
+\end{itemize}
+
+\section{Strategia di Pesatura}
+
+\subsection{Pesi Empirici}
+
+Per osservazioni RA/Dec:
+
+\begin{equation}
+    w_{\alpha,i} = \frac{1}{\sigma_{\alpha,i}^2}, \quad w_{\delta,i} = \frac{1}{\sigma_{\delta,i}^2}
+\end{equation}
+
+$\sigma$ tipici:
+\begin{itemize}
+    \item CCD moderno (calibrato Gaia): 0.1"
+    \item CCD amatoriale: 0.5"
+    \item Fotografico storico: 1-2"
+\end{itemize}
+
+\subsection{Pesatura Robusta}
+
+Ridurre peso degli outlier usando pesi di Huber:
+
+\begin{equation}
+    w_i' = \begin{cases}
+        w_i & \text{se } |r_i| < k\sigma \\
+        w_i \frac{k\sigma}{|r_i|} & \text{se } |r_i| \ge k\sigma
+    \end{cases}
+\end{equation}
+
+dove $k = 2.5$ (tipico).
+
+\section{Matrice di Covarianza}
+
+\subsection{Incertezza Formale}
+
+Dalla matrice normale:
+
+\begin{equation}
+    \mathbf{C} = \mathbf{N}^{-1} = (\mathbf{H}^T \mathbf{W} \mathbf{H})^{-1}
+\end{equation}
+
+Elementi diagonali: $\sigma_i = \sqrt{C_{ii}}$
+
+\textbf{Esempio} (asteroide con 100 osservazioni su 30 giorni):
+\begin{itemize}
+    \item $\sigma_x \sim 10^{-7}$ AU (15 km)
+    \item $\sigma_v \sim 10^{-9}$ AU/giorno (1.7 mm/s)
+\end{itemize}
+
+\subsection{Correlazione}
+
+Gli elementi fuori diagonale mostrano le correlazioni tra parametri:
+
+\begin{equation}
+    \rho_{ij} = \frac{C_{ij}}{\sqrt{C_{ii} C_{jj}}}
+\end{equation}
+
+Correlazioni forti (es., $\rho_{xy} > 0.9$) indicano problemi di geometria osservativa.
+
+\subsection{Incertezza Propagata}
+
+Al tempo $t$:
+
+\begin{equation}
+    \mathbf{C}(t) = \Phi(t, t_0) \mathbf{C}(t_0) \Phi(t, t_0)^T
+\end{equation}
+
+L'incertezza cresce con il tempo. Per soluzioni ad arco corto, $\sigma$ può aumentare esponenzialmente.
+
+\section{Implementazione}
+
+\begin{lstlisting}[language=C++,caption={Implementazione della correzione differenziale}]
+struct DCResult {
+    Vector6d state;
+    Matrix6d covariance;
+    double rms;
+    int iterations;
+    std::vector<double> residuals;
+};
+
+DCResult differential_correction(
+    const Vector6d& initial_state,
+    double epoch,
+    const std::vector<Observation>& observations,
+    const ForceModel& forces,
+    const EphemerisInterface& ephemeris,
+    int max_iterations = 20,
+    double tol = 1e-8)
+{
+    Vector6d y0 = initial_state;
+    double prev_rms = 1e10;
+    
+    for (int iter = 0; iter < max_iterations; ++iter) {
+        // Accumulare matrice normale e termine noto
+        Matrix6d N = Matrix6d::Zero();
+        Vector6d b = Vector6d::Zero();
+        double chi2 = 0.0;
+        std::vector<double> residuals;
+        
+        for (const auto& obs : observations) {
+            // Propagare con STM
+            auto [y_obs, Phi] = propagate_with_stm(y0, epoch, obs.epoch, forces);
+            
+            // Predire osservazione
+            Vector2d computed = predict_observation(y_obs, obs.epoch, obs.obs_code, ephemeris);
+            
+            // Residuo (O-C)
+            Vector2d residual;
+            residual(0) = (obs.ra - computed(0)) * cos(obs.dec);  // RA cos(Dec)
+            residual(1) = obs.dec - computed(1);  // Dec
+            
+            residuals.push_back(residual.norm() * RAD_TO_ARCSEC);
+            
+            // Derivate geometriche
+            Matrix<double, 2, 3> geom_partials = compute_ra_dec_partials(y_obs, obs, ephemeris);
+            
+            // Derivate complete via STM
+            Matrix<double, 2, 6> H;
+            H.block<2, 3>(0, 0) = geom_partials;
+            H.block<2, 3>(0, 3).setZero();
+            H = H * Phi;  // Regola della catena
+            
+            // Pesi
+            double w_ra = 1.0 / (obs.sigma_ra * obs.sigma_ra);
+            double w_dec = 1.0 / (obs.sigma_dec * obs.sigma_dec);
+            Matrix2d W = Vector2d(w_ra, w_dec).asDiagonal();
+            
+            // Accumulare equazioni normali
+            N += H.transpose() * W * H;
+            b += H.transpose() * W * residual;
+            chi2 += residual.transpose() * W * residual;
+        }
+        
+        // Risolvere equazioni normali
+        Vector6d delta_y0 = N.ldlt().solve(b);
+        
+        // Aggiornare stato
+        y0 += delta_y0;
+        
+        // Calcolare RMS
+        int dof = 2 * observations.size() - 6;  // gradi di liberta'
+        double rms = sqrt(chi2 / dof) * RAD_TO_ARCSEC;
+        
+        // Verificare convergenza
+        if (delta_y0.norm() < tol && abs(rms - prev_rms) < 1e-6) {
+            Matrix6d covariance = N.inverse();
+            return {y0, covariance, rms, iter + 1, residuals};
+        }
+        
+        prev_rms = rms;
+    }
+    
+    throw std::runtime_error("DC non convergente");
+}
+\end{lstlisting}
+
+\section{Esempio: Asteroide 203 Pompeja}
+
+\subsection{Definizione del Problema}
+
+\begin{itemize}
+    \item Oggetto: 203 Pompeja (asteroide della Fascia Principale)
+    \item Osservazioni: 100 misure RA/Dec
+    \item Arco temporale: 60 giorni
+    \item Osservatorio: 500 (geocentrico), F51 (Pan-STARRS)
+    \item Orbita iniziale: Da JPL Horizons
+\end{itemize}
+
+\subsection{Risultati}
+
+\begin{lstlisting}[language=C++,caption={Esecuzione DC su Pompeja}]
+// Caricare osservazioni da file formato MPC
+std::vector<Observation> obs = load_mpc_observations("pompeja.obs");
+std::cout << "Caricate " << obs.size() << " osservazioni\n";
+
+// Orbita iniziale da Horizons
+Vector6d y0_initial = /* ... da JPL ... */;
+double epoch = 2460000.5;  // JD
+
+// Modello di forze
+auto forces = std::make_shared<ForceModel>();
+forces->add_perturbation(std::make_shared<SunGravity>());
+forces->add_perturbation(std::make_shared<JupiterPerturbation>());
+forces->add_perturbation(std::make_shared<SaturnPerturbation>());
+
+// Effemeridi
+SpiceInterface spice;
+spice.load_kernel("de440.bsp");
+
+// Eseguire correzione differenziale
+try {
+    auto result = differential_correction(y0_initial, epoch, obs, *forces, spice);
+    
+    std::cout << "Convergenza in " << result.iterations << " iterazioni\n";
+    std::cout << "RMS = " << result.rms << " arcosec\n";
+    
+    // Stampare elementi orbitali
+    OrbitalElements elem = OrbitalElements::from_cartesian(result.state, epoch);
+    std::cout << "\nOrbita migliorata:\n";
+    std::cout << "a = " << elem.a << " +/- " << sqrt(result.covariance(0,0)) << " AU\n";
+    std::cout << "e = " << elem.e << " +/- " << sqrt(result.covariance(1,1)) << "\n";
+    std::cout << "i = " << elem.i * RAD_TO_DEG << " deg\n";
+    
+    // Residui maggiori
+    std::sort(result.residuals.begin(), result.residuals.end(), std::greater<>());
+    std::cout << "\nTop 5 residui:\n";
+    for (int i = 0; i < 5; ++i) {
+        std::cout << i+1 << ". " << result.residuals[i] << " arcosec\n";
+    }
+    
+} catch (const std::exception& e) {
+    std::cerr << "Errore: " << e.what() << "\n";
+}
+\end{lstlisting}
+
+\textbf{Output tipico}:
+\begin{verbatim}
+Caricate 100 osservazioni
+Convergenza in 5 iterazioni
+RMS = 0.658 arcosec
+
+Orbita migliorata:
+a = 2.7436 +/- 0.000001 AU
+e = 0.0624 +/- 0.000005
+i = 11.743 deg
+
+Top 5 residui:
+1. 2.34 arcosec
+2. 1.98 arcosec
+3. 1.76 arcosec
+4. 1.65 arcosec
+5. 1.54 arcosec
+\end{verbatim}
+
+\subsection{Interpretazione}
+
+\begin{itemize}
+    \item \textbf{RMS = 0.658"}: Eccellente adattamento, coerente con precisione astrometria CCD
+    \item \textbf{5 iterazioni}: Convergenza rapida indica buona orbita iniziale
+    \item \textbf{$\sigma_a = 10^{-6}$ AU}: Semiasse maggiore determinato a ~150 km
+    \item \textbf{Residui maggiori $<$2.5"}: Nessun outlier ovvio
+    \item \textbf{Covarianza}: Incertezza formale, propagare per errore effemeridi
+\end{itemize}
+
+\section{Risoluzione Problemi}
+
+\subsection{Non-Convergenza}
+
+\textbf{Sintomi}: RMS oscilla o aumenta.
+
+\textbf{Cause}:
+\begin{enumerate}
+    \item Orbita iniziale scadente (troppo lontana dalla verità)
+    \item Outlier che dominano il fit
+    \item Modello di forze inadeguato
+    \item Problemi numerici (matrice normale mal condizionata)
+\end{enumerate}
+
+\textbf{Soluzioni}:
+\begin{itemize}
+    \item Migliorare IOD
+    \item Abilitare pesatura robusta
+    \item Aggiungere perturbazioni mancanti
+    \item Regolarizzare matrice normale
+\end{itemize}
+
+\subsection{RMS Elevato}
+
+\textbf{Sintomi}: RMS $>$ 2" per osservazioni moderne.
+
+\textbf{Cause}:
+\begin{itemize}
+    \item Errori sistematici nelle osservazioni
+    \item Coordinate osservatorio errate
+    \item Errori di temporizzazione
+    \item Perturbazioni mancanti (es., incontro ravvicinato)
+\end{itemize}
+
+\textbf{Diagnosi}: Graficare residui vs. tempo, magnitudine, osservatorio.
+
+\subsection{Residui Piccoli ma Orbita Sbagliata}
+
+\textbf{Sintomi}: RMS $<$ 0.5" ma predizioni effemeridi falliscono.
+
+\textbf{Causa}: Arco corto + degenerazione. Molte orbite si adattano ugualmente bene su archi brevi.
+
+\textbf{Soluzione}: Acquisire osservazioni su arco più lungo (>30 giorni per fascia principale, >7 giorni per NEA).
+
+\section{Sommario}
+
+Punti chiave sulla correzione differenziale:
+
+\begin{enumerate}
+    \item I \textbf{minimi quadrati} minimizzano la somma pesata dei residui O-C al quadrato
+    \item Le \textbf{equazioni normali} $\mathbf{N}\Delta\mathbf{y}_0 = \mathbf{b}$ vengono risolte iterativamente
+    \item Le \textbf{derivate parziali} vengono calcolate via regola della catena con STM
+    \item Le \textbf{derivate geometriche} relazionano RA/Dec alla posizione topocentrica
+    \item \textbf{Convergenza} tipicamente in 3-10 iterazioni
+    \item La \textbf{matrice di covarianza} $\mathbf{C} = \mathbf{N}^{-1}$ fornisce l'incertezza formale
+    \item L'\textbf{RMS} indica qualità del fit; obiettivo $<$1" per CCD moderno
+    \item La \textbf{pesatura robusta} riduce il peso degli outlier
+    \item L'\textbf{esempio Pompeja} dimostra il workflow completo
+\end{enumerate}
+
+Il prossimo capitolo copre l'analisi dei residui per valutazione qualità e rilevamento outlier.

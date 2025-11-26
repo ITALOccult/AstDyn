@@ -1,0 +1,24 @@
+! OrbFit propagator options for 203 Pompeja
+! Configuration file for AstDyn orbit propagation and fitting
+
+! Integrator configuration
+integrator.type = RK4          ! Options: RK4, RKF78
+integrator.step_size = 0.1     ! Initial step size in days
+integrator.tolerance = 1.0e-12 ! Tolerance for adaptive integrators (RKF78)
+
+! Propagator settings
+propagator.max_step = 10.0     ! Maximum step size in days
+propagator.min_step = 1.0e-6   ! Minimum step size in days
+
+! Perturbations
+perturb.planets = true         ! Include planetary perturbations
+perturb.asteroids = false      ! Include asteroid perturbations (not yet implemented)
+perturb.relativity = false     ! Include relativistic corrections
+
+! Differential correction
+diffcorr.max_iter = 20         ! Maximum iterations
+diffcorr.convergence = 1.0e-6  ! Convergence threshold in AU
+diffcorr.outlier_threshold = 3.0 ! Sigma threshold for outlier rejection
+
+! Output
+verbose = true                 ! Verbose output

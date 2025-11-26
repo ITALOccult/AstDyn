@@ -1,0 +1,5 @@
+if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_pompeja_full_dynamics[1]_tests.cmake")
+  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_pompeja_full_dynamics[1]_tests.cmake")
+else()
+  add_test(astdyn_pompeja_full_dynamics_NOT_BUILT astdyn_pompeja_full_dynamics_NOT_BUILT)
+endif()

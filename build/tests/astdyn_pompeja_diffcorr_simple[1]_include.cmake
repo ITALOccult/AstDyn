@@ -1,0 +1,5 @@
+if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_pompeja_diffcorr_simple[1]_tests.cmake")
+  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_pompeja_diffcorr_simple[1]_tests.cmake")
+else()
+  add_test(astdyn_pompeja_diffcorr_simple_NOT_BUILT astdyn_pompeja_diffcorr_simple_NOT_BUILT)
+endif()

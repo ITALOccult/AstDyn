@@ -1,0 +1,608 @@
+\chapter{Troubleshooting}
+\label{ch:troubleshooting}
+
+\section{Introduction}
+
+This chapter provides solutions to common problems encountered when using AstDyn, organized by symptom and component.
+
+\section{Compilation Issues}
+
+\subsection{Eigen3 Not Found}
+
+\textbf{Symptom}:
+\begin{verbatim}
+CMake Error: Could not find Eigen3
+\end{verbatim}
+
+\textbf{Solutions}:
+
+1. Install Eigen3 development package:
+\begin{lstlisting}[language=bash]
+# Ubuntu/Debian
+sudo apt-get install libeigen3-dev
+
+# macOS
+brew install eigen
+
+# From source
+git clone https://gitlab.com/libeigen/eigen.git
+cd eigen && mkdir build && cd build
+cmake .. && sudo make install
+\end{lstlisting}
+
+2. Specify Eigen3 location manually:
+\begin{lstlisting}[language=bash]
+cmake .. -DEigen3_DIR=/path/to/eigen3/share/eigen3/cmake
+\end{lstlisting}
+
+\subsection{SPICE Library Not Found}
+
+\textbf{Symptom}:
+\begin{verbatim}
+CMake Error: Could not find CSPICE
+\end{verbatim}
+
+\textbf{Solutions}:
+
+1. Download and install CSPICE:
+\begin{lstlisting}[language=bash]
+# Linux
+wget https://naif.jpl.nasa.gov/pub/naif/toolkit//C/PC_Linux_GCC_64bit/packages/cspice.tar.Z
+tar xzf cspice.tar.Z
+export CSPICE_DIR=$(pwd)/cspice
+\end{lstlisting}
+
+2. Build without SPICE (use analytic ephemeris):
+\begin{lstlisting}[language=bash]
+cmake .. -DUSE_SPICE=OFF
+\end{lstlisting}
+
+\subsection{C++17 Standard Not Supported}
+
+\textbf{Symptom}:
+\begin{verbatim}
+error: 'std::optional' has not been declared
+\end{verbatim}
+
+\textbf{Solution}: Update compiler to support C++17:
+\begin{lstlisting}[language=bash]
+# Check compiler version
+g++ --version  # Need GCC >= 7.0
+clang++ --version  # Need Clang >= 5.0
+
+# Ubuntu: update GCC
+sudo apt-get install g++-11
+export CXX=g++-11
+\end{lstlisting}
+
+\section{Runtime Errors}
+
+\subsection{Segmentation Fault on Startup}
+
+\textbf{Symptom}: Program crashes immediately with segfault.
+
+\textbf{Possible Causes}:
+
+1. \textbf{Missing SPICE kernel}:
+\begin{lstlisting}[language=C++]
+// Check kernel exists before loading
+if (!std::filesystem::exists("de440.bsp")) {
+    std::cerr << "Error: SPICE kernel not found\n";
+    return 1;
+}
+ephemeris->load_kernel("de440.bsp");
+\end{lstlisting}
+
+2. \textbf{Uninitialized ephemeris pointer}:
+\begin{lstlisting}[language=C++]
+// Wrong:
+std::shared_ptr<IEphemeris> eph;  // nullptr!
+auto forces = std::make_shared<PointMassGravity>(eph, bodies);  // Crash
+
+// Correct:
+auto eph = std::make_shared<SPICEEphemeris>();
+eph->load_kernel("de440.bsp");
+\end{lstlisting}
+
+\subsection{NaN or Inf in Results}
+
+\textbf{Symptom}: Output contains NaN or Infinity values.
+
+\textbf{Possible Causes}:
+
+1. \textbf{Invalid orbital elements}:
+\begin{lstlisting}[language=C++]
+// Check validity before use
+if (!elements.is_valid()) {
+    std::cerr << "Invalid elements:\n";
+    if (elements.e < 0 || elements.e >= 1) {
+        std::cerr << "  Bad eccentricity: " << elements.e << "\n";
+    }
+    if (elements.a <= 0) {
+        std::cerr << "  Bad semimajor axis: " << elements.a << "\n";
+    }
+    return;
+}
+\end{lstlisting}
+
+2. \textbf{Division by zero in Kepler equation}:
+\begin{lstlisting}[language=C++]
+// Handle near-parabolic case
+if (std::abs(elements.e - 1.0) < 1e-10) {
+    std::cerr << "Warning: Near-parabolic orbit, use cometary elements\n";
+    // Convert to cometary elements instead
+}
+\end{lstlisting}
+
+3. \textbf{Integration divergence}:
+\begin{lstlisting}[language=C++]
+try {
+    auto state = propagator.propagate(state0, target_epoch);
+} catch (const PropagationError& e) {
+    std::cerr << "Propagation failed: " << e.what() << "\n";
+    // Reduce tolerance or check force model
+}
+\end{lstlisting}
+
+\section{Parsing Errors}
+
+\subsection{Cannot Parse OrbFit File}
+
+\textbf{Symptom}:
+\begin{verbatim}
+ParseError: Invalid file format
+\end{verbatim}
+
+\textbf{Solutions}:
+
+1. \textbf{Check file format}:
+\begin{lstlisting}[language=bash]
+# Verify it's actually .eq1 format
+head -20 pompeja.eq1
+\end{lstlisting}
+
+Expected format:
+\begin{verbatim}
+! Object name
+Pompeja
+! Epoch (MJD)
+58000.0
+! Equinoctial elements
+...
+\end{verbatim}
+
+2. \textbf{Check for BOM or encoding issues}:
+\begin{lstlisting}[language=bash]
+file pompeja.eq1  # Should be ASCII text
+dos2unix pompeja.eq1  # Convert line endings if needed
+\end{lstlisting}
+
+\subsection{MPC Observation Parse Failures}
+
+\textbf{Symptom}: Some observations skipped or misread.
+
+\textbf{Debug}:
+\begin{lstlisting}[language=C++]
+auto observations = MPCReader::read_file("obs.txt");
+
+if (observations.empty()) {
+    std::cerr << "No observations parsed!\n";
+    std::cerr << "Check file format (MPC 80-column)\n";
+}
+
+// Count by type
+int ccd_count = 0, other_count = 0;
+for (const auto& obs : observations) {
+    // MPCReader only reads CCD observations (column 15 = 'C')
+    if (obs.obs_code == "F51") ccd_count++;
+}
+std::cout << "Parsed " << observations.size() << " observations\n";
+\end{lstlisting}
+
+\textbf{Common issues}:
+\begin{itemize}
+    \item Non-CCD observations (photographic, visual) are skipped
+    \item Lines shorter than 80 columns ignored
+    \item Invalid date format
+    \item Missing observatory code
+\end{itemize}
+
+\section{Convergence Problems}
+
+\subsection{Differential Correction Not Converging}
+
+\textbf{Symptom}: Reaches max iterations without convergence.
+
+\textbf{Diagnostic}:
+\begin{lstlisting}[language=C++]
+auto result = corrector.solve(initial_guess, observations, obs_coords);
+
+if (!result.converged) {
+    std::cout << "Iterations: " << result.iterations << "\n";
+    std::cout << "Final RMS: " << result.rms_residual << " arcsec\n";
+    
+    // Check if improving
+    if (result.rms_residual < 10.0) {
+        std::cout << "Close to convergence, increase max iterations\n";
+    } else {
+        std::cout << "Not improving, check initial guess\n";
+    }
+}
+\end{lstlisting}
+
+\textbf{Solutions}:
+
+1. \textbf{Improve initial guess}:
+\begin{lstlisting}[language=C++]
+// Try different observation triplet for Gauss
+auto obs1 = observations[0];
+auto obs2 = observations[observations.size() / 3];  // Earlier middle point
+auto obs3 = observations.back();
+
+auto initial = gauss.solve(obs1, obs2, obs3);
+\end{lstlisting}
+
+2. \textbf{Increase iteration limit}:
+\begin{lstlisting}[language=C++]
+DifferentialCorrector corrector(propagator, 50, 1e-8);  // 50 iterations
+\end{lstlisting}
+
+3. \textbf{Loosen tolerance temporarily}:
+\begin{lstlisting}[language=C++]
+DifferentialCorrector corrector(propagator, 20, 1e-6);  // Looser tolerance
+\end{lstlisting}
+
+4. \textbf{Filter outliers first}:
+\begin{lstlisting}[language=C++]
+// Remove observations with large residuals
+std::vector<Observation> filtered;
+for (const auto& obs : observations) {
+    // Manual filtering based on known good range
+    if (obs.ra > min_ra && obs.ra < max_ra) {
+        filtered.push_back(obs);
+    }
+}
+\end{lstlisting}
+
+\subsection{Oscillating RMS}
+
+\textbf{Symptom}: RMS residual oscillates, doesn't decrease monotonically.
+
+\textbf{Cause}: Step size too large or poor observation weighting.
+
+\textbf{Solutions}:
+
+1. \textbf{Reduce damping}:
+\begin{lstlisting}[language=C++]
+// In differential corrector implementation
+delta_elements = 0.5 * (H.transpose() * H).inverse() * H.transpose() * residuals;
+// Reduce multiplier from 1.0 to 0.5
+\end{lstlisting}
+
+2. \textbf{Check observation weights}:
+\begin{lstlisting}[language=C++]
+// Ensure all observations have reasonable uncertainties
+for (auto& obs : observations) {
+    if (obs.sigma_ra < 0.01 * ARCSEC_TO_RAD) {
+        std::cerr << "Warning: Very tight uncertainty\n";
+        obs.sigma_ra = 0.1 * ARCSEC_TO_RAD;  // Regularize
+    }
+}
+\end{lstlisting}
+
+\section{Numerical Instabilities}
+
+\subsection{Integration Fails with Small Step Size}
+
+\textbf{Symptom}:
+\begin{verbatim}
+PropagationError: Step size below minimum
+\end{verbatim}
+
+\textbf{Causes}:
+\begin{itemize}
+    \item Very high eccentricity near perihelion
+    \item Close planetary encounter
+    \item Singularity in force model
+\end{itemize}
+
+\textbf{Solutions}:
+
+1. \textbf{Increase minimum step}:
+\begin{lstlisting}[language=C++]
+auto integrator = std::make_shared<RKF78>(
+    1e-12,    // tolerance
+    1e-5,     // min step (increased from 1e-6)
+    100.0     // max step
+);
+\end{lstlisting}
+
+2. \textbf{Use cometary elements for high eccentricity}:
+\begin{lstlisting}[language=C++]
+if (elem.e > 0.95) {
+    // Convert to cometary elements
+    CometaryElements comet_elem = elem.to_cometary();
+    // Propagate using specialized method
+}
+\end{lstlisting}
+
+\subsection{Energy Not Conserved}
+
+\textbf{Symptom}: Energy drift $> 10^{-10}$ in unperturbed two-body problem.
+
+\textbf{Diagnostic}:
+\begin{lstlisting}[language=C++]
+// Compute energy before and after propagation
+auto compute_energy = [](const CartesianState& state) {
+    double r = state.position.norm();
+    double v = state.velocity.norm();
+    return 0.5 * v * v - GM_SUN / r;
+};
+
+double E0 = compute_energy(state0);
+auto state_final = propagator.propagate(state0, state0.epoch + 60.0);
+double Ef = compute_energy(state_final);
+
+double dE = std::abs(Ef - E0) / std::abs(E0);
+if (dE > 1e-10) {
+    std::cerr << "Energy not conserved: " << dE << "\n";
+}
+\end{lstlisting}
+
+\textbf{Solutions}:
+
+1. \textbf{Tighten tolerance}:
+\begin{lstlisting}[language=C++]
+auto integrator = std::make_shared<RKF78>(1e-14);  // Tighter
+\end{lstlisting}
+
+2. \textbf{Check force model}:
+\begin{lstlisting}[language=C++]
+// For two-body test, ensure no perturbations
+auto forces = std::make_shared<PointMassGravity>(
+    eph, std::vector<std::string>{});  // Empty list = Sun only
+\end{lstlisting}
+
+\section{Performance Issues}
+
+\subsection{Slow Orbit Determination}
+
+\textbf{Symptom}: Takes $> 10$ seconds for 100 observations.
+
+\textbf{Diagnostic}:
+\begin{lstlisting}[language=C++]
+auto start = std::chrono::high_resolution_clock::now();
+
+auto result = corrector.solve(initial_guess, observations, obs_coords);
+
+auto end = std::chrono::high_resolution_clock::now();
+auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+    end - start).count();
+
+std::cout << "Time: " << duration << " ms\n";
+std::cout << "Steps per propagation: " 
+          << integrator->steps_taken() / result.iterations / observations.size() 
+          << "\n";
+\end{lstlisting}
+
+\textbf{Solutions}:
+
+1. \textbf{Check compilation flags}:
+\begin{lstlisting}[language=bash]
+# Verify optimization enabled
+grep CMAKE_BUILD_TYPE CMakeCache.txt
+# Should be "Release", not "Debug"
+\end{lstlisting}
+
+2. \textbf{Loosen integration tolerance}:
+\begin{lstlisting}[language=C++]
+auto integrator = std::make_shared<RKF78>(1e-10);  // Faster, less accurate
+\end{lstlisting}
+
+3. \textbf{Reduce force model complexity}:
+\begin{lstlisting}[language=C++]
+// Instead of all planets:
+auto forces = std::make_shared<PointMassGravity>(
+    eph, std::vector<std::string>{"JUPITER", "SATURN"}  // Just 2 bodies
+);
+\end{lstlisting}
+
+\subsection{Memory Usage Grows Over Time}
+
+\textbf{Symptom}: Memory leak in long-running batch processing.
+
+\textbf{Diagnostic}:
+\begin{lstlisting}[language=bash]
+valgrind --leak-check=full ./astdyn_app
+\end{lstlisting}
+
+\textbf{Common causes}:
+\begin{itemize}
+    \item Not clearing observation vectors between objects
+    \item Ephemeris cache growing unbounded
+    \item Logging to memory buffer without flushing
+\end{itemize}
+
+\textbf{Solution}:
+\begin{lstlisting}[language=C++]
+for (const auto& object_file : object_files) {
+    std::vector<Observation> observations = load_observations(object_file);
+    
+    // Process object
+    auto result = corrector.solve(initial, observations, obs_coords);
+    
+    // Clear memory
+    observations.clear();
+    observations.shrink_to_fit();
+}
+\end{lstlisting}
+
+\section{Observation Issues}
+
+\subsection{Large Residuals (Greater Than 5 arcsec)}
+
+\textbf{Symptom}: RMS residual much larger than expected.
+
+\textbf{Diagnostic}:
+\begin{lstlisting}[language=C++]
+// Check residual distribution
+std::vector<double> residuals_ra, residuals_dec;
+for (size_t i = 0; i < observations.size(); ++i) {
+    residuals_ra.push_back(result.residuals(2*i));
+    residuals_dec.push_back(result.residuals(2*i + 1));
+}
+
+// Find outliers
+double mean_ra = std::accumulate(residuals_ra.begin(), residuals_ra.end(), 0.0) 
+                 / residuals_ra.size();
+double threshold = 3.0 * result.rms_residual;
+
+for (size_t i = 0; i < observations.size(); ++i) {
+    if (std::abs(residuals_ra[i] - mean_ra) > threshold) {
+        std::cout << "Outlier at observation " << i << ": "
+                  << observations[i].epoch << "\n";
+    }
+}
+\end{lstlisting}
+
+\textbf{Possible causes}:
+\begin{itemize}
+    \item Observatory coordinates incorrect
+    \item Observation date parsing error
+    \item Wrong object (confusion with nearby asteroid)
+    \item Instrumental error in observation
+\end{itemize}
+
+\subsection{Systematic Bias in Residuals}
+
+\textbf{Symptom}: Residuals consistently positive or negative.
+
+\textbf{Diagnostic}:
+\begin{lstlisting}[language=C++]
+double mean_residual = result.residuals.mean();
+std::cout << "Mean residual: " << mean_residual * RAD_TO_ARCSEC << " arcsec\n";
+
+if (std::abs(mean_residual) > 0.5 * ARCSEC_TO_RAD) {
+    std::cout << "Warning: Systematic bias detected\n";
+}
+\end{lstlisting}
+
+\textbf{Possible causes}:
+\begin{itemize}
+    \item Incorrect observatory coordinates (elevation, lat/lon)
+    \item Missing light-time correction
+    \item Stellar aberration not accounted for
+    \item Wrong force model (missing major perturbation)
+\end{itemize}
+
+\section{Ephemeris Problems}
+
+\subsection{SPICE Kernel Out of Range}
+
+\textbf{Symptom}:
+\begin{verbatim}
+SPICE Error: Requested time outside kernel coverage
+\end{verbatim}
+
+\textbf{Solution}:
+\begin{lstlisting}[language=C++]
+// Check coverage before using
+double jd = 2460000.5;
+if (jd < 2287184.5 || jd > 2688976.5) {  // DE440s range
+    std::cerr << "Date outside DE440s coverage (1849-2150)\n";
+    std::cerr << "Use DE440 (extended) or DE441 (long-term)\n";
+}
+\end{lstlisting}
+
+\subsection{Different Results with Different Ephemerides}
+
+\textbf{Symptom}: Position differs by $> 5$ km when using DE440 vs. DE441.
+
+\textbf{Explanation}: Normal—different ephemerides have different accuracy models.
+
+\textbf{Check}:
+\begin{lstlisting}[language=C++]
+// Compare ephemeris outputs
+auto pos_de440 = eph_de440->position("JUPITER", 2460000.5);
+auto pos_de441 = eph_de441->position("JUPITER", 2460000.5);
+
+double diff = (pos_de440 - pos_de441).norm() * AU_TO_KM;
+std::cout << "Jupiter position difference: " << diff << " km\n";
+// Expect < 1 km for major planets
+\end{lstlisting}
+
+\section{Platform-Specific Issues}
+
+\subsection{Windows: Missing DLLs}
+
+\textbf{Symptom}:
+\begin{verbatim}
+The code execution cannot proceed because [library].dll was not found.
+\end{verbatim}
+
+\textbf{Solution}: Add library directories to PATH:
+\begin{lstlisting}[language=bash]
+set PATH=%PATH%;C:\path\to\eigen;C:\path\to\boost
+\end{lstlisting}
+
+\subsection{macOS: Library Not Loaded}
+
+\textbf{Symptom}:
+\begin{verbatim}
+dyld: Library not loaded: libastdyn.dylib
+\end{verbatim}
+
+\textbf{Solution}:
+\begin{lstlisting}[language=bash]
+export DYLD_LIBRARY_PATH=/path/to/astdyn/lib:$DYLD_LIBRARY_PATH
+\end{lstlisting}
+
+\section{Getting Help}
+
+If problems persist:
+
+\begin{enumerate}
+    \item \textbf{Check logs}: Enable verbose logging for diagnostics
+    \item \textbf{Minimal example}: Create minimal reproducer
+    \item \textbf{GitHub issues}: Report bug with full details
+    \item \textbf{Documentation}: Review relevant manual chapters
+    \item \textbf{Community}: Ask on project discussions
+\end{enumerate}
+
+\subsection{Bug Report Template}
+
+\begin{lstlisting}
+**AstDyn Version**: 1.0.0
+**OS**: Ubuntu 22.04
+**Compiler**: GCC 11.4
+
+**Problem**: Differential correction fails to converge
+
+**Steps to Reproduce**:
+1. Load observations from pompeja.obs
+2. Run Gauss IOD
+3. Call differential corrector
+
+**Expected**: Convergence in 4-5 iterations
+**Actual**: Reaches 20 iterations without convergence
+
+**Code**:
+[paste minimal code example]
+
+**Output**:
+[paste error messages / logs]
+\end{lstlisting}
+
+\section{Summary}
+
+Most common issues:
+
+\begin{enumerate}
+    \item \textbf{Compilation}: Missing Eigen3 or outdated compiler
+    \item \textbf{Convergence}: Poor initial guess or outliers
+    \item \textbf{Performance}: Debug build or tight tolerance
+    \item \textbf{Parsing}: File format mismatch or encoding issues
+    \item \textbf{Numerical}: High eccentricity or close encounter
+\end{enumerate}
+
+Follow diagnostic procedures systematically to identify root cause.

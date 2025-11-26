@@ -1,0 +1,513 @@
+\chapter{Parser System}
+\label{ch:parsers}
+
+\section{Introduction}
+
+AstDyn supports multiple file formats for orbital elements through a configurable parser system. The design uses the **Strategy Pattern** with a factory for parser creation.
+
+\subsection{Supported Formats}
+
+\begin{itemize}
+    \item \textbf{OrbFit .eq1}: Equinoctial elements (legacy format)
+    \item \textbf{OrbFit .eq0}: Keplerian elements
+    \item \textbf{OrbFit .rwo}: Residuals and weights (future)
+    \item \textbf{MPC}: Observations in 80-column format
+    \item \textbf{JSON}: Modern structured format (future)
+\end{itemize}
+
+\section{Parser Interface}
+
+\subsection{IParser Base Class}
+
+\begin{lstlisting}[language=C++,caption={Parser interface}]
+namespace astdyn {
+namespace io {
+
+class IParser {
+public:
+    virtual ~IParser() = default;
+    
+    // Parse file and return orbital elements
+    virtual coordinates::OrbitalElements parse(
+        const std::string& filename) = 0;
+    
+    // Get file format name
+    virtual std::string format_name() const = 0;
+    
+    // Check if file can be parsed by this parser
+    virtual bool can_parse(const std::string& filename) const = 0;
+};
+
+}} // namespace
+\end{lstlisting}
+
+\subsection{Design Benefits}
+
+\begin{enumerate}
+    \item \textbf{Extensibility}: Add new formats without modifying existing code
+    \item \textbf{Testability}: Each parser tested independently
+    \item \textbf{Flexibility}: Runtime format selection
+    \item \textbf{Maintainability}: Clear separation of concerns
+\end{enumerate}
+
+\section{OrbFit .eq1 Parser}
+
+\subsection{Format Specification}
+
+OrbFit equinoctial elements file (.eq1):
+
+\begin{verbatim}
+! Object name
+ObjectName
+! Epoch (MJD)
+58000.0
+! Equinoctial elements: h, k, p, q, lambda, a
+0.01234
+-0.00567
+0.08901
+-0.12345
+2.34567
+2.7681234
+\end{verbatim}
+
+Equinoctial elements avoid singularities at $e=0$ and $i=0$:
+\begin{align}
+    h &= e \sin(\omega + \Omega) \\
+    k &= e \cos(\omega + \Omega) \\
+    p &= \tan(i/2) \sin\Omega \\
+    q &= \tan(i/2) \cos\Omega \\
+    \lambda &= M + \omega + \Omega \\
+    a &= \text{semimajor axis}
+\end{align}
+
+\subsection{Implementation}
+
+\begin{lstlisting}[language=C++,caption={OrbFitEQ1Parser implementation}]
+namespace astdyn {
+namespace io {
+
+class OrbFitEQ1Parser : public IParser {
+public:
+    coordinates::OrbitalElements parse(const std::string& filename) override {
+        std::ifstream file(filename);
+        if (!file) {
+            throw std::runtime_error("Cannot open file: " + filename);
+        }
+        
+        std::string line;
+        
+        // Skip comment and read object name
+        std::getline(file, line);  // "! Object name"
+        std::string object_name;
+        std::getline(file, object_name);
+        
+        // Skip comment and read epoch
+        std::getline(file, line);  // "! Epoch (MJD)"
+        double mjd;
+        file >> mjd;
+        double epoch = mjd + 2400000.5;  // Convert to JD
+        
+        // Skip comment and read equinoctial elements
+        std::getline(file, line);  // newline
+        std::getline(file, line);  // "! Equinoctial..."
+        
+        double h, k, p, q, lambda, a;
+        file >> h >> k >> p >> q >> lambda >> a;
+        
+        // Convert equinoctial to Keplerian
+        double e = std::sqrt(h*h + k*k);
+        double i = 2.0 * std::atan(std::sqrt(p*p + q*q));
+        
+        double Omega, omega_plus_Omega;
+        if (p != 0.0 || q != 0.0) {
+            Omega = std::atan2(p, q);
+        } else {
+            Omega = 0.0;
+        }
+        
+        if (h != 0.0 || k != 0.0) {
+            omega_plus_Omega = std::atan2(h, k);
+        } else {
+            omega_plus_Omega = 0.0;
+        }
+        
+        double omega = omega_plus_Omega - Omega;
+        double M = lambda - omega_plus_Omega;
+        
+        // Normalize angles to [0, 2pi)
+        M = math::normalize_angle(M);
+        omega = math::normalize_angle(omega);
+        Omega = math::normalize_angle(Omega);
+        
+        // Create Keplerian elements
+        coordinates::KeplerianElements elem;
+        elem.a = a;
+        elem.e = e;
+        elem.i = i;
+        elem.Omega = Omega;
+        elem.omega = omega;
+        elem.M = M;
+        elem.epoch = epoch;
+        elem.name = object_name;
+        
+        return elem;
+    }
+    
+    std::string format_name() const override {
+        return "OrbFit Equinoctial (.eq1)";
+    }
+    
+    bool can_parse(const std::string& filename) const override {
+        return filename.ends_with(".eq1");
+    }
+};
+
+}} // namespace
+\end{lstlisting}
+
+\subsection{Usage}
+
+\begin{lstlisting}[language=C++]
+#include <astdyn/io/parsers/OrbFitEQ1Parser.hpp>
+
+using namespace astdyn;
+
+io::OrbFitEQ1Parser parser;
+auto elements = parser.parse("pompeja.eq1");
+
+std::cout << "Object: " << elements.name << "\n";
+std::cout << "Epoch: " << elements.epoch << " JD\n";
+std::cout << "a = " << elements.a << " AU\n";
+std::cout << "e = " << elements.e << "\n";
+\end{lstlisting}
+
+\section{Parser Factory}
+
+\subsection{Factory Pattern}
+
+Automatic parser selection based on file extension.
+
+\begin{lstlisting}[language=C++,caption={ParserFactory class}]
+namespace astdyn {
+namespace io {
+
+class ParserFactory {
+public:
+    // Register a parser for specific extensions
+    static void register_parser(
+        const std::string& extension,
+        std::function<std::unique_ptr<IParser>()> creator) {
+        
+        parsers_[extension] = creator;
+    }
+    
+    // Create parser for given filename
+    static std::unique_ptr<IParser> create(const std::string& filename) {
+        // Extract extension
+        size_t dot = filename.find_last_of('.');
+        if (dot == std::string::npos) {
+            throw std::invalid_argument("No file extension found");
+        }
+        
+        std::string ext = filename.substr(dot);
+        
+        // Look up parser
+        auto it = parsers_.find(ext);
+        if (it == parsers_.end()) {
+            throw std::invalid_argument("No parser for extension: " + ext);
+        }
+        
+        return it->second();
+    }
+    
+    // List supported formats
+    static std::vector<std::string> supported_formats() {
+        std::vector<std::string> formats;
+        for (const auto& [ext, _] : parsers_) {
+            formats.push_back(ext);
+        }
+        return formats;
+    }
+    
+private:
+    static std::map<std::string, std::function<std::unique_ptr<IParser>()>> parsers_;
+};
+
+// Initialize static map
+std::map<std::string, std::function<std::unique_ptr<IParser>()>> 
+ParserFactory::parsers_ = {
+    {".eq1", []() { return std::make_unique<OrbFitEQ1Parser>(); }},
+    {".eq0", []() { return std::make_unique<OrbFitEQ0Parser>(); }},
+};
+
+}} // namespace
+\end{lstlisting}
+
+\subsection{Usage}
+
+\begin{lstlisting}[language=C++]
+#include <astdyn/io/ParserFactory.hpp>
+
+using namespace astdyn;
+
+// Automatic parser selection
+std::string filename = "asteroid.eq1";
+auto parser = io::ParserFactory::create(filename);
+auto elements = parser->parse(filename);
+
+// List supported formats
+std::cout << "Supported formats:\n";
+for (const auto& fmt : io::ParserFactory::supported_formats()) {
+    std::cout << "  " << fmt << "\n";
+}
+\end{lstlisting}
+
+\section{MPC Observation Parser}
+
+\subsection{80-Column Format}
+
+Minor Planet Center standard format (as seen in Chapter 12).
+
+\textbf{Example}:
+\begin{verbatim}
+     203        C2024 01 15.13542 10 23 24.12 +12 34 05.6         18.2 V      F51
+\end{verbatim}
+
+Columns:
+\begin{itemize}
+    \item 1-5: Object number or provisional designation
+    \item 15-32: Observation date (YYYY MM DD.ddddd)
+    \item 33-44: RA (HH MM SS.sss)
+    \item 45-56: Dec (sDD MM SS.ss)
+    \item 66-70: Magnitude
+    \item 71: Band
+    \item 78-80: Observatory code
+\end{itemize}
+
+\subsection{MPCObservationParser}
+
+\begin{lstlisting}[language=C++,caption={MPC observation parser}]
+class MPCObservationParser {
+public:
+    static std::vector<observations::Observation> parse_file(
+        const std::string& filename) {
+        
+        std::vector<observations::Observation> obs;
+        std::ifstream file(filename);
+        std::string line;
+        
+        while (std::getline(file, line)) {
+            if (line.length() < 80) continue;
+            if (line[14] != 'C') continue;  // Skip non-CCD
+            
+            observations::Observation ob;
+            
+            // Observatory code
+            ob.obs_code = line.substr(77, 3);
+            
+            // Parse date: YYYY MM DD.ddddd
+            int year = std::stoi(line.substr(15, 4));
+            int month = std::stoi(line.substr(20, 2));
+            double day = std::stod(line.substr(23, 8));
+            ob.epoch = date_to_jd(year, month, day);
+            
+            // Parse RA: HH MM SS.sss
+            int ra_h = std::stoi(line.substr(32, 2));
+            int ra_m = std::stoi(line.substr(35, 2));
+            double ra_s = std::stod(line.substr(38, 5));
+            ob.ra = (ra_h * 15.0 + ra_m * 0.25 + ra_s * 0.004166667) * DEG_TO_RAD;
+            
+            // Parse Dec: sDD MM SS.ss
+            char sign = line[44];
+            int dec_d = std::stoi(line.substr(45, 2));
+            int dec_m = std::stoi(line.substr(48, 2));
+            double dec_s = std::stod(line.substr(51, 4));
+            ob.dec = (dec_d + dec_m/60.0 + dec_s/3600.0) * DEG_TO_RAD;
+            if (sign == '-') ob.dec = -ob.dec;
+            
+            // Magnitude (optional)
+            std::string mag_str = line.substr(65, 5);
+            if (!mag_str.empty() && mag_str[0] != ' ') {
+                ob.magnitude = std::stod(mag_str);
+            }
+            
+            // Default uncertainties
+            ob.sigma_ra = 0.5 * ARCSEC_TO_RAD;   // ~0.5"
+            ob.sigma_dec = 0.5 * ARCSEC_TO_RAD;
+            
+            obs.push_back(ob);
+        }
+        
+        return obs;
+    }
+};
+\end{lstlisting}
+
+\section{Adding New Parsers}
+
+\subsection{Steps}
+
+\begin{enumerate}
+    \item Create class inheriting from \texttt{IParser}
+    \item Implement \texttt{parse()}, \texttt{format\_name()}, \texttt{can\_parse()}
+    \item Register with \texttt{ParserFactory}
+    \item Add unit tests
+    \item Update documentation
+\end{enumerate}
+
+\subsection{Example: JSON Parser}
+
+\begin{lstlisting}[language=C++,caption={JSON parser skeleton}]
+#include <nlohmann/json.hpp>
+
+class JSONParser : public IParser {
+public:
+    coordinates::OrbitalElements parse(const std::string& filename) override {
+        std::ifstream file(filename);
+        nlohmann::json j;
+        file >> j;
+        
+        coordinates::KeplerianElements elem;
+        elem.a = j["semimajor_axis"];
+        elem.e = j["eccentricity"];
+        elem.i = j["inclination"] * DEG_TO_RAD;
+        elem.Omega = j["ascending_node"] * DEG_TO_RAD;
+        elem.omega = j["argument_perihelion"] * DEG_TO_RAD;
+        elem.M = j["mean_anomaly"] * DEG_TO_RAD;
+        elem.epoch = j["epoch"];
+        elem.name = j["object_name"];
+        
+        return elem;
+    }
+    
+    std::string format_name() const override {
+        return "JSON Orbital Elements";
+    }
+    
+    bool can_parse(const std::string& filename) const override {
+        return filename.ends_with(".json");
+    }
+};
+
+// Register with factory
+void register_json_parser() {
+    ParserFactory::register_parser(".json", 
+        []() { return std::make_unique<JSONParser>(); });
+}
+\end{lstlisting}
+
+\section{Configuration File Parser}
+
+\subsection{AstDynConfig}
+
+Parse runtime configuration from file.
+
+\begin{lstlisting}[language=C++]
+struct AstDynConfig {
+    // Integrator settings
+    std::string integrator_type = "RKF78";
+    double tolerance = 1e-12;
+    double min_step = 1e-6;
+    double max_step = 100.0;
+    
+    // Force model
+    std::vector<std::string> perturbations = {"SUN", "JUPITER", "SATURN"};
+    bool include_relativity = false;
+    bool include_j2 = false;
+    
+    // Differential correction
+    int max_iterations = 20;
+    double convergence_tol = 1e-8;
+    bool enable_robust_weighting = false;
+    
+    // Ephemeris
+    std::string spice_kernel = "de440.bsp";
+    
+    // Parse from file
+    static AstDynConfig from_file(const std::string& filename);
+    
+    // Save to file
+    void to_file(const std::string& filename) const;
+};
+\end{lstlisting}
+
+\section{Error Handling}
+
+\subsection{Common Parse Errors}
+
+\begin{lstlisting}[language=C++]
+try {
+    auto parser = ParserFactory::create("data.eq1");
+    auto elements = parser->parse("data.eq1");
+    
+} catch (const std::invalid_argument& e) {
+    std::cerr << "Invalid file format: " << e.what() << "\n";
+    
+} catch (const std::runtime_error& e) {
+    std::cerr << "Parse error: " << e.what() << "\n";
+    
+} catch (const std::exception& e) {
+    std::cerr << "Unexpected error: " << e.what() << "\n";
+}
+\end{lstlisting}
+
+\subsection{Validation}
+
+\begin{lstlisting}[language=C++]
+auto elements = parser->parse(filename);
+
+// Validate parsed elements
+if (!elements.is_valid()) {
+    std::cerr << "Warning: Invalid orbital elements\n";
+    
+    if (elements.e < 0 || elements.e >= 1) {
+        std::cerr << "  Eccentricity out of range: " << elements.e << "\n";
+    }
+    
+    if (elements.a <= 0) {
+        std::cerr << "  Negative semimajor axis: " << elements.a << "\n";
+    }
+}
+\end{lstlisting}
+
+\section{Testing}
+
+\subsection{Unit Tests}
+
+\begin{lstlisting}[language=C++]
+TEST(ParserTest, OrbFitEQ1_ValidFile) {
+    io::OrbFitEQ1Parser parser;
+    auto elem = parser.parse("test_data/pompeja.eq1");
+    
+    EXPECT_EQ(elem.name, "Pompeja");
+    EXPECT_NEAR(elem.a, 2.7436, 1e-4);
+    EXPECT_NEAR(elem.e, 0.0624, 1e-4);
+    EXPECT_NEAR(elem.i * RAD_TO_DEG, 11.74, 0.01);
+}
+
+TEST(ParserTest, Factory_AutoSelect) {
+    auto parser = io::ParserFactory::create("test.eq1");
+    EXPECT_EQ(parser->format_name(), "OrbFit Equinoctial (.eq1)");
+}
+
+TEST(MPCTest, ParseObservations) {
+    auto obs = io::MPCObservationParser::parse_file("pompeja.obs");
+    EXPECT_GT(obs.size(), 0);
+    EXPECT_EQ(obs[0].obs_code, "F51");  // Pan-STARRS
+}
+\end{lstlisting}
+
+\section{Summary}
+
+Parser system features:
+
+\begin{enumerate}
+    \item \textbf{Interface-based design}: \texttt{IParser} base class
+    \item \textbf{Factory pattern}: Automatic format selection
+    \item \textbf{Extensibility}: Easy to add new formats
+    \item \textbf{Multiple formats}: OrbFit, MPC, future JSON
+    \item \textbf{Robust error handling}: Validation and exceptions
+    \item \textbf{Well tested}: Unit tests for each parser
+\end{enumerate}
+
+The system successfully separates format-specific code from core algorithms.

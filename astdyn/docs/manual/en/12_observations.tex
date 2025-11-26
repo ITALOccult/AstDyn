@@ -1,0 +1,570 @@
+\chapter{Observations}
+\label{ch:observations}
+
+\section{Introduction}
+
+\textbf{Observations} are the fundamental data for orbit determination. This chapter describes:
+\begin{itemize}
+    \item Types of observations (astrometric, radar, spacecraft)
+    \item Observation models relating state to measurements
+    \item Data formats (MPC, radar, tracking)
+    \item Corrections (refraction, light-time, aberration)
+    \item Observatory coordinates and Earth orientation
+\end{itemize}
+
+Accurate observation modeling is essential for achieving sub-arcsecond orbit determination.
+
+\section{Observation Types}
+
+\subsection{Optical Astrometry}
+
+The most common observations are angular positions on the celestial sphere:
+
+\begin{equation}
+    \text{Observation} = (\alpha, \delta, t)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $\alpha$ is right ascension (0$^\circ$ to 360$^\circ$ or 0h to 24h)
+    \item $\delta$ is declination ($-90^\circ$ to $+90^\circ$)
+    \item $t$ is observation time (usually UTC)
+\end{itemize}
+
+\textbf{Precision ranges}:
+\begin{itemize}
+    \item Historical (photographic): 0.5--2 arcsec
+    \item CCD astrometry: 0.1--0.5 arcsec
+    \item Gaia space mission: 0.0001--0.001 arcsec (100 $\mu$as)
+    \item Ground-based surveys (Pan-STARRS, ATLAS): 0.05--0.2 arcsec
+\end{itemize}
+
+\subsection{Radar Observations}
+
+Planetary radar provides range and Doppler measurements:
+
+\begin{equation}
+    \text{Range: } \rho = |\mathbf{r}_{\text{target}} - \mathbf{r}_{\text{station}}|
+\end{equation}
+
+\begin{equation}
+    \text{Doppler: } \dot{\rho} = \frac{(\mathbf{r}_{\text{target}} - \mathbf{r}_{\text{station}}) \cdot (\mathbf{v}_{\text{target}} - \mathbf{v}_{\text{station}})}{|\mathbf{r}_{\text{target}} - \mathbf{r}_{\text{station}}|}
+\end{equation}
+
+\textbf{Major radar facilities}:
+\begin{itemize}
+    \item Arecibo (305 m, 2.38 GHz) -- decommissioned 2020
+    \item Goldstone DSS-14 (70 m, 8.56 GHz) -- operational
+    \item Green Bank (100 m, receive-only)
+\end{itemize}
+
+\textbf{Precision}:
+\begin{itemize}
+    \item Range: 10--100 meters (delay-Doppler imaging: $<$1 m)
+    \item Doppler: 0.1--1 mm/s
+\end{itemize}
+
+Radar is 1000$\times$ more precise than optical astrometry in range but limited to nearby objects ($<$ 0.3 AU for asteroids).
+
+\subsection{Spacecraft Tracking}
+
+Deep space missions tracked via:
+\begin{itemize}
+    \item Two-way Doppler (mm/s precision)
+    \item Range measurements (meter-level)
+    \item Delta-DOR (angular position via interferometry)
+    \item Optical navigation (camera images)
+\end{itemize}
+
+\section{Astrometric Observation Model}
+
+\subsection{Coordinate Transformation}
+
+Given object position $\mathbf{r}_{\text{obj}}$ in heliocentric ecliptic J2000, compute topocentric equatorial:
+
+\begin{enumerate}
+    \item Transform to barycentric: $\mathbf{r}_{\text{bary}} = \mathbf{r}_{\text{obj}} + \mathbf{r}_{\odot,\text{bary}}$
+    \item Subtract Earth position: $\mathbf{r}_{\text{geo}} = \mathbf{r}_{\text{bary}} - \mathbf{r}_{\text{Earth}}$
+    \item Subtract observatory position: $\mathbf{r}_{\text{topo}} = \mathbf{r}_{\text{geo}} - \mathbf{r}_{\text{obs}}$
+    \item Rotate to equatorial: $\mathbf{r}_{\text{eq}} = \mathbf{R}_{\text{ecl}\to\text{eq}} \mathbf{r}_{\text{topo}}$
+\end{enumerate}
+
+\subsection{Spherical Coordinates}
+
+From Cartesian topocentric equatorial $\mathbf{r}_{\text{eq}} = (x, y, z)$:
+
+\begin{equation}
+    \alpha = \arctan2(y, x)
+\end{equation}
+
+\begin{equation}
+    \delta = \arcsin\left(\frac{z}{\sqrt{x^2 + y^2 + z^2}}\right)
+\end{equation}
+
+Handle quadrant correctly with \texttt{atan2}.
+
+\subsection{Light-Time Correction}
+
+Observation time $t_{\text{obs}}$ is when photons arrive at Earth. Object was at emission position at:
+
+\begin{equation}
+    t_{\text{emit}} = t_{\text{obs}} - \frac{\rho}{c}
+\end{equation}
+
+where $\rho$ is geocentric distance.
+
+Iterate to find $t_{\text{emit}}$:
+\begin{lstlisting}[language=C++,caption={Light-time iteration}]
+double tau = 0.0;  // Initial guess
+for (int iter = 0; iter < 5; ++iter) {
+    Vector3d r_obj = propagate(y0, t0, t_obs - tau);
+    Vector3d r_earth = ephemeris.get_position("Earth", t_obs);
+    double rho = (r_obj - r_earth).norm();
+    double tau_new = rho / C_AU_PER_DAY;
+    if (std::abs(tau_new - tau) < 1e-10) break;
+    tau = tau_new;
+}
+\end{lstlisting}
+
+Typical correction: 4--30 minutes for asteroids.
+
+\subsection{Stellar Aberration}
+
+Earth's orbital motion causes apparent displacement:
+
+\begin{equation}
+    \mathbf{r}_{\text{aberrated}} = \mathbf{r}_{\text{geometric}} + \frac{\rho}{c}\mathbf{v}_{\text{Earth}}
+\end{equation}
+
+where $\mathbf{v}_{\text{Earth}}$ is Earth's velocity.
+
+Maximum effect: $\pm 20.5$ arcsec (annual aberration).
+
+\subsection{Atmospheric Refraction}
+
+Light bends passing through atmosphere. Correction depends on zenith angle $z$:
+
+\begin{equation}
+    \Delta z \approx 58.2'' \tan z - 0.067'' \tan^3 z
+\end{equation}
+
+At zenith ($z = 0$): no refraction. At horizon ($z = 90^\circ$): $\sim$34 arcmin (solar diameter!).
+
+For precise work, use wavelength-dependent model:
+
+\begin{equation}
+    n - 1 = 77.6 \times 10^{-6} \frac{P}{T}\left(1 + 7.52 \times 10^{-3}\lambda^{-2}\right)
+\end{equation}
+
+where $P$ is pressure (mbar), $T$ is temperature (K), $\lambda$ is wavelength ($\mu$m).
+
+Modern astrometry corrects to "above atmosphere" by:
+\begin{itemize}
+    \item Fitting catalog stars in field
+    \item Measuring local refraction empirically
+    \item Applying site-specific models
+\end{itemize}
+
+\section{Observatory Coordinates}
+
+\subsection{ITRF and Observatory Codes}
+
+The International Terrestrial Reference Frame (ITRF) provides precise coordinates for observatories.
+
+\textbf{Minor Planet Center (MPC) observatory codes}:
+\begin{itemize}
+    \item 500: Geocenter (for space-based observations)
+    \item 568: Mauna Kea (Hawaii)
+    \item 703: Catalina Sky Survey (Arizona)
+    \item F51: Pan-STARRS 1 (Hawaii)
+    \item G96: Mt. Lemmon Survey (Arizona)
+\end{itemize}
+
+Example entry for observatory 703:
+\begin{verbatim}
+703  Catalina  4.215500  0.759260  0.648764  -31.67
+\end{verbatim}
+
+Format: code, name, $\rho \cos\phi'$, $\rho \sin\phi'$, longitude (deg), altitude (m).
+
+\subsection{Geocentric Observatory Position}
+
+Convert geodetic coordinates $(h, \lambda, \phi)$ to geocentric Cartesian:
+
+\begin{equation}
+    \mathbf{r}_{\text{obs}} = \begin{bmatrix}
+        (N + h)\cos\phi\cos\lambda \\
+        (N + h)\cos\phi\sin\lambda \\
+        (N(1-e^2) + h)\sin\phi
+    \end{bmatrix}
+\end{equation}
+
+where:
+\begin{equation}
+    N = \frac{a}{\sqrt{1 - e^2\sin^2\phi}}
+\end{equation}
+
+and $a = 6378.137$ km (WGS84 equatorial radius), $e = 0.08181919$ (eccentricity).
+
+\subsection{Rotation to Inertial Frame}
+
+Observatory position rotates with Earth. Transformation involves:
+
+\begin{enumerate}
+    \item Polar motion ($x_p, y_p$)
+    \item UT1-UTC correction (Earth rotation angle)
+    \item Precession-nutation (IAU 2006/2000A)
+    \item Frame bias (ICRS to J2000)
+\end{enumerate}
+
+\textbf{Simplified rotation}:
+
+\begin{equation}
+    \mathbf{r}_{\text{inertial}} = \mathbf{R}_3(\text{GAST}) \mathbf{r}_{\text{ITRF}}
+\end{equation}
+
+where GAST is Greenwich Apparent Sidereal Time.
+
+\section{Earth Orientation Parameters}
+
+\subsection{Polar Motion}
+
+Earth's rotation axis moves relative to crust (Chandler wobble, annual motion):
+
+\begin{equation}
+    \mathbf{R}_{\text{polar}} = \mathbf{R}_2(-x_p)\mathbf{R}_1(-y_p)
+\end{equation}
+
+Amplitude: $\sim$0.3 arcsec ($\sim$10 meters at surface).
+
+Data from IERS: \texttt{finals2000A.all} bulletin.
+
+\subsection{UT1-UTC}
+
+Universal Time (UT1) tracks Earth's actual rotation. Atomic time (UTC) is uniform.
+
+\begin{equation}
+    \text{UT1} = \text{UTC} + (\text{UT1-UTC})
+\end{equation}
+
+$|\text{UT1-UTC}| < 0.9$ seconds (leap seconds added when needed).
+
+Prediction: available from IERS with $\sim$10 ms accuracy for 1 year ahead.
+
+\subsection{Precession and Nutation}
+
+Earth's rotation axis precesses (26,000 year period) and nutates (18.6 year main period).
+
+\textbf{IAU 2006 precession} + \textbf{IAU 2000A nutation} = high-precision model.
+
+Simplified for asteroid work: use mean pole (J2000) and ignore nutation ($\sim$15 arcsec effect).
+
+\section{MPC Observation Format}
+
+\subsection{80-Column Format}
+
+Standard format for optical astrometry:
+
+\begin{verbatim}
+     K17S00S  C2017 06 01.41667 18 26 54.13 -23 47 08.4          21.1 V      F51
+\end{verbatim}
+
+Fields:
+\begin{itemize}
+    \item Columns 1-5: Temporary designation or number
+    \item Column 12: Discovery asterisk (*)
+    \item Column 13: Note (e.g., photometry)
+    \item Column 14: Publication reference
+    \item Columns 15-32: Observation date (YYYY MM DD.ddddd)
+    \item Columns 33-44: Right ascension (HH MM SS.sss)
+    \item Columns 45-56: Declination (sDD MM SS.ss)
+    \item Columns 66-70: Magnitude
+    \item Column 71: Mag band (V, R, I, etc.)
+    \item Columns 78-80: Observatory code
+\end{itemize}
+
+\subsection{ADES Format}
+
+Astrometry Data Exchange Standard (modern XML/JSON format):
+
+\begin{lstlisting}[language=XML,caption={ADES XML example}]
+<obsBlock>
+  <obsContext>
+    <observatory>
+      <mpcCode>F51</mpcCode>
+    </observatory>
+  </obsContext>
+  <obsData>
+    <optical>
+      <trkSub>K17S00S</trkSub>
+      <obsTime>2017-06-01T10:00:00.000Z</obsTime>
+      <ra>276.72554</ra>
+      <dec>-23.78567</dec>
+      <mag>21.1</mag>
+      <band>V</band>
+      <rmsRA>0.1</rmsRA>
+      <rmsDec>0.1</rmsDec>
+    </optical>
+  </obsData>
+</obsBlock>
+\end{lstlisting}
+
+\textbf{Advantages over 80-column}:
+\begin{itemize}
+    \item Explicit uncertainties
+    \item Metadata (telescope, detector, catalog)
+    \item No fixed-width limitations
+    \item International standard
+\end{itemize}
+
+\section{Observation Weights}
+
+\subsection{Weighting Schemes}
+
+Not all observations equally reliable. Weight by estimated uncertainty:
+
+\begin{equation}
+    w_i = \frac{1}{\sigma_i^2}
+\end{equation}
+
+\textbf{Uncertainty sources}:
+\begin{itemize}
+    \item Measurement error (star fitting, centroid)
+    \item Catalog errors (Gaia DR3: 0.02--0.05 arcsec)
+    \item Timing errors ($\pm$1 second $\to$ 0.01 arcsec for slow movers)
+    \item Atmospheric effects (seeing, refraction)
+    \item Trailing losses (long exposures)
+\end{itemize}
+
+\subsection{Empirical Weighting}
+
+For MPC observations without formal uncertainties:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Observatory Type} & \textbf{$\sigma_\alpha \cos\delta$} & \textbf{$\sigma_\delta$} \\
+\midrule
+Professional (Pan-STARRS, CSS) & 0.1 arcsec & 0.1 arcsec \\
+Amateur CCD & 0.5 arcsec & 0.5 arcsec \\
+Historical photographic & 1.0 arcsec & 1.0 arcsec \\
+Radar range & 10 m & -- \\
+Radar Doppler & -- & 1 mm/s \\
+\bottomrule
+\end{tabular}
+\caption{Typical observation uncertainties.}
+\label{tab:obs_uncertainties}
+\end{table}
+
+\subsection{Downweighting Outliers}
+
+After initial fit, identify outliers (residual $> 3\sigma$) and reduce weight:
+
+\begin{equation}
+    w_{\text{new}} = w_{\text{old}} \times \exp\left(-\frac{r^2}{2\sigma^2}\right)
+\end{equation}
+
+where $r$ is residual. This is "robust least squares" or "Huber weighting."
+
+\section{Observation Partials}
+
+\subsection{Definition}
+
+For orbit determination, we need:
+
+\begin{equation}
+    \frac{\partial(\alpha, \delta)}{\partial\mathbf{y}(t_0)}
+\end{equation}
+
+This relates how initial state affects predicted observation.
+
+\subsection{Chain Rule}
+
+Use chain rule with state transition matrix:
+
+\begin{equation}
+    \frac{\partial(\alpha, \delta)}{\partial\mathbf{y}(t_0)} = \frac{\partial(\alpha, \delta)}{\partial\mathbf{r}(t_{\text{obs}})} \frac{\partial\mathbf{r}(t_{\text{obs}})}{\partial\mathbf{y}(t_{\text{obs}})} \frac{\partial\mathbf{y}(t_{\text{obs}})}{\partial\mathbf{y}(t_0)}
+\end{equation}
+
+The last factor is the STM $\Phi(t_{\text{obs}}, t_0)$.
+
+\subsection{Geometric Partials}
+
+For topocentric position $\mathbf{r} = (x, y, z)$ in equatorial frame:
+
+\begin{equation}
+    \rho = \sqrt{x^2 + y^2 + z^2}
+\end{equation}
+
+\begin{equation}
+    \frac{\partial\alpha}{\partial x} = -\frac{y}{x^2 + y^2}, \quad
+    \frac{\partial\alpha}{\partial y} = \frac{x}{x^2 + y^2}, \quad
+    \frac{\partial\alpha}{\partial z} = 0
+\end{equation}
+
+\begin{equation}
+    \frac{\partial\delta}{\partial x} = -\frac{xz}{\rho^2\sqrt{x^2+y^2}}, \quad
+    \frac{\partial\delta}{\partial y} = -\frac{yz}{\rho^2\sqrt{x^2+y^2}}, \quad
+    \frac{\partial\delta}{\partial z} = \frac{\sqrt{x^2+y^2}}{\rho^2}
+\end{equation}
+
+\subsection{Implementation}
+
+\begin{lstlisting}[language=C++,caption={Computing observation partials}]
+Matrix<2,6> compute_partials_radec(
+    const Vector6d& state,
+    const Matrix6d& stm,
+    const Vector3d& obs_pos)
+{
+    Vector3d r = state.head<3>() - obs_pos;
+    double x = r(0), y = r(1), z = r(2);
+    double rho = r.norm();
+    double rho_xy = std::sqrt(x*x + y*y);
+    
+    // Partials w.r.t. position
+    Matrix<2,3> dobs_dr;
+    dobs_dr(0,0) = -y / (x*x + y*y);  // d(RA)/dx
+    dobs_dr(0,1) =  x / (x*x + y*y);  // d(RA)/dy
+    dobs_dr(0,2) =  0.0;              // d(RA)/dz
+    
+    dobs_dr(1,0) = -x*z / (rho*rho*rho_xy);  // d(Dec)/dx
+    dobs_dr(1,1) = -y*z / (rho*rho*rho_xy);  // d(Dec)/dy
+    dobs_dr(1,2) =  rho_xy / (rho*rho);      // d(Dec)/dz
+    
+    // Chain with STM
+    Matrix<2,6> partials = dobs_dr * stm.block<3,6>(0,0);
+    
+    return partials;
+}
+\end{lstlisting}
+
+\section{Data Quality}
+
+\subsection{Timing Accuracy}
+
+Observation time must be UTC to $\pm$1 second for asteroids ($\pm$0.01 sec for fast movers).
+
+\textbf{Common issues}:
+\begin{itemize}
+    \item Clock drift (GPS receivers essential)
+    \item Mid-exposure vs start/end time
+    \item Time zone errors (always use UTC!)
+    \item Leap seconds
+\end{itemize}
+
+\subsection{Astrometric Catalog}
+
+Modern observations referenced to:
+\begin{itemize}
+    \item Gaia DR3 (2022): 0.02--0.05 arcsec, $\sim$1.8 billion stars
+    \item UCAC4: 0.02--0.1 arcsec, 113 million stars
+    \item 2MASS: 0.08 arcsec (infrared), 471 million objects
+\end{itemize}
+
+\textbf{Older observations} (pre-Gaia) may have systematic errors from catalog:
+\begin{itemize}
+    \item USNO-A: $\sim$0.25 arcsec systematic
+    \item GSC: $\sim$0.3 arcsec systematic
+\end{itemize}
+
+Use catalog-specific debiasing when mixing observations.
+
+\subsection{Site-Specific Systematics}
+
+Some observatories have known issues:
+\begin{itemize}
+    \item Poor timing ($>$10 sec errors)
+    \item Incorrect coordinates (wrong latitude/longitude)
+    \item Scale errors (wrong plate scale)
+    \item Magnitude-dependent bias (charge bleeding)
+\end{itemize}
+
+MPC maintains quality flags, but user must validate data.
+
+\section{Practical Example}
+
+\subsection{Loading MPC Observations}
+
+\begin{lstlisting}[language=C++,caption={Parsing MPC observations}]
+#include <astdyn/observations/MPCObservation.hpp>
+
+std::vector<Observation> load_mpc_file(const std::string& filename) {
+    std::vector<Observation> observations;
+    std::ifstream file(filename);
+    std::string line;
+    
+    while (std::getline(file, line)) {
+        if (line.length() < 80) continue;
+        
+        MPCObservation obs;
+        if (obs.parse(line)) {
+            observations.push_back(obs);
+        }
+    }
+    
+    std::cout << "Loaded " << observations.size() << " observations\n";
+    return observations;
+}
+\end{lstlisting}
+
+\subsection{Computing Predicted Observations}
+
+\begin{lstlisting}[language=C++,caption={Predicting observations}]
+Vector2d predict_observation(
+    const Vector6d& state,
+    double epoch,
+    const std::string& obs_code,
+    const EphemerisInterface& ephemeris)
+{
+    // Get Earth position
+    Vector3d earth_pos = ephemeris.get_position("Earth", epoch);
+    
+    // Get observatory position (ITRF -> inertial)
+    Vector3d obs_pos_geo = observatory_db.get_geocentric(obs_code);
+    Matrix3d R_itrf_to_j2000 = earth_rotation(epoch);
+    Vector3d obs_pos = earth_pos + R_itrf_to_j2000 * obs_pos_geo;
+    
+    // Topocentric position
+    Vector3d r_topo = state.head<3>() - obs_pos;
+    
+    // Ecliptic to equatorial
+    Vector3d r_eq = R_ecl_to_eq * r_topo;
+    
+    // Compute RA/Dec
+    double alpha = std::atan2(r_eq(1), r_eq(0));
+    double delta = std::asin(r_eq(2) / r_eq.norm());
+    
+    if (alpha < 0) alpha += 2*M_PI;
+    
+    return Vector2d(alpha, delta);
+}
+\end{lstlisting}
+
+\section{Summary}
+
+Key concepts about observations:
+
+\begin{enumerate}
+    \item \textbf{Optical astrometry} provides RA/Dec with 0.1--0.5 arcsec precision
+    \item \textbf{Radar} gives range/Doppler with meter/mm-per-sec precision
+    \item \textbf{Light-time} correction is essential (4--30 minutes for asteroids)
+    \item \textbf{Aberration} causes $\pm$20 arcsec displacement
+    \item \textbf{Refraction} affects low-elevation observations
+    \item \textbf{Observatory position} must be in inertial frame
+    \item \textbf{MPC format} is standard, ADES is modern
+    \item \textbf{Weighting} by uncertainty improves fit quality
+    \item \textbf{Partials} $\partial(\alpha,\delta)/\partial\mathbf{y}$ enable orbit fitting
+\end{enumerate}
+
+Practical recommendations:
+\begin{itemize}
+    \item Always apply light-time and aberration corrections
+    \item Use Gaia DR3 catalog for modern observations
+    \item Validate timing (UTC, leap seconds)
+    \item Check observatory coordinates
+    \item Weight by estimated uncertainty
+    \item Identify and downweight outliers
+\end{itemize}
+
+The next chapter covers initial orbit determination from a few observations, followed by differential correction to refine orbits using all available data.

@@ -164,21 +164,26 @@ public:
      * Rotation about X-axis by the mean obliquity of the ecliptic (ε₀)
      * at J2000.0 = 23.439291° (IAU 2000)
      * 
+     * To go from equatorial to ecliptic, rotate by -ε around X axis
+     * 
      * @return 3x3 rotation matrix
      */
     static Matrix3d j2000_to_ecliptic() {
         // Mean obliquity at J2000.0 (IAU 2000)
         constexpr double epsilon0 = 23.439291 * constants::DEG_TO_RAD;
-        return rotation_x(epsilon0);
+        return rotation_x(-epsilon0);
     }
     
     /**
      * @brief Get transformation matrix from Ecliptic to J2000
+     * 
+     * To go from ecliptic to equatorial, rotate by +ε around X axis
+     * 
      * @return 3x3 rotation matrix
      */
     static Matrix3d ecliptic_to_j2000() {
         constexpr double epsilon0 = 23.439291 * constants::DEG_TO_RAD;
-        return rotation_x(-epsilon0);
+        return rotation_x(epsilon0);
     }
     
     // ========================================================================

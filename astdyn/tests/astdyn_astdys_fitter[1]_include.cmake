@@ -1,0 +1,5 @@
+if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_astdys_fitter[1]_tests.cmake")
+  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_astdys_fitter[1]_tests.cmake")
+else()
+  add_test(astdyn_astdys_fitter_NOT_BUILT astdyn_astdys_fitter_NOT_BUILT)
+endif()

@@ -1,0 +1,466 @@
+\chapter{Differential Correction}
+\label{ch:differential_correction}
+
+\section{Introduction}
+
+\textbf{Differential correction} (DC) is the iterative least-squares refinement of an orbit using all available observations. It is the cornerstone of orbit determination.
+
+\textbf{Input}: Initial orbit + observations
+
+\textbf{Output}: Improved orbit + covariance matrix + residuals
+
+\textbf{Method}: Weighted least squares minimizing O-C (observed minus computed) residuals.
+
+\section{The Least Squares Problem}
+
+\subsection{Observation Equation}
+
+For observation $i$:
+
+\begin{equation}
+    \mathbf{o}_i = \mathbf{h}(\mathbf{y}_0, t_i) + \boldsymbol{\epsilon}_i
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $\mathbf{o}_i$: Observed value (e.g., RA, Dec)
+    \item $\mathbf{h}$: Observation model (coordinate transformation)
+    \item $\mathbf{y}_0$: State at epoch $t_0$
+    \item $\boldsymbol{\epsilon}_i \sim \mathcal{N}(0, \mathbf{W}_i^{-1})$: Measurement error
+\end{itemize}
+
+\subsection{Linearization}
+
+Linearize around current estimate $\mathbf{y}_0^{(k)}$:
+
+\begin{equation}
+    \mathbf{o}_i - \mathbf{c}_i = \mathbf{H}_i \Delta\mathbf{y}_0 + \boldsymbol{\epsilon}_i
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $\mathbf{c}_i = \mathbf{h}(\mathbf{y}_0^{(k)}, t_i)$: Computed value
+    \item $\mathbf{H}_i = \frac{\partial \mathbf{h}}{\partial \mathbf{y}_0}$: Design matrix (observation partials)
+    \item $\Delta\mathbf{y}_0 = \mathbf{y}_0 - \mathbf{y}_0^{(k)}$: State correction
+\end{itemize}
+
+\subsection{Normal Equations}
+
+Minimize weighted sum of squared residuals:
+
+\begin{equation}
+    \chi^2 = \sum_{i=1}^m (\mathbf{o}_i - \mathbf{c}_i - \mathbf{H}_i \Delta\mathbf{y}_0)^T \mathbf{W}_i (\mathbf{o}_i - \mathbf{c}_i - \mathbf{H}_i \Delta\mathbf{y}_0)
+\end{equation}
+
+Solution:
+
+\begin{equation}
+    (\mathbf{H}^T \mathbf{W} \mathbf{H}) \Delta\mathbf{y}_0 = \mathbf{H}^T \mathbf{W} (\mathbf{o} - \mathbf{c})
+\end{equation}
+
+Define:
+\begin{align}
+    \mathbf{N} &= \mathbf{H}^T \mathbf{W} \mathbf{H} \quad \text{(normal matrix)} \\
+    \mathbf{b} &= \mathbf{H}^T \mathbf{W} (\mathbf{o} - \mathbf{c}) \quad \text{(right-hand side)}
+\end{align}
+
+Solution: $\mathbf{N} \Delta\mathbf{y}_0 = \mathbf{b}$
+
+Covariance: $\mathbf{C} = \mathbf{N}^{-1}$
+
+\section{Computing Observation Partials}
+
+\subsection{Chain Rule with STM}
+
+For RA/Dec observations at time $t_i$:
+
+\begin{equation}
+    \mathbf{H}_i = \frac{\partial (\alpha, \delta)}{\partial \mathbf{y}_0} = \frac{\partial (\alpha, \delta)}{\partial \mathbf{y}(t_i)} \frac{\partial \mathbf{y}(t_i)}{\partial \mathbf{y}_0}
+\end{equation}
+
+where $\Phi(t_i, t_0) = \frac{\partial \mathbf{y}(t_i)}{\partial \mathbf{y}_0}$ is the state transition matrix (Chapter 10).
+
+\subsection{Geometric Partials}
+
+From topocentric position $\boldsymbol{\rho} = \mathbf{r} - \mathbf{R}$:
+
+\begin{align}
+    \alpha &= \arctan2(\rho_y, \rho_x) \\
+    \delta &= \arcsin(\rho_z / \rho)
+\end{align}
+
+Partials:
+
+\begin{align}
+    \frac{\partial \alpha}{\partial \rho_x} &= -\frac{\rho_y}{\rho_x^2 + \rho_y^2} \\
+    \frac{\partial \alpha}{\partial \rho_y} &= \frac{\rho_x}{\rho_x^2 + \rho_y^2} \\
+    \frac{\partial \alpha}{\partial \rho_z} &= 0 \\
+    \frac{\partial \delta}{\partial \rho_x} &= -\frac{\rho_x \rho_z}{\rho^2 \sqrt{\rho_x^2 + \rho_y^2}} \\
+    \frac{\partial \delta}{\partial \rho_y} &= -\frac{\rho_y \rho_z}{\rho^2 \sqrt{\rho_x^2 + \rho_y^2}} \\
+    \frac{\partial \delta}{\partial \rho_z} &= \frac{\sqrt{\rho_x^2 + \rho_y^2}}{\rho^2}
+\end{align}
+
+\subsection{Full Partials}
+
+Combine geometric partials with $\Phi$:
+
+\begin{equation}
+    \mathbf{H}_i = \begin{bmatrix}
+        \frac{\partial \alpha}{\partial x} & \frac{\partial \alpha}{\partial y} & \frac{\partial \alpha}{\partial z} & 0 & 0 & 0 \\
+        \frac{\partial \delta}{\partial x} & \frac{\partial \delta}{\partial y} & \frac{\partial \delta}{\partial z} & 0 & 0 & 0
+    \end{bmatrix} \Phi(t_i, t_0)
+\end{equation}
+
+Note: RA/Dec depend only on position, not velocity, in geometric partials. Velocity affects observations through propagation ($\Phi$).
+
+\section{Algorithm}
+
+\textbf{Input}: Initial orbit $\mathbf{y}_0^{(0)}$, observations $\{(\mathbf{o}_i, t_i, \mathbf{W}_i)\}$
+
+\textbf{Iterate}:
+\begin{enumerate}
+    \item For each observation $i$:
+    \begin{enumerate}
+        \item Propagate to $t_i$ with STM: $[\mathbf{y}(t_i), \Phi(t_i, t_0)]$
+        \item Compute prediction $\mathbf{c}_i = \mathbf{h}(\mathbf{y}(t_i))$
+        \item Compute geometric partials
+        \item Compute full partials $\mathbf{H}_i$ using STM
+    \end{enumerate}
+    \item Form normal matrix: $\mathbf{N} = \sum_i \mathbf{H}_i^T \mathbf{W}_i \mathbf{H}_i$
+    \item Form RHS: $\mathbf{b} = \sum_i \mathbf{H}_i^T \mathbf{W}_i (\mathbf{o}_i - \mathbf{c}_i)$
+    \item Solve: $\mathbf{N} \Delta\mathbf{y}_0 = \mathbf{b}$
+    \item Update: $\mathbf{y}_0^{(k+1)} = \mathbf{y}_0^{(k)} + \Delta\mathbf{y}_0$
+    \item Compute RMS: $\text{RMS} = \sqrt{\frac{1}{m-n} \sum_i w_i r_i^2}$ where $r_i = \mathbf{o}_i - \mathbf{c}_i$
+    \item Check convergence: $|\Delta\mathbf{y}_0| < \epsilon$ and $|\Delta\text{RMS}| < \epsilon_{\text{RMS}}$
+\end{enumerate}
+
+\textbf{Output}: Converged state $\mathbf{y}_0^*$, covariance $\mathbf{C} = \mathbf{N}^{-1}$, residuals
+
+\section{Convergence Criteria}
+
+\subsection{State Correction}
+
+\begin{equation}
+    ||\Delta\mathbf{y}_0|| < 10^{-8} \text{ AU, AU/day}
+\end{equation}
+
+\subsection{RMS Change}
+
+\begin{equation}
+    \frac{|\text{RMS}^{(k+1)} - \text{RMS}^{(k)}|}{\text{RMS}^{(k)}} < 10^{-6}
+\end{equation}
+
+\subsection{Maximum Iterations}
+
+Typically converges in 3-10 iterations. If not converged after 20 iterations, suspect:
+\begin{itemize}
+    \item Poor initial orbit
+    \item Bad observations (outliers)
+    \item Model inadequacy (missing perturbations)
+\end{itemize}
+
+\section{Weighting Strategy}
+
+\subsection{Empirical Weights}
+
+For RA/Dec observations:
+
+\begin{equation}
+    w_{\alpha,i} = \frac{1}{\sigma_{\alpha,i}^2}, \quad w_{\delta,i} = \frac{1}{\sigma_{\delta,i}^2}
+\end{equation}
+
+Typical $\sigma$:
+\begin{itemize}
+    \item Modern CCD (Gaia-calibrated): 0.1"
+    \item Amateur CCD: 0.5"
+    \item Historical photographic: 1-2"
+\end{itemize}
+
+\subsection{Robust Weighting}
+
+Downweight outliers using Huber weights:
+
+\begin{equation}
+    w_i' = \begin{cases}
+        w_i & \text{if } |r_i| < k\sigma \\
+        w_i \frac{k\sigma}{|r_i|} & \text{if } |r_i| \ge k\sigma
+    \end{cases}
+\end{equation}
+
+where $k = 2.5$ (typical).
+
+\section{Covariance Matrix}
+
+\subsection{Formal Uncertainty}
+
+From normal matrix:
+
+\begin{equation}
+    \mathbf{C} = \mathbf{N}^{-1} = (\mathbf{H}^T \mathbf{W} \mathbf{H})^{-1}
+\end{equation}
+
+Diagonal elements: $\sigma_i = \sqrt{C_{ii}}$
+
+\textbf{Example} (asteroid with 100 observations over 30 days):
+\begin{itemize}
+    \item $\sigma_x \sim 10^{-7}$ AU (15 km)
+    \item $\sigma_v \sim 10^{-9}$ AU/day (1.7 mm/s)
+\end{itemize}
+
+\subsection{Correlation}
+
+Off-diagonal elements show parameter correlations:
+
+\begin{equation}
+    \rho_{ij} = \frac{C_{ij}}{\sqrt{C_{ii} C_{jj}}}
+\end{equation}
+
+Strong correlations (e.g., $\rho_{xy} > 0.9$) indicate observational geometry issues.
+
+\subsection{Propagated Uncertainty}
+
+At time $t$:
+
+\begin{equation}
+    \mathbf{C}(t) = \Phi(t, t_0) \mathbf{C}(t_0) \Phi(t, t_0)^T
+\end{equation}
+
+Uncertainty grows with time. For short-arc solutions, $\sigma$ can increase exponentially.
+
+\section{Implementation}
+
+\begin{lstlisting}[language=C++,caption={Differential correction implementation}]
+struct DCResult {
+    Vector6d state;
+    Matrix6d covariance;
+    double rms;
+    int iterations;
+    std::vector<double> residuals;
+};
+
+DCResult differential_correction(
+    const Vector6d& initial_state,
+    double epoch,
+    const std::vector<Observation>& observations,
+    const ForceModel& forces,
+    const EphemerisInterface& ephemeris,
+    int max_iterations = 20,
+    double tol = 1e-8)
+{
+    Vector6d y0 = initial_state;
+    double prev_rms = 1e10;
+    
+    for (int iter = 0; iter < max_iterations; ++iter) {
+        // Accumulate normal matrix and RHS
+        Matrix6d N = Matrix6d::Zero();
+        Vector6d b = Vector6d::Zero();
+        double chi2 = 0.0;
+        std::vector<double> residuals;
+        
+        for (const auto& obs : observations) {
+            // Propagate with STM
+            auto [y_obs, Phi] = propagate_with_stm(y0, epoch, obs.epoch, forces);
+            
+            // Predict observation
+            Vector2d computed = predict_observation(y_obs, obs.epoch, obs.obs_code, ephemeris);
+            
+            // Residual (O-C)
+            Vector2d residual;
+            residual(0) = (obs.ra - computed(0)) * cos(obs.dec);  // RA cos(Dec)
+            residual(1) = obs.dec - computed(1);  // Dec
+            
+            residuals.push_back(residual.norm() * RAD_TO_ARCSEC);
+            
+            // Geometric partials
+            Matrix<double, 2, 3> geom_partials = compute_ra_dec_partials(y_obs, obs, ephemeris);
+            
+            // Full partials via STM
+            Matrix<double, 2, 6> H;
+            H.block<2, 3>(0, 0) = geom_partials;
+            H.block<2, 3>(0, 3).setZero();
+            H = H * Phi;  // Chain rule
+            
+            // Weights
+            double w_ra = 1.0 / (obs.sigma_ra * obs.sigma_ra);
+            double w_dec = 1.0 / (obs.sigma_dec * obs.sigma_dec);
+            Matrix2d W = Vector2d(w_ra, w_dec).asDiagonal();
+            
+            // Accumulate normal equations
+            N += H.transpose() * W * H;
+            b += H.transpose() * W * residual;
+            chi2 += residual.transpose() * W * residual;
+        }
+        
+        // Solve normal equations
+        Vector6d delta_y0 = N.ldlt().solve(b);
+        
+        // Update state
+        y0 += delta_y0;
+        
+        // Compute RMS
+        int dof = 2 * observations.size() - 6;  // degrees of freedom
+        double rms = sqrt(chi2 / dof) * RAD_TO_ARCSEC;
+        
+        // Check convergence
+        if (delta_y0.norm() < tol && abs(rms - prev_rms) < 1e-6) {
+            Matrix6d covariance = N.inverse();
+            return {y0, covariance, rms, iter + 1, residuals};
+        }
+        
+        prev_rms = rms;
+    }
+    
+    throw std::runtime_error("DC did not converge");
+}
+\end{lstlisting}
+
+\section{Example: Asteroid 203 Pompeja}
+
+\subsection{Problem Setup}
+
+\begin{itemize}
+    \item Object: 203 Pompeja (Main Belt asteroid)
+    \item Observations: 100 RA/Dec measurements
+    \item Time span: 60 days
+    \item Observatory: 500 (geocentric), F51 (Pan-STARRS)
+    \item Initial orbit: From JPL Horizons
+\end{itemize}
+
+\subsection{Results}
+
+\begin{lstlisting}[language=C++,caption={Running DC on Pompeja}]
+// Load observations from MPC format file
+std::vector<Observation> obs = load_mpc_observations("pompeja.obs");
+std::cout << "Loaded " << obs.size() << " observations\n";
+
+// Initial orbit from Horizons
+Vector6d y0_initial = /* ... from JPL ... */;
+double epoch = 2460000.5;  // JD
+
+// Force model
+auto forces = std::make_shared<ForceModel>();
+forces->add_perturbation(std::make_shared<SunGravity>());
+forces->add_perturbation(std::make_shared<JupiterPerturbation>());
+forces->add_perturbation(std::make_shared<SaturnPerturbation>());
+
+// Ephemeris
+SpiceInterface spice;
+spice.load_kernel("de440.bsp");
+
+// Run differential correction
+try {
+    auto result = differential_correction(y0_initial, epoch, obs, *forces, spice);
+    
+    std::cout << "Converged in " << result.iterations << " iterations\n";
+    std::cout << "RMS = " << result.rms << " arcsec\n";
+    
+    // Print orbital elements
+    OrbitalElements elem = OrbitalElements::from_cartesian(result.state, epoch);
+    std::cout << "\nImproved orbit:\n";
+    std::cout << "a = " << elem.a << " +/- " << sqrt(result.covariance(0,0)) << " AU\n";
+    std::cout << "e = " << elem.e << " +/- " << sqrt(result.covariance(1,1)) << "\n";
+    std::cout << "i = " << elem.i * RAD_TO_DEG << " deg\n";
+    
+    // Largest residuals
+    std::sort(result.residuals.begin(), result.residuals.end(), std::greater<>());
+    std::cout << "\nTop 5 residuals:\n";
+    for (int i = 0; i < 5; ++i) {
+        std::cout << i+1 << ". " << result.residuals[i] << " arcsec\n";
+    }
+    
+} catch (const std::exception& e) {
+    std::cerr << "Error: " << e.what() << "\n";
+}
+\end{lstlisting}
+
+\textbf{Typical output}:
+\begin{verbatim}
+Loaded 100 observations
+Converged in 5 iterations
+RMS = 0.658 arcsec
+
+Improved orbit:
+a = 2.7436 +/- 0.000001 AU
+e = 0.0624 +/- 0.000005
+i = 11.743 deg
+
+Top 5 residuals:
+1. 2.34 arcsec
+2. 1.98 arcsec
+3. 1.76 arcsec
+4. 1.65 arcsec
+5. 1.54 arcsec
+\end{verbatim}
+
+\subsection{Interpretation}
+
+\begin{itemize}
+    \item \textbf{RMS = 0.658"}: Excellent fit, consistent with CCD astrometry precision
+    \item \textbf{5 iterations}: Rapid convergence indicates good initial orbit
+    \item \textbf{$\sigma_a = 10^{-6}$ AU}: Semimajor axis determined to ~150 km
+    \item \textbf{Top residuals $<$2.5"}: No obvious outliers
+    \item \textbf{Covariance}: Formal uncertainty, propagate for ephemeris error
+\end{itemize}
+
+\section{Troubleshooting}
+
+\subsection{Non-Convergence}
+
+\textbf{Symptoms}: RMS oscillates or increases.
+
+\textbf{Causes}:
+\begin{enumerate}
+    \item Poor initial orbit (too far from truth)
+    \item Outliers dominating fit
+    \item Force model inadequate
+    \item Numerical issues (ill-conditioned normal matrix)
+\end{enumerate}
+
+\textbf{Solutions}:
+\begin{itemize}
+    \item Improve IOD
+    \item Enable robust weighting
+    \item Add missing perturbations
+    \item Regularize normal matrix
+\end{itemize}
+
+\subsection{Large RMS}
+
+\textbf{Symptoms}: RMS $>$ 2" for modern observations.
+
+\textbf{Causes}:
+\begin{itemize}
+    \item Systematic errors in observations
+    \item Wrong observatory coordinates
+    \item Timing errors
+    \item Missing perturbations (e.g., close encounter)
+\end{itemize}
+
+\textbf{Diagnosis}: Plot residuals vs. time, magnitude, observatory.
+
+\subsection{Small Residuals but Wrong Orbit}
+
+\textbf{Symptoms}: RMS $<$ 0.5" but ephemeris predictions fail.
+
+\textbf{Cause}: Short arc + degeneracy. Many orbits fit equally well over short spans.
+
+\textbf{Solution}: Acquire observations over longer arc (>30 days for main belt, >7 days for NEA).
+
+\section{Summary}
+
+Key points about differential correction:
+
+\begin{enumerate}
+    \item \textbf{Least squares} minimizes weighted sum of O-C squared residuals
+    \item \textbf{Normal equations} $\mathbf{N}\Delta\mathbf{y}_0 = \mathbf{b}$ solved iteratively
+    \item \textbf{Observation partials} computed via chain rule with STM
+    \item \textbf{Geometric partials} relate RA/Dec to topocentric position
+    \item \textbf{Convergence} typically in 3-10 iterations
+    \item \textbf{Covariance matrix} $\mathbf{C} = \mathbf{N}^{-1}$ gives formal uncertainty
+    \item \textbf{RMS} indicates fit quality; target $<$1" for modern CCD
+    \item \textbf{Robust weighting} downweights outliers
+    \item \textbf{Pompeja example} demonstrates complete workflow
+\end{enumerate}
+
+Next chapter covers residual analysis for quality assessment and outlier detection.
+

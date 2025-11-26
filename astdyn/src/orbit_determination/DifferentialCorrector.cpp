@@ -209,9 +209,12 @@ DifferentialCorrector::build_design_matrix(
         }
         Vector3d observer_pos = *obs_pos_opt;
         
+        // Convert observation time to TDB (STM needs TDB)
+        double obs_mjd_tdb = ResidualCalculator::utc_to_tdb(obs.mjd_utc);
+        
         // Compute STM and observation partials
         auto partials = stm_computer_->compute_with_partials(
-            state, obs.mjd_utc, observer_pos);
+            state, obs_mjd_tdb, observer_pos);
         
         // Design matrix row: ∂(RA,Dec)/∂x₀ = ∂(RA,Dec)/∂x * Φ(t,t₀)
         Eigen::Matrix<double, 2, 6> A_obs = partials.partial_radec * partials.phi;

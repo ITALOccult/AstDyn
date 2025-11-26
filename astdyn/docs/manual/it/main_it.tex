@@ -1,0 +1,202 @@
+\documentclass[12pt,a4paper,twoside]{book}
+
+% ============================================================================
+% PACKAGES
+% ============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{booktabs}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
+\usepackage{titlesec}
+\usepackage{float}
+
+% Font simile a Optima - usando Palatino (eleganza simile)
+% pacchetto classico non disponibile, usando alternativa
+\usepackage{mathpazo} % Font Palatino (eleganza simile a Optima)
+\usepackage[scaled=0.92]{helvet} % Helvetica per sans-serif
+
+% Interlinea 1.3
+\usepackage{setspace}
+\setstretch{1.3}
+
+% Geometria pagina
+\geometry{
+    top=3cm,
+    bottom=3cm,
+    left=3.5cm,
+    right=2.5cm,
+    headheight=15pt
+}
+
+% ============================================================================
+% COLORI
+% ============================================================================
+\definecolor{codebackground}{rgb}{0.95,0.95,0.95}
+\definecolor{codekeyword}{rgb}{0.0,0.0,0.5}
+\definecolor{codecomment}{rgb}{0.25,0.5,0.35}
+\definecolor{codestring}{rgb}{0.6,0.1,0.1}
+\definecolor{linkcolor}{rgb}{0.0,0.2,0.6}
+
+% ============================================================================
+% HYPERREF
+% ============================================================================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=linkcolor,
+    citecolor=linkcolor,
+    urlcolor=linkcolor,
+    bookmarksnumbered=true,
+    pdfauthor={Michele Bigi},
+    pdftitle={Libreria AstDyn - Manuale Scientifico},
+    pdfsubject={Meccanica Celeste e Determinazione Orbitale},
+    pdfkeywords={meccanica celeste, determinazione orbitale, astrodinamica}
+}
+
+% ============================================================================
+% LISTATI CODICE
+% ============================================================================
+\lstset{
+    backgroundcolor=\color{codebackground},
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{codekeyword}\bfseries,
+    commentstyle=\color{codecomment}\itshape,
+    stringstyle=\color{codestring},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=8pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    rulecolor=\color{black},
+    tabsize=4,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)},
+    xleftmargin=1.5em,
+    xrightmargin=0.5em
+}
+
+\lstdefinestyle{cpp}{
+    language=C++,
+    morekeywords={constexpr,nullptr,override,final}
+}
+
+% ============================================================================
+% TIKZ/PGFPLOTS
+% ============================================================================
+\usetikzlibrary{shapes,arrows,positioning,calc,decorations.markings}
+\pgfplotsset{compat=1.16}
+
+% ============================================================================
+% AMBIENTI TEOREMI
+% ============================================================================
+\theoremstyle{definition}
+\newtheorem{definition}{Definizione}[chapter]
+\newtheorem{example}{Esempio}[chapter]
+\newtheorem{algorithm}{Algoritmo}[chapter]
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Teorema}[chapter]
+\newtheorem{proposition}{Proposizione}[chapter]
+\newtheorem{lemma}{Lemma}[chapter]
+
+\theoremstyle{remark}
+\newtheorem{remark}{Nota}[chapter]
+\newtheorem{note}{Osservazione}[chapter]
+
+% ============================================================================
+% INTESTAZIONI E PIÈ DI PAGINA
+% ============================================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\leftmark}
+\fancyhead[RO]{\rightmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% ============================================================================
+% FRONTESPIZIO
+% ============================================================================
+\title{%
+    \Huge\textbf{Libreria AstDyn}\\[0.5cm]
+    \Large Manuale Scientifico\\[0.3cm]
+    \large Versione 1.0.0
+}
+\author{Michele Bigi}
+\date{\today}
+
+% ============================================================================
+% DOCUMENTO
+% ============================================================================
+\begin{document}
+
+% Materia preliminare
+\frontmatter
+\include{00_frontespizio}
+\include{00_prefazione}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+% Materia principale
+\mainmatter
+
+% Parte I: Fondamenti Teorici
+\part{Fondamenti Teorici della Meccanica Celeste}
+\include{01_introduzione}
+\include{02_sistemi_tempo}
+\include{03_sistemi_coordinate}
+\include{04_sistemi_riferimento}
+\include{05_elementi_orbitali}
+\include{06_problema_due_corpi}
+\include{07_perturbazioni}
+
+% Parte II: Metodi Numerici
+\part{Metodi Numerici e Algoritmi}
+\include{08_integrazione_numerica}
+\include{09_propagazione_orbite}
+\include{10_matrice_transizione}
+\include{11_effemeridi}
+
+% Parte III: Determinazione Orbitale
+\part{Determinazione Orbitale}
+\include{12_osservazioni}
+\include{13_orbita_iniziale}
+\include{14_correzione_differenziale}
+\include{15_residui}
+
+% Parte IV: Implementazione Libreria
+\part{Implementazione della Libreria AstDyn}
+\include{16_architettura}
+\include{17_moduli_core}
+\include{18_parser}
+\include{19_riferimento_api}
+\include{20_esempi}
+
+% Parte V: Validazione e Applicazioni
+\part{Validazione e Applicazioni}
+\include{21_validazione}
+\include{22_casi_studio}
+\include{23_prestazioni}
+
+% Materia finale
+\backmatter
+\include{24_riferimenti}
+\include{25_appendici}
+
+\end{document}

@@ -1,0 +1,318 @@
+\chapter{Initial Orbit Determination}
+\label{ch:initial_orbit}
+
+\section{Introduction}
+
+\textbf{Initial orbit determination} (IOD) computes an approximate orbit from a small number of observations. This provides:
+\begin{itemize}
+    \item Starting point for differential correction
+    \item Linking observations across oppositions
+    \item Recovery predictions for lost objects
+    \item Preliminary impact assessments
+\end{itemize}
+
+Classical methods use 3 observations (Gauss, Laplace) or 2 observations + constraints.
+
+\section{The IOD Problem}
+
+\subsection{Angles-Only Observations}
+
+Given: Three observations $(\alpha_i, \delta_i, t_i)$, $i = 1, 2, 3$.
+
+Find: Six orbital elements or Cartesian state $\mathbf{y} = [\mathbf{r}, \mathbf{v}]$.
+
+\textbf{Challenge}: We have 6 unknowns but only 6 constraints (2 angles $\times$ 3 times). The problem is exactly determined but highly nonlinear.
+
+\subsection{Line of Sight}
+
+Each observation defines a unit vector:
+
+\begin{equation}
+    \hat{\rho}_i = \begin{bmatrix} \cos\delta_i \cos\alpha_i \\ \cos\delta_i \sin\alpha_i \\ \sin\delta_i \end{bmatrix}
+\end{equation}
+
+The object lies somewhere along this line: $\mathbf{r}_i = \mathbf{R}_i + \rho_i \hat{\rho}_i$ where $\mathbf{R}_i$ is observatory position and $\rho_i$ is unknown topocentric range.
+
+\section{Gauss Method}
+
+\subsection{Historical Context}
+
+Developed by Carl Friedrich Gauss (1809) to recover Ceres after it passed behind the Sun. Still widely used today.
+
+\subsection{Basic Idea}
+
+Use 3 observations to:
+\begin{enumerate}
+    \item Estimate range $\rho_2$ at middle observation
+    \item Compute position $\mathbf{r}_2$
+    \item Use Lagrange coefficients to get velocity $\mathbf{v}_2$
+\end{enumerate}
+
+\subsection{Lagrange Coefficients}
+
+For two-body motion, positions at times $t_1$, $t_2$, $t_3$ are related by:
+
+\begin{align}
+    \mathbf{r}_1 &= f_1 \mathbf{r}_2 + g_1 \mathbf{v}_2 \\
+    \mathbf{r}_3 &= f_3 \mathbf{r}_2 + g_3 \mathbf{v}_2
+\end{align}
+
+where $f$ and $g$ are Lagrange coefficients depending on time intervals $\tau_1 = t_1 - t_2$ and $\tau_3 = t_3 - t_2$.
+
+Series expansion:
+
+\begin{align}
+    f &= 1 - \frac{\mu}{2r^3}\tau^2 + \frac{\mu}{2r^3}\frac{\mathbf{r} \cdot \mathbf{v}}{r^2}\tau^3 + O(\tau^4) \\
+    g &= \tau - \frac{\mu}{6r^3}\tau^3 + O(\tau^4)
+\end{align}
+
+\subsection{Scalar Equation of Lagrange}
+
+The three position vectors lie in the orbital plane. Using coplanarity:
+
+\begin{equation}
+    \mathbf{r}_1 \cdot (\mathbf{r}_2 \times \mathbf{r}_3) = 0
+\end{equation}
+
+This gives a scalar equation for $\rho_2$ (the "8th degree polynomial" after manipulation).
+
+\subsection{Algorithm}
+
+\textbf{Input}: Three observations $(\alpha_i, \delta_i, t_i, \mathbf{R}_i)$.
+
+\textbf{Steps}:
+\begin{enumerate}
+    \item Compute line-of-sight vectors $\hat{\rho}_i$
+    \item Initial guess: $\rho_2 = |\mathbf{R}_2|$ (Earth-Sun distance)
+    \item Iterate:
+    \begin{enumerate}
+        \item Compute $\mathbf{r}_2 = \mathbf{R}_2 + \rho_2 \hat{\rho}_2$
+        \item Compute $r_2 = |\mathbf{r}_2|$
+        \item Estimate $f, g$ coefficients
+        \item Solve for $\mathbf{v}_2$ from $\mathbf{r}_1, \mathbf{r}_3$
+        \item Refine $\rho_2$ using Lagrange scalar equation
+        \item Check convergence: $|\Delta\rho_2| < 10^{-6}$ AU
+    \end{enumerate}
+    \item Return state $(\mathbf{r}_2, \mathbf{v}_2)$ at epoch $t_2$
+\end{enumerate}
+
+\textbf{Convergence}: Typically 5-10 iterations for well-observed objects.
+
+\section{Implementation}
+
+\begin{lstlisting}[language=C++,caption={Gauss method implementation}]
+Vector6d gauss_iod(
+    const std::array<Observation, 3>& obs,
+    const EphemerisInterface& ephemeris)
+{
+    // Extract times and line-of-sight vectors
+    double t1 = obs[0].epoch;
+    double t2 = obs[1].epoch;
+    double t3 = obs[2].epoch;
+    
+    Vector3d rho_hat1 = obs[0].line_of_sight();
+    Vector3d rho_hat2 = obs[1].line_of_sight();
+    Vector3d rho_hat3 = obs[2].line_of_sight();
+    
+    // Observatory positions
+    Vector3d R1 = ephemeris.get_observer_position(obs[0]);
+    Vector3d R2 = ephemeris.get_observer_position(obs[1]);
+    Vector3d R3 = ephemeris.get_observer_position(obs[2]);
+    
+    // Time intervals
+    double tau1 = t1 - t2;
+    double tau3 = t3 - t2;
+    
+    // Initial guess for middle range
+    double rho2 = R2.norm();
+    
+    // Iterative refinement
+    for (int iter = 0; iter < 20; ++iter) {
+        Vector3d r2 = R2 + rho2 * rho_hat2;
+        double r2_mag = r2.norm();
+        
+        // Compute f,g series (to 3rd order)
+        double f1 = 1.0 - 0.5 * MU_SUN * tau1*tau1 / (r2_mag*r2_mag*r2_mag);
+        double f3 = 1.0 - 0.5 * MU_SUN * tau3*tau3 / (r2_mag*r2_mag*r2_mag);
+        double g1 = tau1 - MU_SUN * tau1*tau1*tau1 / (6.0 * r2_mag*r2_mag*r2_mag);
+        double g3 = tau3 - MU_SUN * tau3*tau3*tau3 / (6.0 * r2_mag*r2_mag*r2_mag);
+        
+        // Solve for velocity at t2
+        Vector3d v2 = (f3 * (R1 + rho_hat1) - f1 * (R3 + rho_hat3)) / (f1*g3 - f3*g1);
+        
+        // Improve rho2 using scalar equation of Lagrange
+        // (simplified: use r1, r3 estimates)
+        Vector3d r1 = r2 * f1 + v2 * g1;
+        Vector3d r3 = r2 * f3 + v3 * g3;
+        
+        double rho1_new = (r1 - R1).dot(rho_hat1);
+        double rho3_new = (r3 - R3).dot(rho_hat3);
+        double rho2_new = (r2 - R2).dot(rho_hat2);
+        
+        if (std::abs(rho2_new - rho2) < 1e-6) {
+            // Converged
+            return Vector6d(r2, v2);
+        }
+        
+        rho2 = rho2_new;
+    }
+    
+    throw std::runtime_error("Gauss IOD did not converge");
+}
+\end{lstlisting}
+
+\section{Too-Short Arc Problem}
+
+\subsection{Challenge}
+
+For short observational arcs (hours to days), many orbits fit equally well. The orbit is poorly constrained in:
+\begin{itemize}
+    \item Semimajor axis $a$ (degenerate with eccentricity)
+    \item Eccentricity $e$
+    \item Argument of perihelion $\omega$
+\end{itemize}
+
+\textbf{Example}: NEA observed for 3 hours. Could be:
+\begin{itemize}
+    \item $a = 1.2$ AU, $e = 0.1$ (Apollo)
+    \item $a = 2.5$ AU, $e = 0.6$ (Amor)
+    \item $a = 0.8$ AU, $e = 0.3$ (Aten)
+\end{itemize}
+
+All produce similar RA/Dec over short arc!
+
+\subsection{Additional Constraints}
+
+To resolve degeneracy:
+\begin{enumerate}
+    \item \textbf{Apparent motion}: $d\alpha/dt$, $d\delta/dt$ constrains distance
+    \item \textbf{Brightness}: $H, G$ phase function gives distance estimate
+    \item \textbf{Statistical priors}: Most NEAs have $0.8 < a < 2$ AU
+    \item \textbf{Additional observations}: Even +1 day helps enormously
+\end{enumerate}
+
+\section{Laplace Method}
+
+\subsection{Alternative Approach}
+
+Use angular velocity $\dot{\alpha}, \dot{\delta}$ in addition to angles. Requires high-precision timing or multiple closely-spaced observations.
+
+\textbf{Advantage}: Can work with 2 observations (plus rates).
+
+\textbf{Disadvantage}: Sensitive to measurement errors in rates.
+
+\subsection{Equations}
+
+From $\mathbf{r} = \mathbf{R} + \rho\hat{\rho}$, differentiate twice:
+
+\begin{equation}
+    \ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r}
+\end{equation}
+
+This gives 3 equations in 3 unknowns ($\rho, \dot{\rho}, \ddot{\rho}$) at one epoch.
+
+\section{Modern Methods}
+
+\subsection{Admissible Region}
+
+For very short arcs, solve for all admissible orbits satisfying:
+\begin{itemize}
+    \item Observations
+    \item Physical constraints ($e < 1$ for bound orbits)
+    \item Brightness (distance estimate)
+\end{itemize}
+
+Produces a region in orbital element space, not a single solution.
+
+\subsection{Constrained Least Squares}
+
+Minimize:
+
+\begin{equation}
+    \chi^2 = \sum_i w_i(\mathbf{o}_i - \mathbf{c}_i)^2 + \lambda P(\mathbf{e})
+\end{equation}
+
+where $P(\mathbf{e})$ is a prior on elements (e.g., prefer $e < 0.3$).
+
+\section{Quality Assessment}
+
+\subsection{Orbit Uncertainty}
+
+From 3 observations, uncertainty is large:
+\begin{itemize}
+    \item Position at epoch: $\sim$0.001 AU (150,000 km)
+    \item Velocity: $\sim$0.01 AU/day (17 km/s)
+    \item Semimajor axis: $\pm$0.5 AU
+\end{itemize}
+
+\textbf{Propagation uncertainty grows rapidly!} After 1 month, position error $>$1 AU.
+
+\subsection{Validation}
+
+Check orbit quality:
+\begin{enumerate}
+    \item Residuals: Should be $<$5 arcsec for good fit
+    \item Energy: $E < 0$ for bound orbit
+    \item Perihelion: $q > 0.1$ AU (inside this, orbit crashes into Sun)
+    \item Eccentricity: $0 \le e < 1$ for elliptic orbit
+\end{enumerate}
+
+\section{Example: Newly Discovered Asteroid}
+
+\begin{lstlisting}[language=C++,caption={IOD from discovery observations}]
+// Three observations from MPC
+std::vector<Observation> obs = {
+    {"2024-01-15T03:15:00Z", 185.234, +12.567, "F51"},
+    {"2024-01-15T04:30:00Z", 185.189, +12.592, "F51"},
+    {"2024-01-15T05:45:00Z", 185.144, +12.617, "F51"}
+};
+
+// Load planetary ephemeris
+SpiceInterface spice;
+spice.load_kernel("de440.bsp");
+
+// Perform Gauss IOD
+try {
+    Vector6d state = gauss_iod(obs, spice);
+    double epoch = obs[1].epoch;
+    
+    // Convert to orbital elements
+    OrbitalElements elements = OrbitalElements::from_cartesian(state, epoch);
+    
+    std::cout << "Initial orbit determination:\n";
+    std::cout << "a = " << elements.a << " AU\n";
+    std::cout << "e = " << elements.e << "\n";
+    std::cout << "i = " << elements.i * RAD_TO_DEG << " deg\n";
+    std::cout << "Omega = " << elements.Omega * RAD_TO_DEG << " deg\n";
+    std::cout << "omega = " << elements.omega * RAD_TO_DEG << " deg\n";
+    std::cout << "M = " << elements.M * RAD_TO_DEG << " deg\n";
+    
+    // Compute residuals
+    for (const auto& ob : obs) {
+        Vector2d predicted = predict_observation(state, ob.epoch, ob.obs_code, spice);
+        double dRA = (predicted(0) - ob.ra) * cos(ob.dec) * RAD_TO_ARCSEC;
+        double dDec = (predicted(1) - ob.dec) * RAD_TO_ARCSEC;
+        std::cout << "Residual: " << dRA << ", " << dDec << " arcsec\n";
+    }
+    
+} catch (const std::exception& e) {
+    std::cerr << "IOD failed: " << e.what() << "\n";
+}
+\end{lstlisting}
+
+\section{Summary}
+
+Key points about initial orbit determination:
+
+\begin{enumerate}
+    \item \textbf{Gauss method} uses 3 observations to determine orbit
+    \item \textbf{Lagrange coefficients} relate positions at different times
+    \item \textbf{Iterative solution} converges in 5-10 iterations typically
+    \item \textbf{Short arcs} lead to poorly constrained orbits
+    \item \textbf{Additional constraints} (brightness, priors) help
+    \item \textbf{Laplace method} uses angular rates as well as angles
+    \item \textbf{Modern methods} compute admissible regions
+    \item \textbf{Validation} checks energy, eccentricity, residuals
+\end{enumerate}
+
+The initial orbit is refined using differential correction (next chapter) with all available observations.

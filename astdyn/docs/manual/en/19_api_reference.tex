@@ -1,0 +1,780 @@
+\chapter{API Reference}
+\label{ch:api_reference}
+
+\section{Overview}
+
+This chapter provides comprehensive reference documentation for AstDyn's public API. All classes, methods, and functions are documented with parameters, return values, and exceptions.
+
+\subsection{Organization}
+
+API organized by namespace:
+
+\begin{itemize}
+    \item \texttt{astdyn::constants}: Physical and astronomical constants
+    \item \texttt{astdyn::math}: Mathematical utilities
+    \item \texttt{astdyn::time}: Time systems and conversions
+    \item \texttt{astdyn::coordinates}: Coordinate systems and transformations
+    \item \texttt{astdyn::orbit}: Orbital elements classes
+    \item \texttt{astdyn::propagation}: Orbit propagation
+    \item \texttt{astdyn::observations}: Observation handling
+    \item \texttt{astdyn::orbit\_determination}: Orbit determination algorithms
+    \item \texttt{astdyn::io}: Input/output and parsers
+    \item \texttt{astdyn::ephemeris}: Ephemeris interfaces
+\end{itemize}
+
+\section{Core Constants}
+
+\subsection{astdyn::constants}
+
+\begin{lstlisting}[language=C++]
+namespace astdyn {
+namespace constants {
+
+// Fundamental constants
+constexpr double C = 299792458.0;              // Speed of light (m/s)
+constexpr double G = 6.67430e-11;             // Gravitational constant (SI)
+constexpr double AU = 1.495978707e11;         // Astronomical unit (m)
+
+// Time constants
+constexpr double JD_J2000 = 2451545.0;        // J2000.0 epoch
+constexpr double DAYS_PER_CENTURY = 36525.0;  // Julian century
+constexpr double SECONDS_PER_DAY = 86400.0;   // Seconds in day
+
+// Angle conversions
+constexpr double DEG_TO_RAD = M_PI / 180.0;
+constexpr double RAD_TO_DEG = 180.0 / M_PI;
+constexpr double ARCSEC_TO_RAD = DEG_TO_RAD / 3600.0;
+constexpr double RAD_TO_ARCSEC = 3600.0 * RAD_TO_DEG;
+
+// Solar system masses (GM values in AU^3/day^2)
+constexpr double GM_SUN = 0.2959122082855911e-3;
+constexpr double GM_MERCURY = 0.4912547451450812e-10;
+constexpr double GM_VENUS = 0.7243452486162703e-9;
+constexpr double GM_EARTH = 0.8887692390113509e-9;
+constexpr double GM_MARS = 0.9549535105779258e-10;
+constexpr double GM_JUPITER = 0.2825345909524226e-6;
+constexpr double GM_SATURN = 0.8459715185680659e-7;
+constexpr double GM_URANUS = 0.1292024916781969e-7;
+constexpr double GM_NEPTUNE = 0.1524358900784276e-7;
+
+}} // namespace
+\end{lstlisting}
+
+\section{Mathematical Utilities}
+
+\subsection{astdyn::math}
+
+\subsubsection{normalize\_angle}
+
+\begin{lstlisting}[language=C++]
+double normalize_angle(double angle, double center = 0.0);
+\end{lstlisting}
+
+\textbf{Purpose}: Normalize angle to range $[\text{center} - \pi, \text{center} + \pi)$.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{angle}: Input angle (radians)
+    \item \texttt{center}: Center of range (default 0.0)
+\end{itemize}
+
+\textbf{Returns}: Normalized angle
+
+\textbf{Example}:
+\begin{lstlisting}[language=C++]
+double angle = 7.0;  // > 2*pi
+double norm = math::normalize_angle(angle);  // Returns 0.716...
+\end{lstlisting}
+
+\subsubsection{cross\_product}
+
+\begin{lstlisting}[language=C++]
+Vector3d cross_product(const Vector3d& a, const Vector3d& b);
+\end{lstlisting}
+
+\textbf{Purpose}: Compute vector cross product $\mathbf{a} \times \mathbf{b}$.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{a}: First vector
+    \item \texttt{b}: Second vector
+\end{itemize}
+
+\textbf{Returns}: Cross product vector
+
+\subsubsection{rotation\_matrix}
+
+\begin{lstlisting}[language=C++]
+Matrix3d rotation_matrix(double angle, int axis);
+\end{lstlisting}
+
+\textbf{Purpose}: Create rotation matrix around coordinate axis.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{angle}: Rotation angle (radians)
+    \item \texttt{axis}: Axis index (0=x, 1=y, 2=z)
+\end{itemize}
+
+\textbf{Returns}: $3 \times 3$ rotation matrix
+
+\section{Time Systems}
+
+\subsection{astdyn::time::TimeConverter}
+
+\subsubsection{utc\_to\_tt}
+
+\begin{lstlisting}[language=C++]
+static double utc_to_tt(double jd_utc);
+\end{lstlisting}
+
+\textbf{Purpose}: Convert UTC to Terrestrial Time (TT).
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{jd\_utc}: Julian Date in UTC
+\end{itemize}
+
+\textbf{Returns}: Julian Date in TT
+
+\textbf{Note}: Applies leap seconds and 32.184s TT-TAI offset.
+
+\subsubsection{tt\_to\_tdb}
+
+\begin{lstlisting}[language=C++]
+static double tt_to_tdb(double jd_tt);
+\end{lstlisting}
+
+\textbf{Purpose}: Convert Terrestrial Time to Barycentric Dynamical Time.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{jd\_tt}: Julian Date in TT
+\end{itemize}
+
+\textbf{Returns}: Julian Date in TDB
+
+\textbf{Note}: Uses periodic approximation with $\pm 2$ms accuracy.
+
+\section{Orbital Elements}
+
+\subsection{astdyn::orbit::KeplerianElements}
+
+\subsubsection{Class Definition}
+
+\begin{lstlisting}[language=C++]
+class KeplerianElements {
+public:
+    double a;         // Semimajor axis (AU)
+    double e;         // Eccentricity
+    double i;         // Inclination (rad)
+    double Omega;     // Ascending node (rad)
+    double omega;     // Argument of perihelion (rad)
+    double M;         // Mean anomaly (rad)
+    double epoch;     // Epoch (JD)
+    std::string name; // Object name
+    
+    // Constructors
+    KeplerianElements();
+    KeplerianElements(double a, double e, double i, 
+                     double Omega, double omega, double M, 
+                     double epoch);
+    
+    // Conversions
+    static KeplerianElements from_cartesian(
+        const Vector3d& pos, const Vector3d& vel, 
+        double epoch, double mu = GM_SUN);
+    
+    CartesianState to_cartesian(double mu = GM_SUN) const;
+    
+    // Derived quantities
+    double period() const;              // Orbital period (days)
+    double mean_motion() const;         // Mean motion (rad/day)
+    double perihelion_distance() const; // q = a(1-e)
+    double aphelion_distance() const;   // Q = a(1+e)
+    double eccentric_anomaly() const;   // E from M
+    double true_anomaly() const;        // f from E
+    
+    // Validation
+    bool is_valid() const;
+};
+\end{lstlisting}
+
+\subsubsection{from\_cartesian}
+
+\begin{lstlisting}[language=C++]
+static KeplerianElements from_cartesian(
+    const Vector3d& pos, const Vector3d& vel, 
+    double epoch, double mu = GM_SUN);
+\end{lstlisting}
+
+\textbf{Purpose}: Convert Cartesian state to Keplerian elements.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{pos}: Position vector (AU)
+    \item \texttt{vel}: Velocity vector (AU/day)
+    \item \texttt{epoch}: Epoch (JD)
+    \item \texttt{mu}: Gravitational parameter (default: GM\_SUN)
+\end{itemize}
+
+\textbf{Returns}: Keplerian elements
+
+\textbf{Example}:
+\begin{lstlisting}[language=C++]
+Vector3d pos(1.0, 0.0, 0.0);  // 1 AU on x-axis
+Vector3d vel(0.0, 0.01720209895, 0.0);  // Circular velocity
+auto elem = KeplerianElements::from_cartesian(pos, vel, 2460000.0);
+// elem.a ~ 1.0 AU, elem.e ~ 0.0
+\end{lstlisting}
+
+\subsubsection{to\_cartesian}
+
+\begin{lstlisting}[language=C++]
+CartesianState to_cartesian(double mu = GM_SUN) const;
+\end{lstlisting}
+
+\textbf{Purpose}: Convert Keplerian elements to Cartesian state.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{mu}: Gravitational parameter (default: GM\_SUN)
+\end{itemize}
+
+\textbf{Returns}: \texttt{CartesianState} with position, velocity, epoch
+
+\textbf{Algorithm}: Uses perifocal frame transformation and rotation matrices.
+
+\subsubsection{period}
+
+\begin{lstlisting}[language=C++]
+double period() const;
+\end{lstlisting}
+
+\textbf{Purpose}: Compute orbital period using Kepler's third law.
+
+\textbf{Returns}: Period in days
+
+\textbf{Formula}: $P = 2\pi \sqrt{a^3/\mu}$
+
+\textbf{Throws}: \texttt{std::domain\_error} if $a \leq 0$ or $e \geq 1$
+
+\subsection{astdyn::orbit::CometaryElements}
+
+\begin{lstlisting}[language=C++]
+class CometaryElements {
+public:
+    double q;      // Perihelion distance (AU)
+    double e;      // Eccentricity
+    double i;      // Inclination (rad)
+    double Omega;  // Ascending node (rad)
+    double omega;  // Argument of perihelion (rad)
+    double T;      // Time of perihelion passage (JD)
+    std::string name;
+    
+    // Conversions
+    KeplerianElements to_keplerian(double epoch) const;
+    CartesianState to_cartesian(double epoch, double mu = GM_SUN) const;
+};
+\end{lstlisting}
+
+\textbf{Use Case}: Preferred for near-parabolic orbits ($e \approx 1$) where semimajor axis is ill-defined.
+
+\section{Force Models}
+
+\subsection{astdyn::propagation::ForceModel}
+
+\subsubsection{Interface}
+
+\begin{lstlisting}[language=C++]
+class ForceModel {
+public:
+    virtual ~ForceModel() = default;
+    
+    // Compute acceleration at given state
+    virtual Vector3d acceleration(
+        double t, const Vector3d& pos, const Vector3d& vel) const = 0;
+    
+    // Optional: Compute partials for STM propagation
+    virtual bool supports_partials() const { return false; }
+    
+    virtual std::pair<Matrix3d, Matrix3d> partials(
+        double t, const Vector3d& pos, const Vector3d& vel) const {
+        throw std::logic_error("Partials not implemented");
+    }
+};
+\end{lstlisting}
+
+\subsection{astdyn::propagation::PointMassGravity}
+
+\begin{lstlisting}[language=C++]
+class PointMassGravity : public ForceModel {
+public:
+    PointMassGravity(std::shared_ptr<ephemeris::IEphemeris> eph,
+                     const std::vector<std::string>& bodies);
+    
+    Vector3d acceleration(double t, const Vector3d& pos, 
+                         const Vector3d& vel) const override;
+    
+    bool supports_partials() const override { return true; }
+    
+    std::pair<Matrix3d, Matrix3d> partials(double t, 
+        const Vector3d& pos, const Vector3d& vel) const override;
+};
+\end{lstlisting}
+
+\textbf{Purpose}: N-body point-mass gravitational perturbations.
+
+\textbf{Constructor Parameters}:
+\begin{itemize}
+    \item \texttt{eph}: Ephemeris provider for planetary positions
+    \item \texttt{bodies}: List of perturbing bodies (e.g., \{"JUPITER", "SATURN"\})
+\end{itemize}
+
+\textbf{Algorithm}: Computes direct and indirect terms for each body.
+
+\section{Numerical Integration}
+
+\subsection{astdyn::propagation::IIntegrator}
+
+\subsubsection{Interface}
+
+\begin{lstlisting}[language=C++]
+class IIntegrator {
+public:
+    virtual ~IIntegrator() = default;
+    
+    // Single integration step
+    virtual double step(double t, std::vector<double>& y, 
+                       const std::function<void(double, const std::vector<double>&, 
+                                              std::vector<double>&)>& derivs) = 0;
+    
+    // Integrate from t0 to tf
+    virtual void integrate(double t0, double tf, std::vector<double>& y,
+                          const std::function<void(double, const std::vector<double>&,
+                                                 std::vector<double>&)>& derivs) = 0;
+    
+    // Statistics
+    virtual size_t steps_taken() const = 0;
+    virtual size_t steps_rejected() const = 0;
+};
+\end{lstlisting}
+
+\subsection{astdyn::propagation::RKF78}
+
+\begin{lstlisting}[language=C++]
+class RKF78 : public IIntegrator {
+public:
+    RKF78(double tol = 1e-12, double h_min = 1e-6, double h_max = 100.0);
+    
+    double step(double t, std::vector<double>& y,
+               const std::function<void(double, const std::vector<double>&,
+                                      std::vector<double>&)>& derivs) override;
+    
+    void integrate(double t0, double tf, std::vector<double>& y,
+                  const std::function<void(double, const std::vector<double>&,
+                                        std::vector<double>&)>& derivs) override;
+    
+    // Setters
+    void set_tolerance(double tol);
+    void set_step_limits(double h_min, double h_max);
+    
+    // Getters
+    double get_tolerance() const;
+    size_t steps_taken() const override;
+    size_t steps_rejected() const override;
+};
+\end{lstlisting}
+
+\textbf{Purpose}: Adaptive Runge-Kutta-Fehlberg 7(8) integrator.
+
+\textbf{Constructor Parameters}:
+\begin{itemize}
+    \item \texttt{tol}: Error tolerance (default: $10^{-12}$)
+    \item \texttt{h\_min}: Minimum step size (days, default: $10^{-6}$)
+    \item \texttt{h\_max}: Maximum step size (days, default: 100.0)
+\end{itemize}
+
+\textbf{Method}: 13-stage Runge-Kutta with 7th and 8th order estimates for error control.
+
+\section{Orbit Propagation}
+
+\subsection{astdyn::propagation::Propagator}
+
+\subsubsection{Constructor}
+
+\begin{lstlisting}[language=C++]
+Propagator(std::shared_ptr<IIntegrator> integrator,
+          std::shared_ptr<ForceModel> forces,
+          std::shared_ptr<ephemeris::IEphemeris> ephemeris);
+\end{lstlisting}
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{integrator}: Numerical integrator (e.g., RKF78)
+    \item \texttt{forces}: Force model (e.g., PointMassGravity)
+    \item \texttt{ephemeris}: Ephemeris provider (e.g., SPICEEphemeris)
+\end{itemize}
+
+\subsubsection{propagate}
+
+\begin{lstlisting}[language=C++]
+CartesianState propagate(const CartesianState& initial,
+                         double target_epoch);
+\end{lstlisting}
+
+\textbf{Purpose}: Propagate state to target epoch.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{initial}: Initial Cartesian state
+    \item \texttt{target\_epoch}: Target epoch (JD)
+\end{itemize}
+
+\textbf{Returns}: State at target epoch
+
+\textbf{Example}:
+\begin{lstlisting}[language=C++]
+auto integrator = std::make_shared<RKF78>(1e-12);
+auto forces = std::make_shared<PointMassGravity>(eph, 
+    std::vector<std::string>{"JUPITER", "SATURN"});
+Propagator prop(integrator, forces, eph);
+
+CartesianState state0 = elements.to_cartesian();
+CartesianState state1 = prop.propagate(state0, state0.epoch + 60.0);
+\end{lstlisting}
+
+\subsubsection{propagate\_with\_stm}
+
+\begin{lstlisting}[language=C++]
+std::pair<CartesianState, Matrix6d> propagate_with_stm(
+    const CartesianState& initial, double target_epoch);
+\end{lstlisting}
+
+\textbf{Purpose}: Propagate state and state transition matrix.
+
+\textbf{Returns}: Pair of (final state, $6 \times 6$ STM $\Phi(t_f, t_0)$)
+
+\textbf{Note}: STM maps initial state perturbations to final state:
+\[
+\delta \mathbf{x}(t_f) = \Phi(t_f, t_0) \, \delta \mathbf{x}(t_0)
+\]
+
+\subsubsection{generate\_ephemeris}
+
+\begin{lstlisting}[language=C++]
+std::vector<CartesianState> generate_ephemeris(
+    const CartesianState& initial, 
+    double start_epoch, double end_epoch, double step);
+\end{lstlisting}
+
+\textbf{Purpose}: Generate table of states at regular intervals.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{initial}: Initial state
+    \item \texttt{start\_epoch}: First epoch (JD)
+    \item \texttt{end\_epoch}: Last epoch (JD)
+    \item \texttt{step}: Time step (days)
+\end{itemize}
+
+\textbf{Returns}: Vector of states
+
+\section{Observations}
+
+\subsection{astdyn::observations::Observation}
+
+\begin{lstlisting}[language=C++]
+struct Observation {
+    double epoch;        // JD
+    double ra;           // Right ascension (rad)
+    double dec;          // Declination (rad)
+    double sigma_ra;     // RA uncertainty (rad)
+    double sigma_dec;    // Dec uncertainty (rad)
+    std::string obs_code; // Observatory code
+    double magnitude;    // Apparent magnitude
+    
+    // Methods
+    Vector3d line_of_sight() const;
+    double weight_ra() const;
+    double weight_dec() const;
+};
+\end{lstlisting}
+
+\subsubsection{line\_of\_sight}
+
+\begin{lstlisting}[language=C++]
+Vector3d line_of_sight() const;
+\end{lstlisting}
+
+\textbf{Purpose}: Compute unit vector in direction of observation.
+
+\textbf{Returns}: Unit vector $(\cos\delta\cos\alpha, \cos\delta\sin\alpha, \sin\delta)$
+
+\subsubsection{weight\_ra/weight\_dec}
+
+\begin{lstlisting}[language=C++]
+double weight_ra() const;
+double weight_dec() const;
+\end{lstlisting}
+
+\textbf{Purpose}: Compute observation weights for least squares.
+
+\textbf{Returns}: $w = 1/\sigma^2$
+
+\subsection{astdyn::observations::ObservatoryCoordinates}
+
+\begin{lstlisting}[language=C++]
+struct ObservatoryCoordinates {
+    std::string code;   // MPC observatory code
+    double longitude;   // Geodetic longitude (rad)
+    double latitude;    // Geodetic latitude (rad)
+    double altitude;    // Altitude above ellipsoid (m)
+    
+    Vector3d position_itrf() const;
+    Vector3d position_icrf(double jd) const;
+};
+\end{lstlisting}
+
+\textbf{Purpose}: Convert observatory location to observer position vectors.
+
+\section{Orbit Determination}
+
+\subsection{astdyn::orbit\_determination::DifferentialCorrector}
+
+\begin{lstlisting}[language=C++]
+class DifferentialCorrector {
+public:
+    DifferentialCorrector(std::shared_ptr<Propagator> propagator,
+                         int max_iterations = 20,
+                         double convergence_tol = 1e-8);
+    
+    struct Result {
+        orbit::KeplerianElements elements;
+        double rms_residual;
+        int iterations;
+        bool converged;
+        Eigen::VectorXd residuals;
+        Eigen::MatrixXd covariance;
+    };
+    
+    Result solve(const orbit::KeplerianElements& initial_guess,
+                const std::vector<observations::Observation>& observations,
+                const std::vector<observations::ObservatoryCoordinates>& observatories);
+};
+\end{lstlisting}
+
+\subsubsection{solve}
+
+\textbf{Purpose}: Refine orbital elements to minimize observation residuals.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{initial\_guess}: Initial orbital elements
+    \item \texttt{observations}: Vector of observations
+    \item \texttt{observatories}: Observatory coordinates
+\end{itemize}
+
+\textbf{Returns}: \texttt{Result} structure with:
+\begin{itemize}
+    \item \texttt{elements}: Refined orbital elements
+    \item \texttt{rms\_residual}: RMS of residuals (arcseconds)
+    \item \texttt{iterations}: Number of iterations
+    \item \texttt{converged}: Convergence flag
+    \item \texttt{residuals}: Full residual vector
+    \item \texttt{covariance}: Parameter covariance matrix
+\end{itemize}
+
+\textbf{Algorithm}: Iterative least squares with numerical derivatives via STM.
+
+\section{Input/Output}
+
+\subsection{astdyn::io::ParserFactory}
+
+\begin{lstlisting}[language=C++]
+class ParserFactory {
+public:
+    static void register_parser(const std::string& extension,
+        std::function<std::unique_ptr<IParser>()> creator);
+    
+    static std::unique_ptr<IParser> create(const std::string& filename);
+    
+    static std::vector<std::string> supported_formats();
+};
+\end{lstlisting}
+
+\textbf{Usage}:
+\begin{lstlisting}[language=C++]
+auto parser = io::ParserFactory::create("asteroid.eq1");
+auto elements = parser->parse("asteroid.eq1");
+\end{lstlisting}
+
+\subsection{astdyn::io::MPCReader}
+
+\begin{lstlisting}[language=C++]
+class MPCReader {
+public:
+    static std::vector<observations::Observation> read_file(
+        const std::string& filename);
+    
+    static observations::Observation parse_line(const std::string& line);
+};
+\end{lstlisting}
+
+\textbf{Purpose}: Parse MPC 80-column observation format.
+
+\section{Ephemeris}
+
+\subsection{astdyn::ephemeris::IEphemeris}
+
+\begin{lstlisting}[language=C++]
+class IEphemeris {
+public:
+    virtual ~IEphemeris() = default;
+    
+    virtual Vector3d position(const std::string& body, double jd) const = 0;
+    virtual Vector3d velocity(const std::string& body, double jd) const = 0;
+    
+    virtual std::pair<Vector3d, Vector3d> state(
+        const std::string& body, double jd) const = 0;
+};
+\end{lstlisting}
+
+\textbf{Purpose}: Interface for planetary ephemerides.
+
+\textbf{Implementations}:
+\begin{itemize}
+    \item \texttt{SPICEEphemeris}: NASA SPICE toolkit (high accuracy)
+    \item \texttt{AnalyticEphemeris}: Approximate analytic formulas (fast)
+\end{itemize}
+
+\section{Exception Hierarchy}
+
+\begin{lstlisting}[language=C++]
+namespace astdyn {
+
+// Base exception
+class AstDynException : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+// Specific exceptions
+class ParseError : public AstDynException {
+    using AstDynException::AstDynException;
+};
+
+class PropagationError : public AstDynException {
+    using AstDynException::AstDynException;
+};
+
+class ConvergenceError : public AstDynException {
+    using AstDynException::AstDynException;
+};
+
+} // namespace
+\end{lstlisting}
+
+\section{Type Aliases}
+
+\begin{lstlisting}[language=C++]
+namespace astdyn {
+
+// Eigen types
+using Vector3d = Eigen::Vector3d;
+using Vector6d = Eigen::Matrix<double, 6, 1>;
+using Matrix3d = Eigen::Matrix3d;
+using Matrix6d = Eigen::Matrix<double, 6, 6>;
+using MatrixXd = Eigen::MatrixXd;
+using VectorXd = Eigen::VectorXd;
+
+// Enumerations
+enum class CoordinateSystem { ICRF, ECLIPTIC, EQUATORIAL };
+enum class TimeScale { UTC, TT, TDB };
+enum class IntegratorType { RKF78, DOPRI853, RADAU };
+
+} // namespace
+\end{lstlisting}
+
+\section{Common Usage Patterns}
+
+\subsection{Complete Orbit Propagation}
+
+\begin{lstlisting}[language=C++]
+#include <astdyn/AstDyn.hpp>
+using namespace astdyn;
+
+// 1. Parse orbital elements
+auto parser = io::ParserFactory::create("asteroid.eq1");
+auto elements = parser->parse("asteroid.eq1");
+
+// 2. Setup ephemeris
+auto eph = std::make_shared<ephemeris::SPICEEphemeris>("de440.bsp");
+
+// 3. Create force model
+auto forces = std::make_shared<propagation::PointMassGravity>(
+    eph, std::vector<std::string>{"JUPITER", "SATURN", "EARTH"});
+
+// 4. Create integrator
+auto integrator = std::make_shared<propagation::RKF78>(1e-12);
+
+// 5. Create propagator
+propagation::Propagator prop(integrator, forces, eph);
+
+// 6. Propagate
+auto state0 = elements.to_cartesian();
+auto state60 = prop.propagate(state0, state0.epoch + 60.0);
+
+// 7. Convert back
+auto elem60 = orbit::KeplerianElements::from_cartesian(
+    state60.position, state60.velocity, state60.epoch);
+\end{lstlisting}
+
+\subsection{Orbit Determination Workflow}
+
+\begin{lstlisting}[language=C++]
+// 1. Load observations
+auto observations = io::MPCReader::read_file("observations.txt");
+
+// 2. Load observatory coordinates
+std::vector<observations::ObservatoryCoordinates> obs_coords;
+// ... populate from database
+
+// 3. Initial orbit determination (Gauss method)
+orbit_determination::GaussIOD gauss;
+auto initial_elements = gauss.solve(observations[0], 
+    observations[observations.size()/2], observations.back());
+
+// 4. Setup propagator (same as above)
+// ...
+
+// 5. Differential correction
+orbit_determination::DifferentialCorrector dc(propagator);
+auto result = dc.solve(initial_elements, observations, obs_coords);
+
+if (result.converged) {
+    std::cout << "Converged in " << result.iterations << " iterations\n";
+    std::cout << "RMS residual: " << result.rms_residual << " arcsec\n";
+    std::cout << "Final elements:\n";
+    std::cout << "  a = " << result.elements.a << " AU\n";
+    std::cout << "  e = " << result.elements.e << "\n";
+}
+\end{lstlisting}
+
+\section{Summary}
+
+This chapter documented:
+
+\begin{enumerate}
+    \item \textbf{Constants and utilities}: Physical constants, math functions, time conversions
+    \item \textbf{Orbital elements}: KeplerianElements, CometaryElements, conversions
+    \item \textbf{Force models}: ForceModel interface, PointMassGravity implementation
+    \item \textbf{Integration}: IIntegrator interface, RKF78 adaptive integrator
+    \item \textbf{Propagation}: Propagator class with STM support
+    \item \textbf{Observations}: Observation struct, ObservatoryCoordinates
+    \item \textbf{Orbit determination}: DifferentialCorrector algorithm
+    \item \textbf{I/O}: Parsers for OrbFit and MPC formats
+    \item \textbf{Ephemeris}: IEphemeris interface for planetary positions
+    \item \textbf{Common patterns}: Complete workflow examples
+\end{enumerate}
+
+For detailed examples and tutorials, see Chapter 20.

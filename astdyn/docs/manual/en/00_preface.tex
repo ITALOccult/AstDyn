@@ -1,0 +1,106 @@
+\chapter*{Preface}
+\addcontentsline{toc}{chapter}{Preface}
+
+This manual presents the \textbf{AstDyn Library}, a comprehensive C++17 implementation of celestial mechanics and orbit determination algorithms. The library has been developed with a focus on numerical accuracy, computational efficiency, and ease of use, making it suitable for both research and operational applications in astrodynamics.
+
+\section*{Motivation}
+
+The study of celestial mechanics has a rich history spanning centuries, from Kepler's laws to modern spacecraft trajectory optimization. Despite this long tradition, high-quality open-source implementations of fundamental astrodynamics algorithms remain relatively scarce. The AstDyn library aims to fill this gap by providing:
+
+\begin{itemize}
+    \item \textbf{Rigorous implementations} of classical and modern celestial mechanics algorithms
+    \item \textbf{Well-documented code} with clear mathematical foundations
+    \item \textbf{Validated results} against established software (OrbFit, JPL Horizons)
+    \item \textbf{Modular architecture} allowing easy integration and extension
+    \item \textbf{Modern C++} design patterns and best practices
+\end{itemize}
+
+\section*{Structure of this Manual}
+
+This manual is organized into five main parts:
+
+\textbf{Part I: Theoretical Foundations} provides a comprehensive introduction to celestial mechanics, covering time systems, coordinate systems, reference frames, orbital elements, and perturbation theory. This part establishes the mathematical framework underlying all subsequent implementations.
+
+\textbf{Part II: Numerical Methods} describes the numerical integration techniques, orbit propagation algorithms, state transition matrix computation, and ephemeris calculations. Each algorithm is presented with its mathematical formulation, implementation details, and accuracy considerations.
+
+\textbf{Part III: Orbit Determination} covers the complete workflow from observations to orbit solutions, including initial orbit determination methods, differential correction, residual computation, and statistical analysis.
+
+\textbf{Part IV: Library Implementation} provides detailed documentation of the AstDyn library architecture, core modules, data parsers, and API reference with extensive code examples.
+
+\textbf{Part V: Validation and Applications} presents validation studies comparing AstDyn results with established software, real-world case studies (including asteroid 203 Pompeja), and performance benchmarks.
+
+\section*{Intended Audience}
+
+This manual is written for:
+
+\begin{itemize}
+    \item \textbf{Researchers} in astrodynamics, celestial mechanics, and planetary science
+    \item \textbf{Software engineers} developing space mission analysis tools
+    \item \textbf{Students} learning orbital mechanics and numerical methods
+    \item \textbf{Amateur astronomers} interested in asteroid orbit computation
+\end{itemize}
+
+A solid foundation in classical mechanics, linear algebra, and numerical analysis is assumed. Familiarity with C++ programming is required to use the library effectively.
+
+\section*{How to Use this Manual}
+
+Readers primarily interested in \textit{using} the library should focus on:
+\begin{itemize}
+    \item Chapter 1 (Introduction) for an overview
+    \item Part IV (Library Implementation) for API documentation
+    \item Chapter 20 (Examples) for practical usage patterns
+    \item Part V (Validation) for understanding accuracy and limitations
+\end{itemize}
+
+Readers seeking \textit{theoretical understanding} should read sequentially through Parts I-III, which build progressively from fundamental concepts to advanced algorithms.
+
+Readers interested in \textit{extending or modifying} the library should study:
+\begin{itemize}
+    \item Chapter 16 (Architecture) for design principles
+    \item Chapter 17 (Core Modules) for implementation details
+    \item The source code itself, which is extensively commented
+\end{itemize}
+
+\section*{Notation and Conventions}
+
+Throughout this manual, we adopt the following conventions:
+
+\begin{itemize}
+    \item \textbf{Vectors} are denoted in boldface: $\mathbf{r}$, $\mathbf{v}$
+    \item \textbf{Matrices} are denoted in uppercase: $\mathbf{A}$, $\mathbf{P}$
+    \item \textbf{Scalars} are in italics: $a$, $e$, $t$
+    \item \textbf{Units} follow SI conventions unless noted otherwise
+    \item \textbf{Angles} are in radians unless explicitly stated as degrees
+    \item \textbf{Time} is typically in Modified Julian Days (MJD)
+    \item \textbf{Distances} in the solar system are often in Astronomical Units (AU)
+\end{itemize}
+
+\section*{Acknowledgments}
+
+The development of AstDyn has been influenced by several seminal works:
+
+\begin{itemize}
+    \item The \textit{OrbFit} software by Andrea Milani and collaborators
+    \item \textit{Fundamentals of Astrodynamics} by Bate, Mueller, and White
+    \item \textit{Orbital Mechanics for Engineering Students} by Howard Curtis
+    \item NASA JPL's SPICE toolkit and Horizons system
+\end{itemize}
+
+Special thanks to the open-source community for providing excellent tools (Eigen, Boost) that make modern C++ scientific computing productive and enjoyable.
+
+\section*{License and Distribution}
+
+The AstDyn library is distributed under [LICENSE TO BE DETERMINED]. The source code is available at:
+
+\begin{center}
+    \url{https://github.com/manvalan/ITALOccultLibrary}
+\end{center}
+
+Bug reports, feature requests, and contributions are welcome via the GitHub issue tracker and pull request system.
+
+\vfill
+
+\begin{flushright}
+    \textit{Michele Bigi}\\
+    \textit{November 2025}
+\end{flushright}

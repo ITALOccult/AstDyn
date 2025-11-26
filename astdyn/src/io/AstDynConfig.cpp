@@ -127,7 +127,15 @@ std::pair<std::string, std::string> OptionFileParser::parseLine(const std::strin
     }
     
     std::string key = trim(line.substr(0, eq_pos));
-    std::string value = trim(line.substr(eq_pos + 1));
+    std::string value_part = line.substr(eq_pos + 1);
+    
+    // Remove comments (starting with ! or #)
+    size_t comment_pos = value_part.find_first_of("!#");
+    if (comment_pos != std::string::npos) {
+        value_part = value_part.substr(0, comment_pos);
+    }
+    
+    std::string value = trim(value_part);
     
     return {key, value};
 }

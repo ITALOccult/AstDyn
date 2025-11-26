@@ -1,0 +1,5 @@
+if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_jacobian_tests[1]_tests.cmake")
+  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_jacobian_tests[1]_tests.cmake")
+else()
+  add_test(astdyn_jacobian_tests_NOT_BUILT astdyn_jacobian_tests_NOT_BUILT)
+endif()

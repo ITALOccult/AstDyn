@@ -40,6 +40,7 @@ struct AstDynConfig {
     propagation::PropagatorSettings propagator_settings;
     
     // Integrator settings
+    std::string integrator_type = "RK4";    ///< Integrator type: RK4, RKF78
     double initial_step_size = 0.1;         ///< Initial step size [days]
     double tolerance = 1e-12;                ///< Integration tolerance
     
@@ -256,6 +257,11 @@ public:
         config_ = config;
         update_propagator();
     }
+    
+    /**
+     * @brief Load configuration from .oop file
+     */
+    void load_config(const std::string& oop_file);
     
     /**
      * @brief Get current configuration

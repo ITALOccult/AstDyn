@@ -1,0 +1,505 @@
+\chapter{Matrice di Transizione di Stato}
+\label{ch:transizione_stato}
+
+\section{Introduzione}
+
+La \textbf{matrice di transizione di stato} (STM) è fondamentale per la determinazione orbitale, tracciando piccole perturbazioni nel moto orbitale e propagando le incertezze. Questo capitolo sviluppa la teoria matematica e il calcolo pratico della STM.
+
+\section{Fondamenti Matematici}
+
+\subsection{Linearizzazione della Dinamica}
+
+Consideriamo la dinamica orbitale generale:
+
+\begin{equation}
+    \dot{\mathbf{y}} = \mathbf{f}(t, \mathbf{y})
+\end{equation}
+
+dove $\mathbf{y} = [\mathbf{r}, \mathbf{v}]^T$ è il vettore di stato 6-dimensionale.
+
+Per una traiettoria di riferimento $\mathbf{y}_{\text{rif}}(t)$ e una traiettoria perturbata $\mathbf{y}(t)$, definiamo:
+
+\begin{equation}
+    \delta\mathbf{y}(t) = \mathbf{y}(t) - \mathbf{y}_{\text{rif}}(t)
+\end{equation}
+
+\subsection{Equazioni Variazionali}
+
+Assumendo piccole perturbazioni, linearizziamo:
+
+\begin{equation}
+    \delta\dot{\mathbf{y}} = \frac{\partial\mathbf{f}}{\partial\mathbf{y}}\bigg|_{\mathbf{y}_{\text{rif}}} \delta\mathbf{y} = \mathbf{A}(t) \delta\mathbf{y}
+\end{equation}
+
+dove $\mathbf{A}(t)$ è la matrice Jacobiana $6 \times 6$:
+
+\begin{equation}
+    \mathbf{A} = \begin{bmatrix}
+        \frac{\partial\mathbf{f}_r}{\partial\mathbf{r}} & \frac{\partial\mathbf{f}_r}{\partial\mathbf{v}} \\[8pt]
+        \frac{\partial\mathbf{f}_v}{\partial\mathbf{r}} & \frac{\partial\mathbf{f}_v}{\partial\mathbf{v}}
+    \end{bmatrix} = \begin{bmatrix}
+        \mathbf{0}_{3\times3} & \mathbf{I}_{3\times3} \\[8pt]
+        \frac{\partial\mathbf{a}}{\partial\mathbf{r}} & \frac{\partial\mathbf{a}}{\partial\mathbf{v}}
+    \end{bmatrix}
+\end{equation}
+
+\subsection{Definizione Matrice di Transizione di Stato}
+
+La \textbf{matrice di transizione di stato} $\Phi(t, t_0)$ è la soluzione di:
+
+\begin{equation}
+    \frac{d\Phi}{dt} = \mathbf{A}(t)\Phi(t, t_0), \quad \Phi(t_0, t_0) = \mathbf{I}_{6\times6}
+\end{equation}
+
+Essa relaziona le perturbazioni di stato a tempi diversi:
+
+\begin{equation}
+    \delta\mathbf{y}(t) = \Phi(t, t_0) \delta\mathbf{y}(t_0)
+\end{equation}
+
+\subsection{Proprietà}
+
+La STM ha proprietà importanti:
+
+\begin{enumerate}
+    \item \textbf{Identità a $t_0$}: $\Phi(t_0, t_0) = \mathbf{I}$
+    \item \textbf{Composizione}: $\Phi(t_2, t_0) = \Phi(t_2, t_1)\Phi(t_1, t_0)$
+    \item \textbf{Inversa}: $\Phi(t_0, t) = \Phi^{-1}(t, t_0)$
+    \item \textbf{Determinante}: $\det[\Phi(t, t_0)] = \exp\left[\int_{t_0}^t \text{tr}(\mathbf{A}(\tau))d\tau\right]$
+\end{enumerate}
+
+Per sistemi conservativi (Hamiltoniani), la STM è simplettica: $\Phi^T\mathbf{J}\Phi = \mathbf{J}$ dove $\mathbf{J}$ è la matrice simplettica.
+
+\section{Calcolo della Matrice Jacobiana}
+
+\subsection{Problema dei Due Corpi}
+
+Per il problema kepleriano non perturbato:
+
+\begin{equation}
+    \mathbf{a} = -\frac{\mu}{r^3}\mathbf{r}
+\end{equation}
+
+Le derivate parziali dell'accelerazione sono:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}}{\partial\mathbf{r}} = -\frac{\mu}{r^3}\left[\mathbf{I} - 3\frac{\mathbf{r}\mathbf{r}^T}{r^2}\right]
+\end{equation}
+
+\begin{equation}
+    \frac{\partial\mathbf{a}}{\partial\mathbf{v}} = \mathbf{0}_{3\times3}
+\end{equation}
+
+Quindi:
+
+\begin{equation}
+    \mathbf{A}_{\text{2-corpi}} = \begin{bmatrix}
+        \mathbf{0} & \mathbf{I} \\[8pt]
+        -\frac{\mu}{r^3}\left[\mathbf{I} - 3\frac{\mathbf{r}\mathbf{r}^T}{r^2}\right] & \mathbf{0}
+    \end{bmatrix}
+\end{equation}
+
+\subsection{Perturbazioni N-Corpi}
+
+Per perturbazioni planetarie, l'accelerazione è:
+
+\begin{equation}
+    \mathbf{a}_p = \mu_p \left[\frac{\mathbf{r}_p - \mathbf{r}}{|\mathbf{r}_p - \mathbf{r}|^3} - \frac{\mathbf{r}_p}{r_p^3}\right]
+\end{equation}
+
+La derivata parziale rispetto alla posizione:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}_p}{\partial\mathbf{r}} = -\frac{\mu_p}{d^3}\left[\mathbf{I} - 3\frac{\mathbf{d}\mathbf{d}^T}{d^2}\right]
+\end{equation}
+
+dove $\mathbf{d} = \mathbf{r}_p - \mathbf{r}$ e $d = |\mathbf{d}|$.
+
+\subsection{Correzioni Relativistiche}
+
+L'accelerazione post-Newtoniana include termini dipendenti dalla velocità:
+
+\begin{equation}
+    \mathbf{a}_{\text{GR}} = \frac{\mu}{c^2 r^3}\left[4\frac{\mu}{r}\mathbf{r} - v^2\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
+\end{equation}
+
+Sia $\partial\mathbf{a}_{\text{GR}}/\partial\mathbf{r}$ che $\partial\mathbf{a}_{\text{GR}}/\partial\mathbf{v}$ sono non-zero.
+
+Per la posizione:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}_{\text{GR}}}{\partial\mathbf{r}} = \frac{\mu}{c^2 r^3}\left[-v^2\mathbf{I} + 4(\mathbf{v}\mathbf{v}^T) + \text{(termini ordine superiore)}\right]
+\end{equation}
+
+Per la velocità:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}_{\text{GR}}}{\partial\mathbf{v}} = \frac{\mu}{c^2 r^3}\left[-2v\mathbf{r}\mathbf{v}^T + 4\mathbf{v}\mathbf{r}^T + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{I}\right]
+\end{equation}
+
+\subsection{Pressione di Radiazione Solare}
+
+Per SRP con rapporto area-massa costante:
+
+\begin{equation}
+    \mathbf{a}_{\text{SRP}} = P_\odot \frac{A}{m} C_R \left(\frac{r_0}{r}\right)^2 \hat{\mathbf{r}}
+\end{equation}
+
+La parziale è:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}_{\text{SRP}}}{\partial\mathbf{r}} = P_\odot \frac{A}{m} C_R r_0^2 \left[\frac{\mathbf{I}}{r^3} - 3\frac{\mathbf{r}\mathbf{r}^T}{r^5}\right]
+\end{equation}
+
+\section{Calcolo Numerico}
+
+\subsection{Vettore di Stato Aumentato}
+
+Per calcolare la STM numericamente, aumentiamo il vettore di stato:
+
+\begin{equation}
+    \tilde{\mathbf{y}} = \begin{bmatrix} \mathbf{y} \\ \text{vec}(\Phi) \end{bmatrix} \in \mathbb{R}^{42}
+\end{equation}
+
+dove $\text{vec}(\Phi)$ impila i 36 elementi di $\Phi$ per colonne.
+
+\subsection{Dinamica Aumentata}
+
+Il sistema aumentato è:
+
+\begin{equation}
+    \frac{d\tilde{\mathbf{y}}}{dt} = \begin{bmatrix} \mathbf{f}(\mathbf{y}) \\ \text{vec}(\mathbf{A}(\mathbf{y})\Phi) \end{bmatrix}
+\end{equation}
+
+In pratica, integriamo:
+\begin{itemize}
+    \item 6 equazioni per lo stato $\mathbf{y}$
+    \item 36 equazioni per gli elementi STM
+    \item Totale: 42 ODE accoppiate
+\end{itemize}
+
+\subsection{Implementazione in AstDyn}
+
+\begin{lstlisting}[language=C++,caption={Propagazione STM}]
+#include <astdyn/propagation/Propagator.hpp>
+
+using namespace astdyn;
+
+Vector6d y0 = ...;  // Stato iniziale
+double t0 = 60000.0;
+double tf = 60100.0;
+
+Propagator prop(force_model);
+prop.enable_stm(true);  // Abilita calcolo STM
+
+// Propaga stato e STM
+auto result = prop.propagate_with_stm(y0, t0, tf);
+
+Vector6d yf = result.state;
+Matrix6d Phi = result.stm;  // Matrice 6x6 di transizione stato
+
+std::cout << "Determinante STM: " << Phi.determinant() << "\n";
+std::cout << "Numero condizione STM: " 
+          << Phi.norm() * Phi.inverse().norm() << "\n";
+\end{lstlisting}
+
+\subsection{Costo Computazionale}
+
+Il calcolo STM aumenta il costo computazionale:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Calcolo} & \textbf{Equazioni Stato} & \textbf{Fattore Tempo CPU} \\
+\midrule
+Solo stato & 6 & 1.0$\times$ \\
+Stato + STM & 42 & 5-7$\times$ \\
+Stato + STM + sensibilità & 42 + 6$N_p$ & 10-15$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Costo computazionale propagazione STM. $N_p$ è il numero di parametri.}
+\label{tab:costo_stm}
+\end{table}
+
+\section{Applicazioni}
+
+\subsection{Determinazione Orbitale}
+
+Nella correzione differenziale (fit orbitale minimi quadrati), necessitiamo:
+
+\begin{equation}
+    \frac{\partial\mathbf{y}(t_{\text{oss}})}{\partial\mathbf{y}(t_0)} = \Phi(t_{\text{oss}}, t_0)
+\end{equation}
+
+Questo relaziona le osservazioni alle condizioni iniziali, abilitando il raffinamento orbitale iterativo.
+
+\subsection{Propagazione Covarianza}
+
+Data la covarianza iniziale $\mathbf{P}_0$, la covarianza al tempo $t$ è:
+
+\begin{equation}
+    \mathbf{P}(t) = \Phi(t, t_0) \mathbf{P}_0 \Phi^T(t, t_0)
+\end{equation}
+
+Questo quantifica la crescita dell'incertezza nel tempo.
+
+Esempio:
+\begin{lstlisting}[language=C++,caption={Propagazione covarianza}]
+Matrix6d P0 = initial_covariance();  // km^2, (km/s)^2
+Matrix6d Phi = result.stm;
+
+Matrix6d Pf = Phi * P0 * Phi.transpose();
+
+// Incertezza posizione al tempo finale
+Vector3d sigma_pos = Pf.block<3,3>(0,0).diagonal().cwiseSqrt();
+std::cout << "Incertezza posizione: " 
+          << sigma_pos.transpose() << " km\n";
+\end{lstlisting}
+
+\subsection{Analisi di Sensibilità}
+
+La STM rivela come le perturbazioni nelle condizioni iniziali influenzano gli stati futuri:
+
+\begin{equation}
+    \frac{\partial r(t)}{\partial r_0} = \Phi_{11}(t, t_0), \quad
+    \frac{\partial r(t)}{\partial v_0} = \Phi_{12}(t, t_0)
+\end{equation}
+
+Questi sono i blocchi $3 \times 3$ superiore-sinistro e superiore-destro di $\Phi$.
+
+\subsection{Ottimizzazione Manovre}
+
+Per la progettazione di traiettorie spaziali, la STM aiuta a calcolare:
+\begin{itemize}
+    \item Matrici di puntamento (dove mirare per colpire un bersaglio)
+    \item Requisiti $\Delta v$
+    \item Sensibilità a errori di esecuzione
+\end{itemize}
+
+\section{STM Analitica vs Numerica}
+
+\subsection{STM Analitica per Moto Kepleriano}
+
+Per il problema non perturbato dei due corpi, esistono soluzioni in forma chiusa. La STM può essere espressa in termini di elementi orbitali e loro derivate.
+
+Vantaggi:
+\begin{itemize}
+    \item Esatta (nessun errore numerico)
+    \item Veloce da valutare
+    \item Valida per lunghi intervalli temporali
+\end{itemize}
+
+Svantaggi:
+\begin{itemize}
+    \item Formule complesse (specialmente vicino a singolarità)
+    \item Non include perturbazioni
+    \item Uso pratico limitato
+\end{itemize}
+
+\subsection{STM Numerica}
+
+Integrando numericamente le equazioni variazionali:
+
+Vantaggi:
+\begin{itemize}
+    \item Gestisce modelli di forza arbitrari
+    \item Implementazione diretta
+    \item Include tutte le perturbazioni
+\end{itemize}
+
+Svantaggi:
+\begin{itemize}
+    \item Accumulo errore numerico
+    \item 7$\times$ più lenta della propagazione solo-stato
+    \item Mal condizionamento per archi lunghi
+\end{itemize}
+
+\subsection{Approcci Ibridi}
+
+Per alcune applicazioni, usare:
+\begin{enumerate}
+    \item STM analitica per parte kepleriana
+    \item Correzioni perturbazione numeriche
+    \item Composizione transizione stato
+\end{enumerate}
+
+\section{Stabilità Numerica}
+
+\subsection{Problemi di Condizionamento}
+
+La STM diventa mal condizionata per:
+\begin{itemize}
+    \item Tempi di propagazione lunghi ($>$ diversi periodi orbitali)
+    \item Orbite ad alta eccentricità
+    \item Moto quasi-rettilineo
+\end{itemize}
+
+Crescita del numero di condizione:
+
+\begin{equation}
+    \kappa(\Phi) \approx \exp\left(\lambda_{\max} \Delta t\right)
+\end{equation}
+
+dove $\lambda_{\max}$ è il più grande esponente di Lyapunov.
+
+\subsection{Strategie di Mitigazione}
+
+\textbf{1. Rilinearizzazione}
+
+Invece di propagare da $t_0$ a $t_f$, dividere in segmenti:
+
+\begin{equation}
+    \Phi(t_f, t_0) = \Phi(t_f, t_2) \Phi(t_2, t_1) \Phi(t_1, t_0)
+\end{equation}
+
+Ogni segmento ha migliore condizionamento.
+
+\textbf{2. Transizione stato in elementi orbitali}
+
+Invece della STM cartesiana, usare:
+
+\begin{equation}
+    \frac{\partial\mathbf{e}(t)}{\partial\mathbf{e}(t_0)}
+\end{equation}
+
+dove $\mathbf{e} = [a, e, i, \Omega, \omega, M]$ sono elementi orbitali.
+
+\textbf{3. Regolarizzazione}
+
+Usare coordinate regolarizzate (Kustaanheimo-Stiefel, Sperling-Burdet) che si comportano meglio vicino al periasse.
+
+\section{Esempio Pratico}
+
+\subsection{Tracciamento Bersaglio}
+
+Tracciare l'incertezza nella posizione asteroidale per valutazione impatto:
+
+\begin{lstlisting}[language=C++,caption={Propagazione incertezza asteroide}]
+// Stato iniziale da determinazione orbitale
+Vector6d y0 = {1.1, 0.2, 0.05, -0.01, 0.03, 0.0};  // AU, AU/giorno
+
+// Covarianza iniziale (da fit minimi quadrati)
+Matrix6d P0 = Matrix6d::Zero();
+P0.diagonal() << 1e-8, 1e-8, 1e-9,  // pos: 1500 km
+                 1e-11, 1e-11, 1e-12;  // vel: 0.15 m/s
+
+ForceModel forces;
+forces.enable_planets({"Earth", "Jupiter", "Venus", "Mars"});
+
+Propagator prop(forces);
+prop.enable_stm(true);
+
+// Propaga 10 anni
+double t0 = 60000.0;
+double tf = t0 + 3652.5;  // 10 anni
+
+auto result = prop.propagate_with_stm(y0, t0, tf);
+
+// Calcola incertezza al tempo futuro
+Matrix6d Pf = result.stm * P0 * result.stm.transpose();
+
+// Incertezza posizione (3-sigma)
+Vector3d sigma_3 = 3.0 * Pf.block<3,3>(0,0).diagonal().cwiseSqrt();
+std::cout << "Incertezza posizione (3-sigma): \n";
+std::cout << sigma_3.transpose() * AU_TO_KM << " km\n";
+
+// Controlla avvicinamento ravvicinato Terra
+Vector6d earth_state = ephemeris.get_planet("Earth", tf);
+Vector3d rel_pos = result.state.head<3>() - earth_state.head<3>();
+double distance = rel_pos.norm() * AU_TO_KM;
+
+std::cout << "Distanza dalla Terra: " << distance << " km\n";
+std::cout << "Probabilita' impatto (Gaussiana): ";
+if (distance < 3.0 * sigma_3.norm() * AU_TO_KM) {
+    std::cout << "NON-ZERO - richiesta ulteriore analisi\n";
+} else {
+    std::cout << "Trascurabile\n";
+}
+\end{lstlisting}
+
+\subsection{Pianificazione Osservazioni}
+
+Determinare tempi ottimali di osservazione per ridurre incertezza:
+
+\begin{lstlisting}[language=C++,caption={Pianificazione osservazioni}]
+// Propaga con STM a epoche osservative multiple
+std::vector<double> obs_times = {t0 + 30, t0 + 60, t0 + 90};
+
+for (double t_obs : obs_times) {
+    auto result = prop.propagate_with_stm(y0, t0, t_obs);
+    Matrix6d P = result.stm * P0 * result.stm.transpose();
+    
+    // Incertezza RA/Dec da incertezza posizione
+    Vector3d r = result.state.head<3>();
+    double dec = std::asin(r(2) / r.norm());
+    double ra = std::atan2(r(1), r(0));
+    
+    // Approssimazione semplice (calcolo completo usa parziali osservazione)
+    double sigma_ra = P(0,0) / (r.norm() * std::cos(dec));
+    double sigma_dec = P(2,2) / r.norm();
+    
+    std::cout << "Epoca " << t_obs << ": "
+              << "sigma_RA = " << sigma_ra * RAD_TO_ARCSEC << " arcosec, "
+              << "sigma_Dec = " << sigma_dec * RAD_TO_ARCSEC << " arcosec\n";
+}
+\end{lstlisting}
+
+\section{Sensibilità Parametri}
+
+\subsection{Vettore di Stato Esteso}
+
+Per studiare la sensibilità a parametri dinamici (es. $\mu$, $C_R$, masse asteroidi), aumentare lo stato:
+
+\begin{equation}
+    \tilde{\mathbf{y}} = \begin{bmatrix} \mathbf{y} \\ \mathbf{p} \end{bmatrix}
+\end{equation}
+
+dove $\mathbf{p}$ sono parametri. Quindi:
+
+\begin{equation}
+    \frac{d}{dt}\begin{bmatrix} \mathbf{y} \\ \mathbf{p} \end{bmatrix} = \begin{bmatrix} \mathbf{f}(\mathbf{y}, \mathbf{p}) \\ \mathbf{0} \end{bmatrix}
+\end{equation}
+
+La STM estesa include $\partial\mathbf{y}/\partial\mathbf{p}$.
+
+\subsection{Matrici di Sensibilità}
+
+Definire matrice di sensibilità:
+
+\begin{equation}
+    \mathbf{S}(t) = \frac{\partial\mathbf{y}(t)}{\partial\mathbf{p}}
+\end{equation}
+
+Essa soddisfa:
+
+\begin{equation}
+    \frac{d\mathbf{S}}{dt} = \mathbf{A}(t)\mathbf{S} + \frac{\partial\mathbf{f}}{\partial\mathbf{p}}
+\end{equation}
+
+Questo rivela come il moto orbitale dipende dai parametri fisici.
+
+\section{Riepilogo}
+
+Concetti chiave sulla matrice di transizione di stato:
+
+\begin{enumerate}
+    \item La \textbf{STM} $\Phi(t, t_0)$ propaga linearmente piccole perturbazioni
+    \item Soddisfa le \textbf{equazioni variazionali}: $\dot{\Phi} = \mathbf{A}(t)\Phi$
+    \item La \textbf{matrice Jacobiana} $\mathbf{A}$ contiene derivate del modello di forza
+    \item Il \textbf{calcolo numerico} richiede integrazione di 42 ODE (6 stato + 36 STM)
+    \item \textbf{Applicazioni}: determinazione orbitale, propagazione covarianza, analisi sensibilità
+    \item Il \textbf{condizionamento} degrada per archi lunghi; usare rilinearizzazione
+    \item La \textbf{STM estesa} include sensibilità parametri
+\end{enumerate}
+
+Comprendere la STM è essenziale per:
+\begin{itemize}
+    \item Determinazione orbitale precisa (Capitolo 14)
+    \item Quantificazione incertezza
+    \item Progettazione missioni e puntamento
+    \item Stima parametri
+    \item Valutazione probabilità impatto
+\end{itemize}
+
+Il prossimo capitolo copre il calcolo di effemeridi e metodi di interpolazione per ricerca efficiente dello stato.

@@ -1,0 +1,73 @@
+\babel@toc {italian}{}\relax 
+\babel@toc {italian}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Secondi intercalari recenti (tabella parziale)}}{18}{table.2.1}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Classificazione delle coniche orbitali per eccentricità ed energia.}}{49}{table.6.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {7.1}{\ignorespaces Magnitudini tipiche delle accelerazioni perturbative per asteroidi.}}{60}{table.7.1}%
+\contentsline {table}{\numberline {7.2}{\ignorespaces Confronto tra integrazione numerica e teoria analitica delle perturbazioni.}}{68}{table.7.2}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {8.1}{\ignorespaces Confronto dei metodi di integrazione numerica.}}{80}{table.8.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {9.1}{\ignorespaces Modelli di forza raccomandati per diversi tipi di oggetti.}}{96}{table.9.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {10.1}{\ignorespaces Costo computazionale propagazione STM. $N_p$ è il numero di parametri.}}{103}{table.10.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {11.1}{\ignorespaces Esempio effemeride tabulata con spaziatura di 1 giorno.}}{112}{table.11.1}%
+\contentsline {table}{\numberline {11.2}{\ignorespaces Confronto effemeridi planetarie.}}{118}{table.11.2}%
+\contentsline {table}{\numberline {11.3}{\ignorespaces Requisiti effemeride per diverse applicazioni.}}{120}{table.11.3}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {12.1}{\ignorespaces Incertezze osservative tipiche.}}{135}{table.12.1}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {21.1}{\ignorespaces Copertura unit test per modulo}}{238}{table.21.1}%
+\contentsline {table}{\numberline {21.2}{\ignorespaces Errore posizione dopo un periodo (varie eccentricita')}}{238}{table.21.2}%
+\contentsline {table}{\numberline {21.3}{\ignorespaces Differenza posizione: AstDyn vs OrbFit}}{239}{table.21.3}%
+\contentsline {table}{\numberline {21.4}{\ignorespaces Differenze elementi orbitali: AstDyn vs OrbFit}}{239}{table.21.4}%
+\contentsline {table}{\numberline {21.5}{\ignorespaces Errore RMS posizione vs JPL Horizons (1 anno)}}{240}{table.21.5}%
+\contentsline {table}{\numberline {21.6}{\ignorespaces Successo integrazione vs eccentricita'}}{240}{table.21.6}%
+\contentsline {table}{\numberline {21.7}{\ignorespaces Timing integrazione (Intel i7-10700K, thread singolo)}}{241}{table.21.7}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {22.1}{\ignorespaces Dataset osservazioni Pompeja}}{245}{table.22.1}%
+\contentsline {table}{\numberline {22.2}{\ignorespaces Osservazioni selezionate per IOD Gauss}}{245}{table.22.2}%
+\contentsline {table}{\numberline {22.3}{\ignorespaces Elementi orbitali iniziali metodo Gauss}}{245}{table.22.3}%
+\contentsline {table}{\numberline {22.4}{\ignorespaces Convergenza correzione differenziale}}{246}{table.22.4}%
+\contentsline {table}{\numberline {22.5}{\ignorespaces Soluzione orbitale finale per Pompeja}}{246}{table.22.5}%
+\contentsline {table}{\numberline {22.6}{\ignorespaces Residui osservazioni}}{247}{table.22.6}%
+\contentsline {table}{\numberline {22.7}{\ignorespaces Confronto AstDyn vs OrbFit}}{247}{table.22.7}%
+\contentsline {table}{\numberline {22.8}{\ignorespaces Differenza posizione: AstDyn vs JPL (60 giorni)}}{248}{table.22.8}%
+\contentsline {table}{\numberline {22.9}{\ignorespaces Matrice correlazione (elementi selezionati)}}{248}{table.22.9}%
+\contentsline {table}{\numberline {22.10}{\ignorespaces Incertezza posizione vs tempo}}{249}{table.22.10}%
+\contentsline {table}{\numberline {22.11}{\ignorespaces Suddivisione timing (Intel i7-10700K, core singolo)}}{249}{table.22.11}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {23.1}{\ignorespaces Timing propagazione: arco 60 giorni}}{252}{table.23.1}%
+\contentsline {table}{\numberline {23.2}{\ignorespaces Statistiche propagazione batch}}{252}{table.23.2}%
+\contentsline {table}{\numberline {23.3}{\ignorespaces Timing vs modello forze (propagazione 60 giorni)}}{252}{table.23.3}%
+\contentsline {table}{\numberline {23.4}{\ignorespaces Suddivisione correzione differenziale}}{253}{table.23.4}%
+\contentsline {table}{\numberline {23.5}{\ignorespaces Prestazioni vs numero osservazioni}}{253}{table.23.5}%
+\contentsline {table}{\numberline {23.6}{\ignorespaces Timing AstDyn vs OrbFit}}{254}{table.23.6}%
+\contentsline {table}{\numberline {23.7}{\ignorespaces Confronto prestazioni linguaggio (propagazione 60 giorni)}}{254}{table.23.7}%
+\contentsline {table}{\numberline {23.8}{\ignorespaces Footprint memoria per componente}}{255}{table.23.8}%
+\contentsline {table}{\numberline {23.9}{\ignorespaces Uso memoria vs numero osservazioni}}{255}{table.23.9}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {23.10}{\ignorespaces Costanti fisiche fondamentali}}{261}{table.23.10}%
+\contentsline {table}{\numberline {23.11}{\ignorespaces Masse planetarie (parametri GM in AU$^3$/giorno$^2$)}}{261}{table.23.11}%
+\contentsline {table}{\numberline {23.12}{\ignorespaces Elementi orbitali planetari (epoca J2000.0)}}{262}{table.23.12}%
+\contentsline {table}{\numberline {23.13}{\ignorespaces Fattori conversione angolare}}{262}{table.23.13}%
+\contentsline {table}{\numberline {23.14}{\ignorespaces Fattori conversione temporale}}{262}{table.23.14}%
+\contentsline {table}{\numberline {23.15}{\ignorespaces Fattori conversione distanza}}{263}{table.23.15}%
+\contentsline {table}{\numberline {23.16}{\ignorespaces Codici osservatorio MPC selezionati}}{264}{table.23.16}%
+\contentsline {table}{\numberline {23.17}{\ignorespaces Acronimi comuni}}{265}{table.23.17}%

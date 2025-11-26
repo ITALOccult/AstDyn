@@ -1,0 +1,513 @@
+\chapter{Software Architecture}
+\label{ch:architecture}
+
+\section{Introduction}
+
+AstDyn is designed as a modern C++17 library for astrodynamics and orbit determination. The architecture emphasizes:
+
+\begin{itemize}
+    \item \textbf{Modularity}: Independent modules with clear interfaces
+    \item \textbf{Performance}: Efficient numerical algorithms with Eigen3
+    \item \textbf{Extensibility}: Easy to add new force models, integrators, parsers
+    \item \textbf{Maintainability}: Clean code, comprehensive tests, documentation
+\end{itemize}
+
+\section{Design Principles}
+
+\subsection{Separation of Concerns}
+
+Each module handles a specific aspect:
+\begin{itemize}
+    \item \textbf{Time}: Scale conversions (UTC, TT, TDB)
+    \item \textbf{Coordinates}: Reference frames, transformations
+    \item \textbf{Orbit}: Elements, state vectors, conversions
+    \item \textbf{Propagation}: Numerical integration, force models
+    \item \textbf{Observations}: Astrometry, MPC format, weights
+    \item \textbf{Orbit Determination}: IOD, differential correction, residuals
+\end{itemize}
+
+\subsection{Interface-Based Design}
+
+Abstract interfaces enable flexibility:
+
+\begin{lstlisting}[language=C++,caption={Interface examples}]
+// Parser interface - multiple formats supported
+class IParser {
+public:
+    virtual ~IParser() = default;
+    virtual OrbitalElements parse(const std::string& filename) = 0;
+};
+
+// Integrator interface - multiple methods available
+class IIntegrator {
+public:
+    virtual ~IIntegrator() = default;
+    virtual void integrate(State& y, double t0, double t1, ForceModel& forces) = 0;
+};
+
+// Ephemeris interface - SPICE, JPL, analytic
+class IEphemeris {
+public:
+    virtual ~IEphemeris() = default;
+    virtual Vector3d get_position(Body body, double jd_tdb) = 0;
+};
+\end{lstlisting}
+
+\subsection{Header-Only vs. Compiled}
+
+\textbf{Header-only} (inline, templates):
+\begin{itemize}
+    \item \texttt{core/Constants.hpp}: Physical constants
+    \item \texttt{core/Types.hpp}: Type aliases, enums
+    \item \texttt{utils/StringUtils.hpp}: String utilities
+\end{itemize}
+
+\textbf{Compiled} (implementation in .cpp):
+\begin{itemize}
+    \item All numerical algorithms (propagation, integration)
+    \item I/O operations (file parsing, observation loading)
+    \item Complex calculations (STM, differential correction)
+\end{itemize}
+
+\section{Module Organization}
+
+\subsection{Directory Structure}
+
+\begin{lstlisting}[language=bash,caption={Project layout}]
+astdyn/
+|-- include/astdyn/           # Public headers
+|   |-- AstDyn.hpp           # Main include (everything)
+|   |-- AstDynEngine.hpp     # High-level engine
+|   |-- Version.hpp          # Version info (generated)
+|   |-- Config.hpp           # Build configuration (generated)
+|   |-- core/                # Fundamental types
+|   |   |-- Constants.hpp
+|   |   `-- Types.hpp
+|   |-- math/                # Mathematical utilities
+|   |   |-- MathUtils.hpp
+|   |   `-- LinearAlgebra.hpp
+|   |-- time/                # Time scales
+|   |   `-- TimeScale.hpp
+|   |-- coordinates/         # Reference frames
+|   |   |-- KeplerianElements.hpp
+|   |   |-- CartesianState.hpp
+|   |   `-- CometaryElements.hpp
+|   |-- orbit/               # Orbital mechanics
+|   |   |-- TwoBody.hpp
+|   |   `-- Perturbations.hpp
+|   |-- propagation/         # Numerical integration
+|   |   |-- Integrator.hpp
+|   |   `-- Propagator.hpp
+|   |-- observations/        # Astrometric data
+|   |   |-- Observation.hpp
+|   |   |-- MPCReader.hpp
+|   |   `-- ObservatoryDatabase.hpp
+|   |-- orbit_determination/ # OD algorithms
+|   |   |-- GaussIOD.hpp
+|   |   |-- DifferentialCorrection.hpp
+|   |   |-- StateTransitionMatrix.hpp
+|   |   `-- Residuals.hpp
+|   |-- io/                  # Parsers
+|   |   |-- IParser.hpp
+|   |   |-- ParserFactory.hpp
+|   |   `-- parsers/
+|   |       |-- OrbFitEQ1Parser.hpp
+|   |       `-- OrbFitRWOParser.hpp
+|   |-- ephemeris/           # Planetary positions
+|   |   `-- SpiceInterface.hpp
+|   `-- utils/               # Utilities
+|       |-- Logger.hpp
+|       `-- StringUtils.hpp
+|-- src/                     # Implementation files
+|   |-- CMakeLists.txt
+|   |-- AstDynEngine.cpp
+|   |-- math/
+|   |-- time/
+|   |-- coordinates/
+|   |-- orbit/
+|   |-- propagation/
+|   |-- observations/
+|   |-- orbit_determination/
+|   |-- io/
+|   `-- ephemeris/
+|-- tests/                   # Unit tests (Google Test)
+|-- examples/                # Example programs
+|-- docs/                    # Documentation
+`-- data/                    # Data files (kernels, catalogs)
+\end{lstlisting}
+
+\subsection{Namespace Organization}
+
+\begin{lstlisting}[language=C++,caption={Namespace hierarchy}]
+namespace astdyn {
+    namespace constants {    // Physical constants
+        constexpr double AU = 149597870.7;  // km
+        constexpr double C_LIGHT = 299792.458;  // km/s
+        // ...
+    }
+    
+    namespace math {         // Math utilities
+        double mod_angle(double angle, double period);
+        Matrix3d rotation_matrix_z(double angle);
+        // ...
+    }
+    
+    namespace time {         // Time conversions
+        double utc_to_tt(double jd_utc);
+        double tt_to_tdb(double jd_tt);
+        // ...
+    }
+    
+    namespace coordinates {  // Coordinate systems
+        class KeplerianElements { /* ... */ };
+        class CartesianState { /* ... */ };
+        // ...
+    }
+    
+    namespace observations { // Observations
+        class Observation { /* ... */ };
+        class MPCReader { /* ... */ };
+        // ...
+    }
+    
+    // Propagation, orbit determination at top level
+    class Propagator { /* ... */ };
+    class DifferentialCorrection { /* ... */ };
+    // ...
+}
+\end{lstlisting}
+
+\section{Core Components}
+
+\subsection{Constants and Types}
+
+\textbf{Physical Constants} (\texttt{core/Constants.hpp}):
+\begin{itemize}
+    \item Gravitational parameters: \texttt{MU\_SUN}, \texttt{MU\_EARTH}, etc.
+    \item Distances: \texttt{AU}, \texttt{EARTH\_RADIUS}
+    \item Time: \texttt{JD2000}, \texttt{SECONDS\_PER\_DAY}
+    \item Speed of light, obliquity, etc.
+\end{itemize}
+
+\textbf{Type Aliases} (\texttt{core/Types.hpp}):
+\begin{lstlisting}[language=C++]
+// Linear algebra (Eigen)
+using Vector3d = Eigen::Vector3d;
+using Vector6d = Eigen::Matrix<double, 6, 1>;
+using Matrix3d = Eigen::Matrix3d;
+using Matrix6d = Eigen::Matrix<double, 6, 6>;
+
+// Strong typing for units
+using Radians = double;
+using Degrees = double;
+using AU_Distance = double;
+using KM_Distance = double;
+using JulianDate = double;
+\end{lstlisting}
+
+\textbf{Enumerations}:
+\begin{lstlisting}[language=C++]
+enum class CoordinateSystem {
+    ECLIPTIC, EQUATORIAL, ICRF, BODY_FIXED
+};
+
+enum class ElementType {
+    KEPLERIAN, CARTESIAN, COMETARY, EQUINOCTIAL
+};
+
+enum class TimeScale {
+    UTC, UT1, TAI, TT, TDB, TCB, TCG
+};
+
+enum class IntegratorType {
+    RADAU15, RK_GAUSS, DOPRI, LSODAR, GAUSS_JACKSON
+};
+\end{lstlisting}
+
+\subsection{Version and Configuration}
+
+\textbf{Version} (generated from CMake):
+\begin{lstlisting}[language=C++]
+namespace astdyn {
+    namespace Version {
+        constexpr int major = 1;
+        constexpr int minor = 0;
+        constexpr int patch = 0;
+        constexpr const char* string = "1.0.0";
+    }
+}
+\end{lstlisting}
+
+\textbf{Configuration} (build options):
+\begin{lstlisting}[language=C++]
+namespace astdyn {
+    namespace Config {
+        constexpr bool use_spice = true;
+        constexpr bool use_openmp = false;
+        constexpr const char* build_type = "Release";
+        constexpr const char* compiler = "AppleClang 16.0.0";
+    }
+}
+\end{lstlisting}
+
+\section{Dependency Management}
+
+\subsection{External Dependencies}
+
+\textbf{Eigen3} (required):
+\begin{itemize}
+    \item Purpose: Linear algebra (vectors, matrices)
+    \item Version: $\ge$ 3.3
+    \item Usage: Header-only, no linking required
+    \item Why: Fast, expressive, template-based
+\end{itemize}
+
+\textbf{Boost} (optional):
+\begin{itemize}
+    \item Purpose: Extended utilities (filesystem, date\_time)
+    \item Version: $\ge$ 1.70
+    \item Usage: Some compiled components
+    \item Why: Industry-standard C++ extensions
+\end{itemize}
+
+\textbf{SPICE} (optional):
+\begin{itemize}
+    \item Purpose: High-precision planetary ephemerides
+    \item Provider: JPL/NAIF
+    \item Usage: Compiled library (CSPICE)
+    \item Why: Gold standard for ephemeris computation
+\end{itemize}
+
+\textbf{Google Test} (testing only):
+\begin{itemize}
+    \item Purpose: Unit testing framework
+    \item Version: $\ge$ 1.10
+    \item Usage: Downloaded automatically by CMake if not found
+\end{itemize}
+
+\subsection{CMake Build System}
+
+\textbf{Features}:
+\begin{itemize}
+    \item Modern CMake (3.15+)
+    \item Automatic dependency finding
+    \item Version generation
+    \item Configuration options
+    \item Install targets
+    \item Package export for use in other projects
+\end{itemize}
+
+\textbf{Build options}:
+\begin{lstlisting}[language=bash]
+cmake -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DASTDYN_BUILD_SHARED=ON \
+  -DASTDYN_BUILD_TESTS=ON \
+  -DASTDYN_BUILD_EXAMPLES=ON \
+  -DASTDYN_USE_SPICE=ON
+cmake --build build -j
+cmake --install build
+\end{lstlisting}
+
+\section{Error Handling}
+
+\subsection{Strategy}
+
+\textbf{Exceptions} for programming errors:
+\begin{lstlisting}[language=C++]
+if (eccentricity < 0.0 || eccentricity >= 1.0) {
+    throw std::invalid_argument("Eccentricity must be in [0, 1)");
+}
+\end{lstlisting}
+
+\textbf{Optional} for expected failures:
+\begin{lstlisting}[language=C++]
+std::optional<Matrix3d> invert_matrix(const Matrix3d& A) {
+    if (A.determinant() < 1e-15) {
+        return std::nullopt;  // Singular
+    }
+    return A.inverse();
+}
+\end{lstlisting}
+
+\textbf{Return codes} for I/O:
+\begin{lstlisting}[language=C++]
+bool load_observations(const std::string& filename,
+                       std::vector<Observation>& obs) {
+    std::ifstream file(filename);
+    if (!file) return false;
+    // ...
+    return true;
+}
+\end{lstlisting}
+
+\subsection{Logging}
+
+\begin{lstlisting}[language=C++]
+#include <astdyn/utils/Logger.hpp>
+
+// Severity levels
+Logger::debug("Iteration {} converged", iter);
+Logger::info("Loaded {} observations", n_obs);
+Logger::warning("RMS = {:.3f} arcsec (high!)", rms);
+Logger::error("Failed to load kernel: {}", filename);
+\end{lstlisting}
+
+\section{Memory Management}
+
+\subsection{Ownership}
+
+\textbf{Stack allocation} for small objects:
+\begin{lstlisting}[language=C++]
+Vector3d position;  // 24 bytes
+Matrix6d covariance;  // 288 bytes
+KeplerianElements elements;  // ~80 bytes
+\end{lstlisting}
+
+\textbf{Smart pointers} for dynamic lifetime:
+\begin{lstlisting}[language=C++]
+// Unique ownership
+auto propagator = std::make_unique<Propagator>(integrator, forces);
+
+// Shared ownership (when multiple references needed)
+auto spice = std::make_shared<SpiceInterface>();
+propagator->set_ephemeris(spice);
+corrector->set_ephemeris(spice);  // Same object
+\end{lstlisting}
+
+\textbf{Move semantics} for efficiency:
+\begin{lstlisting}[language=C++]
+std::vector<Observation> load_mpc_observations(const std::string& file) {
+    std::vector<Observation> obs;
+    // ... populate obs ...
+    return obs;  // Moved, not copied (C++11 RVO)
+}
+\end{lstlisting}
+
+\subsection{Large Datasets}
+
+For large observation sets (e.g., 10,000+ observations):
+\begin{itemize}
+    \item Use \texttt{std::vector::reserve()} to avoid reallocations
+    \item Stream processing for files too large for RAM
+    \item Memory-mapped files for very large datasets (future)
+\end{itemize}
+
+\section{Threading and Parallelism}
+
+\subsection{Current State}
+
+AstDyn v1.0 is single-threaded. Parallelization opportunities:
+
+\begin{enumerate}
+    \item \textbf{Observation processing}: Compute partials in parallel
+    \item \textbf{Monte Carlo}: Multiple orbit propagations independently
+    \item \textbf{Uncertainty propagation}: Parallel particle simulations
+\end{enumerate}
+
+\subsection{Future Plans}
+
+\begin{lstlisting}[language=C++]
+// OpenMP for loop parallelization
+#pragma omp parallel for
+for (size_t i = 0; i < observations.size(); ++i) {
+    residuals[i] = compute_residual(observations[i], state);
+}
+
+// std::async for task parallelism
+auto future1 = std::async(std::launch::async, propagate, state1, t_end);
+auto future2 = std::async(std::launch::async, propagate, state2, t_end);
+auto result1 = future1.get();
+auto result2 = future2.get();
+\end{lstlisting}
+
+\section{Testing Strategy}
+
+\subsection{Unit Tests}
+
+Google Test framework with fixtures:
+
+\begin{lstlisting}[language=C++]
+TEST(TimeScaleTest, UTCtoTT) {
+    double jd_utc = 2451545.0;  // J2000.0
+    double jd_tt = time::utc_to_tt(jd_utc);
+    EXPECT_NEAR(jd_tt - jd_utc, 64.184 / 86400.0, 1e-10);
+}
+
+TEST(KeplerianTest, CartesianRoundTrip) {
+    CartesianState cart(1.0, 0.0, 0.0, 0.0, 0.0172, 0.0);
+    auto kep = KeplerianElements::from_cartesian(cart);
+    auto cart2 = kep.to_cartesian();
+    EXPECT_VECTOR_NEAR(cart.position, cart2.position, 1e-12);
+}
+\end{lstlisting}
+
+\subsection{Integration Tests}
+
+\begin{itemize}
+    \item Propagate known orbits, compare with JPL Horizons
+    \item Differential correction on real asteroids (e.g., Pompeja)
+    \item IOD from synthetic observations
+\end{itemize}
+
+\subsection{Performance Benchmarks}
+
+\begin{lstlisting}[language=C++]
+TEST(PropagationBenchmark, Pompeja60Days) {
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    propagate(initial_state, 0.0, 60.0, forces);
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    
+    std::cout << "Propagation time: " << duration.count() << " ms\n";
+    EXPECT_LT(duration.count(), 1000);  // Should complete in < 1 second
+}
+\end{lstlisting}
+
+\section{Documentation}
+
+\subsection{Inline Documentation}
+
+Doxygen-style comments:
+
+\begin{lstlisting}[language=C++]
+/**
+ * @brief Convert Keplerian elements to Cartesian state
+ * 
+ * @param elements Keplerian orbital elements (a, e, i, Omega, omega, M)
+ * @param mu Gravitational parameter [km^3/s^2]
+ * @return CartesianState Position [km] and velocity [km/s]
+ * 
+ * @note Uses iterative solution of Kepler's equation for eccentric anomaly
+ * @throws std::invalid_argument if eccentricity >= 1.0 (parabolic/hyperbolic)
+ */
+CartesianState to_cartesian(const KeplerianElements& elements, double mu);
+\end{lstlisting}
+
+\subsection{External Documentation}
+
+\begin{itemize}
+    \item \textbf{README.md}: Quick start, installation, examples
+    \item \textbf{This manual}: Theory + implementation
+    \item \textbf{API reference}: Generated from Doxygen
+    \item \textbf{Examples}: Commented working code
+\end{itemize}
+
+\section{Summary}
+
+Key architectural features:
+
+\begin{enumerate}
+    \item \textbf{Modular design}: Clear separation of concerns
+    \item \textbf{Interface-based}: Easy to extend (parsers, integrators, etc.)
+    \item \textbf{Modern C++17}: Smart pointers, move semantics, templates
+    \item \textbf{Eigen3 integration}: Efficient linear algebra
+    \item \textbf{CMake build}: Cross-platform, automatic dependencies
+    \item \textbf{Comprehensive testing}: Unit tests + integration tests
+    \item \textbf{Clear error handling}: Exceptions, optionals, return codes
+    \item \textbf{Well documented}: Inline + external docs
+\end{enumerate}
+
+Next chapter covers individual core modules in detail.

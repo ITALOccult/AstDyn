@@ -1,0 +1,318 @@
+\chapter{Determinazione dell'Orbita Iniziale}
+\label{ch:initial_orbit}
+
+\section{Introduzione}
+
+La \textbf{determinazione dell'orbita iniziale} (Initial Orbit Determination, IOD) calcola un'orbita approssimata da un piccolo numero di osservazioni. Fornisce:
+\begin{itemize}
+    \item Punto di partenza per la correzione differenziale
+    \item Collegamento di osservazioni attraverso opposizioni
+    \item Previsioni di recupero per oggetti persi
+    \item Valutazioni preliminari di impatto
+\end{itemize}
+
+I metodi classici usano 3 osservazioni (Gauss, Laplace) o 2 osservazioni + vincoli.
+
+\section{Il Problema IOD}
+
+\subsection{Osservazioni Solo Angolari}
+
+Dato: Tre osservazioni $(\alpha_i, \delta_i, t_i)$, $i = 1, 2, 3$.
+
+Trovare: Sei elementi orbitali o stato cartesiano $\mathbf{y} = [\mathbf{r}, \mathbf{v}]$.
+
+\textbf{Sfida}: Abbiamo 6 incognite ma solo 6 vincoli (2 angoli $\times$ 3 tempi). Il problema è esattamente determinato ma altamente non lineare.
+
+\subsection{Linea di Vista}
+
+Ogni osservazione definisce un vettore unitario:
+
+\begin{equation}
+    \hat{\rho}_i = \begin{bmatrix} \cos\delta_i \cos\alpha_i \\ \cos\delta_i \sin\alpha_i \\ \sin\delta_i \end{bmatrix}
+\end{equation}
+
+L'oggetto si trova da qualche parte lungo questa linea: $\mathbf{r}_i = \mathbf{R}_i + \rho_i \hat{\rho}_i$ dove $\mathbf{R}_i$ è la posizione dell'osservatorio e $\rho_i$ è la distanza topocentrica incognita.
+
+\section{Metodo di Gauss}
+
+\subsection{Contesto Storico}
+
+Sviluppato da Carl Friedrich Gauss (1809) per recuperare Cerere dopo il suo passaggio dietro il Sole. Ancora ampiamente utilizzato oggi.
+
+\subsection{Idea di Base}
+
+Usare 3 osservazioni per:
+\begin{enumerate}
+    \item Stimare la distanza $\rho_2$ all'osservazione centrale
+    \item Calcolare la posizione $\mathbf{r}_2$
+    \item Usare i coefficienti di Lagrange per ottenere la velocità $\mathbf{v}_2$
+\end{enumerate}
+
+\subsection{Coefficienti di Lagrange}
+
+Per il moto a due corpi, le posizioni ai tempi $t_1$, $t_2$, $t_3$ sono legate da:
+
+\begin{align}
+    \mathbf{r}_1 &= f_1 \mathbf{r}_2 + g_1 \mathbf{v}_2 \\
+    \mathbf{r}_3 &= f_3 \mathbf{r}_2 + g_3 \mathbf{v}_2
+\end{align}
+
+dove $f$ e $g$ sono coefficienti di Lagrange che dipendono dagli intervalli temporali $\tau_1 = t_1 - t_2$ e $\tau_3 = t_3 - t_2$.
+
+Sviluppo in serie:
+
+\begin{align}
+    f &= 1 - \frac{\mu}{2r^3}\tau^2 + \frac{\mu}{2r^3}\frac{\mathbf{r} \cdot \mathbf{v}}{r^2}\tau^3 + O(\tau^4) \\
+    g &= \tau - \frac{\mu}{6r^3}\tau^3 + O(\tau^4)
+\end{align}
+
+\subsection{Equazione Scalare di Lagrange}
+
+I tre vettori posizione giacciono nel piano orbitale. Usando la complanarità:
+
+\begin{equation}
+    \mathbf{r}_1 \cdot (\mathbf{r}_2 \times \mathbf{r}_3) = 0
+\end{equation}
+
+Questo fornisce un'equazione scalare per $\rho_2$ (il "polinomio di ottavo grado" dopo manipolazione).
+
+\subsection{Algoritmo}
+
+\textbf{Input}: Tre osservazioni $(\alpha_i, \delta_i, t_i, \mathbf{R}_i)$.
+
+\textbf{Passi}:
+\begin{enumerate}
+    \item Calcolare i vettori linea di vista $\hat{\rho}_i$
+    \item Stima iniziale: $\rho_2 = |\mathbf{R}_2|$ (distanza Terra-Sole)
+    \item Iterare:
+    \begin{enumerate}
+        \item Calcolare $\mathbf{r}_2 = \mathbf{R}_2 + \rho_2 \hat{\rho}_2$
+        \item Calcolare $r_2 = |\mathbf{r}_2|$
+        \item Stimare i coefficienti $f, g$
+        \item Risolvere per $\mathbf{v}_2$ da $\mathbf{r}_1, \mathbf{r}_3$
+        \item Raffinare $\rho_2$ usando l'equazione scalare di Lagrange
+        \item Verificare convergenza: $|\Delta\rho_2| < 10^{-6}$ AU
+    \end{enumerate}
+    \item Restituire lo stato $(\mathbf{r}_2, \mathbf{v}_2)$ all'epoca $t_2$
+\end{enumerate}
+
+\textbf{Convergenza}: Tipicamente 5-10 iterazioni per oggetti ben osservati.
+
+\section{Implementazione}
+
+\begin{lstlisting}[language=C++,caption={Implementazione del metodo di Gauss}]
+Vector6d gauss_iod(
+    const std::array<Observation, 3>& obs,
+    const EphemerisInterface& ephemeris)
+{
+    // Estrarre tempi e vettori linea di vista
+    double t1 = obs[0].epoch;
+    double t2 = obs[1].epoch;
+    double t3 = obs[2].epoch;
+    
+    Vector3d rho_hat1 = obs[0].line_of_sight();
+    Vector3d rho_hat2 = obs[1].line_of_sight();
+    Vector3d rho_hat3 = obs[2].line_of_sight();
+    
+    // Posizioni osservatorio
+    Vector3d R1 = ephemeris.get_observer_position(obs[0]);
+    Vector3d R2 = ephemeris.get_observer_position(obs[1]);
+    Vector3d R3 = ephemeris.get_observer_position(obs[2]);
+    
+    // Intervalli temporali
+    double tau1 = t1 - t2;
+    double tau3 = t3 - t2;
+    
+    // Stima iniziale per la distanza centrale
+    double rho2 = R2.norm();
+    
+    // Raffinamento iterativo
+    for (int iter = 0; iter < 20; ++iter) {
+        Vector3d r2 = R2 + rho2 * rho_hat2;
+        double r2_mag = r2.norm();
+        
+        // Calcolare serie f,g (al 3 grado ordine)
+        double f1 = 1.0 - 0.5 * MU_SUN * tau1*tau1 / (r2_mag*r2_mag*r2_mag);
+        double f3 = 1.0 - 0.5 * MU_SUN * tau3*tau3 / (r2_mag*r2_mag*r2_mag);
+        double g1 = tau1 - MU_SUN * tau1*tau1*tau1 / (6.0 * r2_mag*r2_mag*r2_mag);
+        double g3 = tau3 - MU_SUN * tau3*tau3*tau3 / (6.0 * r2_mag*r2_mag*r2_mag);
+        
+        // Risolvere per la velocita' a t2
+        Vector3d v2 = (f3 * (R1 + rho_hat1) - f1 * (R3 + rho_hat3)) / (f1*g3 - f3*g1);
+        
+        // Migliorare rho2 usando l'equazione scalare di Lagrange
+        // (semplificato: usare stime r1, r3)
+        Vector3d r1 = r2 * f1 + v2 * g1;
+        Vector3d r3 = r2 * f3 + v3 * g3;
+        
+        double rho1_new = (r1 - R1).dot(rho_hat1);
+        double rho3_new = (r3 - R3).dot(rho_hat3);
+        double rho2_new = (r2 - R2).dot(rho_hat2);
+        
+        if (std::abs(rho2_new - rho2) < 1e-6) {
+            // Convergenza raggiunta
+            return Vector6d(r2, v2);
+        }
+        
+        rho2 = rho2_new;
+    }
+    
+    throw std::runtime_error("IOD di Gauss non convergente");
+}
+\end{lstlisting}
+
+\section{Problema dell'Arco Troppo Corto}
+
+\subsection{Sfida}
+
+Per archi osservativi brevi (ore o giorni), molte orbite si adattano ugualmente bene. L'orbita è mal vincolata in:
+\begin{itemize}
+    \item Semiasse maggiore $a$ (degenere con eccentricità)
+    \item Eccentricità $e$
+    \item Argomento del pericentro $\omega$
+\end{itemize}
+
+\textbf{Esempio}: NEA osservato per 3 ore. Potrebbe essere:
+\begin{itemize}
+    \item $a = 1.2$ AU, $e = 0.1$ (Apollo)
+    \item $a = 2.5$ AU, $e = 0.6$ (Amor)
+    \item $a = 0.8$ AU, $e = 0.3$ (Aten)
+\end{itemize}
+
+Tutte producono RA/Dec simili su arco breve!
+
+\subsection{Vincoli Aggiuntivi}
+
+Per risolvere la degenerazione:
+\begin{enumerate}
+    \item \textbf{Moto apparente}: $d\alpha/dt$, $d\delta/dt$ vincola la distanza
+    \item \textbf{Luminosità}: $H, G$ funzione di fase fornisce stima distanza
+    \item \textbf{Priori statistici}: La maggior parte dei NEA ha $0.8 < a < 2$ AU
+    \item \textbf{Osservazioni aggiuntive}: Anche +1 giorno aiuta enormemente
+\end{enumerate}
+
+\section{Metodo di Laplace}
+
+\subsection{Approccio Alternativo}
+
+Usare la velocità angolare $\dot{\alpha}, \dot{\delta}$ oltre agli angoli. Richiede temporizzazione ad alta precisione o multiple osservazioni ravvicinate.
+
+\textbf{Vantaggio}: Può funzionare con 2 osservazioni (più rate).
+
+\textbf{Svantaggio}: Sensibile agli errori di misura nelle rate.
+
+\subsection{Equazioni}
+
+Da $\mathbf{r} = \mathbf{R} + \rho\hat{\rho}$, derivare due volte:
+
+\begin{equation}
+    \ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r}
+\end{equation}
+
+Questo fornisce 3 equazioni in 3 incognite ($\rho, \dot{\rho}, \ddot{\rho}$) ad un'epoca.
+
+\section{Metodi Moderni}
+
+\subsection{Regione Ammissibile}
+
+Per archi molto corti, risolvere per tutte le orbite ammissibili che soddisfano:
+\begin{itemize}
+    \item Osservazioni
+    \item Vincoli fisici ($e < 1$ per orbite legate)
+    \item Luminosità (stima della distanza)
+\end{itemize}
+
+Produce una regione nello spazio degli elementi orbitali, non una singola soluzione.
+
+\subsection{Minimi Quadrati Vincolati}
+
+Minimizzare:
+
+\begin{equation}
+    \chi^2 = \sum_i w_i(\mathbf{o}_i - \mathbf{c}_i)^2 + \lambda P(\mathbf{e})
+\end{equation}
+
+dove $P(\mathbf{e})$ è un priore sugli elementi (es., preferire $e < 0.3$).
+
+\section{Valutazione della Qualità}
+
+\subsection{Incertezza Orbitale}
+
+Da 3 osservazioni, l'incertezza è grande:
+\begin{itemize}
+    \item Posizione all'epoca: $\sim$0.001 AU (150.000 km)
+    \item Velocità: $\sim$0.01 AU/giorno (17 km/s)
+    \item Semiasse maggiore: $\pm$0.5 AU
+\end{itemize}
+
+\textbf{L'incertezza di propagazione cresce rapidamente!} Dopo 1 mese, errore di posizione $>$1 AU.
+
+\subsection{Validazione}
+
+Verificare la qualità dell'orbita:
+\begin{enumerate}
+    \item Residui: Dovrebbero essere $<$5 arcosecondi per un buon fit
+    \item Energia: $E < 0$ per orbita legata
+    \item Pericentro: $q > 0.1$ AU (all'interno, l'orbita collide con il Sole)
+    \item Eccentricità: $0 \le e < 1$ per orbita ellittica
+\end{enumerate}
+
+\section{Esempio: Asteroide Appena Scoperto}
+
+\begin{lstlisting}[language=C++,caption={IOD da osservazioni di scoperta}]
+// Tre osservazioni da MPC
+std::vector<Observation> obs = {
+    {"2024-01-15T03:15:00Z", 185.234, +12.567, "F51"},
+    {"2024-01-15T04:30:00Z", 185.189, +12.592, "F51"},
+    {"2024-01-15T05:45:00Z", 185.144, +12.617, "F51"}
+};
+
+// Caricare effemeridi planetarie
+SpiceInterface spice;
+spice.load_kernel("de440.bsp");
+
+// Eseguire IOD di Gauss
+try {
+    Vector6d state = gauss_iod(obs, spice);
+    double epoch = obs[1].epoch;
+    
+    // Convertire in elementi orbitali
+    OrbitalElements elements = OrbitalElements::from_cartesian(state, epoch);
+    
+    std::cout << "Determinazione orbita iniziale:\n";
+    std::cout << "a = " << elements.a << " AU\n";
+    std::cout << "e = " << elements.e << "\n";
+    std::cout << "i = " << elements.i * RAD_TO_DEG << " deg\n";
+    std::cout << "Omega = " << elements.Omega * RAD_TO_DEG << " deg\n";
+    std::cout << "omega = " << elements.omega * RAD_TO_DEG << " deg\n";
+    std::cout << "M = " << elements.M * RAD_TO_DEG << " deg\n";
+    
+    // Calcolare residui
+    for (const auto& ob : obs) {
+        Vector2d predicted = predict_observation(state, ob.epoch, ob.obs_code, spice);
+        double dRA = (predicted(0) - ob.ra) * cos(ob.dec) * RAD_TO_ARCSEC;
+        double dDec = (predicted(1) - ob.dec) * RAD_TO_ARCSEC;
+        std::cout << "Residuo: " << dRA << ", " << dDec << " arcosec\n";
+    }
+    
+} catch (const std::exception& e) {
+    std::cerr << "IOD fallito: " << e.what() << "\n";
+}
+\end{lstlisting}
+
+\section{Sommario}
+
+Punti chiave sulla determinazione dell'orbita iniziale:
+
+\begin{enumerate}
+    \item Il \textbf{metodo di Gauss} usa 3 osservazioni per determinare l'orbita
+    \item I \textbf{coefficienti di Lagrange} relazionano le posizioni a tempi diversi
+    \item La \textbf{soluzione iterativa} converge tipicamente in 5-10 iterazioni
+    \item Gli \textbf{archi brevi} portano a orbite mal vincolate
+    \item \textbf{Vincoli aggiuntivi} (luminosità, priori) aiutano
+    \item Il \textbf{metodo di Laplace} usa rate angolari oltre agli angoli
+    \item I \textbf{metodi moderni} calcolano regioni ammissibili
+    \item La \textbf{validazione} controlla energia, eccentricità, residui
+\end{enumerate}
+
+L'orbita iniziale viene raffinata usando la correzione differenziale (capitolo successivo) con tutte le osservazioni disponibili.

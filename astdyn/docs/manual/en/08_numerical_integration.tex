@@ -1,0 +1,372 @@
+\chapter{Numerical Integration Methods}
+\label{ch:numerical_integration}
+
+\section{Introduction}
+
+In Chapter~\ref{ch:perturbations}, we saw that orbital motion with perturbations requires solving:
+
+\begin{equation}
+    \ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r} + \mathbf{a}_{\text{pert}}(t, \mathbf{r}, \dot{\mathbf{r}})
+\end{equation}
+
+For general perturbations, this differential equation has no closed-form solution. We must use \textbf{numerical integration} to compute the orbit step-by-step.
+
+This chapter reviews the main classes of integrators used in celestial mechanics and discusses their strengths, weaknesses, and implementation in AstDyn.
+
+\subsection{The Initial Value Problem}
+
+We seek to solve:
+\begin{equation}
+    \dot{\mathbf{y}} = \mathbf{f}(t, \mathbf{y}), \quad \mathbf{y}(t_0) = \mathbf{y}_0
+\end{equation}
+
+where $\mathbf{y} = [\mathbf{r}, \mathbf{v}]^T$ is the 6-dimensional state vector.
+
+The goal is to advance from $(t_0, \mathbf{y}_0)$ to $(t_f, \mathbf{y}_f)$ with controlled error.
+
+\section{Euler's Method}
+
+The simplest integrator is \textbf{Euler's method}:
+
+\begin{equation}
+    \mathbf{y}_{n+1} = \mathbf{y}_n + h\mathbf{f}(t_n, \mathbf{y}_n)
+\end{equation}
+
+where $h = t_{n+1} - t_n$ is the step size.
+
+\textbf{Pros}: Simple, explicit
+\textbf{Cons}: First-order accurate ($O(h^2)$ error per step), unstable for stiff problems
+
+Euler's method is rarely used in practice except for pedagogical purposes.
+
+\section{Runge-Kutta Methods}
+
+\subsection{The RK4 Method}
+
+The classic \textbf{fourth-order Runge-Kutta} (RK4) method is:
+
+\begin{align}
+    k_1 &= h\mathbf{f}(t_n, \mathbf{y}_n) \\
+    k_2 &= h\mathbf{f}(t_n + h/2, \mathbf{y}_n + k_1/2) \\
+    k_3 &= h\mathbf{f}(t_n + h/2, \mathbf{y}_n + k_2/2) \\
+    k_4 &= h\mathbf{f}(t_n + h, \mathbf{y}_n + k_3) \\
+    \mathbf{y}_{n+1} &= \mathbf{y}_n + \frac{1}{6}(k_1 + 2k_2 + 2k_3 + k_4)
+\end{align}
+
+\textbf{Pros}: Fourth-order accurate ($O(h^5)$ per step), self-starting, easy to implement
+\textbf{Cons}: Requires 4 function evaluations per step, no error estimate
+
+RK4 is widely used for moderate-accuracy problems.
+
+\subsection{Embedded Runge-Kutta Methods}
+
+For adaptive step size control, we use \textbf{embedded} methods that provide two solutions of different orders:
+
+\textbf{Runge-Kutta-Fehlberg 4(5)} (RKF45):
+\begin{itemize}
+    \item Computes 4th-order and 5th-order solutions
+    \item Error estimate: $\epsilon = |\mathbf{y}_5 - \mathbf{y}_4|$
+    \item 6 function evaluations per step
+\end{itemize}
+
+\textbf{Dormand-Prince 5(4)} (DOPRI54 or RK54):
+\begin{itemize}
+    \item Optimized coefficients for better stability
+    \item 7 function evaluations (one reused for next step)
+    \item Default in MATLAB's ode45
+\end{itemize}
+
+\textbf{Runge-Kutta 7(8)} (RK78):
+\begin{itemize}
+    \item 7th and 8th order solutions
+    \item 13 function evaluations
+    \item Best for high-accuracy requirements
+\end{itemize}
+
+\subsection{Step Size Control}
+
+Given error estimate $\epsilon$, adjust step size $h$:
+
+\begin{equation}
+    h_{\text{new}} = h_{\text{old}} \left(\frac{\text{tol}}{\epsilon}\right)^{1/(q+1)} \times \text{safety factor}
+\end{equation}
+
+where $q$ is the order and safety factor $\approx 0.9$.
+
+If $\epsilon > \text{tol}$: reject step, reduce $h$
+If $\epsilon < \text{tol}$: accept step, possibly increase $h$
+
+\section{Multistep Methods}
+
+\subsection{Adams-Bashforth-Moulton (ABM)}
+
+Multistep methods use information from previous steps. The \textbf{Adams family} is popular:
+
+\textbf{Adams-Bashforth (explicit predictor)}:
+\begin{equation}
+    \mathbf{y}_{n+1}^P = \mathbf{y}_n + h\sum_{i=0}^{k-1} \beta_i \mathbf{f}_{n-i}
+\end{equation}
+
+\textbf{Adams-Moulton (implicit corrector)}:
+\begin{equation}
+    \mathbf{y}_{n+1}^C = \mathbf{y}_n + h\sum_{i=-1}^{k-1} \beta_i^* \mathbf{f}_{n-i}
+\end{equation}
+
+The \textbf{predictor-corrector} (PC) mode evaluates:
+\begin{enumerate}
+    \item Predict $\mathbf{y}_{n+1}^P$ using Adams-Bashforth
+    \item Evaluate $\mathbf{f}_{n+1} = \mathbf{f}(t_{n+1}, \mathbf{y}_{n+1}^P)$
+    \item Correct $\mathbf{y}_{n+1}^C$ using Adams-Moulton
+\end{enumerate}
+
+\textbf{ABM12}: 12th-order Adams-Bashforth-Moulton
+\begin{itemize}
+    \item Uses 12 previous steps
+    \item Very high accuracy for smooth problems
+    \item Used by JPL for planetary ephemerides
+\end{itemize}
+
+\textbf{Pros}: High order with few function evaluations (2 per step after startup)
+\textbf{Cons}: Not self-starting, requires fixed step size (or careful variable-step algorithm)
+
+\subsection{Backward Differentiation Formulas (BDF)}
+
+For \textbf{stiff} problems (not common in orbital mechanics), BDF methods are preferred:
+
+\begin{equation}
+    \sum_{i=0}^{k} \alpha_i \mathbf{y}_{n+1-i} = h\mathbf{f}(t_{n+1}, \mathbf{y}_{n+1})
+\end{equation}
+
+These are implicit and require solving nonlinear equations at each step.
+
+\section{Symplectic Integrators}
+
+\subsection{Hamiltonian Mechanics}
+
+For conservative systems, the equations of motion can be written in Hamiltonian form:
+
+\begin{align}
+    \dot{\mathbf{q}} &= \frac{\partial H}{\partial \mathbf{p}} \\
+    \dot{\mathbf{p}} &= -\frac{\partial H}{\partial \mathbf{q}}
+\end{align}
+
+where $\mathbf{q}$ are positions, $\mathbf{p}$ are momenta, and $H$ is the Hamiltonian (total energy).
+
+\subsection{Symplectic Property}
+
+A method is \textbf{symplectic} if it preserves the symplectic structure of phase space. This ensures:
+\begin{itemize}
+    \item Energy oscillates around true value (no systematic drift)
+    \item Long-term stability
+    \item Preservation of geometrical structures (e.g., periodic orbits)
+\end{itemize}
+
+\subsection{Leapfrog Method}
+
+The simplest symplectic integrator is \textbf{leapfrog} (Verlet):
+
+\begin{align}
+    \mathbf{v}_{n+1/2} &= \mathbf{v}_n + \frac{h}{2}\mathbf{a}_n \\
+    \mathbf{r}_{n+1} &= \mathbf{r}_n + h\mathbf{v}_{n+1/2} \\
+    \mathbf{v}_{n+1} &= \mathbf{v}_{n+1/2} + \frac{h}{2}\mathbf{a}_{n+1}
+\end{align}
+
+\textbf{Pros}: Symplectic, second-order, simple
+\textbf{Cons}: Requires splitting the Hamiltonian, not suitable for velocity-dependent forces
+
+\subsection{Higher-Order Symplectic Methods}
+
+\textbf{Yoshida's method} (4th-order symplectic):
+\begin{itemize}
+    \item Composition of leapfrog steps with carefully chosen coefficients
+    \item Used in N-body simulations
+\end{itemize}
+
+\textbf{Wisdom-Holman method}:
+\begin{itemize}
+    \item Splits Hamiltonian into Keplerian + perturbation parts
+    \item Keplerian part solved analytically
+    \item Perturbations handled with kicks
+\end{itemize}
+
+Symplectic methods are ideal for long-term integrations ($10^6$-$10^9$ years) where energy conservation is critical.
+
+\section{Error Analysis}
+
+\subsection{Local vs Global Error}
+
+\textbf{Local truncation error (LTE)}: Error introduced in a single step
+
+\textbf{Global error}: Accumulated error after many steps
+
+For a method of order $p$:
+\begin{itemize}
+    \item LTE $\propto h^{p+1}$
+    \item Global error $\propto h^p$ (over fixed interval)
+\end{itemize}
+
+\subsection{Accuracy vs Efficiency Trade-off}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Order} & \textbf{Evals/step} & \textbf{Best For} \\
+\midrule
+Euler & 1 & 1 & Teaching only \\
+RK4 & 4 & 4 & Moderate accuracy \\
+RKF45 & 4(5) & 6 & General purpose \\
+DOPRI54 & 5(4) & 7 & High accuracy \\
+RK78 & 7(8) & 13 & Very high accuracy \\
+ABM12 & 12 & 2 & Smooth, high accuracy \\
+Leapfrog & 2 & 2 & Long-term, conservative \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of numerical integration methods.}
+\label{tab:integrators}
+\end{table}
+
+\subsection{Error Sources}
+
+In orbit determination, errors come from:
+
+\begin{enumerate}
+    \item \textbf{Truncation error}: Finite step size
+    \item \textbf{Roundoff error}: Finite precision arithmetic
+    \item \textbf{Force model error}: Incomplete or inaccurate perturbations
+    \item \textbf{Ephemeris error}: Planetary position uncertainties
+\end{enumerate}
+
+For high-precision work, all sources must be controlled.
+
+\section{Practical Considerations}
+
+\subsection{Choosing an Integrator}
+
+\textbf{For orbit determination (days to years)}:
+\begin{itemize}
+    \item DOPRI54 with adaptive step size
+    \item Tolerance: $10^{-12}$ to $10^{-14}$
+\end{itemize}
+
+\textbf{For long-term evolution (millions of years)}:
+\begin{itemize}
+    \item Wisdom-Holman or Yoshida symplectic
+    \item Fixed step size (0.1-1 day)
+\end{itemize}
+
+\textbf{For real-time applications}:
+\begin{itemize}
+    \item RK4 with fixed step size
+    \item Precompute step size for stability
+\end{itemize}
+
+\subsection{Step Size Selection}
+
+Rule of thumb: $h \approx 0.01 \times T_{\text{orbit}}$
+
+For asteroid at 2.5 AU:
+\begin{itemize}
+    \item Period $T \approx 4$ years = 1461 days
+    \item Good step size: $h \approx 10$-15 days
+\end{itemize}
+
+Adaptive methods automatically adjust $h$ based on local behavior.
+
+\subsection{Initial Step Size}
+
+For adaptive methods, initial step size estimate:
+
+\begin{equation}
+    h_0 = 0.01 \times \min\left(\frac{|\mathbf{r}|}{|\dot{\mathbf{r}}|}, \frac{|\dot{\mathbf{r}}|}{|\ddot{\mathbf{r}}|}\right)
+\end{equation}
+
+This prevents taking too large a first step.
+
+\section{AstDyn Implementation}
+
+AstDyn provides multiple integrators:
+
+\begin{lstlisting}[language=C++,caption={Using integrators in AstDyn}]
+#include <astdyn/integration/Integrator.hpp>
+#include <astdyn/integration/RK4.hpp>
+#include <astdyn/integration/DOPRI54.hpp>
+
+using namespace astdyn;
+
+// Define the ODE system
+auto ode = [](double t, const Vector6d& y) -> Vector6d {
+    Vector3d r = y.head<3>();
+    Vector3d v = y.tail<3>();
+    Vector3d a = -MU_SUN * r / pow(r.norm(), 3);
+    
+    Vector6d dydt;
+    dydt << v, a;
+    return dydt;
+};
+
+// Initial state
+Vector6d y0;
+y0 << 1.0, 0.0, 0.0,  // position (AU)
+      0.0, 6.28, 0.0;  // velocity (AU/day)
+
+double t0 = 0.0;
+double tf = 365.25;  // 1 year
+
+// Option 1: Fixed-step RK4
+RK4Integrator<Vector6d> rk4;
+double h = 1.0;  // 1-day steps
+auto result_rk4 = rk4.integrate(ode, t0, y0, tf, h);
+
+// Option 2: Adaptive DOPRI54
+DOPRI54Integrator<Vector6d> dopri;
+dopri.set_tolerance(1e-12);
+auto result_dopri = dopri.integrate(ode, t0, y0, tf);
+
+std::cout << "Final position (RK4):    " 
+          << result_rk4.transpose() << "\n";
+std::cout << "Final position (DOPRI):  " 
+          << result_dopri.transpose() << "\n";
+\end{lstlisting}
+
+\subsection{Custom Integrators}
+
+Users can implement custom integrators by inheriting from \texttt{IntegratorBase}:
+
+\begin{lstlisting}[language=C++,caption={Custom integrator interface}]
+template<typename StateType>
+class CustomIntegrator : public IntegratorBase<StateType> {
+public:
+    StateType integrate(
+        const ODEFunction<StateType>& f,
+        double t0,
+        const StateType& y0,
+        double tf
+    ) override {
+        // Implementation here
+    }
+};
+\end{lstlisting}
+
+\section{Summary}
+
+Key concepts about numerical integration:
+
+\begin{enumerate}
+    \item \textbf{Runge-Kutta methods} are versatile and self-starting
+    \item \textbf{Adaptive step size} (RKF45, DOPRI54) provides automatic error control
+    \item \textbf{Multistep methods} (ABM) are efficient for smooth problems
+    \item \textbf{Symplectic integrators} preserve energy for long-term simulations
+    \item \textbf{Trade-offs} exist between accuracy, efficiency, and stability
+    \item \textbf{Step size} should be chosen based on orbital period and accuracy requirements
+\end{enumerate}
+
+Understanding numerical integration is essential for:
+\begin{itemize}
+    \item Accurate orbit propagation
+    \item Balancing computational cost and precision
+    \item Avoiding numerical artifacts
+    \item Validating results against analytical solutions
+\end{itemize}
+
+In the next chapter, we will apply these integration methods to practical orbit propagation problems.

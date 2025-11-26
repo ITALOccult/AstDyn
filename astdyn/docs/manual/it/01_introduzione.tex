@@ -1,0 +1,285 @@
+\chapter{Introduzione}
+\label{ch:introduction}
+
+\section{Cos'è la Meccanica Celeste?}
+
+La meccanica celeste è il ramo dell'astronomia che studia i moti dei corpi celesti sotto l'influenza delle forze gravitazionali. Fornisce il quadro matematico e fisico per comprendere:
+
+\begin{itemize}
+    \item Le orbite di pianeti, lune, asteroidi e comete
+    \item La progettazione di traiettorie spaziali e l'analisi di missioni
+    \item La stabilità a lungo termine del sistema solare
+    \item Gli effetti mareali e la dinamica rotazionale
+    \item La formazione ed evoluzione dei sistemi planetari
+\end{itemize}
+
+Il campo ha una storia illustre, che inizia con le leggi empiriche del moto planetario di Johannes Kepler (1609-1619) e la legge di gravitazione universale di Isaac Newton (1687). Newton dimostrò che le leggi di Kepler potevano essere derivate da principi fisici fondamentali, segnando la nascita della meccanica celeste teorica.
+
+\subsection{Il Problema dei Due Corpi}
+
+La pietra angolare della meccanica celeste è il \textit{problema dei due corpi}: determinare il moto di due masse puntiformi che interagiscono esclusivamente attraverso l'attrazione gravitazionale reciproca. Questo problema ha un'elegante soluzione analitica, espressa in termini di sei \textit{elementi orbitali} che specificano completamente l'orbita.
+
+Consideriamo due corpi con masse $m_1$ e $m_2$, separati da una distanza $r$. La legge di gravitazione di Newton afferma:
+
+\begin{equation}
+F = G\frac{m_1 m_2}{r^2}
+\end{equation}
+
+dove $G = 6.67430 \times 10^{-11}$ m$^3$ kg$^{-1}$ s$^{-2}$ è la costante gravitazionale.
+
+Per un corpo piccolo di massa $m$ che orbita attorno a un corpo molto più grande di massa $M$ (come un asteroide che orbita attorno al Sole), possiamo approssimare il sistema come un problema a un corpo con il corpo massiccio all'origine. L'equazione del moto diventa:
+
+\begin{equation}
+\ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r}
+\end{equation}
+
+dove $\mu = GM$ è il parametro gravitazionale e $\mathbf{r}$ è il vettore posizione del corpo piccolo.
+
+\subsection{Il Problema degli N Corpi}
+
+In realtà, i corpi celesti esistono in sistemi con molteplici oggetti gravitanti. Il sistema solare, per esempio, contiene il Sole, otto pianeti maggiori, numerose lune, asteroidi e comete—tutti che esercitano forze gravitazionali gli uni sugli altri. Questo è il \textit{problema degli N corpi}.
+
+A differenza del problema dei due corpi, il problema degli N corpi non ha una soluzione analitica generale per $N \geq 3$. Invece, dobbiamo ricorrere a:
+
+\begin{enumerate}
+    \item \textbf{Teoria delle perturbazioni}: Trattare le forze aggiuntive come piccole correzioni a una soluzione a due corpi
+    \item \textbf{Integrazione numerica}: Calcolare le orbite passo dopo passo usando i computer
+    \item \textbf{Soluzioni speciali}: Risultati analitici per casi ristretti (es. punti di Lagrange)
+\end{enumerate}
+
+La libreria AstDyn implementa tutti e tre gli approcci, con enfasi sulla teoria delle perturbazioni e sull'integrazione numerica ad alta precisione.
+
+\section{Panoramica della Libreria AstDyn}
+
+\subsection{Filosofia di Progettazione}
+
+La libreria AstDyn è costruita su diversi principi fondamentali:
+
+\begin{description}
+    \item[Accuratezza] I metodi numerici sono scelti e calibrati per alta precisione, validati contro software consolidati
+    \item[Modularità] I componenti sono debolmente accoppiati, permettendo agli utenti di impiegare solo le funzionalità necessarie
+    \item[Chiarezza] Il codice è documentato con riferimenti a formulazioni matematiche e letteratura
+    \item[Prestazioni] Gli algoritmi sono ottimizzati usando caratteristiche moderne di C++ senza sacrificare la leggibilità
+    \item[Estensibilità] L'architettura supporta l'aggiunta di nuovi integratori, modelli di forza e tipi di osservazione
+\end{description}
+
+\subsection{Caratteristiche Principali}
+
+La libreria fornisce:
+
+\begin{itemize}
+    \item \textbf{Sistemi temporali}: Conversioni tra UTC, TAI, TT, TDB con modelli accurati di $\Delta T$
+    \item \textbf{Sistemi di coordinate}: Trasformazioni tra sistemi eclittico, equatoriale e planetario
+    \item \textbf{Elementi orbitali}: Rappresentazioni kepleriane, cartesiane, equinoziali e di Delaunay
+    \item \textbf{Integrazione numerica}: Runge-Kutta, Adams-Bashforth-Moulton e metodi adattativi
+    \item \textbf{Modelli di forza}: Gravitazione a N corpi, perturbazioni asteroidali, effetti relativistici
+    \item \textbf{Propagazione orbitale}: Integrazione avanti/indietro con matrice di transizione di stato
+    \item \textbf{Determinazione dell'orbita iniziale}: Metodo di Gauss per tre osservazioni
+    \item \textbf{Correzione differenziale}: Adattamento dell'orbita ai minimi quadrati alle osservazioni astrometriche
+    \item \textbf{Effemeridi}: Posizioni planetarie usando VSOP87 e DE440/441
+    \item \textbf{I/O dati}: Parser per OrbFit (.eq1, .rwo), MPC e formati personalizzati
+\end{itemize}
+
+\subsection{Architettura Software}
+
+La Figura~\ref{fig:architecture} illustra l'architettura di alto livello:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm,
+    box/.style={rectangle, draw, fill=blue!10, text width=3cm, align=center, rounded corners, minimum height=1cm},
+    arrow/.style={->, >=stealth, thick}
+]
+    % Top layer
+    \node[box] (engine) {AstDynEngine\\{\small API di alto livello}};
+    
+    % Second layer
+    \node[box, below left=of engine] (prop) {Propagazione};
+    \node[box, below right=of engine] (od) {Determinazione\\Orbita};
+    
+    % Third layer
+    \node[box, below=of prop] (integrator) {Integrazione\\Numerica};
+    \node[box, below=of od] (obs) {Osservazioni\\\& Residui};
+    
+    % Fourth layer
+    \node[box, below=of integrator] (coord) {Coordinate\\\& Tempo};
+    \node[box, below=of obs] (io) {I/O Dati\\Parser};
+    
+    % Bottom layer
+    \node[box, below=2cm of coord] (math) {Matematica \& Algebra Lineare\\{\small Eigen3}};
+    
+    % Arrows
+    \draw[arrow] (engine) -- (prop);
+    \draw[arrow] (engine) -- (od);
+    \draw[arrow] (prop) -- (integrator);
+    \draw[arrow] (od) -- (obs);
+    \draw[arrow] (integrator) -- (coord);
+    \draw[arrow] (obs) -- (io);
+    \draw[arrow] (prop) -- (coord);
+    \draw[arrow] (od) -- (coord);
+    \draw[arrow] (integrator) -- (math);
+    \draw[arrow] (obs) -- (math);
+\end{tikzpicture}
+\caption{Architettura della libreria AstDyn con design stratificato}
+\label{fig:architecture}
+\end{figure}
+
+L'architettura segue un design stratificato:
+
+\begin{enumerate}
+    \item \textbf{Livello fondamentale}: Utilità matematiche e algebra lineare (Eigen3)
+    \item \textbf{Livello core}: Sistemi temporali, trasformazioni di coordinate, elementi orbitali
+    \item \textbf{Livello algoritmico}: Integrazione numerica, gestione osservazioni
+    \item \textbf{Livello applicativo}: Propagazione orbitale, determinazione orbita
+    \item \textbf{Livello interfaccia}: API di alto livello (AstDynEngine), parser dati
+\end{enumerate}
+
+\subsection{Dipendenze}
+
+AstDyn si basa su librerie consolidate:
+
+\begin{description}
+    \item[Eigen3] Operazioni di algebra lineare (matrici, vettori, decomposizioni)
+    \item[Boost] Filesystem, date-time, opzioni programma
+    \item[GoogleTest] Framework per unit testing (opzionale)
+\end{description}
+
+Tutte le dipendenze sono ampiamente disponibili e attivamente mantenute.
+
+\section{Applicazioni}
+
+La libreria AstDyn supporta varie applicazioni:
+
+\subsection{Determinazione di Orbite Asteroidali}
+
+Date osservazioni astrometriche (ascensione retta e declinazione) di un asteroide da telescopi terrestri, determinare la sua orbita eliocentrica. Questo è cruciale per:
+
+\begin{itemize}
+    \item Prevedere posizioni future per campagne osservative
+    \item Valutare il rischio di collisione con la Terra
+    \item Pianificare missioni spaziali
+    \item Comprendere popolazioni e dinamica degli asteroidi
+\end{itemize}
+
+Esempio: Il Capitolo~\ref{ch:case_studies} presenta un'analisi completa dell'asteroide 203 Pompeja utilizzando 100 osservazioni recenti, ottenendo residui RMS di 0.66 arcosecondi.
+
+\subsection{Analisi di Traiettorie Spaziali}
+
+Progettare e analizzare traiettorie spaziali per:
+
+\begin{itemize}
+    \item Trasferimenti interplanetari
+    \item Manovre orbitali
+    \item Operazioni di station-keeping
+    \item Analisi di avvicinamenti ravvicinati
+\end{itemize}
+
+La propagazione ad alta precisione della libreria e la capacità di calcolare matrici di transizione di stato la rendono adatta per la progettazione preliminare di missioni.
+
+\subsection{Evoluzione Orbitale a Lungo Termine}
+
+Studiare il comportamento a lungo termine dei corpi minori sotto perturbazioni planetarie:
+
+\begin{itemize}
+    \item Evoluzione secolare degli elementi orbitali
+    \item Identificazione di risonanze
+    \item Analisi di caos e stabilità
+    \item Stima della probabilità di impatto
+\end{itemize}
+
+\subsection{Strumento Educativo}
+
+La libreria serve come risorsa educativa per studenti che apprendono:
+
+\begin{itemize}
+    \item Implementazione pratica di algoritmi da manuale
+    \item Metodi numerici in astrodinamica
+    \item Ingegneria del software per calcolo scientifico
+    \item Tecniche moderne di programmazione C++
+\end{itemize}
+
+\section{Validazione e Accuratezza}
+
+Un punto di forza chiave di AstDyn è la rigorosa validazione contro software consolidati:
+
+\begin{itemize}
+    \item \textbf{OrbFit}: Il confronto dei risultati di determinazione orbitale per l'asteroide 203 Pompeja mostra un accordo di $\Delta a = 578$ km, $\Delta e = 0.0006$, $\Delta i = 5''$
+    \item \textbf{JPL Horizons}: I confronti di effemeridi validano i modelli di perturbazione planetaria
+    \item \textbf{Soluzioni analitiche}: La propagazione a due corpi è testata contro le formule kepleriane
+\end{itemize}
+
+Studi di validazione dettagliati sono presentati nel Capitolo~\ref{ch:validation}.
+
+\section{Per Iniziare}
+
+\subsection{Installazione}
+
+La libreria può essere compilata usando CMake:
+
+\begin{lstlisting}[style=cpp,caption={Compilazione di AstDyn}]
+git clone https://github.com/manvalan/ITALOccultLibrary.git
+cd ITALOccultLibrary/astdyn
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j8
+\end{lstlisting}
+
+Questo produce:
+\begin{itemize}
+    \item \texttt{libastdyn.a} (libreria statica, 1.5 MB, 1232 simboli)
+    \item \texttt{libastdyn.dylib} (libreria condivisa, 877 KB)
+\end{itemize}
+
+\subsection{Esempio Rapido}
+
+Un esempio minimale di propagazione orbitale:
+
+\begin{lstlisting}[style=cpp,caption={Propagazione orbitale di base}]
+#include <astdyn/AstDyn.hpp>
+using namespace astdyn;
+
+int main() {
+    // Definire elementi orbitali (asteroide in AU, radianti)
+    propagation::KeplerianElements orbit;
+    orbit.epoch = 61000.0;  // MJD TDB
+    orbit.a = 2.7;          // semiasse maggiore (AU)
+    orbit.e = 0.15;         // eccentricita
+    orbit.i = 10.0 * constants::DEG_TO_RAD;
+    orbit.Omega = 80.0 * constants::DEG_TO_RAD;
+    orbit.omega = 73.0 * constants::DEG_TO_RAD;
+    orbit.M = 45.0 * constants::DEG_TO_RAD;
+    orbit.gm = constants::GMS;  // GM del Sole
+    
+    // Creare propagatore
+    propagation::Propagator prop;
+    
+    // Propagare 1 anno in avanti
+    double target_mjd = orbit.epoch + 365.25;
+    auto result = prop.propagate_keplerian(orbit, target_mjd);
+    
+    // Stampare risultati
+    std::cout << "Posizione: " << result.position.transpose() << " AU\n";
+    std::cout << "Velocita: " << result.velocity.transpose() << " AU/giorno\n";
+    
+    return 0;
+}
+\end{lstlisting}
+
+Esempi più completi sono forniti nel Capitolo~\ref{ch:examples}.
+
+\section{Organizzazione dei Capitoli Rimanenti}
+
+Il resto di questo manuale è organizzato come segue:
+
+\textbf{Capitoli 2-7} (Parte I) stabiliscono le fondamenta teoriche: sistemi temporali, coordinate, elementi orbitali, dinamica a due corpi e perturbazioni.
+
+\textbf{Capitoli 8-11} (Parte II) descrivono metodi numerici: algoritmi di integrazione, propagazione, matrici di transizione di stato e calcolo di effemeridi.
+
+\textbf{Capitoli 12-15} (Parte III) coprono la determinazione orbitale: modelli di osservazione, determinazione dell'orbita iniziale, correzione differenziale e analisi dei residui.
+
+\textbf{Capitoli 16-20} (Parte IV) documentano l'implementazione della libreria: architettura, moduli core, parser, riferimento API ed esempi.
+
+\textbf{Capitoli 21-23} (Parte V) presentano studi di validazione, applicazioni del mondo reale e benchmark delle prestazioni.
+
+Ogni capitolo include derivazioni matematiche, note di implementazione ed esempi di codice funzionanti per collegare teoria e pratica.

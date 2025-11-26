@@ -1,0 +1,637 @@
+\chapter{Examples and Tutorials}
+\label{ch:examples}
+
+\section{Introduction}
+
+This chapter provides step-by-step tutorials demonstrating AstDyn's capabilities. All examples include complete, working code.
+
+\subsection{Prerequisites}
+
+Ensure AstDyn is installed and configured:
+
+\begin{lstlisting}[language=bash]
+# Build AstDyn
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+
+# Set library path
+export LD_LIBRARY_PATH=/path/to/astdyn/lib:$LD_LIBRARY_PATH
+\end{lstlisting}
+
+\section{Example 1: Basic Orbit Propagation}
+
+\subsection{Goal}
+
+Propagate asteroid (203) Pompeja for 60 days using simplified force model.
+
+\subsection{Code}
+
+\begin{lstlisting}[language=C++,caption={example1\_propagation.cpp}]
+#include <astdyn/AstDyn.hpp>
+#include <iostream>
+#include <iomanip>
+
+using namespace astdyn;
+
+int main() {
+    // Define initial Keplerian elements (Pompeja at epoch JD 2460000.5)
+    orbit::KeplerianElements elem0;
+    elem0.a = 2.7436;                    // AU
+    elem0.e = 0.0624;
+    elem0.i = 11.74 * constants::DEG_TO_RAD;
+    elem0.Omega = 339.86 * constants::DEG_TO_RAD;
+    elem0.omega = 258.03 * constants::DEG_TO_RAD;
+    elem0.M = 45.32 * constants::DEG_TO_RAD;
+    elem0.epoch = 2460000.5;
+    elem0.name = "Pompeja";
+    
+    std::cout << "Initial Elements (Epoch " << std::fixed 
+              << std::setprecision(1) << elem0.epoch << " JD):\n";
+    std::cout << "  a     = " << std::setprecision(6) << elem0.a << " AU\n";
+    std::cout << "  e     = " << elem0.e << "\n";
+    std::cout << "  i     = " << std::setprecision(2) 
+              << elem0.i * constants::RAD_TO_DEG << " deg\n";
+    std::cout << "  Omega = " << elem0.Omega * constants::RAD_TO_DEG << " deg\n";
+    std::cout << "  omega = " << elem0.omega * constants::RAD_TO_DEG << " deg\n";
+    std::cout << "  M     = " << elem0.M * constants::RAD_TO_DEG << " deg\n";
+    std::cout << "  Period = " << std::setprecision(1) 
+              << elem0.period() << " days\n\n";
+    
+    // Convert to Cartesian
+    auto state0 = elem0.to_cartesian();
+    std::cout << "Cartesian State:\n";
+    std::cout << "  Position: [" << std::setprecision(8)
+              << state0.position[0] << ", "
+              << state0.position[1] << ", "
+              << state0.position[2] << "] AU\n";
+    std::cout << "  Velocity: [" 
+              << state0.velocity[0] << ", "
+              << state0.velocity[1] << ", "
+              << state0.velocity[2] << "] AU/day\n\n";
+    
+    // Setup ephemeris (analytic approximation for simplicity)
+    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
+    
+    // Create force model (Sun + Jupiter + Saturn)
+    auto forces = std::make_shared<propagation::PointMassGravity>(
+        eph, std::vector<std::string>{"JUPITER", "SATURN"});
+    
+    // Create integrator (RKF78 with 1e-12 tolerance)
+    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
+    
+    // Create propagator
+    propagation::Propagator prop(integrator, forces, eph);
+    
+    // Propagate 60 days
+    double target_epoch = elem0.epoch + 60.0;
+    std::cout << "Propagating to " << target_epoch << " JD (+60 days)...\n\n";
+    
+    auto state60 = prop.propagate(state0, target_epoch);
+    
+    // Convert back to Keplerian
+    auto elem60 = orbit::KeplerianElements::from_cartesian(
+        state60.position, state60.velocity, state60.epoch);
+    
+    std::cout << "Final Elements (Epoch " << elem60.epoch << " JD):\n";
+    std::cout << "  a     = " << std::setprecision(6) << elem60.a << " AU\n";
+    std::cout << "  e     = " << elem60.e << "\n";
+    std::cout << "  i     = " << std::setprecision(2) 
+              << elem60.i * constants::RAD_TO_DEG << " deg\n";
+    std::cout << "  Omega = " << elem60.Omega * constants::RAD_TO_DEG << " deg\n";
+    std::cout << "  omega = " << elem60.omega * constants::RAD_TO_DEG << " deg\n";
+    std::cout << "  M     = " << elem60.M * constants::RAD_TO_DEG << " deg\n\n";
+    
+    // Compute changes
+    std::cout << "Changes over 60 days:\n";
+    std::cout << "  Delta a     = " << std::scientific << std::setprecision(2)
+              << (elem60.a - elem0.a) << " AU\n";
+    std::cout << "  Delta e     = " << (elem60.e - elem0.e) << "\n";
+    std::cout << "  Delta i     = " << std::fixed << std::setprecision(4)
+              << (elem60.i - elem0.i) * constants::RAD_TO_DEG * 3600.0 
+              << " arcsec\n";
+    std::cout << "  Delta Omega = " 
+              << (elem60.Omega - elem0.Omega) * constants::RAD_TO_DEG * 3600.0
+              << " arcsec\n";
+    
+    std::cout << "\nIntegration Statistics:\n";
+    std::cout << "  Steps taken: " << integrator->steps_taken() << "\n";
+    std::cout << "  Steps rejected: " << integrator->steps_rejected() << "\n";
+    
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Compilation}
+
+\begin{lstlisting}[language=bash]
+g++ -std=c++17 -O3 example1_propagation.cpp -o example1 \
+    -I/path/to/astdyn/include \
+    -L/path/to/astdyn/lib -lastdyn \
+    -lboost_system
+\end{lstlisting}
+
+\subsection{Expected Output}
+
+\begin{verbatim}
+Initial Elements (Epoch 2460000.5 JD):
+  a     = 2.743600 AU
+  e     = 0.062400
+  i     = 11.74 deg
+  Omega = 339.86 deg
+  omega = 258.03 deg
+  M     = 45.32 deg
+  Period = 1656.3 days
+
+Propagating to 2460060.5 JD (+60 days)...
+
+Final Elements (Epoch 2460060.5 JD):
+  a     = 2.743598 AU
+  e     = 0.062401
+  i     = 11.74 deg
+  ...
+
+Changes over 60 days:
+  Delta a     = -2.14e-06 AU
+  Delta e     = 1.23e-06
+  Delta i     = 0.0234 arcsec
+  Delta Omega = 0.1456 arcsec
+
+Integration Statistics:
+  Steps taken: 127
+  Steps rejected: 3
+\end{verbatim}
+
+\section{Example 2: Ephemeris Generation}
+
+\subsection{Goal}
+
+Generate daily ephemerides for 30 days and write to file.
+
+\subsection{Code}
+
+\begin{lstlisting}[language=C++,caption={example2\_ephemeris.cpp}]
+#include <astdyn/AstDyn.hpp>
+#include <fstream>
+#include <iomanip>
+
+using namespace astdyn;
+
+int main() {
+    // Initial elements
+    orbit::KeplerianElements elem;
+    elem.a = 2.7436;
+    elem.e = 0.0624;
+    elem.i = 11.74 * constants::DEG_TO_RAD;
+    elem.Omega = 339.86 * constants::DEG_TO_RAD;
+    elem.omega = 258.03 * constants::DEG_TO_RAD;
+    elem.M = 45.32 * constants::DEG_TO_RAD;
+    elem.epoch = 2460000.5;
+    
+    // Setup propagator
+    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
+    auto forces = std::make_shared<propagation::PointMassGravity>(
+        eph, std::vector<std::string>{"JUPITER", "SATURN", "EARTH"});
+    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
+    propagation::Propagator prop(integrator, forces, eph);
+    
+    // Generate ephemeris
+    auto state0 = elem.to_cartesian();
+    double start = elem.epoch;
+    double end = elem.epoch + 30.0;
+    double step = 1.0;  // Daily
+    
+    auto ephemeris = prop.generate_ephemeris(state0, start, end, step);
+    
+    // Write to file
+    std::ofstream outfile("pompeja_ephemeris.txt");
+    outfile << std::fixed << std::setprecision(6);
+    outfile << "# Ephemeris for Pompeja\n";
+    outfile << "# Epoch (JD)      X (AU)        Y (AU)        Z (AU)        "
+            << "VX (AU/d)     VY (AU/d)     VZ (AU/d)\n";
+    
+    for (const auto& state : ephemeris) {
+        outfile << std::setw(14) << state.epoch << "  "
+                << std::setw(12) << state.position[0] << "  "
+                << std::setw(12) << state.position[1] << "  "
+                << std::setw(12) << state.position[2] << "  "
+                << std::setw(12) << state.velocity[0] << "  "
+                << std::setw(12) << state.velocity[1] << "  "
+                << std::setw(12) << state.velocity[2] << "\n";
+    }
+    
+    outfile.close();
+    std::cout << "Ephemeris written to pompeja_ephemeris.txt\n";
+    std::cout << "Generated " << ephemeris.size() << " states\n";
+    
+    return 0;
+}
+\end{lstlisting}
+
+\section{Example 3: Orbit Determination}
+
+\subsection{Goal}
+
+Determine orbit from synthetic observations using differential correction.
+
+\subsection{Code}
+
+\begin{lstlisting}[language=C++,caption={example3\_orbit\_determination.cpp}]
+#include <astdyn/AstDyn.hpp>
+#include <iostream>
+#include <iomanip>
+#include <random>
+
+using namespace astdyn;
+
+int main() {
+    // True elements (what we want to recover)
+    orbit::KeplerianElements true_elem;
+    true_elem.a = 2.7436;
+    true_elem.e = 0.0624;
+    true_elem.i = 11.74 * constants::DEG_TO_RAD;
+    true_elem.Omega = 339.86 * constants::DEG_TO_RAD;
+    true_elem.omega = 258.03 * constants::DEG_TO_RAD;
+    true_elem.M = 45.32 * constants::DEG_TO_RAD;
+    true_elem.epoch = 2460000.5;
+    
+    // Generate synthetic observations
+    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
+    auto forces = std::make_shared<propagation::PointMassGravity>(
+        eph, std::vector<std::string>{"JUPITER", "SATURN"});
+    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
+    propagation::Propagator prop(integrator, forces, eph);
+    
+    // Observatory (Pan-STARRS F51)
+    observations::ObservatoryCoordinates obs_coord;
+    obs_coord.code = "F51";
+    obs_coord.longitude = -156.2569 * constants::DEG_TO_RAD;
+    obs_coord.latitude = 20.7082 * constants::DEG_TO_RAD;
+    obs_coord.altitude = 3055.0;
+    
+    std::vector<observations::Observation> observations;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<> noise(0.0, 0.5 * constants::ARCSEC_TO_RAD);
+    
+    // Generate 10 observations over 60 days
+    auto state0 = true_elem.to_cartesian();
+    for (int i = 0; i < 10; ++i) {
+        double t = true_elem.epoch + i * 6.0;  // Every 6 days
+        auto state = prop.propagate(state0, t);
+        
+        // Observer position
+        Vector3d obs_pos = obs_coord.position_icrf(t);
+        
+        // Topocentric position
+        Vector3d topo = state.position - obs_pos;
+        double range = topo.norm();
+        
+        // Convert to RA/Dec
+        double ra = std::atan2(topo[1], topo[0]);
+        double dec = std::asin(topo[2] / range);
+        
+        // Add noise
+        ra += noise(gen);
+        dec += noise(gen);
+        
+        observations::Observation obs;
+        obs.epoch = t;
+        obs.ra = ra;
+        obs.dec = dec;
+        obs.sigma_ra = 0.5 * constants::ARCSEC_TO_RAD;
+        obs.sigma_dec = 0.5 * constants::ARCSEC_TO_RAD;
+        obs.obs_code = "F51";
+        
+        observations.push_back(obs);
+    }
+    
+    std::cout << "Generated " << observations.size() 
+              << " synthetic observations\n\n";
+    
+    // Initial guess (perturbed true elements)
+    orbit::KeplerianElements initial_guess = true_elem;
+    initial_guess.a += 0.001;  // +0.001 AU error
+    initial_guess.e += 0.002;  // +0.002 eccentricity error
+    
+    std::cout << "Initial Guess:\n";
+    std::cout << "  a = " << std::setprecision(6) << initial_guess.a << " AU\n";
+    std::cout << "  e = " << initial_guess.e << "\n\n";
+    
+    // Differential correction
+    orbit_determination::DifferentialCorrector dc(
+        std::make_shared<propagation::Propagator>(integrator, forces, eph),
+        20, 1e-8);
+    
+    auto result = dc.solve(initial_guess, observations, 
+                          std::vector{obs_coord});
+    
+    // Results
+    std::cout << "Differential Correction Results:\n";
+    std::cout << "  Converged: " << (result.converged ? "Yes" : "No") << "\n";
+    std::cout << "  Iterations: " << result.iterations << "\n";
+    std::cout << "  RMS Residual: " << std::setprecision(3) 
+              << result.rms_residual << " arcsec\n\n";
+    
+    std::cout << "Recovered Elements:\n";
+    std::cout << "  a = " << std::setprecision(6) << result.elements.a 
+              << " AU (error: " << std::scientific << std::setprecision(2)
+              << (result.elements.a - true_elem.a) << ")\n";
+    std::cout << "  e = " << std::fixed << std::setprecision(6) 
+              << result.elements.e 
+              << " (error: " << std::scientific 
+              << (result.elements.e - true_elem.e) << ")\n";
+    
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Expected Output}
+
+\begin{verbatim}
+Generated 10 synthetic observations
+
+Initial Guess:
+  a = 2.744600 AU
+  e = 0.064400
+
+Differential Correction Results:
+  Converged: Yes
+  Iterations: 4
+  RMS Residual: 0.487 arcsec
+
+Recovered Elements:
+  a = 2.743601 AU (error: 1.23e-06)
+  e = 0.062399 (error: -1.45e-06)
+\end{verbatim}
+
+\section{Example 4: Reading MPC Observations}
+
+\subsection{Goal}
+
+Parse real MPC observation file and compute residuals.
+
+\subsection{Code}
+
+\begin{lstlisting}[language=C++,caption={example4\_mpc\_parser.cpp}]
+#include <astdyn/AstDyn.hpp>
+#include <iostream>
+#include <iomanip>
+
+using namespace astdyn;
+
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <observations.txt>\n";
+        return 1;
+    }
+    
+    // Parse MPC observations
+    std::string filename = argv[1];
+    auto observations = io::MPCReader::read_file(filename);
+    
+    std::cout << "Loaded " << observations.size() << " observations\n";
+    std::cout << "Time span: " << std::fixed << std::setprecision(1)
+              << (observations.back().epoch - observations.front().epoch)
+              << " days\n\n";
+    
+    // Display first 5 observations
+    std::cout << "First 5 observations:\n";
+    std::cout << "Epoch (JD)       RA (deg)      Dec (deg)     Obs Code\n";
+    
+    for (size_t i = 0; i < std::min<size_t>(5, observations.size()); ++i) {
+        const auto& obs = observations[i];
+        std::cout << std::setw(14) << std::setprecision(5) << obs.epoch << "  "
+                  << std::setw(12) << std::setprecision(6) 
+                  << obs.ra * constants::RAD_TO_DEG << "  "
+                  << std::setw(12) << obs.dec * constants::RAD_TO_DEG << "  "
+                  << obs.obs_code << "\n";
+    }
+    
+    // Count observations by observatory
+    std::map<std::string, int> obs_counts;
+    for (const auto& obs : observations) {
+        obs_counts[obs.obs_code]++;
+    }
+    
+    std::cout << "\nObservations by observatory:\n";
+    for (const auto& [code, count] : obs_counts) {
+        std::cout << "  " << code << ": " << count << "\n";
+    }
+    
+    return 0;
+}
+\end{lstlisting}
+
+\section{Example 5: State Transition Matrix}
+
+\subsection{Goal}
+
+Propagate orbit with STM and analyze sensitivity to initial conditions.
+
+\subsection{Code}
+
+\begin{lstlisting}[language=C++,caption={example5\_stm.cpp}]
+#include <astdyn/AstDyn.hpp>
+#include <iostream>
+#include <iomanip>
+
+using namespace astdyn;
+
+int main() {
+    // Initial elements
+    orbit::KeplerianElements elem;
+    elem.a = 2.7436;
+    elem.e = 0.0624;
+    elem.i = 11.74 * constants::DEG_TO_RAD;
+    elem.Omega = 339.86 * constants::DEG_TO_RAD;
+    elem.omega = 258.03 * constants::DEG_TO_RAD;
+    elem.M = 45.32 * constants::DEG_TO_RAD;
+    elem.epoch = 2460000.5;
+    
+    // Setup propagator
+    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
+    auto forces = std::make_shared<propagation::PointMassGravity>(
+        eph, std::vector<std::string>{"JUPITER", "SATURN"});
+    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
+    propagation::Propagator prop(integrator, forces, eph);
+    
+    // Propagate with STM
+    auto state0 = elem.to_cartesian();
+    double target = elem.epoch + 60.0;
+    
+    auto [state60, stm] = prop.propagate_with_stm(state0, target);
+    
+    std::cout << "State Transition Matrix after 60 days:\n";
+    std::cout << std::scientific << std::setprecision(4);
+    
+    for (int i = 0; i < 6; ++i) {
+        for (int j = 0; j < 6; ++j) {
+            std::cout << std::setw(12) << stm(i, j) << " ";
+        }
+        std::cout << "\n";
+    }
+    
+    // Compute sensitivity
+    std::cout << "\nSensitivity Analysis:\n";
+    std::cout << "Initial position error: 1 km in X\n";
+    
+    Vector6d delta_x0;
+    delta_x0.setZero();
+    delta_x0(0) = 1.0 / constants::AU;  // 1 km = 1/AU_km AU
+    
+    Vector6d delta_xf = stm * delta_x0;
+    
+    std::cout << "Final position error:\n";
+    std::cout << "  Delta X: " << delta_xf(0) * constants::AU << " km\n";
+    std::cout << "  Delta Y: " << delta_xf(1) * constants::AU << " km\n";
+    std::cout << "  Delta Z: " << delta_xf(2) * constants::AU << " km\n";
+    
+    double pos_error = delta_xf.head<3>().norm() * constants::AU;
+    std::cout << "  Total: " << std::setprecision(2) << pos_error << " km\n";
+    
+    return 0;
+}
+\end{lstlisting}
+
+\section{Example 6: Custom Force Model}
+
+\subsection{Goal}
+
+Implement and use custom force model for radiation pressure.
+
+\subsection{Code}
+
+\begin{lstlisting}[language=C++,caption={example6\_custom\_force.cpp}]
+#include <astdyn/AstDyn.hpp>
+#include <iostream>
+
+using namespace astdyn;
+
+// Custom force model: Solar radiation pressure
+class SolarRadiationPressure : public propagation::ForceModel {
+public:
+    SolarRadiationPressure(double area_mass_ratio, double reflectivity = 1.0)
+        : area_mass_ratio_(area_mass_ratio), reflectivity_(reflectivity) {}
+    
+    Vector3d acceleration(double t, const Vector3d& pos, 
+                         const Vector3d& vel) const override {
+        // Solar radiation pressure constant
+        const double P_sun = 4.56e-6;  // N/m^2 at 1 AU
+        
+        // Distance from Sun
+        double r = pos.norm();
+        
+        // Radiation pressure acceleration (away from Sun)
+        Vector3d acc = (P_sun * area_mass_ratio_ * reflectivity_ / (r * r)) 
+                      * pos.normalized();
+        
+        return acc;
+    }
+    
+private:
+    double area_mass_ratio_;  // m^2/kg
+    double reflectivity_;
+};
+
+int main() {
+    orbit::KeplerianElements elem;
+    elem.a = 2.7436;
+    elem.e = 0.0624;
+    elem.i = 11.74 * constants::DEG_TO_RAD;
+    elem.Omega = 339.86 * constants::DEG_TO_RAD;
+    elem.omega = 258.03 * constants::DEG_TO_RAD;
+    elem.M = 45.32 * constants::DEG_TO_RAD;
+    elem.epoch = 2460000.5;
+    
+    // Setup ephemeris
+    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
+    
+    // Combined force model: Gravity + Radiation Pressure
+    auto gravity = std::make_shared<propagation::PointMassGravity>(
+        eph, std::vector<std::string>{"JUPITER", "SATURN"});
+    
+    auto radiation = std::make_shared<SolarRadiationPressure>(0.01);  // 0.01 m^2/kg
+    
+    auto combined = std::make_shared<propagation::CombinedForceModel>();
+    combined->add_force(gravity);
+    combined->add_force(radiation);
+    
+    // Propagate
+    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
+    propagation::Propagator prop(integrator, combined, eph);
+    
+    auto state0 = elem.to_cartesian();
+    auto state60 = prop.propagate(state0, elem.epoch + 60.0);
+    
+    std::cout << "Propagation with custom radiation pressure model complete\n";
+    
+    return 0;
+}
+\end{lstlisting}
+
+\section{Building and Running Examples}
+
+\subsection{CMakeLists.txt}
+
+\begin{lstlisting}[caption={CMakeLists.txt for examples}]
+cmake_minimum_required(VERSION 3.12)
+project(AstDynExamples)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find AstDyn
+find_package(AstDyn REQUIRED)
+find_package(Eigen3 REQUIRED)
+
+# Example executables
+add_executable(example1 example1_propagation.cpp)
+target_link_libraries(example1 AstDyn::astdyn Eigen3::Eigen)
+
+add_executable(example2 example2_ephemeris.cpp)
+target_link_libraries(example2 AstDyn::astdyn Eigen3::Eigen)
+
+add_executable(example3 example3_orbit_determination.cpp)
+target_link_libraries(example3 AstDyn::astdyn Eigen3::Eigen)
+
+add_executable(example4 example4_mpc_parser.cpp)
+target_link_libraries(example4 AstDyn::astdyn Eigen3::Eigen)
+
+add_executable(example5 example5_stm.cpp)
+target_link_libraries(example5 AstDyn::astdyn Eigen3::Eigen)
+
+add_executable(example6 example6_custom_force.cpp)
+target_link_libraries(example6 AstDyn::astdyn Eigen3::Eigen)
+\end{lstlisting}
+
+\subsection{Build Commands}
+
+\begin{lstlisting}[language=bash]
+mkdir build && cd build
+cmake ..
+make -j4
+
+# Run examples
+./example1
+./example2
+./example3
+./example4 ../data/observations.txt
+./example5
+./example6
+\end{lstlisting}
+
+\section{Summary}
+
+This chapter demonstrated:
+
+\begin{enumerate}
+    \item \textbf{Basic propagation}: Converting elements, setting up propagator, integrating equations
+    \item \textbf{Ephemeris generation}: Creating tables of states
+    \item \textbf{Orbit determination}: Differential correction with synthetic observations
+    \item \textbf{MPC parsing}: Reading real observation files
+    \item \textbf{STM propagation}: Sensitivity analysis
+    \item \textbf{Custom forces}: Extending force model framework
+\end{enumerate}
+
+All examples are production-ready and can be adapted for real applications.

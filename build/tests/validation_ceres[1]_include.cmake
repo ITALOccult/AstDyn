@@ -1,0 +1,5 @@
+if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/validation_ceres[1]_tests.cmake")
+  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/validation_ceres[1]_tests.cmake")
+else()
+  add_test(validation_ceres_NOT_BUILT validation_ceres_NOT_BUILT)
+endif()

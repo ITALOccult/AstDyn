@@ -1,0 +1,5 @@
+if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_pompeja_validation[1]_tests.cmake")
+  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_pompeja_validation[1]_tests.cmake")
+else()
+  add_test(astdyn_pompeja_validation_NOT_BUILT astdyn_pompeja_validation_NOT_BUILT)
+endif()

@@ -1,0 +1,525 @@
+\chapter{Riferimento API}
+\label{ch:api_reference}
+
+\section{Panoramica}
+
+Questo capitolo fornisce la documentazione di riferimento completa per l'API pubblica di AstDyn. Tutte le classi, metodi e funzioni sono documentati con parametri, valori di ritorno ed eccezioni.
+
+\subsection{Organizzazione}
+
+API organizzata per namespace:
+
+\begin{itemize}
+    \item \texttt{astdyn::constants}: Costanti fisiche e astronomiche
+    \item \texttt{astdyn::math}: Utility matematiche
+    \item \texttt{astdyn::time}: Sistemi temporali e conversioni
+    \item \texttt{astdyn::coordinates}: Sistemi di coordinate e trasformazioni
+    \item \texttt{astdyn::orbit}: Classi elementi orbitali
+    \item \texttt{astdyn::propagation}: Propagazione orbitale
+    \item \texttt{astdyn::observations}: Gestione osservazioni
+    \item \texttt{astdyn::orbit\_determination}: Algoritmi determinazione orbitale
+    \item \texttt{astdyn::io}: Input/output e parser
+    \item \texttt{astdyn::ephemeris}: Interfacce effemeridi
+\end{itemize}
+
+\section{Costanti Core}
+
+\subsection{astdyn::constants}
+
+\begin{lstlisting}[language=C++]
+namespace astdyn {
+namespace constants {
+
+// Costanti fondamentali
+constexpr double C = 299792458.0;              // Velocita' luce (m/s)
+constexpr double G = 6.67430e-11;             // Costante gravitazionale (SI)
+constexpr double AU = 1.495978707e11;         // Unita' astronomica (m)
+
+// Costanti temporali
+constexpr double JD_J2000 = 2451545.0;        // Epoca J2000.0
+constexpr double DAYS_PER_CENTURY = 36525.0;  // Secolo giuliano
+constexpr double SECONDS_PER_DAY = 86400.0;   // Secondi in un giorno
+
+// Conversioni angolari
+constexpr double DEG_TO_RAD = M_PI / 180.0;
+constexpr double RAD_TO_DEG = 180.0 / M_PI;
+constexpr double ARCSEC_TO_RAD = DEG_TO_RAD / 3600.0;
+constexpr double RAD_TO_ARCSEC = 3600.0 * RAD_TO_DEG;
+
+// Masse sistema solare (valori GM in AU^3/day^2)
+constexpr double GM_SUN = 0.2959122082855911e-3;
+constexpr double GM_MERCURY = 0.4912547451450812e-10;
+constexpr double GM_VENUS = 0.7243452486162703e-9;
+constexpr double GM_EARTH = 0.8887692390113509e-9;
+constexpr double GM_MARS = 0.9549535105779258e-10;
+constexpr double GM_JUPITER = 0.2825345909524226e-6;
+constexpr double GM_SATURN = 0.8459715185680659e-7;
+constexpr double GM_URANUS = 0.1292024916781969e-7;
+constexpr double GM_NEPTUNE = 0.1524358900784276e-7;
+
+}} // namespace
+\end{lstlisting}
+
+\section{Utility Matematiche}
+
+\subsection{astdyn::math}
+
+\subsubsection{normalize\_angle}
+
+\begin{lstlisting}[language=C++]
+double normalize_angle(double angle, double center = 0.0);
+\end{lstlisting}
+
+\textbf{Scopo}: Normalizza angolo nell'intervallo $[\text{center} - \pi, \text{center} + \pi)$.
+
+\textbf{Parametri}:
+\begin{itemize}
+    \item \texttt{angle}: Angolo in input (radianti)
+    \item \texttt{center}: Centro dell'intervallo (default 0.0)
+\end{itemize}
+
+\textbf{Ritorna}: Angolo normalizzato
+
+\textbf{Esempio}:
+\begin{lstlisting}[language=C++]
+double angle = 7.0;  // > 2*pi
+double norm = math::normalize_angle(angle);  // Ritorna 0.716...
+\end{lstlisting}
+
+\subsubsection{cross\_product}
+
+\begin{lstlisting}[language=C++]
+Vector3d cross_product(const Vector3d& a, const Vector3d& b);
+\end{lstlisting}
+
+\textbf{Scopo}: Calcola prodotto vettoriale $\mathbf{a} \times \mathbf{b}$.
+
+\textbf{Parametri}:
+\begin{itemize}
+    \item \texttt{a}: Primo vettore
+    \item \texttt{b}: Secondo vettore
+\end{itemize}
+
+\textbf{Ritorna}: Vettore prodotto vettoriale
+
+\subsubsection{rotation\_matrix}
+
+\begin{lstlisting}[language=C++]
+Matrix3d rotation_matrix(double angle, int axis);
+\end{lstlisting}
+
+\textbf{Scopo}: Crea matrice di rotazione attorno ad asse coordinato.
+
+\textbf{Parametri}:
+\begin{itemize}
+    \item \texttt{angle}: Angolo di rotazione (radianti)
+    \item \texttt{axis}: Indice asse (0=x, 1=y, 2=z)
+\end{itemize}
+
+\textbf{Ritorna}: Matrice di rotazione $3 \times 3$
+
+\section{Sistemi Temporali}
+
+\subsection{astdyn::time::TimeConverter}
+
+\subsubsection{utc\_to\_tt}
+
+\begin{lstlisting}[language=C++]
+static double utc_to_tt(double jd_utc);
+\end{lstlisting}
+
+\textbf{Scopo}: Converte UTC a Terrestrial Time (TT).
+
+\textbf{Parametri}:
+\begin{itemize}
+    \item \texttt{jd\_utc}: Giorno Giuliano in UTC
+\end{itemize}
+
+\textbf{Ritorna}: Giorno Giuliano in TT
+
+\textbf{Nota}: Applica secondi intercalari e offset TT-TAI di 32.184s.
+
+\subsubsection{tt\_to\_tdb}
+
+\begin{lstlisting}[language=C++]
+static double tt_to_tdb(double jd_tt);
+\end{lstlisting}
+
+\textbf{Scopo}: Converte Terrestrial Time a Barycentric Dynamical Time.
+
+\textbf{Parametri}:
+\begin{itemize}
+    \item \texttt{jd\_tt}: Giorno Giuliano in TT
+\end{itemize}
+
+\textbf{Ritorna}: Giorno Giuliano in TDB
+
+\textbf{Nota}: Usa approssimazione periodica con accuratezza $\pm 2$ms.
+
+\section{Elementi Orbitali}
+
+\subsection{astdyn::orbit::KeplerianElements}
+
+\subsubsection{Definizione Classe}
+
+\begin{lstlisting}[language=C++]
+class KeplerianElements {
+public:
+    double a;         // Semiasse maggiore (AU)
+    double e;         // Eccentricita'
+    double i;         // Inclinazione (rad)
+    double Omega;     // Nodo ascendente (rad)
+    double omega;     // Argomento perielio (rad)
+    double M;         // Anomalia media (rad)
+    double epoch;     // Epoca (JD)
+    std::string name; // Nome oggetto
+    
+    // Costruttori
+    KeplerianElements();
+    KeplerianElements(double a, double e, double i, 
+                     double Omega, double omega, double M, 
+                     double epoch);
+    
+    // Conversioni
+    static KeplerianElements from_cartesian(
+        const Vector3d& pos, const Vector3d& vel, 
+        double epoch, double mu = GM_SUN);
+    
+    CartesianState to_cartesian(double mu = GM_SUN) const;
+    
+    // Quantita' derivate
+    double period() const;              // Periodo orbitale (giorni)
+    double mean_motion() const;         // Moto medio (rad/giorno)
+    double perihelion_distance() const; // q = a(1-e)
+    double aphelion_distance() const;   // Q = a(1+e)
+    double eccentric_anomaly() const;   // E da M
+    double true_anomaly() const;        // f da E
+    
+    // Validazione
+    bool is_valid() const;
+};
+\end{lstlisting}
+
+\section{Propagazione Orbitale}
+
+\subsection{astdyn::propagation::OrbitPropagator}
+
+\subsubsection{Definizione Classe}
+
+\begin{lstlisting}[language=C++]
+class OrbitPropagator {
+public:
+    // Costruttore
+    OrbitPropagator(std::shared_ptr<IIntegrator> integrator,
+                   std::shared_ptr<ForceModel> forces);
+    
+    // Propaga da epoca iniziale a finale
+    Vector6d propagate(
+        const Vector6d& initial_state,
+        double t_initial,
+        double t_final);
+    
+    // Propaga a epoca singola
+    Vector6d propagate_to_epoch(
+        const KeplerianElements& elements,
+        double target_epoch);
+    
+    // Propaga con STM
+    std::pair<Vector6d, Matrix6d> propagate_with_stm(
+        const Vector6d& initial_state,
+        double t_initial,
+        double t_final);
+    
+    // Configurazione
+    void set_tolerance(double tol);
+    void set_step_size(double h);
+    void enable_variational_equations(bool enable);
+};
+\end{lstlisting}
+
+\section{Osservazioni}
+
+\subsection{astdyn::observations::Observation}
+
+\begin{lstlisting}[language=C++]
+struct Observation {
+    double epoch;         // Epoca osservazione (JD)
+    double ra;            // Ascensione retta (rad)
+    double dec;           // Declinazione (rad)
+    double sigma_ra;      // Errore AR (rad)
+    double sigma_dec;     // Errore Dec (rad)
+    std::string obs_code; // Codice osservatorio MPC
+    double magnitude;     // Magnitudine apparente
+    char band;           // Banda fotometrica
+    std::string object_id; // ID oggetto
+};
+\end{lstlisting}
+
+\section{Determinazione Orbitale}
+
+\subsection{astdyn::orbit\_determination::DifferentialCorrector}
+
+\subsubsection{Metodo correct}
+
+\begin{lstlisting}[language=C++]
+DifferentialCorrection correct(
+    const KeplerianElements& initial_guess,
+    const std::vector<Observation>& observations,
+    const DifferentialCorrectionOptions& options);
+\end{lstlisting}
+
+\textbf{Scopo}: Esegue correzione differenziale per migliorare elementi orbitali.
+
+\textbf{Parametri}:
+\begin{itemize}
+    \item \texttt{initial\_guess}: Elementi orbitali iniziali
+    \item \texttt{observations}: Vettore osservazioni
+    \item \texttt{options}: Opzioni correzione (tolleranza, iterazioni max)
+\end{itemize}
+
+\textbf{Ritorna}: Struttura \texttt{DifferentialCorrection} con:
+\begin{itemize}
+    \item \texttt{elements}: Elementi corretti
+    \item \texttt{covariance}: Matrice covarianza
+    \item \texttt{rms}: RMS residui
+    \item \texttt{iterations}: Numero iterazioni
+    \item \texttt{converged}: Flag convergenza
+\end{itemize}
+
+\section{Parser I/O}
+
+\subsection{astdyn::io::ParserFactory}
+
+\subsubsection{create}
+
+\begin{lstlisting}[language=C++]
+static std::unique_ptr<IParser> create(const std::string& filename);
+\end{lstlisting}
+
+\textbf{Scopo}: Crea parser appropriato per file dato.
+
+\textbf{Parametri}:
+\begin{itemize}
+    \item \texttt{filename}: Nome file con estensione
+\end{itemize}
+
+\textbf{Ritorna}: Puntatore unico a parser
+
+\textbf{Eccezioni}:
+\begin{itemize}
+    \item \texttt{std::invalid\_argument}: Formato non supportato
+\end{itemize}
+
+\section{Interfacce Effemeridi}
+
+\subsection{astdyn::ephemeris::IEphemeris}
+
+\begin{lstlisting}[language=C++]
+class IEphemeris {
+public:
+    virtual ~IEphemeris() = default;
+    
+    // Ottiene posizione corpo
+    virtual Vector3d get_position(
+        int body_id, 
+        double jd_tdb) const = 0;
+    
+    // Ottiene posizione e velocita'
+    virtual std::pair<Vector3d, Vector3d> get_state(
+        int body_id,
+        double jd_tdb) const = 0;
+    
+    // Verifica se epoca e' valida
+    virtual bool is_epoch_valid(double jd_tdb) const = 0;
+};
+\end{lstlisting}
+
+\subsection{Implementazioni}
+
+\subsubsection{JPLEphemeris}
+
+Interfaccia alle effemeridi JPL DE440/DE441.
+
+\begin{lstlisting}[language=C++]
+class JPLEphemeris : public IEphemeris {
+public:
+    explicit JPLEphemeris(const std::string& filepath);
+    
+    Vector3d get_position(int body_id, double jd_tdb) const override;
+    std::pair<Vector3d, Vector3d> get_state(
+        int body_id, double jd_tdb) const override;
+};
+\end{lstlisting}
+
+\textbf{Body IDs}:
+\begin{itemize}
+    \item 1: Mercurio
+    \item 2: Venere
+    \item 3: Terra
+    \item 4: Marte
+    \item 5: Giove
+    \item 6: Saturno
+    \item 7: Urano
+    \item 8: Nettuno
+    \item 10: Sole
+    \item 11: Luna
+\end{itemize}
+
+\section{Modelli di Forza}
+
+\subsection{astdyn::forces::ForceModel}
+
+\begin{lstlisting}[language=C++]
+class ForceModel {
+public:
+    // Calcola accelerazione
+    Vector3d acceleration(
+        const Vector3d& pos,
+        const Vector3d& vel,
+        double t) const;
+    
+    // Abilita/disabilita perturbazioni
+    void enable_n_body(bool enable);
+    void enable_j2(bool enable);
+    void enable_srp(bool enable, double area_mass_ratio = 0.0);
+    void enable_relativity(bool enable);
+    
+    // Configura effemeridi planetarie
+    void set_ephemeris(std::shared_ptr<IEphemeris> ephem);
+    
+    // Imposta corpi perturbatori
+    void set_perturbing_bodies(const std::vector<int>& bodies);
+};
+\end{lstlisting}
+
+\section{Integratori Numerici}
+
+\subsection{astdyn::integration::IIntegrator}
+
+\begin{lstlisting}[language=C++]
+class IIntegrator {
+public:
+    virtual ~IIntegrator() = default;
+    
+    // Singolo passo integrazione
+    virtual void step(
+        Vector& y,
+        double& t,
+        double dt,
+        const std::function<Vector(const Vector&, double)>& f) = 0;
+    
+    // Integra da t0 a t1
+    virtual Vector integrate(
+        const Vector& y0,
+        double t0,
+        double t1,
+        const std::function<Vector(const Vector&, double)>& f) = 0;
+};
+\end{lstlisting}
+
+\subsection{Implementazioni Disponibili}
+
+\begin{itemize}
+    \item \textbf{RK4Integrator}: Runge-Kutta quarto ordine
+    \item \textbf{RKF45Integrator}: Runge-Kutta-Fehlberg (passo adattivo)
+    \item \textbf{DOP853Integrator}: Dormand-Prince 8(5,3) (alta precisione)
+    \item \textbf{ABMIntegrator}: Adams-Bashforth-Moulton (multipasso)
+\end{itemize}
+
+\section{Utility Analisi}
+
+\subsection{astdyn::analysis::ResidualAnalyzer}
+
+\begin{lstlisting}[language=C++]
+class ResidualAnalyzer {
+public:
+    struct Statistics {
+        double rms;              // RMS residui
+        double wrms;             // RMS pesato
+        double chi2_reduced;     // Chi-quadro ridotto
+        double max_residual;     // Residuo massimo
+        std::vector<int> outliers; // Indici outlier
+    };
+    
+    static Statistics analyze(
+        const std::vector<double>& residuals,
+        const std::vector<double>& weights);
+    
+    static std::vector<int> find_outliers(
+        const std::vector<double>& residuals,
+        double threshold = 3.0);
+};
+\end{lstlisting}
+
+\section{Esempio Completo}
+
+\subsection{Workflow Determinazione Orbitale}
+
+\begin{lstlisting}[language=C++]
+#include <astdyn/all.hpp>
+
+using namespace astdyn;
+
+int main() {
+    // 1. Carica osservazioni
+    auto observations = io::MPCObservationParser::parse_file(
+        "pompeja.obs");
+    
+    // 2. Carica elementi iniziali
+    io::OrbFitEQ1Parser parser;
+    auto initial_elements = parser.parse("pompeja.eq1");
+    
+    // 3. Configura effemeridi planetarie
+    auto ephem = std::make_shared<ephemeris::JPLEphemeris>(
+        "de440.bsp");
+    
+    // 4. Configura modello forze
+    auto forces = std::make_shared<forces::ForceModel>();
+    forces->set_ephemeris(ephem);
+    forces->enable_n_body(true);
+    forces->set_perturbing_bodies({3, 5, 6}); // Terra, Giove, Saturno
+    
+    // 5. Configura integratore
+    auto integrator = std::make_shared<integration::RKF45Integrator>();
+    integrator->set_tolerance(1e-12);
+    
+    // 6. Esegui correzione differenziale
+    orbit_determination::DifferentialCorrector corrector(
+        integrator, forces);
+    
+    orbit_determination::DifferentialCorrectionOptions opts;
+    opts.max_iterations = 20;
+    opts.convergence_tolerance = 1e-8;
+    
+    auto result = corrector.correct(
+        initial_elements, observations, opts);
+    
+    // 7. Analizza risultati
+    std::cout << "Converged: " << result.converged << "\n";
+    std::cout << "RMS: " << result.rms << " arcsec\n";
+    std::cout << "Iterations: " << result.iterations << "\n";
+    
+    // 8. Salva elementi migliorati
+    std::cout << "Improved elements:\n";
+    std::cout << "a = " << result.elements.a << " AU\n";
+    std::cout << "e = " << result.elements.e << "\n";
+    std::cout << "i = " << result.elements.i * RAD_TO_DEG << " deg\n";
+    
+    return 0;
+}
+\end{lstlisting}
+
+\section{Sommario}
+
+L'API di AstDyn fornisce:
+
+\begin{enumerate}
+    \item \textbf{Organizzazione modulare}: Namespace chiari per ogni funzionalita'
+    \item \textbf{Interfacce pulite}: Design basato su classi astratte
+    \item \textbf{Type safety}: Uso estensivo di tipi forti C++17/20
+    \item \textbf{Documentazione completa}: Ogni funzione documentata
+    \item \textbf{Esempi pratici}: Casi d'uso reali
+    \item \textbf{Estensibilita'}: Facile aggiungere nuove funzionalita'
+\end{enumerate}
+
+Per dettagli implementativi consultare il codice sorgente con documentazione Doxygen.

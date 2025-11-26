@@ -1,0 +1,450 @@
+\chapter{Analisi dei Residui}
+\label{ch:residuals}
+
+\section{Introduzione}
+
+L'\textbf{analisi dei residui} è l'esame delle differenze tra valori osservati e calcolati (O-C) per valutare la qualità dell'orbita e diagnosticare problemi.
+
+\textbf{Obiettivi}:
+\begin{itemize}
+    \item Validare la qualità dell'adattamento orbitale
+    \item Identificare outlier ed errori sistematici
+    \item Valutare i pesi delle osservazioni
+    \item Rilevare inadeguatezze del modello di forze
+    \item Stimare incertezze realistiche
+\end{itemize}
+
+\section{Tipi di Residui}
+
+\subsection{Residui Post-Fit}
+
+Dopo la convergenza della correzione differenziale:
+
+\begin{equation}
+    r_i = o_i - c_i(\mathbf{y}_0^*)
+\end{equation}
+
+dove $\mathbf{y}_0^*$ è l'orbita conversa.
+
+Per RA/Dec:
+\begin{align}
+    \Delta\alpha_i &= (\alpha_{\text{oss}} - \alpha_{\text{calc}}) \cos\delta_{\text{oss}} \\
+    \Delta\delta_i &= \delta_{\text{oss}} - \delta_{\text{calc}}
+\end{align}
+
+Nota: Moltiplicare $\Delta\alpha$ per $\cos\delta$ per ottenere la separazione lineare.
+
+\subsection{Residui Normalizzati}
+
+Scalare per l'incertezza di osservazione:
+
+\begin{equation}
+    \zeta_i = \frac{r_i}{\sigma_i}
+\end{equation}
+
+Distribuzione attesa: $\zeta_i \sim \mathcal{N}(0, 1)$ se i pesi sono corretti.
+
+\subsection{Residui Standardizzati}
+
+Tenere conto della correlazione nel fit:
+
+\begin{equation}
+    \xi_i = \frac{r_i}{\sigma_i \sqrt{1 - h_{ii}}}
+\end{equation}
+
+dove $h_{ii}$ è l'$i$-esimo elemento diagonale della matrice hat $\mathbf{H}(\mathbf{H}^T\mathbf{W}\mathbf{H})^{-1}\mathbf{H}^T\mathbf{W}$.
+
+\section{Metriche di Qualità}
+
+\subsection{Radice Media Quadratica (RMS)}
+
+\begin{equation}
+    \text{RMS} = \sqrt{\frac{\sum_i w_i r_i^2}{\sum_i w_i}}
+\end{equation}
+
+Per pesi uguali:
+
+\begin{equation}
+    \text{RMS} = \sqrt{\frac{1}{m} \sum_i r_i^2}
+\end{equation}
+
+\textbf{Interpretazione}:
+\begin{itemize}
+    \item RMS $<$ 0.5": Eccellente (CCD moderno con catalogo Gaia)
+    \item RMS $\sim$ 1": Buono (CCD tipico)
+    \item RMS $\sim$ 2": Discreto (osservazioni amatoriali)
+    \item RMS $>$ 5": Scarso (sospettare errori sistematici)
+\end{itemize}
+
+\subsection{RMS Pesato}
+
+Per pesi disuguali:
+
+\begin{equation}
+    \text{WRMS} = \sqrt{\frac{\chi^2}{m - n}}
+\end{equation}
+
+dove $m$ è il numero di osservazioni, $n = 6$ è il numero di parametri.
+
+\subsection{Test Chi-Quadro}
+
+Sotto modello e pesi corretti:
+
+\begin{equation}
+    \chi^2 = \sum_i w_i r_i^2 \sim \chi^2_{m-n}
+\end{equation}
+
+Statistica di test:
+
+\begin{equation}
+    \chi^2_{\text{rid}} = \frac{\chi^2}{m - n}
+\end{equation}
+
+\textbf{Interpretazione}:
+\begin{itemize}
+    \item $\chi^2_{\text{rid}} \approx 1$: Pesi coerenti con errori
+    \item $\chi^2_{\text{rid}} \gg 1$: Incertezze sottostimate o errore del modello
+    \item $\chi^2_{\text{rid}} \ll 1$: Incertezze sovrastimate
+\end{itemize}
+
+\subsection{Residuo Massimo}
+
+\begin{equation}
+    r_{\text{max}} = \max_i |r_i|
+\end{equation}
+
+Segnalare osservazioni con $|r_i| > 3\sigma$ come potenziali outlier.
+
+\section{Grafici dei Residui}
+
+\subsection{Residui vs. Tempo}
+
+Graficare $r_i$ vs. $t_i$. Cercare:
+\begin{itemize}
+    \item \textbf{Dispersione casuale}: Bene
+    \item \textbf{Tendenze}: Errore sistematico (es., perturbazione mancante, bias catalogo)
+    \item \textbf{Salti}: Cambio condizioni osservative o strumentazione
+    \item \textbf{Variazione periodica}: Errore modello orbitale
+\end{itemize}
+
+\subsection{Residui vs. Osservatorio}
+
+Graficare $r_i$ vs. codice osservatorio. Cercare:
+\begin{itemize}
+    \item \textbf{Dispersione uniforme}: Bene
+    \item \textbf{Bias per sito specifico}: Sistematico specifico del sito (temporizzazione, coordinate, catalogo)
+\end{itemize}
+
+\subsection{Residui vs. Magnitudine}
+
+Graficare $r_i$ vs. magnitudine apparente. Cercare:
+\begin{itemize}
+    \item \textbf{Nessuna tendenza}: Bene
+    \item \textbf{Dispersione crescente con magnitudine}: Il rumore fotonico domina
+    \item \textbf{Tendenza bias}: Errore equazione magnitudine in astrometria
+\end{itemize}
+
+\subsection{Residui RA vs. Dec}
+
+Graficare $\Delta\alpha \cos\delta$ vs. $\Delta\delta$. Cercare:
+\begin{itemize}
+    \item \textbf{Dispersione circolare}: Errori isotropi
+    \item \textbf{Dispersione ellittica}: Errori correlati (es., errore tracking)
+    \item \textbf{Pattern radiale}: Errore di distanza
+\end{itemize}
+
+\subsection{Grafico di Probabilità Normale}
+
+Graficare residui normalizzati ordinati $\zeta_{(i)}$ vs. quantili normali attesi. Dovrebbe essere approssimativamente lineare se gli errori sono gaussiani.
+
+\section{Rilevamento Outlier}
+
+\subsection{Metodo Soglia}
+
+Segnalare osservazione se:
+
+\begin{equation}
+    |r_i| > k \sigma_i
+\end{equation}
+
+Tipico $k = 3$ (regola 3-sigma) o $k = 2.5$ (più aggressivo).
+
+\subsection{Criterio di Chauvenet}
+
+Rifiutare osservazione se probabilità di deviazione maggiore è $< 1/(2m)$:
+
+\begin{equation}
+    P(|\zeta| > |\zeta_i|) < \frac{1}{2m}
+\end{equation}
+
+\subsection{Deviazione Assoluta Mediana (MAD)}
+
+Alternativa robusta alla deviazione standard:
+
+\begin{equation}
+    \text{MAD} = \text{mediana}(|r_i - \text{mediana}(r_i)|)
+\end{equation}
+
+MAD scalato: $\hat{\sigma} = 1.4826 \times \text{MAD}$
+
+Segnalare se $|r_i - \text{mediana}| > k\hat{\sigma}$.
+
+\subsection{Rimozione Iterativa Outlier}
+
+\begin{enumerate}
+    \item Eseguire correzione differenziale
+    \item Identificare outlier (es., $|r_i| > 3\sigma$)
+    \item Rimuovere o ridurre peso outlier
+    \item Ripetere finché non si trovano più outlier
+\end{enumerate}
+
+\textbf{Attenzione}: Non rimuovere troppe osservazioni. Tipicamente rimuovere $<$5\% del dataset.
+
+\section{Diagnosi Errori Sistematici}
+
+\subsection{Errori di Temporizzazione}
+
+\textbf{Sintomo}: Residui correlati con direzione moto apparente.
+
+\textbf{Test}: Calcolare residui lungo-traccia vs. croce-traccia:
+
+\begin{align}
+    r_{\parallel} &= \Delta\alpha \cos\delta \cos\theta + \Delta\delta \sin\theta \\
+    r_{\perp} &= -\Delta\alpha \cos\delta \sin\theta + \Delta\delta \cos\theta
+\end{align}
+
+dove $\theta = \arctan2(\dot{\delta}, \dot{\alpha}\cos\delta)$ è la direzione del moto.
+
+Se $|r_{\parallel}| \gg |r_{\perp}|$, sospettare errore temporizzazione.
+
+\subsection{Bias Catalogo}
+
+\textbf{Sintomo}: Offset sistematico in tutti i residui da un catalogo.
+
+\textbf{Test}: Confrontare risultati usando diversi cataloghi stellari (Gaia DR3, UCAC4, ecc.).
+
+\textbf{Soluzione}: Usare Gaia DR3 (più accurato, 0.02-0.05" sistematico).
+
+\subsection{Errore Coordinate Osservatorio}
+
+\textbf{Sintomo}: Offset sistematico per un osservatorio, varia con posizione oggetto.
+
+\textbf{Test}: Verificare coordinate osservatorio MPC vs. valori ITRF.
+
+\textbf{Soluzione}: Aggiornare coordinate, specialmente per nuovi osservatori.
+
+\subsection{Correzione Light-Time}
+
+\textbf{Sintomo}: Residui mostrano tendenza quadratica su arco lungo.
+
+\textbf{Test}: Verificare che la correzione light-time sia applicata.
+
+\textbf{Soluzione}: Iterare light-time (Capitolo 12).
+
+\subsection{Inadeguatezza Modello Forze}
+
+\textbf{Sintomo}: Residui mostrano tendenza liscia correlata con posizioni planetarie.
+
+\textbf{Test}: Aggiungere perturbazioni mancanti (Giove, Saturno, Terra, ecc.).
+
+\textbf{Soluzione}: Includere tutti i pianeti con $|a_{\text{pert}}/a_{\text{Sole}}| > 10^{-9}$.
+
+\section{Esempio di Analisi}
+
+\textbf{Struttura dati per l'analisi:}
+
+\begin{lstlisting}[language=C++,caption={Struttura ResidualAnalysis}]
+struct ResidualAnalysis {
+    double rms;
+    double wrms;
+    double chi2_red;
+    double max_residual;
+    std::vector<double> residuals;
+    std::vector<double> normalized_residuals;
+    std::vector<int> outlier_indices;
+};
+\end{lstlisting}
+
+\textbf{Funzione principale di analisi:}
+
+\begin{lstlisting}[language=C++,caption={Calcolo residui e metriche}]
+ResidualAnalysis analyze_residuals(
+    const std::vector<Observation>& obs,
+    const Vector6d& state, double epoch,
+    const ForceModel& forces,
+    const EphemerisInterface& ephemeris)
+{
+    ResidualAnalysis result;
+    double chi2 = 0.0;
+    
+    for (size_t i = 0; i < obs.size(); ++i) {
+        // Propagare e calcolare residuo
+        Vector6d y = propagate(state, epoch, obs[i].epoch, forces);
+        Vector2d computed = predict_observation(y, obs[i].epoch, 
+                                               obs[i].obs_code, ephemeris);
+        
+        double dRA = (obs[i].ra - computed(0)) * cos(obs[i].dec) 
+                     * RAD_TO_ARCSEC;
+        double dDec = (obs[i].dec - computed(1)) * RAD_TO_ARCSEC;
+        double residual = sqrt(dRA*dRA + dDec*dDec);
+        
+        result.residuals.push_back(residual);
+        
+        // Residuo normalizzato e outlier detection
+        double sigma = sqrt(obs[i].sigma_ra*obs[i].sigma_ra + 
+                           obs[i].sigma_dec*obs[i].sigma_dec) 
+                       * RAD_TO_ARCSEC;
+        double zeta = residual / sigma;
+        result.normalized_residuals.push_back(zeta);
+        
+        chi2 += (residual/sigma) * (residual/sigma);
+        
+        if (residual > result.max_residual)
+            result.max_residual = residual;
+        
+        if (std::abs(zeta) > 3.0)
+            result.outlier_indices.push_back(i);
+    }
+    
+    // Calcolare metriche finali
+    int dof = 2 * obs.size() - 6;
+    result.rms = sqrt(chi2 / obs.size());
+    result.wrms = sqrt(chi2 / dof);
+    result.chi2_red = chi2 / dof;
+    
+    return result;
+}
+\end{lstlisting}
+
+\textbf{Stampare report:}
+
+\begin{lstlisting}[language=C++,caption={Report analisi residui}]
+void print_residual_report(const ResidualAnalysis& analysis) {
+    std::cout << "Report Analisi Residui\n";
+    std::cout << "======================\n";
+    std::cout << "Numero osservazioni: " 
+              << analysis.residuals.size() << "\n";
+    std::cout << "RMS: " << analysis.rms << " arcosec\n";
+    std::cout << "RMS pesato: " << analysis.wrms << " arcosec\n";
+    std::cout << "Chi-quadro ridotto: " << analysis.chi2_red << "\n";
+    std::cout << "Outlier (>3-sigma): " 
+              << analysis.outlier_indices.size() << "\n";
+    
+    if (!analysis.outlier_indices.empty()) {
+        std::cout << "\nIndici outlier:\n";
+        for (int idx : analysis.outlier_indices) {
+            std::cout << "  " << idx << ": " 
+                     << analysis.residuals[idx] << " arcsec\n";
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Output Esempio}
+
+\begin{verbatim}
+Report Analisi Residui
+======================
+Numero osservazioni: 100
+RMS: 0.658 arcsec
+RMS pesato: 0.661 arcsec
+Chi-quadro ridotto: 1.02
+Residuo massimo: 2.34 arcsec
+Outlier (>3-sigma): 2
+
+Indici outlier:
+  34: 2.34 arcsec
+  78: 2.11 arcsec
+\end{verbatim}
+
+\textbf{Interpretazione}:
+\begin{itemize}
+    \item RMS $\approx$ 0.66": Adattamento eccellente
+    \item $\chi^2_{\text{rid}} \approx 1$: I pesi sono appropriati
+    \item 2 outlier: Tipico per 100 osservazioni (2\%)
+    \item Distribuzione approssimativamente normale
+\end{itemize}
+
+\section{Miglioramento Qualità Orbita}
+
+\subsection{Quando RMS è Troppo Grande}
+
+\textbf{Azioni}:
+\begin{enumerate}
+    \item Verificare outlier, rimuovere se $>$3$\sigma$
+    \item Verificare coordinate osservatorio
+    \item Verificare accuratezza temporizzazione
+    \item Aggiungere perturbazioni mancanti
+    \item Usare catalogo stellare migliore (Gaia DR3)
+    \item Considerare forze non gravitazionali (se cometa)
+\end{enumerate}
+
+\subsection{Quando $\chi^2_{\text{rid}} \gg 1$}
+
+\textbf{Cause}:
+\begin{itemize}
+    \item Incertezze osservative sottostimate
+    \item Errori sistematici non modellati
+    \item Modello forze inadeguato
+\end{itemize}
+
+\textbf{Soluzioni}:
+\begin{itemize}
+    \item Gonfiare incertezze per fattore $\sqrt{\chi^2_{\text{rid}}}$
+    \item Investigare errori sistematici
+    \item Migliorare modello forze
+\end{itemize}
+
+\subsection{Quando Poche Osservazioni Disponibili}
+
+Per $m < 20$ osservazioni:
+\begin{itemize}
+    \item Singolo outlier può dominare $\chi^2$
+    \item Usare metodi robusti (MAD, pesi Huber)
+    \item Essere conservativi nel rifiutare dati
+    \item Cercare osservazioni aggiuntive
+\end{itemize}
+
+\section{Reporting Risultati}
+
+\subsection{Statistiche Sommarie}
+
+Riportare sempre:
+\begin{itemize}
+    \item Numero osservazioni
+    \item Arco temporale
+    \item Osservatori
+    \item RMS o WRMS
+    \item Numero outlier rifiutati
+\end{itemize}
+
+\subsection{Interpretazione Covarianza}
+
+\textbf{Incertezza formale}: Da $\mathbf{C} = \mathbf{N}^{-1}$.
+
+\textbf{Incertezza realistica}: Scalare per $\sqrt{\chi^2_{\text{rid}}}$ se $\chi^2_{\text{rid}} > 1$.
+
+\subsection{Valutazione Arco Orbitale}
+
+\begin{itemize}
+    \item \textbf{Arco corto} ($<$10 giorni): Orbita mal vincolata, grande incertezza estrapolazione
+    \item \textbf{Arco medio} (10-60 giorni): Ragionevole per effemeridi su arco simile
+    \item \textbf{Arco lungo} ($>$1 anno): Ben vincolata, estrapolazione affidabile
+\end{itemize}
+
+\section{Sommario}
+
+Punti chiave sull'analisi dei residui:
+
+\begin{enumerate}
+    \item I \textbf{residui post-fit} $r_i = o_i - c_i$ valutano qualità fit
+    \item L'\textbf{RMS} misura fit complessivo; obiettivo $<$1" per osservazioni moderne
+    \item Il \textbf{test chi-quadro} valida pesi; aspettarsi $\chi^2_{\text{rid}} \approx 1$
+    \item I \textbf{grafici residui} diagnosticano errori sistematici
+    \item Gli \textbf{outlier} vengono rilevati via soglia 3$\sigma$ o metodi robusti
+    \item Gli \textbf{errori sistematici} vengono identificati per correlazioni con tempo, osservatorio, magnitudine
+    \item Il \textbf{modello forze} viene validato esaminando tendenze residui
+    \item Le \textbf{incertezze realistiche} tengono conto errori sistematici via $\chi^2_{\text{rid}}$
+\end{enumerate}
+
+Con la correzione differenziale e l'analisi dei residui, completiamo il workflow centrale di determinazione orbitale. I prossimi capitoli coprono l'implementazione software.

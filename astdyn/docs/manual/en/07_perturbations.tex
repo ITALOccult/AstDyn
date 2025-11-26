@@ -1,0 +1,453 @@
+\chapter{Orbital Perturbations}
+\label{ch:perturbations}
+
+\section{Introduction to Perturbations}
+
+In Chapter~\ref{ch:two_body_problem}, we studied the idealized two-body problem where only gravitational attraction between two point masses is considered. In reality, celestial bodies experience additional forces that cause their orbits to deviate from perfect Keplerian ellipses.
+
+\subsection{Types of Perturbations}
+
+Orbital perturbations can be classified by their physical origin:
+
+\begin{description}
+    \item[Gravitational] Forces from additional bodies (N-body problem), non-spherical mass distribution (J$_2$, J$_4$, etc.)
+    \item[Non-gravitational] Solar radiation pressure, atmospheric drag, thermal effects (Yarkovsky)
+    \item[Relativistic] General relativity corrections to Newtonian gravity
+\end{description}
+
+\subsection{Perturbed Equations of Motion}
+
+The general equation of motion with perturbations is:
+
+\begin{equation}
+    \ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r} + \mathbf{a}_{\text{pert}}
+\end{equation}
+
+where $\mathbf{a}_{\text{pert}}$ is the perturbing acceleration. For small perturbations, we can treat them as corrections to the Keplerian solution.
+
+\subsection{Magnitude of Effects}
+
+For a main-belt asteroid at 2.5 AU:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Perturbation} & \textbf{Acceleration} & \textbf{Relative to Sun} \\
+\midrule
+Solar gravity & $3.8 \times 10^{-3}$ m/s$^2$ & 1 \\
+Jupiter & $\sim 10^{-6}$ m/s$^2$ & $3 \times 10^{-4}$ \\
+Earth J$_2$ (at LEO) & $\sim 10^{-6}$ m/s$^2$ & — \\
+Solar radiation & $\sim 10^{-8}$ m/s$^2$ & $3 \times 10^{-6}$ \\
+Relativity & $\sim 10^{-10}$ m/s$^2$ & $3 \times 10^{-8}$ \\
+\bottomrule
+\end{tabular}
+\caption{Typical magnitudes of perturbing accelerations for asteroids.}
+\label{tab:pert_magnitudes}
+\end{table}
+
+Though small, these effects accumulate over time and must be included for accurate long-term predictions.
+
+\section{The N-Body Problem}
+
+\subsection{Problem Statement}
+
+The \textbf{N-body problem} considers the motion of $N$ bodies under their mutual gravitational attraction. The equation of motion for body $i$ is:
+
+\begin{equation}
+    \ddot{\mathbf{r}}_i = \sum_{j=1, j \neq i}^{N} G\frac{m_j(\mathbf{r}_j - \mathbf{r}_i)}{|\mathbf{r}_j - \mathbf{r}_i|^3}
+\end{equation}
+
+For $N \geq 3$, there is no general analytical solution. The problem must be solved numerically.
+
+\subsection{The Restricted Three-Body Problem}
+
+A special case is the \textbf{circular restricted three-body problem} (CR3BP):
+\begin{itemize}
+    \item Two massive bodies (primaries) orbit their common barycenter in circular orbits
+    \item A third body (massless) moves under their gravitational influence
+    \item The third body does not affect the primaries
+\end{itemize}
+
+This is relevant for Sun-Jupiter-asteroid or Earth-Moon-spacecraft systems.
+
+\subsection{Perturbations from Planets}
+
+For asteroid orbit determination, we typically model the Sun as the central body and planets as perturbing bodies:
+
+\begin{equation}
+    \mathbf{a}_{\text{planets}} = \sum_{p} \left[ G m_p \left( \frac{\mathbf{r}_p - \mathbf{r}}{|\mathbf{r}_p - \mathbf{r}|^3} - \frac{\mathbf{r}_p}{r_p^3} \right) \right]
+\end{equation}
+
+The first term is the direct gravitational pull from planet $p$, and the second term accounts for the fact that the Sun also accelerates toward the planet (indirect term).
+
+\subsection{Planetary Ephemerides}
+
+Accurate N-body modeling requires high-precision planetary positions. Common sources:
+
+\begin{itemize}
+    \item \textbf{JPL DE440/DE441}: NASA's latest planetary ephemerides (2021)
+    \item \textbf{INPOP}: French planetary ephemerides from IMCCE
+    \item \textbf{SPICE}: NASA's toolkit for spacecraft and planetary geometry
+\end{itemize}
+
+AstDyn can use SPICE kernels to obtain planetary states at any epoch.
+
+\section{Oblateness Perturbations (J$_2$)}
+
+\subsection{Non-Spherical Mass Distribution}
+
+Real celestial bodies are not perfect spheres. Earth, for example, is oblate due to rotation. The gravitational potential can be expanded in spherical harmonics:
+
+\begin{equation}
+    U = -\frac{\mu}{r}\left[1 - \sum_{n=2}^{\infty} J_n \left(\frac{R}{r}\right)^n P_n(\sin\phi)\right]
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $J_n$ are the zonal harmonic coefficients
+    \item $R$ is the reference radius
+    \item $P_n$ are Legendre polynomials
+    \item $\phi$ is the latitude
+\end{itemize}
+
+\subsection{The J$_2$ Term}
+
+The dominant term is $J_2$ (quadrupole moment), representing equatorial bulge:
+
+\begin{equation}
+    U_{J_2} = -\frac{\mu}{r}\left[1 - J_2 \left(\frac{R}{r}\right)^2 P_2(\sin\phi)\right]
+\end{equation}
+
+where $P_2(\sin\phi) = \frac{1}{2}(3\sin^2\phi - 1)$.
+
+For Earth: $J_2 = 1.08263 \times 10^{-3}$ (about 0.1\%)
+
+\subsection{J$_2$ Acceleration}
+
+The perturbing acceleration in Cartesian coordinates is:
+
+\begin{align}
+    a_x &= -\frac{3\mu J_2 R^2}{2r^5}\left[x\left(1 - 5\frac{z^2}{r^2}\right)\right] \\
+    a_y &= -\frac{3\mu J_2 R^2}{2r^5}\left[y\left(1 - 5\frac{z^2}{r^2}\right)\right] \\
+    a_z &= -\frac{3\mu J_2 R^2}{2r^5}\left[z\left(3 - 5\frac{z^2}{r^2}\right)\right]
+\end{align}
+
+\subsection{Effects on Orbital Elements}
+
+J$_2$ causes secular (long-term) changes in orbital elements:
+
+\begin{align}
+    \frac{d\Omega}{dt} &= -\frac{3}{2}\frac{n J_2 R^2}{a^2(1-e^2)^2}\cos i \\
+    \frac{d\omega}{dt} &= \frac{3}{4}\frac{n J_2 R^2}{a^2(1-e^2)^2}(5\cos^2 i - 1)
+\end{align}
+
+where $n = \sqrt{\mu/a^3}$ is the mean motion.
+
+\textbf{Key effects}:
+\begin{itemize}
+    \item $\Omega$ (RAAN) precesses westward for prograde orbits ($i < 90^\circ$)
+    \item $\omega$ (argument of periapsis) rotates
+    \item The combination creates complex patterns in ground tracks
+\end{itemize}
+
+For low Earth orbit (LEO), J$_2$ can cause $\Omega$ to change by several degrees per day.
+
+\section{Solar Radiation Pressure}
+
+\subsection{Physical Mechanism}
+
+Photons carry momentum. When sunlight hits an object, it exerts a force:
+
+\begin{equation}
+    F_{\text{SRP}} = P_\odot \frac{A}{c} C_R \left(\frac{r_0}{r}\right)^2
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $P_\odot = 4.56 \times 10^{-6}$ N/m$^2$ is solar radiation pressure at 1 AU
+    \item $A$ is the cross-sectional area
+    \item $c = 3 \times 10^8$ m/s is the speed of light
+    \item $C_R$ is the radiation pressure coefficient ($C_R \approx 1$-$2$)
+    \item $r_0 = 1$ AU, $r$ is the heliocentric distance
+\end{itemize}
+
+\subsection{Area-to-Mass Ratio}
+
+The acceleration depends on the \textbf{area-to-mass ratio}:
+
+\begin{equation}
+    \mathbf{a}_{\text{SRP}} = P_\odot \frac{A}{m} C_R \left(\frac{r_0}{r}\right)^2 \hat{\mathbf{r}}_\odot
+\end{equation}
+
+Small objects (dust, small asteroids) are more affected than large ones.
+
+\subsection{Eclipse Modeling}
+
+SRP drops to zero when the object is in Earth's or planetary shadow. A simple model:
+
+\begin{equation}
+    \nu = \begin{cases}
+        1 & \text{in sunlight} \\
+        0 & \text{in umbra} \\
+        f & \text{in penumbra}
+    \end{cases}
+\end{equation}
+
+where $0 < f < 1$ depends on the fraction of the solar disk visible.
+
+\subsection{Yarkovsky Effect}
+
+The \textbf{Yarkovsky effect} is a thermal recoil force:
+\begin{itemize}
+    \item Asteroid's surface heats in sunlight
+    \item Emits thermal radiation as it rotates
+    \item Creates a small thrust (like a rocket!)
+\end{itemize}
+
+This is important for small asteroids ($< 20$ km) over long timescales (millions of years). It can change the semi-major axis:
+
+\begin{equation}
+    \frac{da}{dt} \approx \pm 10^{-4} \text{ AU/Myr}
+\end{equation}
+
+The sign depends on the sense of rotation (prograde vs retrograde).
+
+\section{Relativistic Effects}
+
+\subsection{Post-Newtonian Corrections}
+
+General relativity introduces corrections to Newtonian gravity. The dominant term is the \textbf{Schwarzschild term}:
+
+\begin{equation}
+    \mathbf{a}_{\text{GR}} = \frac{\mu}{c^2 r^3}\left[4\frac{\mu}{r}\mathbf{r} - (\mathbf{v} \cdot \mathbf{v})\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
+\end{equation}
+
+This is the first-order post-Newtonian (1PN) approximation.
+
+\subsection{Perihelion Precession}
+
+The most famous relativistic effect is the \textbf{precession of perihelion}:
+
+\begin{equation}
+    \Delta\omega = \frac{6\pi G M_\odot}{c^2 a(1-e^2)} \text{ per orbit}
+\end{equation}
+
+For Mercury ($a = 0.387$ AU, $e = 0.206$):
+\begin{equation}
+    \Delta\omega_{\text{Mercury}} = 43'' \text{ per century}
+\end{equation}
+
+This was famously explained by Einstein in 1915 and was one of the first confirmations of general relativity.
+
+\subsection{Light-Time Correction}
+
+Electromagnetic signals travel at finite speed. When measuring asteroid positions via radar or optical observations, we must account for the time the light takes to travel:
+
+\begin{equation}
+    \Delta t = \frac{|\mathbf{r}_{\text{obs}} - \mathbf{r}_{\text{ast}}|}{c}
+\end{equation}
+
+This is the \textbf{light-time correction}. For orbit determination, we must iterate to find the position of the asteroid at the time of observation, not at the time of detection.
+
+\subsection{Shapiro Delay}
+
+Gravitational fields slow down light. The \textbf{Shapiro delay} is:
+
+\begin{equation}
+    \Delta t_{\text{Shapiro}} = \frac{2GM_\odot}{c^3}\ln\left(\frac{r_1 + r_2 + d}{r_1 + r_2 - d}\right)
+\end{equation}
+
+where $r_1$, $r_2$ are distances from the Sun to the two endpoints, and $d$ is their separation. This is typically $\sim 100$ microseconds but is measurable with precision ranging.
+
+\section{Atmospheric Drag}
+
+For satellites in low Earth orbit (LEO), atmospheric drag is a major perturbation.
+
+\subsection{Drag Equation}
+
+\begin{equation}
+    \mathbf{a}_{\text{drag}} = -\frac{1}{2}\frac{C_D A}{m}\rho v^2 \hat{\mathbf{v}}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $C_D \approx 2.2$ is the drag coefficient
+    \item $A$ is the cross-sectional area
+    \item $\rho$ is atmospheric density (exponentially decreasing with altitude)
+    \item $v$ is the velocity relative to the atmosphere
+\end{itemize}
+
+\subsection{Atmospheric Density Models}
+
+Density depends on:
+\begin{itemize}
+    \item Altitude (exponential decrease)
+    \item Solar activity (F10.7 index)
+    \item Geomagnetic activity (Ap index)
+    \item Local solar time and latitude
+\end{itemize}
+
+Common models: NRLMSISE-00, JB2008, DTM2000.
+
+\subsection{Orbital Decay}
+
+Drag causes the semi-major axis to decrease:
+
+\begin{equation}
+    \frac{da}{dt} = -\frac{2a^2}{v}\frac{C_D A}{m}\rho v^2 = -\frac{C_D A}{m}\rho a^2 v
+\end{equation}
+
+Satellites in LEO gradually spiral inward and eventually re-enter the atmosphere.
+
+\section{Perturbation Theory}
+
+\subsection{Variation of Parameters}
+
+\textbf{Lagrange's planetary equations} describe how orbital elements change under perturbations. In terms of the disturbing function $R$:
+
+\begin{align}
+    \frac{da}{dt} &= \frac{2}{na}\frac{\partial R}{\partial M} \\
+    \frac{de}{dt} &= \frac{1-e^2}{na^2 e}\frac{\partial R}{\partial M} - \frac{\sqrt{1-e^2}}{na^2 e}\frac{\partial R}{\partial \omega} \\
+    \frac{di}{dt} &= \frac{\cos i}{na^2\sqrt{1-e^2}\sin i}\frac{\partial R}{\partial \omega} - \frac{1}{na^2\sqrt{1-e^2}\sin i}\frac{\partial R}{\partial \Omega} \\
+    \frac{d\Omega}{dt} &= \frac{1}{na^2\sqrt{1-e^2}\sin i}\frac{\partial R}{\partial i} \\
+    \frac{d\omega}{dt} &= \frac{\sqrt{1-e^2}}{na^2 e}\frac{\partial R}{\partial e} - \frac{\cos i}{na^2\sqrt{1-e^2}\sin i}\frac{\partial R}{\partial i} \\
+    \frac{dM}{dt} &= n - \frac{2}{na}\frac{\partial R}{\partial a} - \frac{1-e^2}{na^2 e}\frac{\partial R}{\partial e}
+\end{align}
+
+These equations allow analytical treatment of perturbations when $R$ has a simple form.
+
+\subsection{Gauss's Perturbation Equations}
+
+An alternative formulation uses the perturbing acceleration components $(S, T, W)$ in the radial, transverse, and normal directions:
+
+\begin{align}
+    \frac{da}{dt} &= \frac{2a^2}{h}\left[eS\sin\nu + T\frac{p}{r}\right] \\
+    \frac{de}{dt} &= \frac{1}{v_0}\left[S\sin\nu + T\left(\cos\nu + \frac{r+p}{p}\cos E\right)\right] \\
+    \frac{di}{dt} &= \frac{r\cos(\omega + \nu)}{h}W
+\end{align}
+
+where $h = \sqrt{\mu a(1-e^2)}$ is the angular momentum magnitude.
+
+\subsection{Osculating Elements}
+
+At any instant, the orbit can be described by \textbf{osculating elements}—the Keplerian elements that the body would follow if all perturbations suddenly ceased. These elements vary continuously under perturbations.
+
+\section{Numerical Integration vs Perturbation Theory}
+
+\subsection{When to Use Each Approach}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Method} & \textbf{Advantages} & \textbf{Best For} \\
+\midrule
+Numerical & Handles any force & Short-term accuracy \\
+Integration & No approximations & Strong perturbations \\
+ & Easy to implement & Multiple forces \\
+\midrule
+Analytical & Physical insight & Long-term trends \\
+Perturbation & Fast computation & Weak perturbations \\
+Theory & Identifies resonances & Qualitative analysis \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of numerical integration and analytical perturbation theory.}
+\label{tab:methods}
+\end{table}
+
+\subsection{Hybrid Approaches}
+
+Modern orbit determination often uses:
+\begin{enumerate}
+    \item Numerical integration for the equation of motion
+    \item Analytical theory to identify important perturbations
+    \item Simplified models (e.g., averaged J$_2$) for faster computation
+\end{enumerate}
+
+\section{AstDyn Implementation}
+
+AstDyn provides a modular perturbation framework:
+
+\begin{lstlisting}[language=C++,caption={Perturbations in AstDyn}]
+#include <astdyn/dynamics/Perturbations.hpp>
+#include <astdyn/dynamics/NBody.hpp>
+
+using namespace astdyn;
+
+// Create state vector
+Vector6d state = ...;  // [x, y, z, vx, vy, vz]
+
+// N-body perturbations from planets
+PlanetaryEphemeris ephem("de440.bsp");
+Vector3d acc_planets = NBody::compute_perturbation(
+    state, time, ephem, {"Jupiter", "Saturn", "Earth"}
+);
+
+// J2 perturbation (for Earth orbiter)
+Vector3d acc_j2 = Perturbations::j2_acceleration(
+    state, MU_EARTH, R_EARTH, J2_EARTH
+);
+
+// Solar radiation pressure
+double area_mass_ratio = 0.01;  // m^2/kg
+double Cr = 1.3;
+Vector3d sun_direction = ...;   // Unit vector to Sun
+Vector3d acc_srp = Perturbations::solar_radiation_pressure(
+    state, area_mass_ratio, Cr, sun_direction
+);
+
+// Relativistic correction
+Vector3d acc_gr = Perturbations::schwarzschild_correction(
+    state, MU_SUN
+);
+
+// Total perturbing acceleration
+Vector3d acc_total = acc_planets + acc_j2 + acc_srp + acc_gr;
+
+// Add to equations of motion
+Vector6d derivatives;
+derivatives.head<3>() = state.tail<3>();  // velocity
+derivatives.tail<3>() = -MU_SUN * state.head<3>() / r^3 + acc_total;
+\end{lstlisting}
+
+\subsection{Perturbation Selection}
+
+AstDyn allows users to enable/disable perturbations:
+
+\begin{lstlisting}[language=C++,caption={Configuring perturbations}]
+PerturbationModel model;
+model.enable_planets({"Jupiter", "Saturn", "Uranus", "Neptune"});
+model.enable_j2(false);  // Not relevant for heliocentric orbits
+model.enable_srp(true);
+model.enable_relativity(true);
+
+// Use in propagation
+Propagator prop(model);
+auto final_state = prop.propagate(initial_state, t0, tf);
+\end{lstlisting}
+
+\section{Summary}
+
+Key concepts about orbital perturbations:
+
+\begin{enumerate}
+    \item \textbf{Perturbations} are deviations from ideal two-body motion
+    \item \textbf{N-body effects} from planets are the dominant perturbation for asteroids
+    \item \textbf{J$_2$ oblateness} causes precession of $\Omega$ and $\omega$ (critical for Earth satellites)
+    \item \textbf{Solar radiation pressure} affects small bodies and spacecraft
+    \item \textbf{Relativistic effects} are small but measurable (Mercury precession: 43''/century)
+    \item \textbf{Atmospheric drag} dominates in LEO, causing orbital decay
+    \item \textbf{Perturbation theory} (Lagrange, Gauss equations) provides analytical insight
+    \item \textbf{Numerical integration} handles arbitrary force models accurately
+\end{enumerate}
+
+Understanding perturbations is essential for:
+\begin{itemize}
+    \item Accurate orbit prediction over long timescales
+    \item Satellite mission design and station-keeping
+    \item Detecting subtle effects (e.g., asteroid masses from perturbations)
+    \item Distinguishing gravitational from non-gravitational forces
+\end{itemize}
+
+In the next chapter, we will discuss numerical integration methods for solving the perturbed equations of motion.

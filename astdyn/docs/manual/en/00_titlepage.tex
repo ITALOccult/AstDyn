@@ -1,0 +1,52 @@
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\Huge\textbf{AstDyn Library}}\\[1cm]
+    {\Large\textit{Scientific Manual}}\\[0.5cm]
+    {\large Celestial Mechanics and Orbit Determination}\\[2cm]
+    
+    \begin{figure}[H]
+        \centering
+        \begin{tikzpicture}[scale=1.5]
+            % Sun at center
+            \shade[ball color=yellow!80] (0,0) circle (0.3);
+            
+            % Orbits
+            \draw[thick,blue!50] (0,0) ellipse (3 and 2.5);
+            \draw[thick,red!50] (0,0) ellipse (2 and 1.8);
+            
+            % Planets
+            \shade[ball color=blue!60] (3,0) circle (0.15);
+            \shade[ball color=red!60] (-1.5,1.2) circle (0.12);
+            
+            % Coordinate axes
+            \draw[->,thick] (-4,0) -- (4,0) node[right] {$x$};
+            \draw[->,thick] (0,-3) -- (0,3) node[above] {$z$};
+            
+            % Labels
+            \node at (3,-0.4) {\small Planet};
+            \node at (-1.5,1.6) {\small Asteroid};
+            \node at (0,-0.5) {\small Sun};
+        \end{tikzpicture}
+        \caption*{Heliocentric orbital dynamics}
+    \end{figure}
+    
+    \vfill
+    
+    {\Large\textbf{Michele Bigi}}\\[0.5cm]
+    {\large Version 1.0.0}\\[0.3cm]
+    {\large\today}\\[1cm]
+    
+    \vspace{1cm}
+    
+    \begin{minipage}{0.8\textwidth}
+        \centering
+        \small
+        \textit{A comprehensive C++17 library for celestial mechanics,\\
+        orbit determination, and astrodynamics calculations}
+    \end{minipage}
+    
+\end{titlepage}
+
+\clearpage

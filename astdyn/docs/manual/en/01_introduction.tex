@@ -1,0 +1,285 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{What is Celestial Mechanics?}
+
+Celestial mechanics is the branch of astronomy that deals with the motions of celestial bodies under the influence of gravitational forces. It provides the mathematical and physical framework for understanding:
+
+\begin{itemize}
+    \item The orbits of planets, moons, asteroids, and comets
+    \item Spacecraft trajectory design and mission analysis
+    \item Long-term stability of the solar system
+    \item Tidal effects and rotational dynamics
+    \item Formation and evolution of planetary systems
+\end{itemize}
+
+The field has a distinguished history, beginning with Johannes Kepler's empirical laws of planetary motion (1609-1619) and Isaac Newton's law of universal gravitation (1687). Newton showed that Kepler's laws could be derived from fundamental physical principles, marking the birth of theoretical celestial mechanics.
+
+\subsection{The Two-Body Problem}
+
+The cornerstone of celestial mechanics is the \textit{two-body problem}: determining the motion of two point masses interacting solely through mutual gravitational attraction. This problem has an elegant analytical solution, expressed in terms of six \textit{orbital elements} that completely specify the orbit.
+
+Consider two bodies with masses $m_1$ and $m_2$, separated by distance $r$. Newton's law of gravitation states:
+
+\begin{equation}
+F = G\frac{m_1 m_2}{r^2}
+\end{equation}
+
+where $G = 6.67430 \times 10^{-11}$ m$^3$ kg$^{-1}$ s$^{-2}$ is the gravitational constant.
+
+For a small body of mass $m$ orbiting a much larger body of mass $M$ (such as an asteroid orbiting the Sun), we can approximate the system as a one-body problem with the massive body at the origin. The equation of motion becomes:
+
+\begin{equation}
+\ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r}
+\end{equation}
+
+where $\mu = GM$ is the gravitational parameter and $\mathbf{r}$ is the position vector of the small body.
+
+\subsection{The N-Body Problem}
+
+In reality, celestial bodies exist in systems with multiple gravitating objects. The solar system, for instance, contains the Sun, eight major planets, numerous moons, asteroids, and comets—all exerting gravitational forces on one another. This is the \textit{N-body problem}.
+
+Unlike the two-body problem, the N-body problem has no general analytical solution for $N \geq 3$. Instead, we must resort to:
+
+\begin{enumerate}
+    \item \textbf{Perturbation theory}: Treating additional forces as small corrections to a two-body solution
+    \item \textbf{Numerical integration}: Computing orbits step-by-step using computers
+    \item \textbf{Special solutions}: Analytical results for restricted cases (e.g., Lagrange points)
+\end{enumerate}
+
+The AstDyn library implements all three approaches, with emphasis on perturbation theory and high-accuracy numerical integration.
+
+\section{Overview of the AstDyn Library}
+
+\subsection{Design Philosophy}
+
+The AstDyn library is built on several core principles:
+
+\begin{description}
+    \item[Accuracy] Numerical methods are chosen and tuned for high precision, validated against established software
+    \item[Modularity] Components are loosely coupled, allowing users to employ only needed functionality
+    \item[Clarity] Code is documented with references to mathematical formulations and literature
+    \item[Performance] Algorithms are optimized using modern C++ features without sacrificing readability
+    \item[Extensibility] Architecture supports adding new integrators, force models, and observation types
+\end{description}
+
+\subsection{Key Features}
+
+The library provides:
+
+\begin{itemize}
+    \item \textbf{Time systems}: Conversions between UTC, TAI, TT, TDB with accurate $\Delta T$ models
+    \item \textbf{Coordinate systems}: Transformations between ecliptic, equatorial, and planetary frames
+    \item \textbf{Orbital elements}: Keplerian, Cartesian, equinoctial, and Delaunay representations
+    \item \textbf{Numerical integration}: Runge-Kutta, Adams-Bashforth-Moulton, and adaptive methods
+    \item \textbf{Force models}: N-body gravitation, asteroid perturbations, relativistic effects
+    \item \textbf{Orbit propagation}: Forward/backward integration with state transition matrix
+    \item \textbf{Initial orbit determination}: Gauss's method for three observations
+    \item \textbf{Differential correction}: Least-squares orbit fitting to astrometric observations
+    \item \textbf{Ephemeris}: Planetary positions using VSOP87 and DE440/441
+    \item \textbf{Data I/O}: Parsers for OrbFit (.eq1, .rwo), MPC, and custom formats
+\end{itemize}
+
+\subsection{Software Architecture}
+
+Figure~\ref{fig:architecture} illustrates the high-level architecture:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm,
+    box/.style={rectangle, draw, fill=blue!10, text width=3cm, align=center, rounded corners, minimum height=1cm},
+    arrow/.style={->, >=stealth, thick}
+]
+    % Top layer
+    \node[box] (engine) {AstDynEngine\\{\small High-level API}};
+    
+    % Second layer
+    \node[box, below left=of engine] (prop) {Propagation};
+    \node[box, below right=of engine] (od) {Orbit\\Determination};
+    
+    % Third layer
+    \node[box, below=of prop] (integrator) {Numerical\\Integration};
+    \node[box, below=of od] (obs) {Observations\\\& Residuals};
+    
+    % Fourth layer
+    \node[box, below=of integrator] (coord) {Coordinates\\\& Time};
+    \node[box, below=of obs] (io) {Data I/O\\Parsers};
+    
+    % Bottom layer
+    \node[box, below=2cm of coord] (math) {Math \& Linear Algebra\\{\small Eigen3}};
+    
+    % Arrows
+    \draw[arrow] (engine) -- (prop);
+    \draw[arrow] (engine) -- (od);
+    \draw[arrow] (prop) -- (integrator);
+    \draw[arrow] (od) -- (obs);
+    \draw[arrow] (integrator) -- (coord);
+    \draw[arrow] (obs) -- (io);
+    \draw[arrow] (prop) -- (coord);
+    \draw[arrow] (od) -- (coord);
+    \draw[arrow] (integrator) -- (math);
+    \draw[arrow] (obs) -- (math);
+\end{tikzpicture}
+\caption{AstDyn library architecture showing layered design}
+\label{fig:architecture}
+\end{figure}
+
+The architecture follows a layered design:
+
+\begin{enumerate}
+    \item \textbf{Foundation layer}: Mathematical utilities and linear algebra (Eigen3)
+    \item \textbf{Core layer}: Time systems, coordinate transforms, orbital elements
+    \item \textbf{Algorithm layer}: Numerical integration, observation handling
+    \item \textbf{Application layer}: Orbit propagation, orbit determination
+    \item \textbf{Interface layer}: High-level API (AstDynEngine), data parsers
+\end{enumerate}
+
+\subsection{Dependencies}
+
+AstDyn relies on well-established libraries:
+
+\begin{description}
+    \item[Eigen3] Linear algebra operations (matrices, vectors, decompositions)
+    \item[Boost] Filesystem, date-time, program options
+    \item[GoogleTest] Unit testing framework (optional)
+\end{description}
+
+All dependencies are widely available and actively maintained.
+
+\section{Applications}
+
+The AstDyn library supports various applications:
+
+\subsection{Asteroid Orbit Determination}
+
+Given astrometric observations (right ascension and declination) of an asteroid from Earth-based telescopes, determine its heliocentric orbit. This is crucial for:
+
+\begin{itemize}
+    \item Predicting future positions for observing campaigns
+    \item Assessing collision risk with Earth
+    \item Planning spacecraft missions
+    \item Understanding asteroid populations and dynamics
+\end{itemize}
+
+Example: Chapter~\ref{ch:case_studies} presents a complete analysis of asteroid 203 Pompeja using 100 recent observations, achieving RMS residuals of 0.66 arcseconds.
+
+\subsection{Spacecraft Trajectory Analysis}
+
+Design and analyze spacecraft trajectories for:
+
+\begin{itemize}
+    \item Interplanetary transfers
+    \item Orbital maneuvers
+    \item Station-keeping operations
+    \item Close-approach analysis
+\end{itemize}
+
+The library's high-accuracy propagation and ability to compute state transition matrices make it suitable for preliminary mission design.
+
+\subsection{Long-term Orbit Evolution}
+
+Study the long-term behavior of small bodies under planetary perturbations:
+
+\begin{itemize}
+    \item Secular evolution of orbital elements
+    \item Resonance identification
+    \item Chaos and stability analysis
+    \item Impact probability estimation
+\end{itemize}
+
+\subsection{Educational Tool}
+
+The library serves as an educational resource for students learning:
+
+\begin{itemize}
+    \item Practical implementation of textbook algorithms
+    \item Numerical methods in astrodynamics
+    \item Software engineering for scientific computing
+    \item Modern C++ programming techniques
+\end{itemize}
+
+\section{Validation and Accuracy}
+
+A key strength of AstDyn is rigorous validation against established software:
+
+\begin{itemize}
+    \item \textbf{OrbFit}: Comparison of orbit determination results for asteroid 203 Pompeja shows agreement of $\Delta a = 578$ km, $\Delta e = 0.0006$, $\Delta i = 5''$
+    \item \textbf{JPL Horizons}: Ephemeris comparisons validate planetary perturbation models
+    \item \textbf{Analytical solutions}: Two-body propagation tested against Keplerian formulas
+\end{itemize}
+
+Detailed validation studies are presented in Chapter~\ref{ch:validation}.
+
+\section{Getting Started}
+
+\subsection{Installation}
+
+The library can be built using CMake:
+
+\begin{lstlisting}[style=cpp,caption={Building AstDyn}]
+git clone https://github.com/manvalan/ITALOccultLibrary.git
+cd ITALOccultLibrary/astdyn
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j8
+\end{lstlisting}
+
+This produces:
+\begin{itemize}
+    \item \texttt{libastdyn.a} (static library, 1.5 MB, 1232 symbols)
+    \item \texttt{libastdyn.dylib} (shared library, 877 KB)
+\end{itemize}
+
+\subsection{Quick Example}
+
+A minimal example propagating an orbit:
+
+\begin{lstlisting}[style=cpp,caption={Basic orbit propagation}]
+#include <astdyn/AstDyn.hpp>
+using namespace astdyn;
+
+int main() {
+    // Define orbital elements (asteroid in AU, radians)
+    propagation::KeplerianElements orbit;
+    orbit.epoch = 61000.0;  // MJD TDB
+    orbit.a = 2.7;          // semi-major axis (AU)
+    orbit.e = 0.15;         // eccentricity
+    orbit.i = 10.0 * constants::DEG_TO_RAD;
+    orbit.Omega = 80.0 * constants::DEG_TO_RAD;
+    orbit.omega = 73.0 * constants::DEG_TO_RAD;
+    orbit.M = 45.0 * constants::DEG_TO_RAD;
+    orbit.gm = constants::GMS;  // Sun's GM
+    
+    // Create propagator
+    propagation::Propagator prop;
+    
+    // Propagate 1 year forward
+    double target_mjd = orbit.epoch + 365.25;
+    auto result = prop.propagate_keplerian(orbit, target_mjd);
+    
+    // Print results
+    std::cout << "Position: " << result.position.transpose() << " AU\n";
+    std::cout << "Velocity: " << result.velocity.transpose() << " AU/day\n";
+    
+    return 0;
+}
+\end{lstlisting}
+
+More comprehensive examples are provided in Chapter~\ref{ch:examples}.
+
+\section{Organization of Remaining Chapters}
+
+The remainder of this manual is organized as follows:
+
+\textbf{Chapters 2-7} (Part I) establish theoretical foundations: time systems, coordinates, orbital elements, two-body dynamics, and perturbations.
+
+\textbf{Chapters 8-11} (Part II) describe numerical methods: integration algorithms, propagation, state transition matrices, and ephemeris computation.
+
+\textbf{Chapters 12-15} (Part III) cover orbit determination: observation models, initial orbit determination, differential correction, and residual analysis.
+
+\textbf{Chapters 16-20} (Part IV) document the library implementation: architecture, core modules, parsers, API reference, and examples.
+
+\textbf{Chapters 21-23} (Part V) present validation studies, real-world applications, and performance benchmarks.
+
+Each chapter includes mathematical derivations, implementation notes, and working code examples to bridge theory and practice.

@@ -1,0 +1,505 @@
+\chapter{State Transition Matrix}
+\label{ch:state_transition}
+
+\section{Introduction}
+
+The \textbf{state transition matrix} (STM) is fundamental to orbit determination, tracking small perturbations in orbital motion and propagating uncertainties. This chapter develops the mathematical theory and practical computation of the STM.
+
+\section{Mathematical Foundation}
+
+\subsection{Linearization of Dynamics}
+
+Consider the general orbital dynamics:
+
+\begin{equation}
+    \dot{\mathbf{y}} = \mathbf{f}(t, \mathbf{y})
+\end{equation}
+
+where $\mathbf{y} = [\mathbf{r}, \mathbf{v}]^T$ is the 6-dimensional state vector.
+
+For a reference trajectory $\mathbf{y}_{\text{ref}}(t)$ and a perturbed trajectory $\mathbf{y}(t)$, define:
+
+\begin{equation}
+    \delta\mathbf{y}(t) = \mathbf{y}(t) - \mathbf{y}_{\text{ref}}(t)
+\end{equation}
+
+\subsection{Variational Equations}
+
+Assuming small perturbations, we linearize:
+
+\begin{equation}
+    \delta\dot{\mathbf{y}} = \frac{\partial\mathbf{f}}{\partial\mathbf{y}}\bigg|_{\mathbf{y}_{\text{ref}}} \delta\mathbf{y} = \mathbf{A}(t) \delta\mathbf{y}
+\end{equation}
+
+where $\mathbf{A}(t)$ is the $6 \times 6$ Jacobian matrix:
+
+\begin{equation}
+    \mathbf{A} = \begin{bmatrix}
+        \frac{\partial\mathbf{f}_r}{\partial\mathbf{r}} & \frac{\partial\mathbf{f}_r}{\partial\mathbf{v}} \\[8pt]
+        \frac{\partial\mathbf{f}_v}{\partial\mathbf{r}} & \frac{\partial\mathbf{f}_v}{\partial\mathbf{v}}
+    \end{bmatrix} = \begin{bmatrix}
+        \mathbf{0}_{3\times3} & \mathbf{I}_{3\times3} \\[8pt]
+        \frac{\partial\mathbf{a}}{\partial\mathbf{r}} & \frac{\partial\mathbf{a}}{\partial\mathbf{v}}
+    \end{bmatrix}
+\end{equation}
+
+\subsection{State Transition Matrix Definition}
+
+The \textbf{state transition matrix} $\Phi(t, t_0)$ is the solution to:
+
+\begin{equation}
+    \frac{d\Phi}{dt} = \mathbf{A}(t)\Phi(t, t_0), \quad \Phi(t_0, t_0) = \mathbf{I}_{6\times6}
+\end{equation}
+
+It relates state perturbations at different times:
+
+\begin{equation}
+    \delta\mathbf{y}(t) = \Phi(t, t_0) \delta\mathbf{y}(t_0)
+\end{equation}
+
+\subsection{Properties}
+
+The STM has important properties:
+
+\begin{enumerate}
+    \item \textbf{Identity at $t_0$}: $\Phi(t_0, t_0) = \mathbf{I}$
+    \item \textbf{Composition}: $\Phi(t_2, t_0) = \Phi(t_2, t_1)\Phi(t_1, t_0)$
+    \item \textbf{Inverse}: $\Phi(t_0, t) = \Phi^{-1}(t, t_0)$
+    \item \textbf{Determinant}: $\det[\Phi(t, t_0)] = \exp\left[\int_{t_0}^t \text{tr}(\mathbf{A}(\tau))d\tau\right]$
+\end{enumerate}
+
+For conservative systems (Hamiltonian), the STM is symplectic: $\Phi^T\mathbf{J}\Phi = \mathbf{J}$ where $\mathbf{J}$ is the symplectic matrix.
+
+\section{Jacobian Matrix Computation}
+
+\subsection{Two-Body Problem}
+
+For the unperturbed Kepler problem:
+
+\begin{equation}
+    \mathbf{a} = -\frac{\mu}{r^3}\mathbf{r}
+\end{equation}
+
+The acceleration partials are:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}}{\partial\mathbf{r}} = -\frac{\mu}{r^3}\left[\mathbf{I} - 3\frac{\mathbf{r}\mathbf{r}^T}{r^2}\right]
+\end{equation}
+
+\begin{equation}
+    \frac{\partial\mathbf{a}}{\partial\mathbf{v}} = \mathbf{0}_{3\times3}
+\end{equation}
+
+Thus:
+
+\begin{equation}
+    \mathbf{A}_{\text{2-body}} = \begin{bmatrix}
+        \mathbf{0} & \mathbf{I} \\[8pt]
+        -\frac{\mu}{r^3}\left[\mathbf{I} - 3\frac{\mathbf{r}\mathbf{r}^T}{r^2}\right] & \mathbf{0}
+    \end{bmatrix}
+\end{equation}
+
+\subsection{N-Body Perturbations}
+
+For planetary perturbations, the acceleration is:
+
+\begin{equation}
+    \mathbf{a}_p = \mu_p \left[\frac{\mathbf{r}_p - \mathbf{r}}{|\mathbf{r}_p - \mathbf{r}|^3} - \frac{\mathbf{r}_p}{r_p^3}\right]
+\end{equation}
+
+The partial derivative with respect to position:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}_p}{\partial\mathbf{r}} = -\frac{\mu_p}{d^3}\left[\mathbf{I} - 3\frac{\mathbf{d}\mathbf{d}^T}{d^2}\right]
+\end{equation}
+
+where $\mathbf{d} = \mathbf{r}_p - \mathbf{r}$ and $d = |\mathbf{d}|$.
+
+\subsection{Relativistic Corrections}
+
+The post-Newtonian acceleration includes velocity-dependent terms:
+
+\begin{equation}
+    \mathbf{a}_{\text{GR}} = \frac{\mu}{c^2 r^3}\left[4\frac{\mu}{r}\mathbf{r} - v^2\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
+\end{equation}
+
+Both $\partial\mathbf{a}_{\text{GR}}/\partial\mathbf{r}$ and $\partial\mathbf{a}_{\text{GR}}/\partial\mathbf{v}$ are non-zero.
+
+For position:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}_{\text{GR}}}{\partial\mathbf{r}} = \frac{\mu}{c^2 r^3}\left[-v^2\mathbf{I} + 4(\mathbf{v}\mathbf{v}^T) + \text{(higher order terms)}\right]
+\end{equation}
+
+For velocity:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}_{\text{GR}}}{\partial\mathbf{v}} = \frac{\mu}{c^2 r^3}\left[-2v\mathbf{r}\mathbf{v}^T + 4\mathbf{v}\mathbf{r}^T + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{I}\right]
+\end{equation}
+
+\subsection{Solar Radiation Pressure}
+
+For SRP with constant area-to-mass ratio:
+
+\begin{equation}
+    \mathbf{a}_{\text{SRP}} = P_\odot \frac{A}{m} C_R \left(\frac{r_0}{r}\right)^2 \hat{\mathbf{r}}
+\end{equation}
+
+The partial is:
+
+\begin{equation}
+    \frac{\partial\mathbf{a}_{\text{SRP}}}{\partial\mathbf{r}} = P_\odot \frac{A}{m} C_R r_0^2 \left[\frac{\mathbf{I}}{r^3} - 3\frac{\mathbf{r}\mathbf{r}^T}{r^5}\right]
+\end{equation}
+
+\section{Numerical Computation}
+
+\subsection{Augmented State Vector}
+
+To compute the STM numerically, augment the state vector:
+
+\begin{equation}
+    \tilde{\mathbf{y}} = \begin{bmatrix} \mathbf{y} \\ \text{vec}(\Phi) \end{bmatrix} \in \mathbb{R}^{42}
+\end{equation}
+
+where $\text{vec}(\Phi)$ stacks the 36 elements of $\Phi$ column-wise.
+
+\subsection{Augmented Dynamics}
+
+The augmented system is:
+
+\begin{equation}
+    \frac{d\tilde{\mathbf{y}}}{dt} = \begin{bmatrix} \mathbf{f}(\mathbf{y}) \\ \text{vec}(\mathbf{A}(\mathbf{y})\Phi) \end{bmatrix}
+\end{equation}
+
+In practice, we integrate:
+\begin{itemize}
+    \item 6 equations for the state $\mathbf{y}$
+    \item 36 equations for the STM elements
+    \item Total: 42 coupled ODEs
+\end{itemize}
+
+\subsection{Implementation in AstDyn}
+
+\begin{lstlisting}[language=C++,caption={STM propagation}]
+#include <astdyn/propagation/Propagator.hpp>
+
+using namespace astdyn;
+
+Vector6d y0 = ...;  // Initial state
+double t0 = 60000.0;
+double tf = 60100.0;
+
+Propagator prop(force_model);
+prop.enable_stm(true);  // Enable STM computation
+
+// Propagate state and STM
+auto result = prop.propagate_with_stm(y0, t0, tf);
+
+Vector6d yf = result.state;
+Matrix6d Phi = result.stm;  // 6x6 state transition matrix
+
+std::cout << "STM determinant: " << Phi.determinant() << "\n";
+std::cout << "STM condition number: " 
+          << Phi.norm() * Phi.inverse().norm() << "\n";
+\end{lstlisting}
+
+\subsection{Computational Cost}
+
+STM computation increases computational cost:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Computation} & \textbf{State Equations} & \textbf{CPU Time Factor} \\
+\midrule
+State only & 6 & 1.0$\times$ \\
+State + STM & 42 & 5-7$\times$ \\
+State + STM + sensitivity & 42 + 6$N_p$ & 10-15$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Computational cost of STM propagation. $N_p$ is number of parameters.}
+\label{tab:stm_cost}
+\end{table}
+
+\section{Applications}
+
+\subsection{Orbit Determination}
+
+In differential correction (least squares orbit fitting), we need:
+
+\begin{equation}
+    \frac{\partial\mathbf{y}(t_{\text{obs}})}{\partial\mathbf{y}(t_0)} = \Phi(t_{\text{obs}}, t_0)
+\end{equation}
+
+This relates observations to initial conditions, enabling iterative orbit refinement.
+
+\subsection{Covariance Propagation}
+
+Given initial covariance $\mathbf{P}_0$, the covariance at time $t$ is:
+
+\begin{equation}
+    \mathbf{P}(t) = \Phi(t, t_0) \mathbf{P}_0 \Phi^T(t, t_0)
+\end{equation}
+
+This quantifies uncertainty growth over time.
+
+Example:
+\begin{lstlisting}[language=C++,caption={Covariance propagation}]
+Matrix6d P0 = initial_covariance();  // km^2, (km/s)^2
+Matrix6d Phi = result.stm;
+
+Matrix6d Pf = Phi * P0 * Phi.transpose();
+
+// Position uncertainty at final time
+Vector3d sigma_pos = Pf.block<3,3>(0,0).diagonal().cwiseSqrt();
+std::cout << "Position uncertainty: " 
+          << sigma_pos.transpose() << " km\n";
+\end{lstlisting}
+
+\subsection{Sensitivity Analysis}
+
+The STM reveals how perturbations in initial conditions affect future states:
+
+\begin{equation}
+    \frac{\partial r(t)}{\partial r_0} = \Phi_{11}(t, t_0), \quad
+    \frac{\partial r(t)}{\partial v_0} = \Phi_{12}(t, t_0)
+\end{equation}
+
+These are the upper-left and upper-right $3 \times 3$ blocks of $\Phi$.
+
+\subsection{Maneuver Optimization}
+
+For spacecraft trajectory design, the STM helps compute:
+\begin{itemize}
+    \item Targeting matrices (where to aim to hit a target)
+    \item $\Delta v$ requirements
+    \item Sensitivity to execution errors
+\end{itemize}
+
+\section{Analytical vs Numerical STM}
+
+\subsection{Analytical STM for Keplerian Motion}
+
+For the unperturbed two-body problem, closed-form solutions exist. The STM can be expressed in terms of orbital elements and their derivatives.
+
+Advantages:
+\begin{itemize}
+    \item Exact (no numerical error)
+    \item Fast to evaluate
+    \item Valid for long time spans
+\end{itemize}
+
+Disadvantages:
+\begin{itemize}
+    \item Complex formulas (especially near singularities)
+    \item Doesn't include perturbations
+    \item Limited practical use
+\end{itemize}
+
+\subsection{Numerical STM}
+
+Integrating the variational equations numerically:
+
+Advantages:
+\begin{itemize}
+    \item Handles arbitrary force models
+    \item Straightforward implementation
+    \item Includes all perturbations
+\end{itemize}
+
+Disadvantages:
+\begin{itemize}
+    \item Numerical error accumulation
+    \item 7$\times$ slower than state-only propagation
+    \item Ill-conditioning for long arcs
+\end{itemize}
+
+\subsection{Hybrid Approaches}
+
+For some applications, use:
+\begin{enumerate}
+    \item Analytical STM for Keplerian part
+    \item Numerical perturbation corrections
+    \item State transition composition
+\end{enumerate}
+
+\section{Numerical Stability}
+
+\subsection{Conditioning Issues}
+
+The STM becomes ill-conditioned for:
+\begin{itemize}
+    \item Long propagation times ($>$ several orbital periods)
+    \item High eccentricity orbits
+    \item Nearly rectilinear motion
+\end{itemize}
+
+Condition number growth:
+
+\begin{equation}
+    \kappa(\Phi) \approx \exp\left(\lambda_{\max} \Delta t\right)
+\end{equation}
+
+where $\lambda_{\max}$ is the largest Lyapunov exponent.
+
+\subsection{Mitigation Strategies}
+
+\textbf{1. Relinearization}
+
+Instead of propagating from $t_0$ to $t_f$, divide into segments:
+
+\begin{equation}
+    \Phi(t_f, t_0) = \Phi(t_f, t_2) \Phi(t_2, t_1) \Phi(t_1, t_0)
+\end{equation}
+
+Each segment has better conditioning.
+
+\textbf{2. State transition in orbital elements}
+
+Instead of Cartesian STM, use:
+
+\begin{equation}
+    \frac{\partial\mathbf{e}(t)}{\partial\mathbf{e}(t_0)}
+\end{equation}
+
+where $\mathbf{e} = [a, e, i, \Omega, \omega, M]$ are orbital elements.
+
+\textbf{3. Regularization}
+
+Use regularized coordinates (Kustaanheimo-Stiefel, Sperling-Burdet) that are better behaved near periapsis.
+
+\section{Practical Example}
+
+\subsection{Target Tracking}
+
+Track uncertainty in asteroid position for impact assessment:
+
+\begin{lstlisting}[language=C++,caption={Asteroid uncertainty propagation}]
+// Initial state from orbit determination
+Vector6d y0 = {1.1, 0.2, 0.05, -0.01, 0.03, 0.0};  // AU, AU/day
+
+// Initial covariance (from least squares fit)
+Matrix6d P0 = Matrix6d::Zero();
+P0.diagonal() << 1e-8, 1e-8, 1e-9,  // pos: 1500 km
+                 1e-11, 1e-11, 1e-12;  // vel: 0.15 m/s
+
+ForceModel forces;
+forces.enable_planets({"Earth", "Jupiter", "Venus", "Mars"});
+
+Propagator prop(forces);
+prop.enable_stm(true);
+
+// Propagate 10 years
+double t0 = 60000.0;
+double tf = t0 + 3652.5;  // 10 years
+
+auto result = prop.propagate_with_stm(y0, t0, tf);
+
+// Compute uncertainty at future time
+Matrix6d Pf = result.stm * P0 * result.stm.transpose();
+
+// Position uncertainty (3-sigma)
+Vector3d sigma_3 = 3.0 * Pf.block<3,3>(0,0).diagonal().cwiseSqrt();
+std::cout << "Position uncertainty (3-sigma): \n";
+std::cout << sigma_3.transpose() * AU_TO_KM << " km\n";
+
+// Check for Earth close approach
+Vector6d earth_state = ephemeris.get_planet("Earth", tf);
+Vector3d rel_pos = result.state.head<3>() - earth_state.head<3>();
+double distance = rel_pos.norm() * AU_TO_KM;
+
+std::cout << "Distance to Earth: " << distance << " km\n";
+std::cout << "Impact probability (Gaussian): ";
+if (distance < 3.0 * sigma_3.norm() * AU_TO_KM) {
+    std::cout << "NON-ZERO - further analysis required\n";
+} else {
+    std::cout << "Negligible\n";
+}
+\end{lstlisting}
+
+\subsection{Observation Planning}
+
+Determine optimal observation times to reduce uncertainty:
+
+\begin{lstlisting}[language=C++,caption={Observation planning}]
+// Propagate with STM to multiple observation epochs
+std::vector<double> obs_times = {t0 + 30, t0 + 60, t0 + 90};
+
+for (double t_obs : obs_times) {
+    auto result = prop.propagate_with_stm(y0, t0, t_obs);
+    Matrix6d P = result.stm * P0 * result.stm.transpose();
+    
+    // RA/Dec uncertainty from position uncertainty
+    Vector3d r = result.state.head<3>();
+    double dec = std::asin(r(2) / r.norm());
+    double ra = std::atan2(r(1), r(0));
+    
+    // Simple approximation (full calculation uses observation partials)
+    double sigma_ra = P(0,0) / (r.norm() * std::cos(dec));
+    double sigma_dec = P(2,2) / r.norm();
+    
+    std::cout << "Epoch " << t_obs << ": "
+              << "sigma_RA = " << sigma_ra * RAD_TO_ARCSEC << " arcsec, "
+              << "sigma_Dec = " << sigma_dec * RAD_TO_ARCSEC << " arcsec\n";
+}
+\end{lstlisting}
+
+\section{Parameter Sensitivity}
+
+\subsection{Extended State Vector}
+
+To study sensitivity to dynamical parameters (e.g., $\mu$, $C_R$, asteroid masses), augment the state:
+
+\begin{equation}
+    \tilde{\mathbf{y}} = \begin{bmatrix} \mathbf{y} \\ \mathbf{p} \end{bmatrix}
+\end{equation}
+
+where $\mathbf{p}$ are parameters. Then:
+
+\begin{equation}
+    \frac{d}{dt}\begin{bmatrix} \mathbf{y} \\ \mathbf{p} \end{bmatrix} = \begin{bmatrix} \mathbf{f}(\mathbf{y}, \mathbf{p}) \\ \mathbf{0} \end{bmatrix}
+\end{equation}
+
+The extended STM includes $\partial\mathbf{y}/\partial\mathbf{p}$.
+
+\subsection{Sensitivity Matrices}
+
+Define sensitivity matrix:
+
+\begin{equation}
+    \mathbf{S}(t) = \frac{\partial\mathbf{y}(t)}{\partial\mathbf{p}}
+\end{equation}
+
+It satisfies:
+
+\begin{equation}
+    \frac{d\mathbf{S}}{dt} = \mathbf{A}(t)\mathbf{S} + \frac{\partial\mathbf{f}}{\partial\mathbf{p}}
+\end{equation}
+
+This reveals how orbital motion depends on physical parameters.
+
+\section{Summary}
+
+Key concepts about the state transition matrix:
+
+\begin{enumerate}
+    \item The \textbf{STM} $\Phi(t, t_0)$ propagates small perturbations linearly
+    \item It satisfies \textbf{variational equations}: $\dot{\Phi} = \mathbf{A}(t)\Phi$
+    \item \textbf{Jacobian matrix} $\mathbf{A}$ contains force model derivatives
+    \item \textbf{Numerical computation} requires integrating 42 ODEs (6 state + 36 STM)
+    \item \textbf{Applications}: orbit determination, covariance propagation, sensitivity analysis
+    \item \textbf{Conditioning} degrades for long arcs; use relinearization
+    \item \textbf{Extended STM} includes parameter sensitivity
+\end{enumerate}
+
+Understanding the STM is essential for:
+\begin{itemize}
+    \item Precise orbit determination (Chapter 14)
+    \item Uncertainty quantification
+    \item Mission design and targeting
+    \item Parameter estimation
+    \item Impact probability assessment
+\end{itemize}
+
+The next chapter covers ephemeris computation and interpolation methods for efficient state lookup.

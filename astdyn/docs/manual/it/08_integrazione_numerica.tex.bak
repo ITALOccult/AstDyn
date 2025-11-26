@@ -1,0 +1,372 @@
+\chapter{Metodi di Integrazione Numerica}
+\label{ch:integrazione_numerica}
+
+\section{Introduzione}
+
+Nel Capitolo~\ref{ch:perturbazioni}, abbiamo visto che il moto orbitale con perturbazioni richiede la risoluzione di:
+
+\begin{equation}
+    \ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r} + \mathbf{a}_{\text{pert}}(t, \mathbf{r}, \dot{\mathbf{r}})
+\end{equation}
+
+Per perturbazioni generali, questa equazione differenziale non ha soluzione in forma chiusa. Dobbiamo usare l'\textbf{integrazione numerica} per calcolare l'orbita passo dopo passo.
+
+Questo capitolo esamina le principali classi di integratori usati in meccanica celeste e discute i loro punti di forza, debolezze e implementazione in AstDyn.
+
+\subsection{Il Problema ai Valori Iniziali}
+
+Cerchiamo di risolvere:
+\begin{equation}
+    \dot{\mathbf{y}} = \mathbf{f}(t, \mathbf{y}), \quad \mathbf{y}(t_0) = \mathbf{y}_0
+\end{equation}
+
+dove $\mathbf{y} = [\mathbf{r}, \mathbf{v}]^T$ è il vettore di stato a 6 dimensioni.
+
+L'obiettivo è avanzare da $(t_0, \mathbf{y}_0)$ a $(t_f, \mathbf{y}_f)$ con errore controllato.
+
+\section{Metodo di Eulero}
+
+L'integratore più semplice è il \textbf{metodo di Eulero}:
+
+\begin{equation}
+    \mathbf{y}_{n+1} = \mathbf{y}_n + h\mathbf{f}(t_n, \mathbf{y}_n)
+\end{equation}
+
+dove $h = t_{n+1} - t_n$ è la dimensione del passo.
+
+\textbf{Pro}: Semplice, esplicito
+\textbf{Contro}: Accuratezza del primo ordine (errore $O(h^2)$ per passo), instabile per problemi stiff
+
+Il metodo di Eulero è raramente usato in pratica tranne che per scopi pedagogici.
+
+\section{Metodi Runge-Kutta}
+
+\subsection{Il Metodo RK4}
+
+Il classico metodo \textbf{Runge-Kutta del quarto ordine} (RK4) è:
+
+\begin{align}
+    k_1 &= h\mathbf{f}(t_n, \mathbf{y}_n) \\
+    k_2 &= h\mathbf{f}(t_n + h/2, \mathbf{y}_n + k_1/2) \\
+    k_3 &= h\mathbf{f}(t_n + h/2, \mathbf{y}_n + k_2/2) \\
+    k_4 &= h\mathbf{f}(t_n + h, \mathbf{y}_n + k_3) \\
+    \mathbf{y}_{n+1} &= \mathbf{y}_n + \frac{1}{6}(k_1 + 2k_2 + 2k_3 + k_4)
+\end{align}
+
+\textbf{Pro}: Accuratezza del quarto ordine ($O(h^5)$ per passo), auto-avviante, facile da implementare
+\textbf{Contro}: Richiede 4 valutazioni di funzione per passo, nessuna stima dell'errore
+
+RK4 è ampiamente usato per problemi di accuratezza moderata.
+
+\subsection{Metodi Runge-Kutta Incorporati}
+
+Per il controllo adattivo della dimensione del passo, usiamo metodi \textbf{incorporati} che forniscono due soluzioni di ordini diversi:
+
+\textbf{Runge-Kutta-Fehlberg 4(5)} (RKF45):
+\begin{itemize}
+    \item Calcola soluzioni di 4° e 5° ordine
+    \item Stima dell'errore: $\epsilon = |\mathbf{y}_5 - \mathbf{y}_4|$
+    \item 6 valutazioni di funzione per passo
+\end{itemize}
+
+\textbf{Dormand-Prince 5(4)} (DOPRI54 o RK54):
+\begin{itemize}
+    \item Coefficienti ottimizzati per migliore stabilità
+    \item 7 valutazioni di funzione (una riusata per il passo successivo)
+    \item Default in ode45 di MATLAB
+\end{itemize}
+
+\textbf{Runge-Kutta 7(8)} (RK78):
+\begin{itemize}
+    \item Soluzioni di 7° e 8° ordine
+    \item 13 valutazioni di funzione
+    \item Migliore per requisiti di alta accuratezza
+\end{itemize}
+
+\subsection{Controllo della Dimensione del Passo}
+
+Data la stima dell'errore $\epsilon$, si aggiusta la dimensione del passo $h$:
+
+\begin{equation}
+    h_{\text{new}} = h_{\text{old}} \left(\frac{\text{tol}}{\epsilon}\right)^{1/(q+1)} \times \text{fattore di sicurezza}
+\end{equation}
+
+dove $q$ è l'ordine e il fattore di sicurezza $\approx 0.9$.
+
+Se $\epsilon > \text{tol}$: rifiuta il passo, riduci $h$
+Se $\epsilon < \text{tol}$: accetta il passo, eventualmente aumenta $h$
+
+\section{Metodi Multipasso}
+
+\subsection{Adams-Bashforth-Moulton (ABM)}
+
+I metodi multipasso usano informazioni dai passi precedenti. La \textbf{famiglia Adams} è popolare:
+
+\textbf{Adams-Bashforth (predittore esplicito)}:
+\begin{equation}
+    \mathbf{y}_{n+1}^P = \mathbf{y}_n + h\sum_{i=0}^{k-1} \beta_i \mathbf{f}_{n-i}
+\end{equation}
+
+\textbf{Adams-Moulton (correttore implicito)}:
+\begin{equation}
+    \mathbf{y}_{n+1}^C = \mathbf{y}_n + h\sum_{i=-1}^{k-1} \beta_i^* \mathbf{f}_{n-i}
+\end{equation}
+
+La modalità \textbf{predittore-correttore} (PC) valuta:
+\begin{enumerate}
+    \item Predice $\mathbf{y}_{n+1}^P$ usando Adams-Bashforth
+    \item Valuta $\mathbf{f}_{n+1} = \mathbf{f}(t_{n+1}, \mathbf{y}_{n+1}^P)$
+    \item Corregge $\mathbf{y}_{n+1}^C$ usando Adams-Moulton
+\end{enumerate}
+
+\textbf{ABM12}: Adams-Bashforth-Moulton del 12° ordine
+\begin{itemize}
+    \item Usa 12 passi precedenti
+    \item Accuratezza molto alta per problemi regolari
+    \item Usato dal JPL per le effemeridi planetarie
+\end{itemize}
+
+\textbf{Pro}: Alto ordine con poche valutazioni di funzione (2 per passo dopo l'avvio)
+\textbf{Contro}: Non auto-avviante, richiede passo fisso (o algoritmo a passo variabile attento)
+
+\subsection{Formule di Differenziazione all'Indietro (BDF)}
+
+Per problemi \textbf{stiff} (non comuni in meccanica orbitale), si preferiscono i metodi BDF:
+
+\begin{equation}
+    \sum_{i=0}^{k} \alpha_i \mathbf{y}_{n+1-i} = h\mathbf{f}(t_{n+1}, \mathbf{y}_{n+1})
+\end{equation}
+
+Questi sono impliciti e richiedono la risoluzione di equazioni non lineari ad ogni passo.
+
+\section{Integratori Simplettici}
+
+\subsection{Meccanica Hamiltoniana}
+
+Per sistemi conservativi, le equazioni del moto possono essere scritte in forma hamiltoniana:
+
+\begin{align}
+    \dot{\mathbf{q}} &= \frac{\partial H}{\partial \mathbf{p}} \\
+    \dot{\mathbf{p}} &= -\frac{\partial H}{\partial \mathbf{q}}
+\end{align}
+
+dove $\mathbf{q}$ sono le posizioni, $\mathbf{p}$ sono i momenti, e $H$ è l'hamiltoniana (energia totale).
+
+\subsection{Proprietà Simplettica}
+
+Un metodo è \textbf{simplettico} se preserva la struttura simplettica dello spazio delle fasi. Questo assicura:
+\begin{itemize}
+    \item L'energia oscilla attorno al valore vero (nessuna deriva sistematica)
+    \item Stabilità a lungo termine
+    \item Preservazione di strutture geometriche (es., orbite periodiche)
+\end{itemize}
+
+\subsection{Metodo Leapfrog}
+
+L'integratore simplettico più semplice è il \textbf{leapfrog} (Verlet):
+
+\begin{align}
+    \mathbf{v}_{n+1/2} &= \mathbf{v}_n + \frac{h}{2}\mathbf{a}_n \\
+    \mathbf{r}_{n+1} &= \mathbf{r}_n + h\mathbf{v}_{n+1/2} \\
+    \mathbf{v}_{n+1} &= \mathbf{v}_{n+1/2} + \frac{h}{2}\mathbf{a}_{n+1}
+\end{align}
+
+\textbf{Pro}: Simplettico, secondo ordine, semplice
+\textbf{Contro}: Richiede la separazione dell'hamiltoniana, non adatto per forze dipendenti dalla velocità
+
+\subsection{Metodi Simplettici di Ordine Superiore}
+
+\textbf{Metodo di Yoshida} (simplettico del 4° ordine):
+\begin{itemize}
+    \item Composizione di passi leapfrog con coefficienti scelti attentamente
+    \item Usato in simulazioni N-body
+\end{itemize}
+
+\textbf{Metodo Wisdom-Holman}:
+\begin{itemize}
+    \item Separa l'hamiltoniana in parti kepleriana + perturbazione
+    \item La parte kepleriana è risolta analiticamente
+    \item Le perturbazioni sono gestite con impulsi
+\end{itemize}
+
+I metodi simplettici sono ideali per integrazioni a lungo termine ($10^6$-$10^9$ anni) dove la conservazione dell'energia è critica.
+
+\section{Analisi dell'Errore}
+
+\subsection{Errore Locale vs Globale}
+
+\textbf{Errore di troncamento locale (LTE)}: Errore introdotto in un singolo passo
+
+\textbf{Errore globale}: Errore accumulato dopo molti passi
+
+Per un metodo di ordine $p$:
+\begin{itemize}
+    \item LTE $\propto h^{p+1}$
+    \item Errore globale $\propto h^p$ (su intervallo fisso)
+\end{itemize}
+
+\subsection{Compromesso Accuratezza vs Efficienza}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Metodo} & \textbf{Ordine} & \textbf{Eval/passo} & \textbf{Migliore Per} \\
+\midrule
+Eulero & 1 & 1 & Solo didattica \\
+RK4 & 4 & 4 & Accuratezza moderata \\
+RKF45 & 4(5) & 6 & Uso generale \\
+DOPRI54 & 5(4) & 7 & Alta accuratezza \\
+RK78 & 7(8) & 13 & Altissima accuratezza \\
+ABM12 & 12 & 2 & Regolare, alta accuratezza \\
+Leapfrog & 2 & 2 & Lungo termine, conservativo \\
+\bottomrule
+\end{tabular}
+\caption{Confronto dei metodi di integrazione numerica.}
+\label{tab:integratori}
+\end{table}
+
+\subsection{Fonti di Errore}
+
+Nella determinazione orbitale, gli errori provengono da:
+
+\begin{enumerate}
+    \item \textbf{Errore di troncamento}: Dimensione del passo finita
+    \item \textbf{Errore di arrotondamento}: Aritmetica a precisione finita
+    \item \textbf{Errore nel modello di forze}: Perturbazioni incomplete o inaccurate
+    \item \textbf{Errore nelle effemeridi}: Incertezze nelle posizioni planetarie
+\end{enumerate}
+
+Per lavoro ad alta precisione, tutte le fonti devono essere controllate.
+
+\section{Considerazioni Pratiche}
+
+\subsection{Scelta di un Integratore}
+
+\textbf{Per determinazione orbitale (giorni ad anni)}:
+\begin{itemize}
+    \item DOPRI54 con dimensione del passo adattiva
+    \item Tolleranza: $10^{-12}$ a $10^{-14}$
+\end{itemize}
+
+\textbf{Per evoluzione a lungo termine (milioni di anni)}:
+\begin{itemize}
+    \item Wisdom-Holman o Yoshida simplettico
+    \item Dimensione del passo fissa (0.1-1 giorno)
+\end{itemize}
+
+\textbf{Per applicazioni in tempo reale}:
+\begin{itemize}
+    \item RK4 con dimensione del passo fissa
+    \item Precalcola la dimensione del passo per stabilità
+\end{itemize}
+
+\subsection{Selezione della Dimensione del Passo}
+
+Regola empirica: $h \approx 0.01 \times T_{\text{orbita}}$
+
+Per asteroide a 2.5 AU:
+\begin{itemize}
+    \item Periodo $T \approx 4$ anni = 1461 giorni
+    \item Buona dimensione del passo: $h \approx 10$-15 giorni
+\end{itemize}
+
+I metodi adattivi regolano automaticamente $h$ in base al comportamento locale.
+
+\subsection{Dimensione del Passo Iniziale}
+
+Per metodi adattivi, stima della dimensione del passo iniziale:
+
+\begin{equation}
+    h_0 = 0.01 \times \min\left(\frac{|\mathbf{r}|}{|\dot{\mathbf{r}}|}, \frac{|\dot{\mathbf{r}}|}{|\ddot{\mathbf{r}}|}\right)
+\end{equation}
+
+Questo previene di fare un primo passo troppo grande.
+
+\section{Implementazione in AstDyn}
+
+AstDyn fornisce multipli integratori:
+
+\begin{lstlisting}[language=C++,caption={Uso degli integratori in AstDyn}]
+#include <astdyn/integration/Integrator.hpp>
+#include <astdyn/integration/RK4.hpp>
+#include <astdyn/integration/DOPRI54.hpp>
+
+using namespace astdyn;
+
+// Definisce il sistema ODE
+auto ode = [](double t, const Vector6d& y) -> Vector6d {
+    Vector3d r = y.head<3>();
+    Vector3d v = y.tail<3>();
+    Vector3d a = -MU_SUN * r / pow(r.norm(), 3);
+    
+    Vector6d dydt;
+    dydt << v, a;
+    return dydt;
+};
+
+// Stato iniziale
+Vector6d y0;
+y0 << 1.0, 0.0, 0.0,  // posizione (AU)
+      0.0, 6.28, 0.0;  // velocita (AU/day)
+
+double t0 = 0.0;
+double tf = 365.25;  // 1 anno
+
+// Opzione 1: RK4 a passo fisso
+RK4Integrator<Vector6d> rk4;
+double h = 1.0;  // passi di 1 giorno
+auto result_rk4 = rk4.integrate(ode, t0, y0, tf, h);
+
+// Opzione 2: DOPRI54 adattivo
+DOPRI54Integrator<Vector6d> dopri;
+dopri.set_tolerance(1e-12);
+auto result_dopri = dopri.integrate(ode, t0, y0, tf);
+
+std::cout << "Posizione finale (RK4):    " 
+          << result_rk4.transpose() << "\n";
+std::cout << "Posizione finale (DOPRI):  " 
+          << result_dopri.transpose() << "\n";
+\end{lstlisting}
+
+\subsection{Integratori Personalizzati}
+
+Gli utenti possono implementare integratori personalizzati ereditando da \texttt{IntegratorBase}:
+
+\begin{lstlisting}[language=C++,caption={Interfaccia integratore personalizzato}]
+template<typename StateType>
+class CustomIntegrator : public IntegratorBase<StateType> {
+public:
+    StateType integrate(
+        const ODEFunction<StateType>& f,
+        double t0,
+        const StateType& y0,
+        double tf
+    ) override {
+        // Implementazione qui
+    }
+};
+\end{lstlisting}
+
+\section{Sommario}
+
+Concetti chiave sull'integrazione numerica:
+
+\begin{enumerate}
+    \item I \textbf{metodi Runge-Kutta} sono versatili e auto-avvianti
+    \item La \textbf{dimensione del passo adattiva} (RKF45, DOPRI54) fornisce controllo automatico dell'errore
+    \item I \textbf{metodi multipasso} (ABM) sono efficienti per problemi regolari
+    \item Gli \textbf{integratori simplettici} preservano l'energia per simulazioni a lungo termine
+    \item Esistono \textbf{compromessi} tra accuratezza, efficienza e stabilità
+    \item La \textbf{dimensione del passo} deve essere scelta in base al periodo orbitale e ai requisiti di accuratezza
+\end{enumerate}
+
+Comprendere l'integrazione numerica è essenziale per:
+\begin{itemize}
+    \item Propagazione accurata dell'orbita
+    \item Bilanciare costo computazionale e precisione
+    \item Evitare artefatti numerici
+    \item Validare i risultati contro soluzioni analitiche
+\end{itemize}
+
+Nel prossimo capitolo, applicheremo questi metodi di integrazione a problemi pratici di propagazione orbitale.

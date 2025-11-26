@@ -1,0 +1,5 @@
+if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_close_approach_tests[1]_tests.cmake")
+  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_close_approach_tests[1]_tests.cmake")
+else()
+  add_test(astdyn_close_approach_tests_NOT_BUILT astdyn_close_approach_tests_NOT_BUILT)
+endif()

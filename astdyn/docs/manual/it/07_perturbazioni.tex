@@ -1,0 +1,453 @@
+\chapter{Perturbazioni Orbitali}
+\label{ch:perturbazioni}
+
+\section{Introduzione alle Perturbazioni}
+
+Nel Capitolo~\ref{ch:problema_due_corpi}, abbiamo studiato il problema idealizzato dei due corpi in cui si considera solo l'attrazione gravitazionale tra due masse puntiformi. In realtà, i corpi celesti sperimentano forze aggiuntive che causano deviazioni delle loro orbite dalle ellissi kepleriane perfette.
+
+\subsection{Tipi di Perturbazioni}
+
+Le perturbazioni orbitali possono essere classificate per origine fisica:
+
+\begin{description}
+    \item[Gravitazionali] Forze da corpi aggiuntivi (problema degli N corpi), distribuzione di massa non sferica (J$_2$, J$_4$, ecc.)
+    \item[Non gravitazionali] Pressione di radiazione solare, resistenza atmosferica, effetti termici (Yarkovsky)
+    \item[Relativistiche] Correzioni relativistiche generali alla gravità newtoniana
+\end{description}
+
+\subsection{Equazioni del Moto Perturbate}
+
+L'equazione generale del moto con perturbazioni è:
+
+\begin{equation}
+    \ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r} + \mathbf{a}_{\text{pert}}
+\end{equation}
+
+dove $\mathbf{a}_{\text{pert}}$ è l'accelerazione perturbatrice. Per piccole perturbazioni, possiamo trattarle come correzioni alla soluzione kepleriana.
+
+\subsection{Magnitudine degli Effetti}
+
+Per un asteroide della fascia principale a 2.5 AU:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Perturbazione} & \textbf{Accelerazione} & \textbf{Relativa al Sole} \\
+\midrule
+Gravità solare & $3.8 \times 10^{-3}$ m/s$^2$ & 1 \\
+Giove & $\sim 10^{-6}$ m/s$^2$ & $3 \times 10^{-4}$ \\
+J$_2$ terrestre (in LEO) & $\sim 10^{-6}$ m/s$^2$ & — \\
+Radiazione solare & $\sim 10^{-8}$ m/s$^2$ & $3 \times 10^{-6}$ \\
+Relatività & $\sim 10^{-10}$ m/s$^2$ & $3 \times 10^{-8}$ \\
+\bottomrule
+\end{tabular}
+\caption{Magnitudini tipiche delle accelerazioni perturbative per asteroidi.}
+\label{tab:magnitudini_pert}
+\end{table}
+
+Sebbene piccoli, questi effetti si accumulano nel tempo e devono essere inclusi per previsioni accurate a lungo termine.
+
+\section{Il Problema degli N Corpi}
+
+\subsection{Formulazione del Problema}
+
+Il \textbf{problema degli N corpi} considera il moto di $N$ corpi sotto la loro attrazione gravitazionale reciproca. L'equazione del moto per il corpo $i$ è:
+
+\begin{equation}
+    \ddot{\mathbf{r}}_i = \sum_{j=1, j \neq i}^{N} G\frac{m_j(\mathbf{r}_j - \mathbf{r}_i)}{|\mathbf{r}_j - \mathbf{r}_i|^3}
+\end{equation}
+
+Per $N \geq 3$, non esiste una soluzione analitica generale. Il problema deve essere risolto numericamente.
+
+\subsection{Il Problema Ristretto dei Tre Corpi}
+
+Un caso speciale è il \textbf{problema circolare ristretto dei tre corpi} (CR3BP):
+\begin{itemize}
+    \item Due corpi massicci (primari) orbitano attorno al loro baricentro comune in orbite circolari
+    \item Un terzo corpo (senza massa) si muove sotto la loro influenza gravitazionale
+    \item Il terzo corpo non influenza i primari
+\end{itemize}
+
+Questo è rilevante per sistemi Sole-Giove-asteroide o Terra-Luna-spacecraft.
+
+\subsection{Perturbazioni dai Pianeti}
+
+Per la determinazione orbitale degli asteroidi, modelliamo tipicamente il Sole come corpo centrale e i pianeti come corpi perturbatori:
+
+\begin{equation}
+    \mathbf{a}_{\text{pianeti}} = \sum_{p} \left[ G m_p \left( \frac{\mathbf{r}_p - \mathbf{r}}{|\mathbf{r}_p - \mathbf{r}|^3} - \frac{\mathbf{r}_p}{r_p^3} \right) \right]
+\end{equation}
+
+Il primo termine è l'attrazione gravitazionale diretta dal pianeta $p$, e il secondo termine tiene conto del fatto che anche il Sole accelera verso il pianeta (termine indiretto).
+
+\subsection{Effemeridi Planetarie}
+
+La modellazione accurata degli N corpi richiede posizioni planetarie ad alta precisione. Fonti comuni:
+
+\begin{itemize}
+    \item \textbf{JPL DE440/DE441}: Ultime effemeridi planetarie della NASA (2021)
+    \item \textbf{INPOP}: Effemeridi planetarie francesi dell'IMCCE
+    \item \textbf{SPICE}: Toolkit NASA per geometria di spacecraft e pianeti
+\end{itemize}
+
+AstDyn può utilizzare kernel SPICE per ottenere stati planetari a qualsiasi epoca.
+
+\section{Perturbazioni da Schiacciamento (J$_2$)}
+
+\subsection{Distribuzione di Massa Non Sferica}
+
+I corpi celesti reali non sono sfere perfette. La Terra, ad esempio, è schiacciata a causa della rotazione. Il potenziale gravitazionale può essere espanso in armoniche sferiche:
+
+\begin{equation}
+    U = -\frac{\mu}{r}\left[1 - \sum_{n=2}^{\infty} J_n \left(\frac{R}{r}\right)^n P_n(\sin\phi)\right]
+\end{equation}
+
+dove:
+\begin{itemize}
+    \item $J_n$ sono i coefficienti armonici zonali
+    \item $R$ è il raggio di riferimento
+    \item $P_n$ sono i polinomi di Legendre
+    \item $\phi$ è la latitudine
+\end{itemize}
+
+\subsection{Il Termine J$_2$}
+
+Il termine dominante è $J_2$ (momento di quadrupolo), che rappresenta il rigonfiamento equatoriale:
+
+\begin{equation}
+    U_{J_2} = -\frac{\mu}{r}\left[1 - J_2 \left(\frac{R}{r}\right)^2 P_2(\sin\phi)\right]
+\end{equation}
+
+dove $P_2(\sin\phi) = \frac{1}{2}(3\sin^2\phi - 1)$.
+
+Per la Terra: $J_2 = 1.08263 \times 10^{-3}$ (circa 0.1\%)
+
+\subsection{Accelerazione da J$_2$}
+
+L'accelerazione perturbatrice in coordinate cartesiane è:
+
+\begin{align}
+    a_x &= -\frac{3\mu J_2 R^2}{2r^5}\left[x\left(1 - 5\frac{z^2}{r^2}\right)\right] \\
+    a_y &= -\frac{3\mu J_2 R^2}{2r^5}\left[y\left(1 - 5\frac{z^2}{r^2}\right)\right] \\
+    a_z &= -\frac{3\mu J_2 R^2}{2r^5}\left[z\left(3 - 5\frac{z^2}{r^2}\right)\right]
+\end{align}
+
+\subsection{Effetti sugli Elementi Orbitali}
+
+J$_2$ causa variazioni secolari (a lungo termine) negli elementi orbitali:
+
+\begin{align}
+    \frac{d\Omega}{dt} &= -\frac{3}{2}\frac{n J_2 R^2}{a^2(1-e^2)^2}\cos i \\
+    \frac{d\omega}{dt} &= \frac{3}{4}\frac{n J_2 R^2}{a^2(1-e^2)^2}(5\cos^2 i - 1)
+\end{align}
+
+dove $n = \sqrt{\mu/a^3}$ è il moto medio.
+
+\textbf{Effetti chiave}:
+\begin{itemize}
+    \item $\Omega$ (RAAN) precede verso ovest per orbite prograde ($i < 90^\circ$)
+    \item $\omega$ (argomento del periastro) ruota
+    \item La combinazione crea pattern complessi nelle tracce al suolo
+\end{itemize}
+
+Per orbite terrestri basse (LEO), J$_2$ può causare variazioni di $\Omega$ di diversi gradi al giorno.
+
+\section{Pressione di Radiazione Solare}
+
+\subsection{Meccanismo Fisico}
+
+I fotoni trasportano momento. Quando la luce solare colpisce un oggetto, esercita una forza:
+
+\begin{equation}
+    F_{\text{SRP}} = P_\odot \frac{A}{c} C_R \left(\frac{r_0}{r}\right)^2
+\end{equation}
+
+dove:
+\begin{itemize}
+    \item $P_\odot = 4.56 \times 10^{-6}$ N/m$^2$ è la pressione di radiazione solare a 1 AU
+    \item $A$ è l'area della sezione trasversale
+    \item $c = 3 \times 10^8$ m/s è la velocità della luce
+    \item $C_R$ è il coefficiente di pressione di radiazione ($C_R \approx 1$-$2$)
+    \item $r_0 = 1$ AU, $r$ è la distanza eliocentrica
+\end{itemize}
+
+\subsection{Rapporto Area-Massa}
+
+L'accelerazione dipende dal \textbf{rapporto area-massa}:
+
+\begin{equation}
+    \mathbf{a}_{\text{SRP}} = P_\odot \frac{A}{m} C_R \left(\frac{r_0}{r}\right)^2 \hat{\mathbf{r}}_\odot
+\end{equation}
+
+Gli oggetti piccoli (polvere, piccoli asteroidi) sono più influenzati di quelli grandi.
+
+\subsection{Modellazione dell'Eclisse}
+
+La SRP scende a zero quando l'oggetto è nell'ombra della Terra o di un pianeta. Un modello semplice:
+
+\begin{equation}
+    \nu = \begin{cases}
+        1 & \text{alla luce del sole} \\
+        0 & \text{in ombra} \\
+        f & \text{in penombra}
+    \end{cases}
+\end{equation}
+
+dove $0 < f < 1$ dipende dalla frazione del disco solare visibile.
+
+\subsection{Effetto Yarkovsky}
+
+L'\textbf{effetto Yarkovsky} è una forza di rinculo termico:
+\begin{itemize}
+    \item La superficie dell'asteroide si riscalda alla luce del sole
+    \item Emette radiazione termica mentre ruota
+    \item Crea una piccola spinta (come un razzo!)
+\end{itemize}
+
+Questo è importante per piccoli asteroidi ($< 20$ km) su scale temporali lunghe (milioni di anni). Può cambiare il semiasse maggiore:
+
+\begin{equation}
+    \frac{da}{dt} \approx \pm 10^{-4} \text{ AU/Myr}
+\end{equation}
+
+Il segno dipende dal senso di rotazione (progrado vs retrogrado).
+
+\section{Effetti Relativistici}
+
+\subsection{Correzioni Post-Newtoniane}
+
+La relatività generale introduce correzioni alla gravità newtoniana. Il termine dominante è il \textbf{termine di Schwarzschild}:
+
+\begin{equation}
+    \mathbf{a}_{\text{GR}} = \frac{\mu}{c^2 r^3}\left[4\frac{\mu}{r}\mathbf{r} - (\mathbf{v} \cdot \mathbf{v})\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
+\end{equation}
+
+Questa è l'approssimazione post-newtoniana del primo ordine (1PN).
+
+\subsection{Precessione del Perielio}
+
+L'effetto relativistico più famoso è la \textbf{precessione del perielio}:
+
+\begin{equation}
+    \Delta\omega = \frac{6\pi G M_\odot}{c^2 a(1-e^2)} \text{ per orbita}
+\end{equation}
+
+Per Mercurio ($a = 0.387$ AU, $e = 0.206$):
+\begin{equation}
+    \Delta\omega_{\text{Mercurio}} = 43'' \text{ per secolo}
+\end{equation}
+
+Questo fu famosamente spiegato da Einstein nel 1915 e fu una delle prime conferme della relatività generale.
+
+\subsection{Correzione del Tempo Luce}
+
+I segnali elettromagnetici viaggiano a velocità finita. Quando si misurano le posizioni degli asteroidi tramite radar o osservazioni ottiche, dobbiamo tenere conto del tempo che la luce impiega per viaggiare:
+
+\begin{equation}
+    \Delta t = \frac{|\mathbf{r}_{\text{oss}} - \mathbf{r}_{\text{ast}}|}{c}
+\end{equation}
+
+Questa è la \textbf{correzione del tempo luce}. Per la determinazione orbitale, dobbiamo iterare per trovare la posizione dell'asteroide al tempo dell'osservazione, non al tempo della rilevazione.
+
+\subsection{Ritardo di Shapiro}
+
+I campi gravitazionali rallentano la luce. Il \textbf{ritardo di Shapiro} è:
+
+\begin{equation}
+    \Delta t_{\text{Shapiro}} = \frac{2GM_\odot}{c^3}\ln\left(\frac{r_1 + r_2 + d}{r_1 + r_2 - d}\right)
+\end{equation}
+
+dove $r_1$, $r_2$ sono le distanze dal Sole ai due estremi, e $d$ è la loro separazione. Questo è tipicamente $\sim 100$ microsecondi ma è misurabile con ranging di precisione.
+
+\section{Resistenza Atmosferica}
+
+Per i satelliti in orbita terrestre bassa (LEO), la resistenza atmosferica è una perturbazione importante.
+
+\subsection{Equazione della Resistenza}
+
+\begin{equation}
+    \mathbf{a}_{\text{drag}} = -\frac{1}{2}\frac{C_D A}{m}\rho v^2 \hat{\mathbf{v}}
+\end{equation}
+
+dove:
+\begin{itemize}
+    \item $C_D \approx 2.2$ è il coefficiente di resistenza
+    \item $A$ è l'area della sezione trasversale
+    \item $\rho$ è la densità atmosferica (decresce esponenzialmente con l'altitudine)
+    \item $v$ è la velocità relativa all'atmosfera
+\end{itemize}
+
+\subsection{Modelli di Densità Atmosferica}
+
+La densità dipende da:
+\begin{itemize}
+    \item Altitudine (decadimento esponenziale)
+    \item Attività solare (indice F10.7)
+    \item Attività geomagnetica (indice Ap)
+    \item Ora solare locale e latitudine
+\end{itemize}
+
+Modelli comuni: NRLMSISE-00, JB2008, DTM2000.
+
+\subsection{Decadimento Orbitale}
+
+La resistenza causa la diminuzione del semiasse maggiore:
+
+\begin{equation}
+    \frac{da}{dt} = -\frac{2a^2}{v}\frac{C_D A}{m}\rho v^2 = -\frac{C_D A}{m}\rho a^2 v
+\end{equation}
+
+I satelliti in LEO gradualmente spiraleggiano verso l'interno e alla fine rientrano nell'atmosfera.
+
+\section{Teoria delle Perturbazioni}
+
+\subsection{Variazione dei Parametri}
+
+Le \textbf{equazioni planetarie di Lagrange} descrivono come cambiano gli elementi orbitali sotto perturbazioni. In termini della funzione perturbatrice $R$:
+
+\begin{align}
+    \frac{da}{dt} &= \frac{2}{na}\frac{\partial R}{\partial M} \\
+    \frac{de}{dt} &= \frac{1-e^2}{na^2 e}\frac{\partial R}{\partial M} - \frac{\sqrt{1-e^2}}{na^2 e}\frac{\partial R}{\partial \omega} \\
+    \frac{di}{dt} &= \frac{\cos i}{na^2\sqrt{1-e^2}\sin i}\frac{\partial R}{\partial \omega} - \frac{1}{na^2\sqrt{1-e^2}\sin i}\frac{\partial R}{\partial \Omega} \\
+    \frac{d\Omega}{dt} &= \frac{1}{na^2\sqrt{1-e^2}\sin i}\frac{\partial R}{\partial i} \\
+    \frac{d\omega}{dt} &= \frac{\sqrt{1-e^2}}{na^2 e}\frac{\partial R}{\partial e} - \frac{\cos i}{na^2\sqrt{1-e^2}\sin i}\frac{\partial R}{\partial i} \\
+    \frac{dM}{dt} &= n - \frac{2}{na}\frac{\partial R}{\partial a} - \frac{1-e^2}{na^2 e}\frac{\partial R}{\partial e}
+\end{align}
+
+Queste equazioni permettono un trattamento analitico delle perturbazioni quando $R$ ha una forma semplice.
+
+\subsection{Equazioni di Perturbazione di Gauss}
+
+Una formulazione alternativa usa le componenti dell'accelerazione perturbatrice $(S, T, W)$ nelle direzioni radiale, trasversale e normale:
+
+\begin{align}
+    \frac{da}{dt} &= \frac{2a^2}{h}\left[eS\sin\nu + T\frac{p}{r}\right] \\
+    \frac{de}{dt} &= \frac{1}{v_0}\left[S\sin\nu + T\left(\cos\nu + \frac{r+p}{p}\cos E\right)\right] \\
+    \frac{di}{dt} &= \frac{r\cos(\omega + \nu)}{h}W
+\end{align}
+
+dove $h = \sqrt{\mu a(1-e^2)}$ è la magnitudine del momento angolare.
+
+\subsection{Elementi Osculatori}
+
+In qualsiasi istante, l'orbita può essere descritta da \textbf{elementi osculatori}—gli elementi kepleriani che il corpo seguirebbe se tutte le perturbazioni cessassero improvvisamente. Questi elementi variano continuamente sotto perturbazioni.
+
+\section{Integrazione Numerica vs Teoria delle Perturbazioni}
+
+\subsection{Quando Usare Ogni Approccio}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Metodo} & \textbf{Vantaggi} & \textbf{Migliore Per} \\
+\midrule
+Integrazione & Gestisce qualsiasi forza & Accuratezza a breve termine \\
+Numerica & Nessuna approssimazione & Perturbazioni forti \\
+ & Facile da implementare & Forze multiple \\
+\midrule
+Teoria & Intuizione fisica & Tendenze a lungo termine \\
+Analitica delle & Calcolo veloce & Perturbazioni deboli \\
+Perturbazioni & Identifica risonanze & Analisi qualitativa \\
+\bottomrule
+\end{tabular}
+\caption{Confronto tra integrazione numerica e teoria analitica delle perturbazioni.}
+\label{tab:metodi}
+\end{table}
+
+\subsection{Approcci Ibridi}
+
+La determinazione orbitale moderna spesso usa:
+\begin{enumerate}
+    \item Integrazione numerica per l'equazione del moto
+    \item Teoria analitica per identificare perturbazioni importanti
+    \item Modelli semplificati (es., J$_2$ mediato) per calcolo più veloce
+\end{enumerate}
+
+\section{Implementazione in AstDyn}
+
+AstDyn fornisce un framework modulare per le perturbazioni:
+
+\begin{lstlisting}[language=C++,caption={Perturbazioni in AstDyn}]
+#include <astdyn/dynamics/Perturbations.hpp>
+#include <astdyn/dynamics/NBody.hpp>
+
+using namespace astdyn;
+
+// Crea vettore di stato
+Vector6d state = ...;  // [x, y, z, vx, vy, vz]
+
+// Perturbazioni N-body dai pianeti
+PlanetaryEphemeris ephem("de440.bsp");
+Vector3d acc_planets = NBody::compute_perturbation(
+    state, time, ephem, {"Jupiter", "Saturn", "Earth"}
+);
+
+// Perturbazione J2 (per orbitatore terrestre)
+Vector3d acc_j2 = Perturbations::j2_acceleration(
+    state, MU_EARTH, R_EARTH, J2_EARTH
+);
+
+// Pressione di radiazione solare
+double area_mass_ratio = 0.01;  // m^2/kg
+double Cr = 1.3;
+Vector3d sun_direction = ...;   // Vettore unitario verso il Sole
+Vector3d acc_srp = Perturbations::solar_radiation_pressure(
+    state, area_mass_ratio, Cr, sun_direction
+);
+
+// Correzione relativistica
+Vector3d acc_gr = Perturbations::schwarzschild_correction(
+    state, MU_SUN
+);
+
+// Accelerazione perturbatrice totale
+Vector3d acc_total = acc_planets + acc_j2 + acc_srp + acc_gr;
+
+// Aggiunge alle equazioni del moto
+Vector6d derivatives;
+derivatives.head<3>() = state.tail<3>();  // velocita
+derivatives.tail<3>() = -MU_SUN * state.head<3>() / r^3 + acc_total;
+\end{lstlisting}
+
+\subsection{Selezione delle Perturbazioni}
+
+AstDyn permette agli utenti di abilitare/disabilitare le perturbazioni:
+
+\begin{lstlisting}[language=C++,caption={Configurazione delle perturbazioni}]
+PerturbationModel model;
+model.enable_planets({"Jupiter", "Saturn", "Uranus", "Neptune"});
+model.enable_j2(false);  // Non rilevante per orbite eliocentriche
+model.enable_srp(true);
+model.enable_relativity(true);
+
+// Usa nella propagazione
+Propagator prop(model);
+auto final_state = prop.propagate(initial_state, t0, tf);
+\end{lstlisting}
+
+\section{Sommario}
+
+Concetti chiave sulle perturbazioni orbitali:
+
+\begin{enumerate}
+    \item Le \textbf{perturbazioni} sono deviazioni dal moto ideale dei due corpi
+    \item Gli \textbf{effetti N-body} dai pianeti sono la perturbazione dominante per gli asteroidi
+    \item Lo \textbf{schiacciamento J$_2$} causa precessione di $\Omega$ e $\omega$ (critico per satelliti terrestri)
+    \item La \textbf{pressione di radiazione solare} influenza piccoli corpi e spacecraft
+    \item Gli \textbf{effetti relativistici} sono piccoli ma misurabili (precessione di Mercurio: 43''/secolo)
+    \item La \textbf{resistenza atmosferica} domina in LEO, causando decadimento orbitale
+    \item La \textbf{teoria delle perturbazioni} (equazioni di Lagrange, Gauss) fornisce intuizione analitica
+    \item L'\textbf{integrazione numerica} gestisce modelli di forze arbitrarie accuratamente
+\end{enumerate}
+
+Comprendere le perturbazioni è essenziale per:
+\begin{itemize}
+    \item Previsione accurata dell'orbita su scale temporali lunghe
+    \item Progettazione di missioni satellitari e station-keeping
+    \item Rilevazione di effetti sottili (es., masse di asteroidi dalle perturbazioni)
+    \item Distinzione tra forze gravitazionali e non gravitazionali
+\end{itemize}
+
+Nel prossimo capitolo, discuteremo i metodi di integrazione numerica per risolvere le equazioni del moto perturbate.

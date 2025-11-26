@@ -1,0 +1,469 @@
+\chapter{Residual Analysis}
+\label{ch:residuals}
+
+\section{Introduction}
+
+\textbf{Residual analysis} is the examination of differences between observed and computed values (O-C) to assess orbit quality and diagnose problems.
+
+\textbf{Goals}:
+\begin{itemize}
+    \item Validate orbit fit quality
+    \item Identify outliers and systematic errors
+    \item Assess observation weights
+    \item Detect force model inadequacies
+    \item Estimate realistic uncertainties
+\end{itemize}
+
+\section{Types of Residuals}
+
+\subsection{Post-Fit Residuals}
+
+After differential correction converges:
+
+\begin{equation}
+    r_i = o_i - c_i(\mathbf{y}_0^*)
+\end{equation}
+
+where $\mathbf{y}_0^*$ is the converged orbit.
+
+For RA/Dec:
+\begin{align}
+    \Delta\alpha_i &= (\alpha_{\text{obs}} - \alpha_{\text{comp}}) \cos\delta_{\text{obs}} \\
+    \Delta\delta_i &= \delta_{\text{obs}} - \delta_{\text{comp}}
+\end{align}
+
+Note: Multiply $\Delta\alpha$ by $\cos\delta$ to get linear separation.
+
+\subsection{Normalized Residuals}
+
+Scale by observation uncertainty:
+
+\begin{equation}
+    \zeta_i = \frac{r_i}{\sigma_i}
+\end{equation}
+
+Expected distribution: $\zeta_i \sim \mathcal{N}(0, 1)$ if weights are correct.
+
+\subsection{Standardized Residuals}
+
+Account for correlation in fit:
+
+\begin{equation}
+    \xi_i = \frac{r_i}{\sigma_i \sqrt{1 - h_{ii}}}
+\end{equation}
+
+where $h_{ii}$ is the $i$-th diagonal element of the hat matrix $\mathbf{H}(\mathbf{H}^T\mathbf{W}\mathbf{H})^{-1}\mathbf{H}^T\mathbf{W}$.
+
+\section{Quality Metrics}
+
+\subsection{Root Mean Square (RMS)}
+
+\begin{equation}
+    \text{RMS} = \sqrt{\frac{\sum_i w_i r_i^2}{\sum_i w_i}}
+\end{equation}
+
+For equal weights:
+
+\begin{equation}
+    \text{RMS} = \sqrt{\frac{1}{m} \sum_i r_i^2}
+\end{equation}
+
+\textbf{Interpretation}:
+\begin{itemize}
+    \item RMS $<$ 0.5": Excellent (modern CCD with Gaia catalog)
+    \item RMS $\sim$ 1": Good (typical CCD)
+    \item RMS $\sim$ 2": Fair (amateur observations)
+    \item RMS $>$ 5": Poor (suspect systematic errors)
+\end{itemize}
+
+\subsection{Weighted RMS}
+
+For unequal weights:
+
+\begin{equation}
+    \text{WRMS} = \sqrt{\frac{\chi^2}{m - n}}
+\end{equation}
+
+where $m$ is number of observations, $n = 6$ is number of parameters.
+
+\subsection{Chi-Square Test}
+
+Under correct model and weights:
+
+\begin{equation}
+    \chi^2 = \sum_i w_i r_i^2 \sim \chi^2_{m-n}
+\end{equation}
+
+Test statistic:
+
+\begin{equation}
+    \chi^2_{\text{red}} = \frac{\chi^2}{m - n}
+\end{equation}
+
+\textbf{Interpretation}:
+\begin{itemize}
+    \item $\chi^2_{\text{red}} \approx 1$: Weights consistent with errors
+    \item $\chi^2_{\text{red}} \gg 1$: Underestimated uncertainties or model error
+    \item $\chi^2_{\text{red}} \ll 1$: Overestimated uncertainties
+\end{itemize}
+
+\subsection{Maximum Residual}
+
+\begin{equation}
+    r_{\text{max}} = \max_i |r_i|
+\end{equation}
+
+Flag observations with $|r_i| > 3\sigma$ as potential outliers.
+
+\section{Residual Plots}
+
+\subsection{Residuals vs. Time}
+
+Plot $r_i$ vs. $t_i$. Look for:
+\begin{itemize}
+    \item \textbf{Random scatter}: Good
+    \item \textbf{Trends}: Systematic error (e.g., missing perturbation, catalog bias)
+    \item \textbf{Jumps}: Change in observing conditions or equipment
+    \item \textbf{Periodic variation}: Orbit model error
+\end{itemize}
+
+\subsection{Residuals vs. Observatory}
+
+Plot $r_i$ vs. observatory code. Look for:
+\begin{itemize}
+    \item \textbf{Uniform scatter}: Good
+    \item \textbf{Bias for specific site}: Site-specific systematic (timing, coordinates, catalog)
+\end{itemize}
+
+\subsection{Residuals vs. Magnitude}
+
+Plot $r_i$ vs. apparent magnitude. Look for:
+\begin{itemize}
+    \item \textbf{No trend}: Good
+    \item \textbf{Increasing scatter with magnitude}: Photon noise dominates
+    \item \textbf{Bias trend}: Magnitude equation error in astrometry
+\end{itemize}
+
+\subsection{RA vs. Dec Residuals}
+
+Plot $\Delta\alpha \cos\delta$ vs. $\Delta\delta$. Look for:
+\begin{itemize}
+    \item \textbf{Circular scatter}: Isotropic errors
+    \item \textbf{Elliptical scatter}: Correlated errors (e.g., tracking error)
+    \item \textbf{Radial pattern}: Distance error
+\end{itemize}
+
+\subsection{Normal Probability Plot}
+
+Plot ordered normalized residuals $\zeta_{(i)}$ vs. expected normal quantiles. Should be approximately linear if errors are Gaussian.
+
+\section{Outlier Detection}
+
+\subsection{Threshold Method}
+
+Flag observation if:
+
+\begin{equation}
+    |r_i| > k \sigma_i
+\end{equation}
+
+Typical $k = 3$ (3-sigma rule) or $k = 2.5$ (more aggressive).
+
+\subsection{Chauvenet's Criterion}
+
+Reject observation if probability of larger deviation is $< 1/(2m)$:
+
+\begin{equation}
+    P(|\zeta| > |\zeta_i|) < \frac{1}{2m}
+\end{equation}
+
+\subsection{Median Absolute Deviation (MAD)}
+
+Robust alternative to standard deviation:
+
+\begin{equation}
+    \text{MAD} = \text{median}(|r_i - \text{median}(r_i)|)
+\end{equation}
+
+Scaled MAD: $\hat{\sigma} = 1.4826 \times \text{MAD}$
+
+Flag if $|r_i - \text{median}| > k\hat{\sigma}$.
+
+\subsection{Iterative Outlier Removal}
+
+\begin{enumerate}
+    \item Run differential correction
+    \item Identify outliers (e.g., $|r_i| > 3\sigma$)
+    \item Remove or downweight outliers
+    \item Repeat until no more outliers found
+\end{enumerate}
+
+\textbf{Caution}: Don't remove too many observations. Typically remove $<$5\% of dataset.
+
+\section{Systematic Error Diagnosis}
+
+\subsection{Timing Errors}
+
+\textbf{Symptom}: Residuals correlated with sky motion direction.
+
+\textbf{Test}: Compute along-track vs. cross-track residuals:
+
+\begin{align}
+    r_{\parallel} &= \Delta\alpha \cos\delta \cos\theta + \Delta\delta \sin\theta \\
+    r_{\perp} &= -\Delta\alpha \cos\delta \sin\theta + \Delta\delta \cos\theta
+\end{align}
+
+where $\theta = \arctan2(\dot{\delta}, \dot{\alpha}\cos\delta)$ is direction of motion.
+
+If $|r_{\parallel}| \gg |r_{\perp}|$, suspect timing error.
+
+\subsection{Catalog Bias}
+
+\textbf{Symptom}: Systematic offset in all residuals from one catalog.
+
+\textbf{Test}: Compare results using different star catalogs (Gaia DR3, UCAC4, etc.).
+
+\textbf{Solution}: Use Gaia DR3 (most accurate, 0.02-0.05" systematic).
+
+\subsection{Observatory Coordinate Error}
+
+\textbf{Symptom}: Systematic offset for one observatory, varies with object position.
+
+\textbf{Test}: Check MPC observatory coordinates vs. ITRF values.
+
+\textbf{Solution}: Update coordinates, especially for new observatories.
+
+\subsection{Light-Time Correction}
+
+\textbf{Symptom}: Residuals show quadratic trend over long arc.
+
+\textbf{Test}: Check that light-time correction is applied.
+
+\textbf{Solution}: Iterate light-time (Chapter 12).
+
+\subsection{Force Model Inadequacy}
+
+\textbf{Symptom}: Residuals show smooth trend correlated with planetary positions.
+
+\textbf{Test}: Add missing perturbations (Jupiter, Saturn, Earth, etc.).
+
+\textbf{Solution}: Include all planets with $|a_{\text{pert}}/a_{\text{Sun}}| > 10^{-9}$.
+
+\section{Example Analysis}
+
+\begin{lstlisting}[language=C++,caption={Residual analysis implementation}]
+struct ResidualAnalysis {
+    double rms;
+    double wrms;
+    double chi2_red;
+    double max_residual;
+    std::vector<double> residuals;
+    std::vector<double> normalized_residuals;
+    std::vector<int> outlier_indices;
+};
+
+ResidualAnalysis analyze_residuals(
+    const std::vector<Observation>& obs,
+    const Vector6d& state,
+    double epoch,
+    const ForceModel& forces,
+    const EphemerisInterface& ephemeris)
+{
+    ResidualAnalysis result;
+    double chi2 = 0.0;
+    double sum_weights = 0.0;
+    
+    for (size_t i = 0; i < obs.size(); ++i) {
+        // Propagate and predict
+        Vector6d y_obs = propagate(state, epoch, obs[i].epoch, forces);
+        Vector2d computed = predict_observation(y_obs, obs[i].epoch, obs[i].obs_code, ephemeris);
+        
+        // Compute residual (in arcsec)
+        double dRA = (obs[i].ra - computed(0)) * cos(obs[i].dec) * RAD_TO_ARCSEC;
+        double dDec = (obs[i].dec - computed(1)) * RAD_TO_ARCSEC;
+        double residual = sqrt(dRA*dRA + dDec*dDec);
+        
+        result.residuals.push_back(residual);
+        
+        // Normalized residual
+        double sigma = sqrt(obs[i].sigma_ra*obs[i].sigma_ra + obs[i].sigma_dec*obs[i].sigma_dec) * RAD_TO_ARCSEC;
+        double zeta = residual / sigma;
+        result.normalized_residuals.push_back(zeta);
+        
+        // Chi-square
+        double weight = 1.0 / (sigma * sigma);
+        chi2 += weight * residual * residual;
+        sum_weights += weight;
+        
+        // Max residual
+        if (residual > result.max_residual) {
+            result.max_residual = residual;
+        }
+        
+        // Outlier detection (3-sigma)
+        if (std::abs(zeta) > 3.0) {
+            result.outlier_indices.push_back(i);
+        }
+    }
+    
+    // RMS
+    result.rms = sqrt(chi2 / obs.size());
+    
+    // Weighted RMS
+    int dof = 2 * obs.size() - 6;
+    result.wrms = sqrt(chi2 / dof);
+    
+    // Reduced chi-square
+    result.chi2_red = chi2 / dof;
+    
+    return result;
+}
+
+// Print analysis report
+void print_residual_report(const ResidualAnalysis& analysis) {
+    std::cout << "Residual Analysis Report\n";
+    std::cout << "========================\n";
+    std::cout << "Number of observations: " << analysis.residuals.size() << "\n";
+    std::cout << "RMS: " << analysis.rms << " arcsec\n";
+    std::cout << "Weighted RMS: " << analysis.wrms << " arcsec\n";
+    std::cout << "Reduced chi-square: " << analysis.chi2_red << "\n";
+    std::cout << "Maximum residual: " << analysis.max_residual << " arcsec\n";
+    std::cout << "Number of outliers (>3-sigma): " << analysis.outlier_indices.size() << "\n";
+    
+    if (!analysis.outlier_indices.empty()) {
+        std::cout << "\nOutlier indices:\n";
+        for (int idx : analysis.outlier_indices) {
+            std::cout << "  " << idx << ": " << analysis.residuals[idx] 
+                     << " arcsec (" << analysis.normalized_residuals[idx] << "-sigma)\n";
+        }
+    }
+    
+    // Histogram of normalized residuals
+    std::cout << "\nNormalized residual distribution:\n";
+    auto hist = make_histogram(analysis.normalized_residuals, -4, 4, 16);
+    for (auto [bin, count] : hist) {
+        std::cout << std::setw(6) << std::fixed << std::setprecision(2) << bin << ": ";
+        std::cout << std::string(count, '*') << " (" << count << ")\n";
+    }
+}
+\end{lstlisting}
+
+\subsection{Example Output}
+
+\begin{verbatim}
+Residual Analysis Report
+========================
+Number of observations: 100
+RMS: 0.658 arcsec
+Weighted RMS: 0.661 arcsec
+Reduced chi-square: 1.02
+Maximum residual: 2.34 arcsec
+Number of outliers (>3-sigma): 2
+
+Outlier indices:
+  34: 2.34 arcsec (3.12-sigma)
+  78: 2.11 arcsec (3.05-sigma)
+
+Normalized residual distribution:
+ -4.00: 
+ -3.00: *
+ -2.00: ****
+ -1.00: ************
+  0.00: **********************************
+  1.00: ***************
+  2.00: *****
+  3.00: **
+  4.00: 
+\end{verbatim}
+
+\textbf{Interpretation}:
+\begin{itemize}
+    \item RMS $\approx$ 0.66": Excellent fit
+    \item $\chi^2_{\text{red}} \approx 1$: Weights are appropriate
+    \item 2 outliers: Typical for 100 observations (2\%)
+    \item Distribution approximately normal
+\end{itemize}
+
+\section{Improving Orbit Quality}
+
+\subsection{When RMS is Too Large}
+
+\textbf{Actions}:
+\begin{enumerate}
+    \item Check for outliers, remove if $>$3$\sigma$
+    \item Verify observatory coordinates
+    \item Check timing accuracy
+    \item Add missing perturbations
+    \item Use better star catalog (Gaia DR3)
+    \item Consider non-gravitational forces (if comet)
+\end{enumerate}
+
+\subsection{When $\chi^2_{\text{red}} \gg 1$}
+
+\textbf{Causes}:
+\begin{itemize}
+    \item Underestimated observation uncertainties
+    \item Systematic errors not modeled
+    \item Force model inadequate
+\end{itemize}
+
+\textbf{Solutions}:
+\begin{itemize}
+    \item Inflate uncertainties by factor $\sqrt{\chi^2_{\text{red}}}$
+    \item Investigate systematic errors
+    \item Improve force model
+\end{itemize}
+
+\subsection{When Few Observations Available}
+
+For $m < 20$ observations:
+\begin{itemize}
+    \item Single outlier can dominate $\chi^2$
+    \item Use robust methods (MAD, Huber weights)
+    \item Be conservative about rejecting data
+    \item Seek additional observations
+\end{itemize}
+
+\section{Reporting Results}
+
+\subsection{Summary Statistics}
+
+Always report:
+\begin{itemize}
+    \item Number of observations
+    \item Time span
+    \item Observatories
+    \item RMS or WRMS
+    \item Number of outliers rejected
+\end{itemize}
+
+\subsection{Covariance Interpretation}
+
+\textbf{Formal uncertainty}: From $\mathbf{C} = \mathbf{N}^{-1}$.
+
+\textbf{Realistic uncertainty}: Scale by $\sqrt{\chi^2_{\text{red}}}$ if $\chi^2_{\text{red}} > 1$.
+
+\subsection{Orbit Arc Assessment}
+
+\begin{itemize}
+    \item \textbf{Short arc} ($<$10 days): Orbit poorly constrained, large extrapolation uncertainty
+    \item \textbf{Medium arc} (10-60 days): Reasonable for ephemeris over similar span
+    \item \textbf{Long arc} ($>$1 year): Well-constrained, reliable extrapolation
+\end{itemize}
+
+\section{Summary}
+
+Key points about residual analysis:
+
+\begin{enumerate}
+    \item \textbf{Post-fit residuals} $r_i = o_i - c_i$ assess fit quality
+    \item \textbf{RMS} measures overall fit; target $<$1" for modern observations
+    \item \textbf{Chi-square test} validates weights; expect $\chi^2_{\text{red}} \approx 1$
+    \item \textbf{Residual plots} diagnose systematic errors
+    \item \textbf{Outliers} detected via 3$\sigma$ threshold or robust methods
+    \item \textbf{Systematic errors} identified by correlations with time, observatory, magnitude
+    \item \textbf{Force model} validated by examining residual trends
+    \item \textbf{Realistic uncertainties} account for systematic errors via $\chi^2_{\text{red}}$
+\end{enumerate}
+
+With differential correction and residual analysis, we complete the core orbit determination workflow. Next chapters cover software implementation.

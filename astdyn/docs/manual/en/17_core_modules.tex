@@ -1,0 +1,520 @@
+\chapter{Core Modules}
+\label{ch:core_modules}
+
+\section{Introduction}
+
+This chapter documents the core modules that implement orbital mechanics algorithms. Each module is designed to be independent yet composable.
+
+\section{Orbital Elements}
+
+\subsection{KeplerianElements}
+
+Classical six Keplerian elements for elliptical orbits.
+
+\begin{lstlisting}[language=C++,caption={KeplerianElements class}]
+namespace astdyn {
+namespace coordinates {
+
+class KeplerianElements {
+public:
+    // Elements
+    double a;      // Semi-major axis [AU]
+    double e;      // Eccentricity [0, 1)
+    double i;      // Inclination [rad]
+    double Omega;  // Longitude of ascending node [rad]
+    double omega;  // Argument of perihelion [rad]
+    double M;      // Mean anomaly [rad]
+    
+    // Epoch
+    double epoch;  // Julian date [TDB]
+    
+    // Construction
+    KeplerianElements() = default;
+    KeplerianElements(double a, double e, double i,
+                     double Omega, double omega, double M,
+                     double epoch);
+    
+    // Conversions
+    static KeplerianElements from_cartesian(
+        const Vector6d& state, double epoch, double mu = MU_SUN);
+    
+    Vector6d to_cartesian(double mu = MU_SUN) const;
+    
+    // Derived quantities
+    double period() const;           // Orbital period [days]
+    double mean_motion() const;      // Mean motion [rad/day]
+    double perihelion_distance() const;  // q [AU]
+    double aphelion_distance() const;    // Q [AU]
+    double orbital_energy(double mu = MU_SUN) const;
+    
+    // Mean anomaly at different epoch
+    double mean_anomaly_at(double jd) const;
+    
+    // Validation
+    bool is_valid() const;
+};
+
+}} // namespace
+\end{lstlisting}
+
+\textbf{Usage}:
+\begin{lstlisting}[language=C++]
+using namespace astdyn::coordinates;
+
+// Create from elements
+KeplerianElements elem;
+elem.a = 2.77;          // AU
+elem.e = 0.075;
+elem.i = 10.6 * DEG_TO_RAD;
+elem.Omega = 80.3 * DEG_TO_RAD;
+elem.omega = 73.6 * DEG_TO_RAD;
+elem.M = 0.0;
+elem.epoch = 2460000.5;
+
+// Derived quantities
+std::cout << "Period: " << elem.period() << " days\n";
+std::cout << "q: " << elem.perihelion_distance() << " AU\n";
+
+// Convert to Cartesian
+Vector6d state = elem.to_cartesian();
+\end{lstlisting}
+
+\subsection{CometaryElements}
+
+Optimized for parabolic and near-parabolic orbits (comets).
+
+\begin{lstlisting}[language=C++]
+class CometaryElements {
+public:
+    double q;      // Perihelion distance [AU]
+    double e;      // Eccentricity
+    double i;      // Inclination [rad]
+    double Omega;  // Longitude of ascending node [rad]
+    double omega;  // Argument of perihelion [rad]
+    double T;      // Time of perihelion passage [JD]
+    double epoch;
+    
+    Vector6d to_cartesian(double jd, double mu = MU_SUN) const;
+    static CometaryElements from_keplerian(const KeplerianElements& kep);
+};
+\end{lstlisting}
+
+\subsection{CartesianState}
+
+Position and velocity vectors.
+
+\begin{lstlisting}[language=C++]
+struct CartesianState {
+    Vector3d position;  // [AU]
+    Vector3d velocity;  // [AU/day]
+    double epoch;       // [JD TDB]
+    
+    Vector6d as_vector() const {
+        Vector6d v;
+        v << position, velocity;
+        return v;
+    }
+    
+    double distance() const { return position.norm(); }
+    double speed() const { return velocity.norm(); }
+};
+\end{lstlisting}
+
+\section{Force Models}
+
+\subsection{ForceModel Interface}
+
+\begin{lstlisting}[language=C++]
+class ForceModel {
+public:
+    virtual ~ForceModel() = default;
+    
+    // Compute acceleration [AU/day^2]
+    virtual Vector3d acceleration(
+        const Vector6d& state,
+        double jd_tdb) const = 0;
+    
+    // Partial derivatives for STM (optional)
+    virtual Matrix3d acceleration_partials_position(
+        const Vector6d& state,
+        double jd_tdb) const {
+        return Matrix3d::Zero();
+    }
+    
+    virtual Matrix3d acceleration_partials_velocity(
+        const Vector6d& state,
+        double jd_tdb) const {
+        return Matrix3d::Zero();
+    }
+};
+\end{lstlisting}
+
+\subsection{Point Mass Gravity}
+
+\begin{lstlisting}[language=C++]
+class PointMassGravity : public ForceModel {
+private:
+    std::shared_ptr<IEphemeris> ephemeris_;
+    std::vector<Body> bodies_;  // Sun, planets
+    
+public:
+    PointMassGravity(std::shared_ptr<IEphemeris> eph,
+                     const std::vector<Body>& bodies)
+        : ephemeris_(eph), bodies_(bodies) {}
+    
+    Vector3d acceleration(const Vector6d& state, double jd) const override {
+        Vector3d r_obj = state.head<3>();
+        Vector3d acc = Vector3d::Zero();
+        
+        for (Body body : bodies_) {
+            Vector3d r_body = ephemeris_->get_position(body, jd);
+            Vector3d d = r_body - r_obj;
+            double d_norm = d.norm();
+            
+            // Direct term
+            acc += body.mu * d / (d_norm * d_norm * d_norm);
+            
+            // Indirect term (if not Sun)
+            if (body != Body::SUN) {
+                double r_norm = r_body.norm();
+                acc -= body.mu * r_body / (r_norm * r_norm * r_norm);
+            }
+        }
+        
+        return acc;
+    }
+};
+\end{lstlisting}
+
+\subsection{Combined Force Model}
+
+\begin{lstlisting}[language=C++]
+class CombinedForceModel : public ForceModel {
+private:
+    std::vector<std::shared_ptr<ForceModel>> models_;
+    
+public:
+    void add_model(std::shared_ptr<ForceModel> model) {
+        models_.push_back(model);
+    }
+    
+    Vector3d acceleration(const Vector6d& state, double jd) const override {
+        Vector3d acc = Vector3d::Zero();
+        for (const auto& model : models_) {
+            acc += model->acceleration(state, jd);
+        }
+        return acc;
+    }
+};
+\end{lstlisting}
+
+\section{Numerical Integration}
+
+\subsection{Integrator Interface}
+
+\begin{lstlisting}[language=C++]
+class IIntegrator {
+public:
+    virtual ~IIntegrator() = default;
+    
+    // Single step
+    virtual void step(Vector6d& y, double& t, double dt,
+                     const ForceModel& forces) = 0;
+    
+    // Integrate from t0 to t1
+    virtual void integrate(Vector6d& y, double t0, double t1,
+                          const ForceModel& forces,
+                          double dt_initial = 0.01) = 0;
+    
+    // Get statistics
+    virtual size_t num_steps() const = 0;
+    virtual size_t num_function_calls() const = 0;
+};
+\end{lstlisting}
+
+\subsection{Runge-Kutta-Fehlberg 7(8)}
+
+Adaptive step size, high accuracy.
+
+\begin{lstlisting}[language=C++]
+class RKF78 : public IIntegrator {
+private:
+    double tol_;         // Error tolerance
+    double dt_min_;      // Minimum step size
+    double dt_max_;      // Maximum step size
+    size_t n_steps_;
+    size_t n_fcalls_;
+    
+public:
+    RKF78(double tol = 1e-12,
+          double dt_min = 1e-6,
+          double dt_max = 100.0)
+        : tol_(tol), dt_min_(dt_min), dt_max_(dt_max),
+          n_steps_(0), n_fcalls_(0) {}
+    
+    void integrate(Vector6d& y, double t0, double t1,
+                  const ForceModel& forces,
+                  double dt) override {
+        double t = t0;
+        double h = dt;
+        
+        while (t < t1) {
+            if (t + h > t1) h = t1 - t;
+            
+            // RKF78 coefficients and stages (13 stages)
+            Vector6d k[13];
+            // ... compute stages ...
+            
+            // 7th and 8th order solutions
+            Vector6d y7 = y + h * (/* 7th order combination */);
+            Vector6d y8 = y + h * (/* 8th order combination */);
+            
+            // Error estimate
+            double err = (y8 - y7).norm();
+            
+            // Accept/reject and adapt step
+            if (err < tol_) {
+                y = y8;
+                t += h;
+                n_steps_++;
+            }
+            
+            // Update step size
+            h *= 0.9 * std::pow(tol_ / err, 1.0/8.0);
+            h = std::clamp(h, dt_min_, dt_max_);
+            
+            n_fcalls_ += 13;
+        }
+    }
+};
+\end{lstlisting}
+
+\section{Orbit Propagation}
+
+\subsection{Propagator Class}
+
+High-level interface combining integrator and forces.
+
+\begin{lstlisting}[language=C++]
+class Propagator {
+private:
+    std::shared_ptr<IIntegrator> integrator_;
+    std::shared_ptr<ForceModel> forces_;
+    std::shared_ptr<IEphemeris> ephemeris_;
+    
+public:
+    Propagator(std::shared_ptr<IIntegrator> integ,
+               std::shared_ptr<ForceModel> forces,
+               std::shared_ptr<IEphemeris> eph)
+        : integrator_(integ), forces_(forces), ephemeris_(eph) {}
+    
+    // Propagate state
+    Vector6d propagate(const Vector6d& y0, double t0, double t1) {
+        Vector6d y = y0;
+        integrator_->integrate(y, t0, t1, *forces_);
+        return y;
+    }
+    
+    // Propagate with STM
+    std::pair<Vector6d, Matrix6d> propagate_with_stm(
+        const Vector6d& y0, double t0, double t1) {
+        
+        // Augmented state: [y, Phi(vectorized)]
+        VectorXd aug(42);  // 6 + 36
+        aug.head<6>() = y0;
+        aug.tail<36>() = Matrix6d::Identity().reshaped();
+        
+        // Integrate variational equations
+        integrator_->integrate(aug, t0, t1, *forces_);
+        
+        Vector6d y = aug.head<6>();
+        Matrix6d Phi = Map<Matrix6d>(aug.tail<36>().data());
+        
+        return {y, Phi};
+    }
+    
+    // Generate ephemeris table
+    std::vector<std::pair<double, Vector6d>> 
+    generate_ephemeris(const Vector6d& y0, double t0,
+                      double t1, double dt) {
+        std::vector<std::pair<double, Vector6d>> table;
+        Vector6d y = y0;
+        double t = t0;
+        
+        while (t <= t1) {
+            table.emplace_back(t, y);
+            if (t + dt > t1) dt = t1 - t;
+            integrator_->integrate(y, t, t + dt, *forces_);
+            t += dt;
+        }
+        
+        return table;
+    }
+};
+\end{lstlisting}
+
+\textbf{Usage Example}:
+\begin{lstlisting}[language=C++]
+// Setup
+auto spice = std::make_shared<SpiceInterface>();
+spice->load_kernel("de440.bsp");
+
+auto forces = std::make_shared<PointMassGravity>(
+    spice, {Body::SUN, Body::JUPITER, Body::SATURN});
+
+auto integrator = std::make_shared<RKF78>(1e-12);
+
+Propagator prop(integrator, forces, spice);
+
+// Propagate Pompeja for 60 days
+Vector6d y0 = /* initial state */;
+double t0 = 2460000.5;
+double t1 = t0 + 60.0;
+
+Vector6d y_final = prop.propagate(y0, t0, t1);
+
+std::cout << "Final position: " << y_final.head<3>().transpose() << " AU\n";
+\end{lstlisting}
+
+\section{Observations}
+
+\subsection{Observation Class}
+
+\begin{lstlisting}[language=C++]
+namespace astdyn {
+namespace observations {
+
+struct Observation {
+    double epoch;        // JD UTC
+    double ra;           // Right ascension [rad]
+    double dec;          // Declination [rad]
+    double sigma_ra;     // RA uncertainty [rad]
+    double sigma_dec;    // Dec uncertainty [rad]
+    std::string obs_code; // MPC observatory code
+    double magnitude;    // Apparent magnitude
+    
+    // Computed from RA/Dec
+    Vector3d line_of_sight() const {
+        return Vector3d(
+            std::cos(dec) * std::cos(ra),
+            std::cos(dec) * std::sin(ra),
+            std::sin(dec)
+        );
+    }
+    
+    // Weight for least squares
+    double weight_ra() const { return 1.0 / (sigma_ra * sigma_ra); }
+    double weight_dec() const { return 1.0 / (sigma_dec * sigma_dec); }
+};
+
+}} // namespace
+\end{lstlisting}
+
+\subsection{MPC Reader}
+
+Parse Minor Planet Center 80-column format.
+
+\begin{lstlisting}[language=C++]
+class MPCReader {
+public:
+    static std::vector<Observation> read_file(const std::string& filename) {
+        std::vector<Observation> obs;
+        std::ifstream file(filename);
+        std::string line;
+        
+        while (std::getline(file, line)) {
+            if (line.length() < 80) continue;
+            if (line[14] == 'S' || line[14] == 'X') continue; // Satellite/roving
+            
+            Observation ob;
+            
+            // Parse columns (MPC format specification)
+            ob.obs_code = line.substr(77, 3);
+            
+            // Date/time
+            int year = std::stoi(line.substr(15, 4));
+            int month = std::stoi(line.substr(20, 2));
+            double day = std::stod(line.substr(23, 8));
+            ob.epoch = date_to_jd(year, month, day);
+            
+            // RA: HH MM SS.sss
+            int ra_h = std::stoi(line.substr(32, 2));
+            int ra_m = std::stoi(line.substr(35, 2));
+            double ra_s = std::stod(line.substr(38, 5));
+            ob.ra = (ra_h + ra_m/60.0 + ra_s/3600.0) * 15.0 * DEG_TO_RAD;
+            
+            // Dec: +DD MM SS.ss
+            char sign = line[44];
+            int dec_d = std::stoi(line.substr(45, 2));
+            int dec_m = std::stoi(line.substr(48, 2));
+            double dec_s = std::stod(line.substr(51, 4));
+            ob.dec = (dec_d + dec_m/60.0 + dec_s/3600.0) * DEG_TO_RAD;
+            if (sign == '-') ob.dec = -ob.dec;
+            
+            // Magnitude
+            if (line.length() >= 70 && line[65] != ' ') {
+                ob.magnitude = std::stod(line.substr(65, 5));
+            }
+            
+            // Default uncertainties (catalog-dependent)
+            ob.sigma_ra = 0.5 * ARCSEC_TO_RAD;
+            ob.sigma_dec = 0.5 * ARCSEC_TO_RAD;
+            
+            obs.push_back(ob);
+        }
+        
+        return obs;
+    }
+};
+\end{lstlisting}
+
+\section{Observatory Database}
+
+\subsection{ObservatoryCoordinates}
+
+\begin{lstlisting}[language=C++]
+struct ObservatoryCoordinates {
+    std::string code;
+    double longitude;  // [rad] East positive
+    double latitude;   // [rad] geocentric
+    double altitude;   // [m] above sea level
+    
+    // Geocentric position at given time
+    Vector3d position_itrf(double jd_utc) const {
+        // WGS84 ellipsoid
+        const double a = 6378137.0;  // m
+        const double f = 1.0 / 298.257223563;
+        const double e2 = 2*f - f*f;
+        
+        double N = a / std::sqrt(1 - e2 * std::sin(latitude) * std::sin(latitude));
+        
+        double x = (N + altitude) * std::cos(latitude) * std::cos(longitude);
+        double y = (N + altitude) * std::cos(latitude) * std::sin(longitude);
+        double z = (N * (1 - e2) + altitude) * std::sin(latitude);
+        
+        return Vector3d(x, y, z) / 1000.0;  // Convert to km
+    }
+    
+    // Rotate to inertial frame
+    Vector3d position_icrf(double jd_utc) const {
+        Vector3d r_itrf = position_itrf(jd_utc);
+        Matrix3d R = earth_rotation_matrix(jd_utc);  // ITRF -> ICRF
+        return R * r_itrf / AU;  // Convert to AU
+    }
+};
+\end{lstlisting}
+
+\section{Summary}
+
+Core modules provide:
+
+\begin{enumerate}
+    \item \textbf{Orbital Elements}: Keplerian, Cartesian, Cometary representations
+    \item \textbf{Force Models}: Extensible interface for perturbations
+    \item \textbf{Integrators}: Adaptive step-size RK methods
+    \item \textbf{Propagator}: High-level orbit propagation with STM
+    \item \textbf{Observations}: Astrometric measurements and MPC parsing
+    \item \textbf{Observatories}: Geodetic coordinates and transformations
+\end{enumerate}
+
+All modules are designed for composition and extensibility.

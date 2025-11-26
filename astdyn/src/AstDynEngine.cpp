@@ -11,6 +11,7 @@
 #include "astdyn/observations/MPCReader.hpp"
 #include "astdyn/coordinates/KeplerianElements.hpp"
 #include "astdyn/time/TimeScale.hpp"
+#include "astdyn/io/AstDynConfig.hpp"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -49,14 +50,70 @@ AstDynEngine::AstDynEngine(const AstDynConfig& config)
 }
 
 void AstDynEngine::update_propagator() {
-    auto integrator = std::make_unique<RKF78Integrator>(
-        config_.initial_step_size,
-        config_.tolerance);
+    // Create integrator based on configuration
+    std::unique_ptr<Integrator> integrator;
+    
+    if (config_.integrator_type == "RKF78") {
+        integrator = std::make_unique<RKF78Integrator>(
+            config_.initial_step_size,
+            config_.tolerance);
+    } else if (config_.integrator_type == "RK4") {
+        integrator = std::make_unique<RK4Integrator>(
+            config_.initial_step_size);
+    } else {
+        // Default to RK4
+        if (config_.verbose) {
+            std::cerr << "WARNING: Unknown integrator type '" << config_.integrator_type 
+                      << "', using RK4\n";
+        }
+        integrator = std::make_unique<RK4Integrator>(
+            config_.initial_step_size);
+    }
     
     propagator_ = std::make_shared<Propagator>(
         std::move(integrator),
         ephemeris_,
         config_.propagator_settings);
+}
+
+void AstDynEngine::load_config(const std::string& oop_file) {
+    config::OptionFileParser parser;
+    
+    if (!parser.load(oop_file)) {
+        if (config_.verbose) {
+            std::cerr << "WARNING: Could not load config file " << oop_file 
+                      << ", using defaults\n";
+        }
+        return;
+    }
+    
+    // Load integrator configuration
+    config_.integrator_type = parser.getString("integrator.type", "RK4");
+    config_.initial_step_size = parser.getDouble("integrator.step_size", 0.1);
+    config_.tolerance = parser.getDouble("integrator.tolerance", 1e-12);
+    
+    // Load perturbation settings
+    config_.propagator_settings.include_planets = parser.getBool("perturb.planets", true);
+    config_.propagator_settings.include_asteroids = parser.getBool("perturb.asteroids", false);
+    config_.propagator_settings.include_relativity = parser.getBool("perturb.relativity", false);
+    
+    // Load differential correction settings
+    config_.max_iterations = parser.getInt("diffcorr.max_iter", 20);
+    config_.convergence_threshold = parser.getDouble("diffcorr.convergence", 1e-6);
+    config_.outlier_sigma = parser.getDouble("diffcorr.outlier_threshold", 3.0);
+    
+    // Load output settings
+    config_.verbose = parser.getBool("verbose", true);
+    
+    // Update propagator with new settings
+    update_propagator();
+    
+    // Always print configuration details
+    std::cout << "   Configuration loaded:\n";
+    std::cout << "   • Integrator: " << config_.integrator_type << "\n";
+    std::cout << "   • Step size: " << config_.initial_step_size << " days\n";
+    std::cout << "   • Tolerance: " << config_.tolerance << "\n";
+    std::cout << "   • Max iterations: " << config_.max_iterations << "\n";
 }
 
 // ============================================================================
@@ -256,8 +313,8 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
         std::cout << "Convergence threshold: " << config_.convergence_threshold << "\n";
     }
     
-    // Create residual calculator and STM computer
-    auto residual_calc = std::make_shared<orbit_determination::ResidualCalculator>(ephemeris_);
+    // Create residual calculator and STM computer (both need propagator)
+    auto residual_calc = std::make_shared<orbit_determination::ResidualCalculator>(ephemeris_, propagator_);
     auto stm_computer = std::make_shared<orbit_determination::StateTransitionMatrix>(propagator_);
     
     // Create differential corrector

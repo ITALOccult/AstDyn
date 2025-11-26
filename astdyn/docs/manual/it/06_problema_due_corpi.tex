@@ -1,0 +1,464 @@
+\chapter{Il Problema dei Due Corpi}
+\label{ch:problema_due_corpi}
+
+\section{Introduzione al Problema dei Due Corpi}
+
+Il \textbf{problema dei due corpi} è il fondamento della meccanica orbitale. Descrive il moto di due masse puntiformi che interagiscono solo attraverso l'attrazione gravitazionale reciproca. Questo è l'unico caso in meccanica celeste con una soluzione analitica completa.
+
+\subsection{Formulazione del Problema}
+
+Consideriamo due corpi con masse $m_1$ e $m_2$ separati da una distanza $r$. La legge di gravitazione di Newton fornisce:
+
+\begin{equation}
+    \mathbf{F}_{12} = -G\frac{m_1 m_2}{r^2}\hat{\mathbf{r}}
+\end{equation}
+
+dove $G = 6.674 \times 10^{-11}$ m$^3$ kg$^{-1}$ s$^{-2}$ è la costante gravitazionale.
+
+Le equazioni del moto sono:
+\begin{align}
+    m_1\ddot{\mathbf{r}}_1 &= G\frac{m_1 m_2}{r^3}(\mathbf{r}_2 - \mathbf{r}_1) \\
+    m_2\ddot{\mathbf{r}}_2 &= G\frac{m_1 m_2}{r^3}(\mathbf{r}_1 - \mathbf{r}_2)
+\end{align}
+
+\subsection{Riduzione a Problema a Un Corpo}
+
+Introducendo la posizione relativa $\mathbf{r} = \mathbf{r}_2 - \mathbf{r}_1$ e la massa ridotta $\mu = G(m_1 + m_2)$, il problema si riduce a:
+
+\begin{equation}
+    \ddot{\mathbf{r}} = -\frac{\mu}{r^3}\mathbf{r}
+\end{equation}
+
+Questa è l'\textbf{equazione della forza centrale} con parametro gravitazionale $\mu$. Per il sistema Sole-pianeta, $\mu_\odot = 1.327 \times 10^{20}$ m$^3$ s$^{-2}$.
+
+\section{Leggi di Conservazione}
+
+Il problema dei due corpi ha diverse quantità conservate che vincolano il moto.
+
+\subsection{Conservazione del Momento Angolare}
+
+Il momento angolare è:
+\begin{equation}
+    \mathbf{h} = \mathbf{r} \times \mathbf{v}
+\end{equation}
+
+Poiché $\ddot{\mathbf{r}}$ è parallelo a $\mathbf{r}$, abbiamo:
+\begin{equation}
+    \frac{d\mathbf{h}}{dt} = \mathbf{r} \times \ddot{\mathbf{r}} = \mathbf{0}
+\end{equation}
+
+Quindi: $\mathbf{h} = \text{costante}$
+
+\textbf{Conseguenze}:
+\begin{itemize}
+    \item Il moto è confinato in un piano perpendicolare a $\mathbf{h}$
+    \item $|\mathbf{h}| = h = \sqrt{\mu a(1-e^2)}$ si relaziona agli elementi orbitali
+    \item La velocità areolare è costante: $\frac{dA}{dt} = \frac{h}{2}$ (Seconda legge di Keplero)
+\end{itemize}
+
+\subsection{Conservazione dell'Energia}
+
+L'energia meccanica specifica è:
+\begin{equation}
+    \mathcal{E} = \frac{v^2}{2} - \frac{\mu}{r} = \text{costante}
+\end{equation}
+
+Questa può essere scritta come:
+\begin{equation}
+    \mathcal{E} = -\frac{\mu}{2a}
+\end{equation}
+
+per orbite ellittiche con semiasse maggiore $a$.
+
+\subsection{Il Vettore di Laplace-Runge-Lenz}
+
+Il vettore di eccentricità è conservato:
+\begin{equation}
+    \mathbf{e} = \frac{1}{\mu}(\mathbf{v} \times \mathbf{h}) - \frac{\mathbf{r}}{r}
+\end{equation}
+
+Proprietà:
+\begin{itemize}
+    \item $|\mathbf{e}| = e$ (eccentricità orbitale)
+    \item $\mathbf{e}$ punta verso il periastro
+    \item $\mathbf{e} \cdot \mathbf{h} = 0$ (perpendicolare al momento angolare)
+\end{itemize}
+
+\section{L'Equazione dell'Orbita}
+
+\subsection{Derivazione}
+
+In coordinate polari $(r, \nu)$ dove $\nu$ è l'anomalia vera, l'equazione dell'orbita è:
+
+\begin{equation}
+    r = \frac{a(1-e^2)}{1 + e\cos\nu} = \frac{p}{1 + e\cos\nu}
+\end{equation}
+
+dove $p = a(1-e^2)$ è il semi-latus rectum.
+
+Questa è l'equazione di una sezione conica con fuoco nell'origine.
+
+\subsection{Sezioni Coniche}
+
+La forma dell'orbita dipende dall'eccentricità e dall'energia:
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.2]
+    % Sole al fuoco
+    \filldraw[yellow,draw=orange,thick] (0,0) circle (3pt);
+    \node[below left] at (0,-0.2) {Sole};
+    
+    % Ellisse (e = 0.5)
+    \draw[thick,blue,rotate=0] (0,0) ellipse (3cm and 2.6cm);
+    \node[blue] at (3.5,2) {Ellisse ($e=0.5$)};
+    \filldraw[blue] (1.5,0) circle (2pt);
+    \draw[blue,dashed] (0,0) -- (1.5,0);
+    
+    % Cerchio (e = 0)
+    \draw[thick,green!60!black] (0,0) circle (2cm);
+    \node[green!60!black] at (1.5,-1.5) {Cerchio ($e=0$)};
+    
+    % Parabola (e = 1)
+    \draw[thick,red,domain=-2:2,samples=50] plot ({-0.5*\x*\x + 2}, {\x});
+    \node[red] at (2.5,2.5) {Parabola ($e=1$)};
+    
+    % Iperbole (e = 1.5)
+    \draw[thick,purple,domain=-1.5:1.5,samples=50] plot ({-0.7/(1-1.5*cos(\x r)) * cos(\x r)}, {-0.7/(1-1.5*cos(\x r)) * sin(\x r)});
+    \node[purple] at (-2.5,1.5) {Iperbole ($e=1.5$)};
+\end{tikzpicture}
+\caption{Orbite coniche per diverse eccentricità. Il Sole è in uno dei fuochi di ogni conica.}
+\label{fig:sezioni_coniche}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Tipo di Orbita} & \textbf{Eccentricità} & \textbf{Energia} & \textbf{Esempi} \\
+\midrule
+Cerchio & $e = 0$ & $\mathcal{E} < 0$ & Orbite idealizzate \\
+Ellisse & $0 < e < 1$ & $\mathcal{E} < 0$ & Pianeti, asteroidi \\
+Parabola & $e = 1$ & $\mathcal{E} = 0$ & Traiettoria di fuga \\
+Iperbole & $e > 1$ & $\mathcal{E} > 0$ & Oggetti interstellari \\
+\bottomrule
+\end{tabular}
+\caption{Classificazione delle coniche orbitali per eccentricità ed energia.}
+\label{tab:tipi_orbita}
+\end{table}
+
+\section{Le Leggi di Keplero}
+
+Johannes Kepler (1571-1630) derivò tre leggi empiriche dalle osservazioni del moto planetario. Queste sono conseguenze del problema dei due corpi.
+
+\subsection{Prima Legge di Keplero (Legge delle Ellissi)}
+
+\textit{L'orbita di un pianeta è un'ellisse con il Sole in uno dei fuochi.}
+
+Matematicamente:
+\begin{equation}
+    r = \frac{a(1-e^2)}{1 + e\cos\nu}
+\end{equation}
+
+La distanza al perielio è $r_p = a(1-e)$ e la distanza all'afelio è $r_a = a(1+e)$.
+
+\subsection{Seconda Legge di Keplero (Legge delle Aree)}
+
+\textit{Una linea che unisce un pianeta e il Sole spazza aree uguali in tempi uguali.}
+
+Questo segue dalla conservazione del momento angolare:
+\begin{equation}
+    \frac{dA}{dt} = \frac{h}{2} = \frac{1}{2}\sqrt{\mu a(1-e^2)} = \text{costante}
+\end{equation}
+
+\subsection{Terza Legge di Keplero (Legge Armonica)}
+
+\textit{Il quadrato del periodo orbitale è proporzionale al cubo del semiasse maggiore.}
+
+\begin{equation}
+    P^2 = \frac{4\pi^2}{\mu}a^3
+\end{equation}
+
+Per il sistema solare:
+\begin{equation}
+    P[\text{anni}] = a[\text{AU}]^{3/2}
+\end{equation}
+
+\section{L'Equazione di Keplero}
+
+\subsection{Le Anomalie}
+
+Tre angoli correlati descrivono la posizione in un'orbita ellittica:
+
+\begin{description}
+    \item[Anomalia Vera ($\nu$)] Angolo effettivo dal perielio alla posizione corrente
+    \item[Anomalia Eccentrica ($E$)] Angolo ausiliario sul cerchio circoscritto
+    \item[Anomalia Media ($M$)] Angolo che sarebbe percorso se il moto fosse uniforme
+\end{description}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.5]
+    % Ellisse
+    \draw[thick] (0,0) ellipse (3cm and 2cm);
+    
+    % Cerchio circoscritto
+    \draw[dashed,gray] (0,0) circle (3cm);
+    
+    % Sole al fuoco
+    \filldraw[yellow,draw=orange] (-1.8,0) circle (3pt);
+    \node[below] at (-1.8,-0.3) {Sole};
+    
+    % Centro
+    \filldraw[black] (0,0) circle (1.5pt);
+    \node[below right] at (0,0) {$C$};
+    
+    % Perielio
+    \draw[dashed] (-3,0) -- (3,0);
+    \node[left] at (-3,0) {Perielio};
+    
+    % Posizione pianeta
+    \filldraw[blue] (1.5,1.5) circle (2pt);
+    \node[above right,blue] at (1.5,1.5) {Pianeta};
+    
+    % Punto sul cerchio (per anomalia eccentrica)
+    \filldraw[red] (1.5,2.12) circle (1.5pt);
+    
+    % Anomalia vera
+    \draw[->,purple,thick] (-1.8,0) -- (1.5,1.5);
+    \draw[->,purple] (-1.3,0) arc (0:45:0.5);
+    \node[purple] at (-0.8,0.4) {$\nu$};
+    
+    % Anomalia eccentrica
+    \draw[->,red] (0.5,0) arc (0:55:0.5);
+    \node[red] at (0.8,0.4) {$E$};
+    
+    % Linea verticale
+    \draw[dotted] (1.5,0) -- (1.5,2.12);
+\end{tikzpicture}
+\caption{Relazione tra anomalia vera $\nu$ e anomalia eccentrica $E$ in un'orbita ellittica.}
+\label{fig:anomalie}
+\end{figure}
+
+\subsection{L'Equazione di Keplero}
+
+L'anomalia media avanza uniformemente con il tempo:
+\begin{equation}
+    M = n(t - t_p) = \sqrt{\frac{\mu}{a^3}}(t - t_p)
+\end{equation}
+
+dove $t_p$ è il tempo del passaggio al perielio e $n$ è il moto medio.
+
+L'equazione di Keplero relaziona $M$ a $E$:
+\begin{equation}
+    M = E - e\sin E
+\end{equation}
+
+Questa è un'equazione trascendente senza soluzione in forma chiusa. Deve essere risolta iterativamente.
+
+\subsection{Risoluzione dell'Equazione di Keplero}
+
+\textbf{Metodo di Newton-Raphson}:
+
+Dato $M$ ed $e$, si trova $E$ iterativamente:
+\begin{align}
+    f(E) &= E - e\sin E - M = 0 \\
+    f'(E) &= 1 - e\cos E \\
+    E_{n+1} &= E_n - \frac{f(E_n)}{f'(E_n)} = E_n - \frac{E_n - e\sin E_n - M}{1 - e\cos E_n}
+\end{align}
+
+Stima iniziale: $E_0 = M$ (per $e$ piccolo) oppure $E_0 = M + e$ (migliore per $e$ moderato).
+
+La convergenza si ottiene tipicamente in 3-5 iterazioni per $\epsilon < 10^{-12}$.
+
+\subsection{Relazione tra le Anomalie}
+
+Una volta noto $E$, l'anomalia vera è:
+\begin{equation}
+    \nu = 2\arctan\left(\sqrt{\frac{1+e}{1-e}}\tan\frac{E}{2}\right)
+\end{equation}
+
+Oppure equivalentemente:
+\begin{align}
+    \cos\nu &= \frac{\cos E - e}{1 - e\cos E} \\
+    \sin\nu &= \frac{\sqrt{1-e^2}\sin E}{1 - e\cos E}
+\end{align}
+
+La distanza radiale è:
+\begin{equation}
+    r = a(1 - e\cos E)
+\end{equation}
+
+\section{L'Equazione Vis-Viva}
+
+L'\textbf{equazione vis-viva} (``forza viva'') relaziona la velocità alla posizione:
+
+\begin{equation}
+    v^2 = \mu\left(\frac{2}{r} - \frac{1}{a}\right)
+\end{equation}
+
+Questa è derivata dalla conservazione dell'energia ed è valida per tutte le orbite coniche.
+
+\subsection{Casi Speciali}
+
+\textbf{Al perielio} ($r = a(1-e)$):
+\begin{equation}
+    v_p = \sqrt{\frac{\mu}{a}\frac{1+e}{1-e}}
+\end{equation}
+
+\textbf{All'afelio} ($r = a(1+e)$):
+\begin{equation}
+    v_a = \sqrt{\frac{\mu}{a}\frac{1-e}{1+e}}
+\end{equation}
+
+\textbf{Orbita circolare} ($e = 0$, $r = a$):
+\begin{equation}
+    v_c = \sqrt{\frac{\mu}{a}}
+\end{equation}
+
+\textbf{Velocità di fuga} (parabolica, $e = 1$, $a \to \infty$):
+\begin{equation}
+    v_e = \sqrt{\frac{2\mu}{r}}
+\end{equation}
+
+\section{Orbite Paraboliche e Iperboliche}
+
+\subsection{Orbite Paraboliche ($e = 1$)}
+
+Per traiettorie di fuga, l'equazione dell'orbita diventa:
+\begin{equation}
+    r = \frac{p}{1 + \cos\nu}
+\end{equation}
+
+dove $p$ è la distanza al periastro.
+
+Il tempo di volo è dato dall'equazione di Barker:
+\begin{equation}
+    t - t_p = \frac{1}{2}\sqrt{\frac{p^3}{\mu}}\left(\tan\frac{\nu}{2} + \frac{1}{3}\tan^3\frac{\nu}{2}\right)
+\end{equation}
+
+\subsection{Orbite Iperboliche ($e > 1$)}
+
+Per traiettorie interstellari o di flyby:
+\begin{equation}
+    r = \frac{a(e^2-1)}{1 + e\cos\nu}
+\end{equation}
+
+Nota: $a < 0$ per orbite iperboliche (energia negativa).
+
+L'anomalia iperbolica $F$ soddisfa:
+\begin{equation}
+    M_h = e\sinh F - F
+\end{equation}
+
+E l'anomalia vera è:
+\begin{equation}
+    \nu = 2\arctan\left(\sqrt{\frac{e+1}{e-1}}\tanh\frac{F}{2}\right)
+\end{equation}
+
+La velocità asintotica all'infinito è:
+\begin{equation}
+    v_\infty = \sqrt{-\frac{\mu}{a}} = \sqrt{\mu\frac{e^2-1}{a}}
+\end{equation}
+
+\section{Coefficienti di Lagrange}
+
+I \textbf{coefficienti di Lagrange} (o funzioni $f$ e $g$) forniscono un modo per propagare le orbite senza calcolare esplicitamente gli elementi orbitali.
+
+\subsection{Definizione}
+
+Dato lo stato iniziale $(\mathbf{r}_0, \mathbf{v}_0)$ al tempo $t_0$, lo stato al tempo $t$ è:
+
+\begin{align}
+    \mathbf{r}(t) &= f(t)\mathbf{r}_0 + g(t)\mathbf{v}_0 \\
+    \mathbf{v}(t) &= \dot{f}(t)\mathbf{r}_0 + \dot{g}(t)\mathbf{v}_0
+\end{align}
+
+dove $f, g, \dot{f}, \dot{g}$ sono funzioni scalari del tempo.
+
+\subsection{Espressioni per i Coefficienti di Lagrange}
+
+Per orbite ellittiche:
+\begin{align}
+    f &= 1 - \frac{a}{r_0}(1 - \cos\Delta E) \\
+    g &= t - t_0 + \sqrt{\frac{a^3}{\mu}}(\sin\Delta E - \Delta E) \\
+    \dot{f} &= -\sqrt{\frac{\mu a}{rr_0}}\sin\Delta E \\
+    \dot{g} &= 1 - \frac{a}{r}(1 - \cos\Delta E)
+\end{align}
+
+dove $\Delta E = E - E_0$ è la variazione dell'anomalia eccentrica.
+
+\subsection{Proprietà}
+
+I coefficienti di Lagrange soddisfano:
+\begin{equation}
+    f\dot{g} - \dot{f}g = 1
+\end{equation}
+
+Questa è l'\textbf{identità di Lagrange}, che assicura la conservazione del Wronskiano.
+
+\section{Implementazione in AstDyn}
+
+AstDyn fornisce funzioni per risolvere il problema dei due corpi:
+
+\begin{lstlisting}[language=C++,caption={Problema dei due corpi in AstDyn}]
+#include <astdyn/dynamics/TwoBody.hpp>
+#include <astdyn/core/OrbitalElements.hpp>
+
+using namespace astdyn;
+
+// Risolve l'equazione di Keplero
+double M = 45.0 * DEG_TO_RAD;  // Anomalia media
+double e = 0.3;                 // Eccentricita
+double E = TwoBody::solve_kepler_equation(M, e);
+std::cout << "Anomalia eccentrica: " << E * RAD_TO_DEG << " deg\n";
+
+// Converte E in anomalia vera
+double nu = TwoBody::eccentric_to_true_anomaly(E, e);
+std::cout << "Anomalia vera: " << nu * RAD_TO_DEG << " deg\n";
+
+// Calcola posizione e velocita da elementi orbitali
+OrbitalElements kep;
+kep.a = 2.5;  // AU
+kep.e = 0.15;
+kep.M = M;
+// ... imposta altri elementi
+
+auto [r, v] = kep.to_position_velocity();
+
+// Propaga usando i coefficienti di Lagrange
+double dt = 100.0;  // giorni
+auto [f, g, fdot, gdot] = TwoBody::lagrange_coefficients(
+    r, v, dt, MU_SUN
+);
+
+Vector3d r_new = f * r + g * v;
+Vector3d v_new = fdot * r + gdot * v;
+
+std::cout << "Nuova posizione: " << r_new.transpose() << " AU\n";
+std::cout << "Nuova velocita: " << v_new.transpose() << " AU/day\n";
+\end{lstlisting}
+
+\section{Sommario}
+
+Punti chiave sul problema dei due corpi:
+
+\begin{enumerate}
+    \item Il problema dei due corpi ha una \textbf{soluzione analitica esatta}
+    \item Il moto è governato dalla conservazione dell'energia, del momento angolare e del vettore di eccentricità
+    \item Le orbite sono \textbf{sezioni coniche}: cerchi, ellissi, parabole o iperboli
+    \item Le \textbf{leggi di Keplero} sono conseguenze dirette della gravità newtoniana
+    \item L'\textbf{equazione di Keplero} ($M = E - e\sin E$) relaziona le anomalie media ed eccentrica
+    \item L'\textbf{equazione vis-viva} relaziona la velocità alla posizione
+    \item I \textbf{coefficienti di Lagrange} permettono una propagazione efficiente dell'orbita
+\end{enumerate}
+
+Comprendere il problema dei due corpi è essenziale per:
+\begin{itemize}
+    \item Prevedere le posizioni di pianeti e asteroidi
+    \item Progettare traiettorie spaziali
+    \item Comprendere la linea di base da cui le perturbazioni deviano
+    \item Sviluppare propagatori numerici efficienti
+\end{itemize}
+
+Nel prossimo capitolo, studieremo le perturbazioni—deviazioni dal moto ideale dei due corpi causate da forze aggiuntive.

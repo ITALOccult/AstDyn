@@ -1,0 +1,5 @@
+if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_propagation_tests[1]_tests.cmake")
+  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_propagation_tests[1]_tests.cmake")
+else()
+  add_test(astdyn_propagation_tests_NOT_BUILT astdyn_propagation_tests_NOT_BUILT)
+endif()
