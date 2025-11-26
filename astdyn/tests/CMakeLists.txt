@@ -331,3 +331,148 @@ target_link_libraries(astdyn_pompeja_full_dynamics
 
 gtest_discover_tests(astdyn_pompeja_full_dynamics)
 
+# ============================================================================
+# Pompeja Differential Correction Test (Fit vs OrbFit using observations)
+# ============================================================================
+
+add_executable(astdyn_pompeja_diffcorr
+    test_pompeja_diffcorr_simple.cpp
+)
+
+target_link_libraries(astdyn_pompeja_diffcorr
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_pompeja_diffcorr)
+
+# EQ1 Parser Test
+# ============================================================================
+
+add_executable(test_eq1_parser
+    test_eq1_parser.cpp
+)
+
+target_link_libraries(test_eq1_parser
+    PRIVATE
+        astdyn
+)
+
+# Pompeja Fit Test (using 203.eq1, 203.rwo, 203.oel)
+# ============================================================================
+
+add_executable(astdyn_pompeja_fit
+    test_pompeja_fit.cpp
+)
+
+target_link_libraries(astdyn_pompeja_fit
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_pompeja_fit)
+
+# Pompeja Comparison Test (OrbFit vs AstDyn vs Horizons)
+# ============================================================================
+
+add_executable(astdyn_pompeja_comparison
+    test_pompeja_comparison.cpp
+)
+
+target_link_libraries(astdyn_pompeja_comparison
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_pompeja_comparison)
+
+# Single Residual Debug Test
+# ============================================================================
+
+add_executable(astdyn_single_residual_debug
+    test_single_residual_debug.cpp
+)
+
+target_link_libraries(astdyn_single_residual_debug
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_single_residual_debug)
+
+# ============================================================================
+# AstDyS Orbit Fitter Utility Class Test
+# ============================================================================
+
+add_executable(astdyn_astdys_fitter
+    test_astdys_fitter.cpp
+)
+
+target_link_libraries(astdyn_astdys_fitter
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_astdys_fitter)
+
+# ============================================================================
+# Residual Calculation Debug Test
+# ============================================================================
+
+add_executable(astdyn_residual_debug
+    test_residual_debug.cpp
+)
+
+target_link_libraries(astdyn_residual_debug
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_residual_debug)
+
+# ============================================================================
+# Single Residual Detailed Debug Test
+# ============================================================================
+
+add_executable(astdyn_residual_single
+    test_residual_single.cpp
+)
+
+target_link_libraries(astdyn_residual_single
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_residual_single)
+
+# ============================================================================
+# Pompeja Differential Correction Simple Test (with AstDyS data)
+# ============================================================================
+
+add_executable(astdyn_pompeja_diffcorr_simple
+    test_pompeja_diffcorr_simple.cpp
+)
+
+target_link_libraries(astdyn_pompeja_diffcorr_simple
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_pompeja_diffcorr_simple)
+

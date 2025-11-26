@@ -17,17 +17,28 @@ file(GLOB_RECURSE ASTDYN_SOURCES
 # Add AstDynEngine to the library
 list(APPEND ASTDYN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AstDynEngine.cpp)
 
-# Create main library
-add_library(astdyn ${ASTDYN_SOURCES})
+# Create static library
+add_library(astdyn STATIC ${ASTDYN_SOURCES})
 
-# Set library properties
+# Create shared library (if enabled)
+if(ASTDYN_BUILD_SHARED)
+    add_library(astdyn_shared SHARED ${ASTDYN_SOURCES})
+    set_target_properties(astdyn_shared PROPERTIES
+        OUTPUT_NAME astdyn
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+        PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/../include/astdyn/AstDyn.hpp"
+    )
+endif()
+
+# Set library properties for static library
 set_target_properties(astdyn PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/../include/astdyn/AstDyn.hpp"
 )
 
-# Link dependencies
+# Link dependencies for static library
 target_link_libraries(astdyn
     PUBLIC
         Eigen3::Eigen
@@ -41,13 +52,35 @@ if(ASTDYN_USE_SPICE AND CSPICE_FOUND)
     target_link_libraries(astdyn PUBLIC CSPICE::CSPICE)
 endif()
 
-# Include directories
+# Include directories for static library
 target_include_directories(astdyn
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
+
+# Link dependencies for shared library (if built)
+if(ASTDYN_BUILD_SHARED)
+    target_link_libraries(astdyn_shared
+        PUBLIC
+            Eigen3::Eigen
+            Boost::filesystem
+            Boost::program_options
+            Boost::date_time
+    )
+    
+    if(ASTDYN_USE_SPICE AND CSPICE_FOUND)
+        target_link_libraries(astdyn_shared PUBLIC CSPICE::CSPICE)
+    endif()
+    
+    target_include_directories(astdyn_shared
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+            $<INSTALL_INTERFACE:include>
+    )
+endif()
 
 # Install library
 install(TARGETS astdyn
