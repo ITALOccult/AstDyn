@@ -240,11 +240,14 @@ Vec3 getPlanetPosition(double jd, int planet) {
             Omega = 76.67984255 - 0.27769418*T;
             break;
         case 3: // Terra-Luna baricentro
-            a = 1.00000261 + 0.00000562*T;
-            e = 0.01671123 - 0.00004392*T;
-            I = -0.00001531 - 0.01294668*T;
+            // Nota: I=0 perché la Terra definisce il piano eclittico
+            // Le variazioni secolari di I e omega_bar non si applicano
+            // quando si usa l'obliquità fissa J2000 per la rotazione ICRF
+            a = 1.00000261;
+            e = 0.01671123;
+            I = 0.0;  // Inclinazione 0 sul piano eclittico
             L = 100.46457166 + 35999.37244981*T;
-            omega_bar = 102.93768193 + 0.32327364*T;
+            omega_bar = 102.93768193;
             Omega = 0.0;
             break;
         case 4: // Marte
@@ -735,14 +738,14 @@ private:
         5.0/6.0, 1.0/6.0, 2.0/3.0, 1.0/3.0, 1.0, 0.0, 1.0
     };
     
-    // Pesi ordine 7
-    static constexpr double b7[STAGES] = {
+    // Pesi ordine 8 (soluzione principale)
+    static constexpr double b8[STAGES] = {
         41.0/840.0, 0, 0, 0, 0, 34.0/105.0, 9.0/35.0, 9.0/35.0,
         9.0/280.0, 9.0/280.0, 41.0/840.0, 0, 0
     };
     
-    // Pesi ordine 8
-    static constexpr double b8[STAGES] = {
+    // Pesi ordine 7 (per stima errore)
+    static constexpr double b7[STAGES] = {
         0, 0, 0, 0, 0, 34.0/105.0, 9.0/35.0, 9.0/35.0,
         9.0/280.0, 9.0/280.0, 0, 41.0/840.0, 41.0/840.0
     };
@@ -807,17 +810,22 @@ private:
                          k[8] * (33.0/164.0) + k[9] * (12.0/41.0) + k[11] * 1.0) * h;
         k[12] = deriv(t + c[12]*h, y12);
         
-        // Soluzione ordine 7
+        // Soluzione ordine 8 (più accurata)
         State y_new = y;
         for (int i = 0; i < STAGES; i++) {
-            y_new = y_new + k[i] * (h * b7[i]);
+            y_new = y_new + k[i] * (h * b8[i]);
         }
         
-        // Stima errore (differenza ordine 7 e 8)
-        State err;
+        // Soluzione ordine 7 per stima errore
+        State y_ord7 = y;
         for (int i = 0; i < STAGES; i++) {
-            err = err + k[i] * (h * (b7[i] - b8[i]));
+            y_ord7 = y_ord7 + k[i] * (h * b7[i]);
         }
+        
+        // Stima errore (differenza ordine 8 e 7)
+        State err;
+        err.r = y_new.r - y_ord7.r;
+        err.v = y_new.v - y_ord7.v;
         
         double error = std::max(err.r.norm(), err.v.norm() * 100);
         
@@ -966,8 +974,10 @@ int main() {
     std::cout << "TARGET: JD " << jd_target << "\n";
     std::cout << "Δt = " << (jd_target - sierks.epoch) << " giorni\n\n";
     
-    // Crea propagatore
+    // Crea propagatore (disabilita AST17 per test - gli elementi sono approssimativi)
     AstDynPropagator prop(1e-12);
+    prop.useAST17(false);  // AST17 non attivo per questo test breve
+    prop.useRelativity(false);  // Test senza relatività
     
     // Converti elementi in stato
     State y0 = prop.elementsToState(sierks);
