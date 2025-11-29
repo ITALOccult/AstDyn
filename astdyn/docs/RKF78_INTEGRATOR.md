@@ -453,7 +453,301 @@ Per dettagli completi, vedere **ASTDYS_FORMAT.md**.
 
 ---
 
-## 11. File Sorgente
+## 11. Guida all'Integrazione
+
+Questa sezione spiega come integrare `AstDynPropagator` nel proprio progetto.
+
+### 11.1 Requisiti
+
+- **Compilatore**: C++17 o superiore
+- **Librerie**: Solo standard library (no dipendenze esterne)
+- **Sistema**: Linux, macOS, Windows
+
+### 11.2 Installazione
+
+Il propagatore è un **header-only** file singolo. Per usarlo:
+
+```bash
+# Copia il file nel tuo progetto
+cp astdyn/tools/astdyn_propagator.cpp my_project/
+
+# Oppure includi come header (rinomina in .hpp)
+cp astdyn/tools/astdyn_propagator.cpp my_project/astdyn_propagator.hpp
+```
+
+### 11.3 Uso Base: Propagazione da Elementi Kepleriani
+
+```cpp
+#include <iostream>
+#include "astdyn_propagator.cpp"  // Include tutto il codice
+
+int main() {
+    using namespace astdyn;
+    
+    // 1. Definisci elementi orbitali
+    OrbitalElements elem;
+    elem.name = "MyAsteroid";
+    elem.a = 2.5;        // Semiasse maggiore [AU]
+    elem.e = 0.15;       // Eccentricità
+    elem.i = 10.5;       // Inclinazione [deg]
+    elem.Omega = 120.0;  // Longitudine nodo [deg]
+    elem.omega = 45.0;   // Argomento perielio [deg]
+    elem.M = 180.0;      // Anomalia media [deg]
+    elem.epoch = 2460000.5;  // Epoca [JD]
+    
+    // 2. Crea propagatore
+    AstDynPropagator prop(1e-12);  // Tolleranza
+    
+    // 3. Converti in stato cartesiano ICRF
+    State y0 = prop.elementsToState(elem);
+    
+    // 4. Propaga a data target
+    double jd_target = 2460030.5;  // +30 giorni
+    PropagationStats stats;
+    State y1 = prop.propagate(y0, elem.epoch, jd_target, &stats);
+    
+    // 5. Calcola coordinate equatoriali
+    EquatorialCoords coords = prop.getEquatorialCoords(y1, jd_target);
+    
+    // 6. Output
+    std::cout << "RA  = " << coords.formatRA() << "\n";
+    std::cout << "Dec = " << coords.formatDec() << "\n";
+    std::cout << "Δ   = " << coords.dist << " AU\n";
+    std::cout << "Passi: " << stats.steps_accepted << "\n";
+    
+    return 0;
+}
+```
+
+**Compilazione:**
+```bash
+g++ -std=c++17 -O3 -o my_propagator my_propagator.cpp
+```
+
+### 11.4 Uso con Elementi AstDyS (Equinoziali)
+
+```cpp
+#include "astdyn_propagator.cpp"
+
+int main() {
+    using namespace astdyn;
+    
+    // Elementi equinoziali da file AstDyS .eq1
+    EquinoctialElements eq;
+    eq.a = 2.6808535916678031;      // a [AU]
+    eq.h = 0.032872036471001;       // e*sin(ϖ)
+    eq.k = 0.036254405825130;       // e*cos(ϖ)
+    eq.p = 0.103391596538937;       // tan(i/2)*sin(Ω)
+    eq.q = -0.042907901689093;      // tan(i/2)*cos(Ω)
+    eq.lambda = 235.8395861037268;  // Longitudine media [deg]
+    eq.epoch = 61000.0;             // MJD
+    eq.is_mjd = true;
+    eq.name = "(11234) 1999 JS82";
+    
+    // Crea propagatore e converti
+    AstDynPropagator prop(1e-12);
+    
+    // Metodo 1: Conversione diretta a stato
+    State y0 = prop.equinoctialToState(eq);
+    
+    // Metodo 2: Prima converti a Kepleriano, poi a stato
+    OrbitalElements kep = prop.equinoctialToKeplerian(eq);
+    State y0_alt = prop.elementsToState(kep);
+    
+    // Propaga
+    double jd0 = eq.getJD();  // Converte MJD → JD
+    double jd1 = jd0 + 30;    // +30 giorni
+    
+    State y1 = prop.propagate(y0, jd0, jd1);
+    EquatorialCoords coords = prop.getEquatorialCoords(y1, jd1);
+    
+    std::cout << "RA  = " << coords.formatRA() << "\n";
+    std::cout << "Dec = " << coords.formatDec() << "\n";
+    
+    return 0;
+}
+```
+
+### 11.5 Configurazione Avanzata
+
+```cpp
+AstDynPropagator prop(1e-12);  // Tolleranza base
+
+// Configura perturbazioni
+prop.usePlanets(true);     // Perturbazioni 8 pianeti (default: true)
+prop.useAST17(true);       // Perturbazioni 16 asteroidi (default: true)
+prop.useRelativity(true);  // Correzione Schwarzschild (default: true)
+
+// Configura limiti passo
+prop.setStepLimits(0.001, 10.0);  // h_min, h_max [giorni]
+
+// Configura tolleranza
+prop.setTolerance(1e-14);  // Per massima precisione
+```
+
+### 11.6 Propagazione Multi-Epoca (Effemeridi)
+
+```cpp
+#include <vector>
+
+// Genera effemeridi per un mese
+std::vector<EquatorialCoords> generateEphemeris(
+    const OrbitalElements& elem,
+    double jd_start,
+    double jd_end,
+    double step_days)
+{
+    AstDynPropagator prop(1e-12);
+    State y = prop.elementsToState(elem);
+    double t = elem.epoch;
+    
+    std::vector<EquatorialCoords> ephem;
+    
+    for (double jd = jd_start; jd <= jd_end; jd += step_days) {
+        // Propaga allo step corrente
+        y = prop.propagate(y, t, jd);
+        t = jd;
+        
+        // Calcola coordinate
+        EquatorialCoords coords = prop.getEquatorialCoords(y, jd);
+        ephem.push_back(coords);
+    }
+    
+    return ephem;
+}
+
+int main() {
+    OrbitalElements elem = {...};
+    
+    auto ephem = generateEphemeris(elem, 2461000.5, 2461030.5, 1.0);
+    
+    for (size_t i = 0; i < ephem.size(); i++) {
+        std::cout << "Day " << i << ": "
+                  << ephem[i].formatRA() << " "
+                  << ephem[i].formatDec() << "\n";
+    }
+    
+    return 0;
+}
+```
+
+### 11.7 Lettura File AstDyS
+
+```cpp
+#include <fstream>
+#include <sstream>
+
+// Parser semplice per file .eq1
+EquinoctialElements parseEq1File(const std::string& filename) {
+    EquinoctialElements eq;
+    std::ifstream file(filename);
+    std::string line;
+    
+    while (std::getline(file, line)) {
+        if (line.find("KEP") != std::string::npos) {
+            // Leggi i 6 elementi dalla riga successiva
+            std::getline(file, line);
+            std::istringstream iss(line);
+            iss >> eq.a >> eq.h >> eq.k >> eq.p >> eq.q >> eq.lambda;
+        }
+        if (line.find("MJD") != std::string::npos) {
+            size_t pos = line.find("MJD");
+            eq.epoch = std::stod(line.substr(pos + 3));
+            eq.is_mjd = true;
+        }
+    }
+    
+    return eq;
+}
+
+int main() {
+    auto eq = parseEq1File("11234.eq1");
+    
+    AstDynPropagator prop;
+    State y0 = prop.equinoctialToState(eq);
+    // ...
+}
+```
+
+### 11.8 Integrazione con Python (ctypes)
+
+Per usare il propagatore da Python:
+
+```cpp
+// propagator_wrapper.cpp
+extern "C" {
+    #include "astdyn_propagator.cpp"
+    
+    void propagate_asteroid(
+        double a, double e, double i, double Omega, double omega, double M,
+        double epoch, double target_jd,
+        double* ra_out, double* dec_out, double* dist_out)
+    {
+        using namespace astdyn;
+        
+        OrbitalElements elem;
+        elem.a = a; elem.e = e; elem.i = i;
+        elem.Omega = Omega; elem.omega = omega;
+        elem.M = M; elem.epoch = epoch;
+        
+        AstDynPropagator prop(1e-12);
+        State y0 = prop.elementsToState(elem);
+        State y1 = prop.propagate(y0, epoch, target_jd);
+        EquatorialCoords coords = prop.getEquatorialCoords(y1, target_jd);
+        
+        *ra_out = coords.ra;
+        *dec_out = coords.dec;
+        *dist_out = coords.dist;
+    }
+}
+```
+
+```python
+# propagator.py
+import ctypes
+
+lib = ctypes.CDLL('./libpropagator.so')
+lib.propagate_asteroid.argtypes = [
+    ctypes.c_double] * 8 + [ctypes.POINTER(ctypes.c_double)] * 3
+
+def propagate(a, e, i, Omega, omega, M, epoch, target):
+    ra = ctypes.c_double()
+    dec = ctypes.c_double()
+    dist = ctypes.c_double()
+    
+    lib.propagate_asteroid(
+        a, e, i, Omega, omega, M, epoch, target,
+        ctypes.byref(ra), ctypes.byref(dec), ctypes.byref(dist))
+    
+    return ra.value, dec.value, dist.value
+
+# Uso
+ra, dec, dist = propagate(3.175, 0.045, 2.9, 104.2, 100.5, 229.8,
+                          2461000.5, 2461030.5)
+print(f"RA={ra:.6f} rad, Dec={dec:.6f} rad, Dist={dist:.4f} AU")
+```
+
+### 11.9 Best Practices
+
+1. **Tolleranza**: Usa `1e-12` per precisione sub-arcsecond, `1e-10` per velocità
+2. **Perturbazioni**: Disabilita AST17 per propagazioni molto brevi (< 1 giorno)
+3. **Frame**: Lo stato è sempre in ICRF - non mescolare con eclittico
+4. **Epoca**: Usa sempre JD (non MJD) nelle funzioni propagate
+5. **Round-trip**: Testa sempre la reversibilità per validare i risultati
+
+### 11.10 Troubleshooting
+
+| Problema | Causa | Soluzione |
+|----------|-------|-----------|
+| Errore > 1' | Elementi sbagliati | Verifica frame (ECLM vs ICRF) |
+| Round-trip > 1m | Tolleranza bassa | Aumenta a 1e-12 o 1e-14 |
+| Crash/NaN | Eccentricità > 1 | Verifica elementi orbitali |
+| Lentezza | Tolleranza troppo stretta | Usa 1e-10 per preview |
+| Offset costante | Posizione Terra errata | Verifica effemeridi Terra |
+
+---
+
+## 12. File Sorgente
 
 | File | Descrizione |
 |------|-------------|
