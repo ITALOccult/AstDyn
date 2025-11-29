@@ -1,10 +1,11 @@
+
 # AstDynPropagator - Documentazione Completa
 
 ## Propagatore Orbitale ad Alta Precisione con RKF78
 
 **Autore**: AstDyS Team  
 **Data**: 29 Novembre 2025  
-**Versione**: 1.0
+**Versione**: 1.1
 
 ---
 
@@ -21,7 +22,17 @@
 | **Numero di stadi** | 13 |
 | **Tipo** | Embedded, adattivo |
 | **Valutazioni per passo** | 13 |
+| **Frame di riferimento** | ICRF (equatoriale J2000) |
+| **Supporto formati** | Kepleriano, Equinoziale (AstDyS) |
 | **Riferimento** | Fehlberg (1968) NASA TR R-287 |
+
+### Validazione
+
+| Sorgente Elementi | Intervallo | Errore vs JPL |
+|-------------------|------------|---------------|
+| JPL Horizons | 6.9 anni | ~11" |
+| AstDyS OEF2.0 | ±30 giorni | ~11" |
+| Round-trip | ±30 giorni | < 1 metro |
 
 ---
 
@@ -380,13 +391,78 @@ Non incluse in questa versione:
 
 ---
 
-## 10. File Sorgente
+## 10. Supporto Formati AstDyS
+
+### 10.1 Elementi Equinoziali
+
+Il propagatore supporta nativamente il formato **OEF2.0** di AstDyS:
+
+```cpp
+// Struttura elementi equinoziali
+struct EquinoctialElements {
+    double a;       // Semiasse maggiore [AU]
+    double h;       // e*sin(ϖ)
+    double k;       // e*cos(ϖ)
+    double p;       // tan(i/2)*sin(Ω)
+    double q;       // tan(i/2)*cos(Ω)
+    double lambda;  // Longitudine media [deg]
+    double epoch;   // Epoca [MJD]
+    bool is_mjd;    // true se MJD
+};
+
+// Uso
+EquinoctialElements eq;
+eq.a = 2.6808535916678031;
+eq.h = 0.032872036471001;
+eq.k = 0.036254405825130;
+eq.p = 0.103391596538937;
+eq.q = -0.042907901689093;
+eq.lambda = 235.8395861037268;
+eq.epoch = 61000.0;
+eq.is_mjd = true;
+
+AstDynPropagator prop;
+State y0 = prop.equinoctialToState(eq);
+```
+
+### 10.2 Conversione Elementi
+
+```cpp
+// Equinoziali → Kepleriani
+OrbitalElements kep = prop.equinoctialToKeplerian(eq);
+
+// Formule di conversione:
+// e = sqrt(h² + k²)
+// i = 2·atan(sqrt(p² + q²))
+// Ω = atan2(p, q)
+// ω = atan2(h, k) - Ω
+// M = λ - atan2(h, k)
+```
+
+### 10.3 Download Dati AstDyS
+
+```bash
+# Elementi orbitali
+curl -s "https://newton.spacedys.com/~astdys2/epoch/numbered/11/11234.eq1"
+
+# Osservazioni con residui
+curl -s "https://newton.spacedys.com/~astdys2/mpcobs/numbered/11/11234.rwo"
+```
+
+Per dettagli completi, vedere **ASTDYS_FORMAT.md**.
+
+---
+
+## 11. File Sorgente
 
 | File | Descrizione |
 |------|-------------|
-| `tools/test_rkf78.cpp` | Implementazione completa RKF78 |
-| `tools/sierks_precision.cpp` | Propagatore con RK4 |
-| `tools/test_roundtrip.cpp` | Test consistenza round-trip |
+| `tools/astdyn_propagator.cpp` | Classe AstDynPropagator completa |
+| `tools/test_rkf78.cpp` | Implementazione standalone RKF78 |
+| `tools/test_jpl_full.cpp` | Test validazione vs JPL (7 anni) |
+| `tools/test_astdys_full.cpp` | Test con elementi AstDyS |
+| `data/11234.eq1` | Elementi esempio (11234) |
+| `data/11234.rwo` | Osservazioni esempio |
 
 ---
 

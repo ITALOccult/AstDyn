@@ -1,0 +1,17 @@
+# Compiled binaries
+astdyn/tools/astdyn_propagator
+astdyn/tools/astdyn_oc_fitter
+astdyn/tools/sierks_position
+astdyn/tools/sierks_precision
+astdyn/tools/test_*
+!astdyn/tools/test_*.cpp
+astdyn/tools/*.o
+
+# OS files
+.DS_Store
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/

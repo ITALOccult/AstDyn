@@ -4,7 +4,7 @@
  * 
  * @author AstDyS Team - Università di Pisa
  * @date 29 Novembre 2025
- * @version 1.0
+ * @version 1.1
  * 
  * @details
  * Propagatore orbitale ad alta precisione basato su:
@@ -13,9 +13,14 @@
  * - Perturbazioni asteroidali (16 asteroidi AST17)
  * - Correzione relativistica (Schwarzschild)
  * - Correzione tempo-luce per posizioni astrometriche
+ * - Supporto elementi AstDyS (formato OEF2.0 Equinoctial)
+ * - Frame di riferimento: ICRF (equatoriale J2000)
  * 
- * Precisione tipica: ~5" rispetto a JPL Horizons
+ * Precisione tipica: ~11" rispetto a JPL Horizons (validato su 7 anni)
  * Reversibilità: errore round-trip < 1 metro
+ * 
+ * @see RKF78_INTEGRATOR.md per dettagli sull'integratore
+ * @see ASTDYS_FORMAT.md per il formato degli elementi AstDyS
  */
 
 #include <iostream>
@@ -117,6 +122,36 @@ struct OrbitalElements {
     double epoch;  ///< Epoca [JD]
     
     std::string name;  ///< Nome oggetto (opzionale)
+};
+
+/**
+ * @struct EquinoctialElements
+ * @brief Elementi orbitali equinoziali (formato AstDyS OEF2.0)
+ * 
+ * Formato equinoziale usato da AstDyS:
+ * - a: semiasse maggiore [AU]
+ * - h: e*sin(ϖ) dove ϖ = Ω + ω (longitude of perihelion)
+ * - k: e*cos(ϖ)
+ * - p: tan(i/2)*sin(Ω)
+ * - q: tan(i/2)*cos(Ω)
+ * - lambda: longitudine media = Ω + ω + M [deg]
+ * 
+ * Frame di riferimento: ECLM J2000 (eclittica media J2000)
+ */
+struct EquinoctialElements {
+    double a;       ///< Semiasse maggiore [AU]
+    double h;       ///< e*sin(ϖ)
+    double k;       ///< e*cos(ϖ)
+    double p;       ///< tan(i/2)*sin(Ω)
+    double q;       ///< tan(i/2)*cos(Ω)
+    double lambda;  ///< Longitudine media [deg]
+    double epoch;   ///< Epoca [MJD o JD]
+    bool is_mjd;    ///< true se epoca è MJD
+    
+    std::string name;  ///< Nome oggetto
+    
+    /** @brief Converte MJD a JD */
+    double getJD() const { return is_mjd ? epoch + 2400000.5 : epoch; }
 };
 
 /**
@@ -299,7 +334,12 @@ Vec3 getPlanetPosition(double jd, int planet) {
                (-sin_O*sin_w + cos_O*cos_w*cos_i) * y_orb;
     double z = (sin_w*sin_i) * x_orb + (cos_w*sin_i) * y_orb;
     
-    return Vec3(x, y, z);
+    // Rotazione eclittica → equatoriale (ICRF)
+    double eps = 23.4392911 * constants::DEG2RAD;
+    double cos_eps = std::cos(eps);
+    double sin_eps = std::sin(eps);
+    
+    return Vec3(x, cos_eps * y - sin_eps * z, sin_eps * y + cos_eps * z);
 }
 
 } // namespace ephemeris
@@ -376,7 +416,12 @@ Vec3 getPosition(const Asteroid& ast, double jd) {
                (-sin_O*sin_w + cos_O*cos_w*cos_i) * y_orb;
     double z = (sin_w*sin_i) * x_orb + (cos_w*sin_i) * y_orb;
     
-    return Vec3(x, y, z);
+    // Rotazione eclittica → equatoriale (ICRF)
+    double eps = 23.4392911 * constants::DEG2RAD;
+    double cos_eps = std::cos(eps);
+    double sin_eps = std::sin(eps);
+    
+    return Vec3(x, cos_eps * y - sin_eps * z, sin_eps * y + cos_eps * z);
 }
 
 } // namespace ast17
@@ -448,11 +493,82 @@ public:
     //=========================================================================
     
     /**
-     * @brief Converte elementi orbitali in stato cartesiano
-     * @param elem Elementi kepleriani
-     * @return Stato (posizione, velocità)
+     * @brief Converte elementi equinoziali (AstDyS) in elementi kepleriani
+     * @param eq Elementi equinoziali
+     * @return Elementi kepleriani
+     * 
+     * Formule di conversione:
+     * - e = sqrt(h² + k²)
+     * - i = 2*atan(sqrt(p² + q²))
+     * - Ω = atan2(p, q)
+     * - ϖ = atan2(h, k)  (longitude of perihelion)
+     * - ω = ϖ - Ω
+     * - M = λ - ϖ
+     */
+    OrbitalElements equinoctialToKeplerian(const EquinoctialElements& eq) {
+        OrbitalElements kep;
+        kep.a = eq.a;
+        kep.name = eq.name;
+        kep.epoch = eq.getJD();
+        
+        // Eccentricità
+        kep.e = std::sqrt(eq.h*eq.h + eq.k*eq.k);
+        
+        // Inclinazione
+        double tan_i_2 = std::sqrt(eq.p*eq.p + eq.q*eq.q);
+        kep.i = 2.0 * std::atan(tan_i_2) * constants::RAD2DEG;
+        
+        // Longitudine del nodo ascendente
+        double Omega_rad = std::atan2(eq.p, eq.q);
+        if (Omega_rad < 0) Omega_rad += 2*M_PI;
+        kep.Omega = Omega_rad * constants::RAD2DEG;
+        
+        // Longitudine del perielio
+        double LP_rad = std::atan2(eq.h, eq.k);
+        if (LP_rad < 0) LP_rad += 2*M_PI;
+        
+        // Argomento del perielio
+        double omega_rad = LP_rad - Omega_rad;
+        while (omega_rad < 0) omega_rad += 2*M_PI;
+        while (omega_rad > 2*M_PI) omega_rad -= 2*M_PI;
+        kep.omega = omega_rad * constants::RAD2DEG;
+        
+        // Anomalia media
+        double M_rad = eq.lambda * constants::DEG2RAD - LP_rad;
+        while (M_rad < 0) M_rad += 2*M_PI;
+        while (M_rad > 2*M_PI) M_rad -= 2*M_PI;
+        kep.M = M_rad * constants::RAD2DEG;
+        
+        return kep;
+    }
+    
+    /**
+     * @brief Converte elementi orbitali in stato cartesiano ICRF
+     * @param elem Elementi kepleriani (frame eclittico)
+     * @return Stato (posizione, velocità) in ICRF
+     * 
+     * Il frame di output è ICRF (equatoriale J2000), compatibile con JPL Horizons.
      */
     State elementsToState(const OrbitalElements& elem) {
+        return elementsToStateICRF(elem);
+    }
+    
+    /**
+     * @brief Converte elementi equinoziali AstDyS in stato ICRF
+     * @param eq Elementi equinoziali
+     * @return Stato in ICRF
+     */
+    State equinoctialToState(const EquinoctialElements& eq) {
+        OrbitalElements kep = equinoctialToKeplerian(eq);
+        return elementsToStateICRF(kep);
+    }
+    
+    /**
+     * @brief Converte elementi orbitali in stato ICRF (equatoriale J2000)
+     * @param elem Elementi kepleriani (frame eclittico J2000)
+     * @return Stato in frame ICRF
+     */
+    State elementsToStateICRF(const OrbitalElements& elem) {
         double a = elem.a;
         double e = elem.e;
         double inc = elem.i * constants::DEG2RAD;
@@ -495,22 +611,36 @@ public:
         double P31 = sw*si,            P32 = cw*si;
         
         // Rotazione nel sistema eclittico
-        Vec3 pos(P11*x_orb + P12*y_orb, P21*x_orb + P22*y_orb, P31*x_orb + P32*y_orb);
-        Vec3 vel(P11*vx_orb + P12*vy_orb, P21*vx_orb + P22*vy_orb, P31*vx_orb + P32*vy_orb);
+        Vec3 pos_ecl(P11*x_orb + P12*y_orb, P21*x_orb + P22*y_orb, P31*x_orb + P32*y_orb);
+        Vec3 vel_ecl(P11*vx_orb + P12*vy_orb, P21*vx_orb + P22*vy_orb, P31*vx_orb + P32*vy_orb);
+        
+        // Rotazione eclittica → equatoriale (ICRF)
+        double eps = 23.4392911 * constants::DEG2RAD;  // Obliquità J2000
+        double cos_eps = std::cos(eps);
+        double sin_eps = std::sin(eps);
+        
+        Vec3 pos(pos_ecl.x,
+                 cos_eps * pos_ecl.y - sin_eps * pos_ecl.z,
+                 sin_eps * pos_ecl.y + cos_eps * pos_ecl.z);
+        Vec3 vel(vel_ecl.x,
+                 cos_eps * vel_ecl.y - sin_eps * vel_ecl.z,
+                 sin_eps * vel_ecl.y + cos_eps * vel_ecl.z);
         
         return State(pos, vel);
     }
     
     /**
-     * @brief Converte stato cartesiano in coordinate equatoriali
-     * @param state Stato (posizione eliocentrica)
+     * @brief Converte stato ICRF in coordinate equatoriali
+     * @param state Stato (posizione eliocentrica in ICRF)
      * @param jd Data giuliana
      * @param apply_lighttime Applica correzione tempo-luce
      * @return Coordinate equatoriali (RA, Dec, distanza)
+     * 
+     * Nota: il calcolo è già in frame ICRF, quindi non serve rotazione
      */
     EquatorialCoords getEquatorialCoords(const State& state, double jd, 
                                           bool apply_lighttime = true) {
-        // Posizione Terra
+        // Posizione Terra (già in ICRF)
         Vec3 earth = ephemeris::getPlanetPosition(jd, 3);
         
         // Vettore geocentrico
@@ -525,21 +655,11 @@ public:
             delta = geo.norm();
         }
         
-        // Obliquità eclittica (J2000.0)
-        double eps = 23.439291111 * constants::DEG2RAD;
-        double cos_eps = std::cos(eps);
-        double sin_eps = std::sin(eps);
-        
-        // Rotazione eclittica → equatoriale
-        double x_eq = geo.x;
-        double y_eq = geo.y * cos_eps - geo.z * sin_eps;
-        double z_eq = geo.y * sin_eps + geo.z * cos_eps;
-        
-        // Coordinate equatoriali
+        // Coordinate equatoriali (già in ICRF, no rotazione necessaria)
         EquatorialCoords coords;
-        coords.ra = std::atan2(y_eq, x_eq);
+        coords.ra = std::atan2(geo.y, geo.x);
         if (coords.ra < 0) coords.ra += 2*M_PI;
-        coords.dec = std::asin(z_eq / delta);
+        coords.dec = std::asin(geo.z / delta);
         coords.dist = delta;
         
         return coords;
