@@ -156,10 +156,6 @@ public:
      * @brief Aggiorna configurazione
      */
     void setConfig(const RKF78PropagationConfig& cfg);
-    
-private:
-    class Impl;
-    std::unique_ptr<Impl> pImpl_;
 };
 
 /**
