@@ -17,6 +17,11 @@ option(BUILD_EXAMPLES "Build examples" ON)
 
 # Trova dipendenze
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+
+# Boost - necessario per AstDyn
+set(Boost_NO_WARN_NEW_VERSIONS ON)
+find_package(Boost 1.70 REQUIRED)
+
 find_package(AstDyn REQUIRED)
 
 # Include directories
@@ -31,6 +36,8 @@ set(ITALOCCULTLIB_SOURCES
     src/eq1_parser.cpp
     src/orbital_conversions.cpp
     src/astdyn_wrapper.cpp
+    src/chebyshev_approximation.cpp
+    src/chebyshev_rkf78_propagation.cpp
 )
 
 # Header files (per installazione)
@@ -38,6 +45,8 @@ set(ITALOCCULTLIB_HEADERS
     include/eq1_parser.h
     include/orbital_conversions.h
     include/astdyn_wrapper.h
+    include/chebyshev_approximation.h
+    include/chebyshev_rkf78_propagation.h
 )
 
 # Crea libreria
