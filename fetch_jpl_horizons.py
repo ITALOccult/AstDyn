@@ -23,10 +23,10 @@ def get_jpl_horizons_data():
         'EPHEM_TYPE': 'VECTORS',      # Coordinate vector output
         'OUT_UNITS': 'AU-D',          # AU and AU/day
         'COORD_TYPE': 'GEODETIC',     # Geodetic/ICRF
-        'REF_PLANE': 'ECLIPTIC',      # Ecliptic
+        'REF_PLANE': 'FRAME',         # FRAME = Equatorial J2000
         'CENTER': '@sun',             # Barycentric Solar System
-        'START_TIME': '2025-11-25 00:00:00',
-        'STOP_TIME': '2025-11-30 23:59:00',
+        'START_TIME': "'2025-11-25 00:00:00'",
+        'STOP_TIME': "'2025-11-30 23:59:00'",
         'STEP_SIZE': '6h',            # 6 hour intervals
         'VEC_LABELS': 'NO',
         'VEC_CORR': 'NONE',
@@ -43,8 +43,13 @@ def get_jpl_horizons_data():
         query_string = urllib.parse.urlencode(params)
         full_url = f"{url}?{query_string}"
         
+        import ssl
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
         # Scarica dati
-        with urllib.request.urlopen(full_url, timeout=30) as response:
+        with urllib.request.urlopen(full_url, context=ctx, timeout=30) as response:
             data = response.read().decode('utf-8')
             
         print("✓ Dati scaricati")
@@ -65,17 +70,32 @@ def parse_horizons_csv(data):
     for line in lines:
         # Cerca inizio dati
         if '$$SOE' in line:
+            print("DEBUG: Found $$SOE")
             in_data = True
             continue
         if '$$EOE' in line:
+            print("DEBUG: Found $$EOE")
             break
             
         if in_data and line.strip():
-            # Parse line: 2025-Nov-25 00:00:00.0000   9.009851844833686E-01   3.165000000000000E+00...
-            parts = line.split()
+            print(f"DEBUG: Data line: {line}")
+            # Parse line
+            if ',' in line:
+                parts = line.split(',')
+            else:
+                parts = line.split()
+                
             if len(parts) >= 8:
                 try:
-                    date_str = f"{parts[0]} {parts[1]}"
+                    # Parse JD from first column
+                    jd = float(parts[0])
+                    mjd = jd - 2400000.5
+                    
+                    # Parse date string for display
+                    date_str = parts[1].strip()
+                    if "A.D." in date_str:
+                        date_str = date_str.replace("A.D. ", "")
+                    
                     x = float(parts[2])
                     y = float(parts[3])
                     z = float(parts[4])
@@ -85,6 +105,7 @@ def parse_horizons_csv(data):
                     
                     results.append({
                         'date': date_str,
+                        'mjd': mjd,
                         'x': x, 'y': y, 'z': z,
                         'vx': vx, 'vy': vy, 'vz': vz
                     })
@@ -93,28 +114,6 @@ def parse_horizons_csv(data):
     
     return results
 
-def gregorian_to_mjd(date_str):
-    """Convert 'YYYY-Mon-DD HH:MM' to MJD"""
-    try:
-        dt = datetime.strptime(date_str, '%Y-%b-%d %H:%M:%S.%f')
-    except ValueError:
-        dt = datetime.strptime(date_str, '%Y-%b-%d %H:%M')
-    
-    # JD from datetime
-    a = (14 - dt.month) // 12
-    y = dt.year + 4800 - a
-    m = dt.month + 12 * a - 3
-    
-    jd = dt.day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
-    
-    # Add time of day
-    fraction = dt.hour / 24.0 + dt.minute / 1440.0 + dt.second / 86400.0
-    
-    # MJD = JD - 2400000.5
-    mjd = jd - 2400000.5 + fraction
-    
-    return mjd
-
 def generate_cpp_data(data):
     """Generate C++ vector initialization"""
     
@@ -122,9 +121,8 @@ def generate_cpp_data(data):
     print("std::vector<JPLData> data = {")
     
     for entry in data:
-        mjd = gregorian_to_mjd(entry['date'])
-        print(f"    // {entry['date']} = MJD {mjd:.2f}")
-        print(f"    {{{mjd:.2f}, {entry['x']:.5f}, {entry['y']:.5f}, {entry['z']:.5f}, "
+        print(f"    // {entry['date']} = MJD {entry['mjd']:.2f}")
+        print(f"    {{{entry['mjd']:.2f}, {entry['x']:.5f}, {entry['y']:.5f}, {entry['z']:.5f}, "
               f"{entry['vx']:.5f}, {entry['vy']:.5f}, {entry['vz']:.5f}}},")
     
     print("};")
@@ -136,8 +134,7 @@ def generate_markdown_table(data):
     print("|----------|---------|--------|--------|--------|-----------|-----------|-----------|")
     
     for entry in data:
-        mjd = gregorian_to_mjd(entry['date'])
-        print(f"| {entry['date']} | {mjd:.4f} | {entry['x']:.6f} | {entry['y']:.6f} | {entry['z']:.6f} | "
+        print(f"| {entry['date']} | {entry['mjd']:.4f} | {entry['x']:.6f} | {entry['y']:.6f} | {entry['z']:.6f} | "
               f"{entry['vx']:.6f} | {entry['vy']:.6f} | {entry['vz']:.6f} |")
 
 if __name__ == '__main__':
@@ -145,6 +142,15 @@ if __name__ == '__main__':
     csv_data = get_jpl_horizons_data()
     
     if csv_data:
+        try:
+            # Horizons API returns JSON by default now
+            import json
+            json_data = json.loads(csv_data)
+            if 'result' in json_data:
+                csv_data = json_data['result']
+        except json.JSONDecodeError:
+            pass # Assume it's raw text
+            
         # Parse
         data = parse_horizons_csv(csv_data)
         
@@ -159,8 +165,7 @@ if __name__ == '__main__':
             with open('jpl_horizons_17030.csv', 'w') as f:
                 f.write("Date,X_AU,Y_AU,Z_AU,VX_AU_d,VY_AU_d,VZ_AU_d,MJD_TDB\n")
                 for entry in data:
-                    mjd = gregorian_to_mjd(entry['date'])
                     f.write(f"{entry['date']},{entry['x']},{entry['y']},{entry['z']},"
-                           f"{entry['vx']},{entry['vy']},{entry['vz']},{mjd:.4f}\n")
+                           f"{entry['vx']},{entry['vy']},{entry['vz']},{entry['mjd']:.4f}\n")
             
             print("\n✓ Dati salvati in jpl_horizons_17030.csv")
