@@ -156,7 +156,7 @@ FitResult OrbitDetermination::fit() {
 }
 
 Eigen::Vector<double, 6> OrbitDetermination::elements_to_cartesian(
-    const io::OrbitalElements& elem
+    const io::IOrbitParser::OrbitalElements& elem
 ) {
     // Keplerian to Cartesian conversion
     double a = elem.semi_major_axis;
@@ -217,7 +217,7 @@ Eigen::Vector<double, 6> OrbitDetermination::elements_to_cartesian(
 }
 
 Observation OrbitDetermination::convert_observation(
-    const io::OpticalObservation& opt_obs
+    const io::IObservationParser::OpticalObservation& opt_obs
 ) {
     Observation obs;
     obs.epoch_mjd = opt_obs.mjd_utc;
