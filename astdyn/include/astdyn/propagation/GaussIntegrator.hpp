@@ -85,6 +85,11 @@ private:
                                const Eigen::VectorXd& y,
                                double h,
                                std::vector<Eigen::VectorXd>& k);
+    
+    /**
+     * @brief Compute energy for Hamiltonian systems (monitoring)
+     */
+    double compute_energy(const Eigen::VectorXd& y) const;
 };
 
 } // namespace astdyn::propagation
