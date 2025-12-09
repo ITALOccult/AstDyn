@@ -97,14 +97,14 @@ private:
      * @brief Convert Keplerian elements to Cartesian state
      */
     Eigen::Vector<double, 6> elements_to_cartesian(
-        const astdyn::io::OrbitalElements& elements
+        const io::IOrbitParser::OrbitalElements& elements
     );
     
     /**
      * @brief Convert OpticalObservation to Observation
      */
     Observation convert_observation(
-        const astdyn::io::OpticalObservation& opt_obs
+        const io::IObservationParser::OpticalObservation& opt_obs
     );
 };
 

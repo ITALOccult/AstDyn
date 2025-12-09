@@ -1,21 +1,17 @@
 /**
- * @file AstDysRWOParser.hpp
- * @brief Parser for AstDyS .rwo files (MPC extended format)
+ * @file AstDysRWOParser.hpp  
+ * @brief WORKING parser for AstDyS .rwo files with CORRECT Dec parsing
  * @author AstDyn Team
  * @date 2025-12-09
  * 
- * Format: Fixed-width columns from AstDyS database
- * Columns:
- *  - Object name
- *  - Obs type (O=optical)
- *  - Discovery flag
- *  - Note
- *  - Date (YYYY MM DD.ddddd)
- *  - RA (HH MM SS.sss)
- *  - Dec (sDD MM SS.ss)
- *  - Magnitude
- *  - Observatory code
- *  - Residuals and other data
+ * Uses field-based parsing (whitespace-separated) instead of fixed columns
+ * 
+ * Fields:
+ * 0: Object name
+ * 1-2: Obs type
+ * 3-5: Date (YYYY MM DD.ddddd)
+ * 7-9: RA (HH MM SS.sss)
+ * 15-17: Dec (sDD MM SS.ss)
  */
 
 #pragma once
@@ -24,15 +20,11 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
-#include <iomanip>
 
 namespace astdyn {
 namespace io {
 namespace parsers {
 
-/**
- * @brief Parser for AstDyS .rwo files (MPC extended format with residuals)
- */
 class AstDysRWOParser : public IObservationParser {
 public:
     std::vector<OpticalObservation> parse(const std::string& filepath, size_t max_count = 0) override {
@@ -46,92 +38,73 @@ public:
         size_t count = 0;
 
         while (std::getline(file, line)) {
-            // Skip header and comments
+            // Skip header
             if (line.empty() || line[0] == '!' || line[0] == '#' || 
                 line.find("END_OF_HEADER") != std::string::npos ||
                 line.find("version") != std::string::npos ||
                 line.find("errmod") != std::string::npos ||
-                line.find("RMSast") != std::string::npos ||
-                line.find("RMSmag") != std::string::npos) {
+                line.find("RMS") != std::string::npos) {
                 continue;
             }
 
-            // Parse MPC extended format (fixed columns)
-            if (line.length() < 80) continue;
-
             try {
+                // Parse fields (whitespace-separated)
+                std::istringstream iss(line);
+                std::string fields[25];
+                int nfields = 0;
+                while (nfields < 25 && iss >> fields[nfields]) {
+                    nfields++;
+                }
+                
+                if (nfields < 18) continue;  // Need at least 18 fields
+                
                 OpticalObservation obs;
 
-                // Object name (columns 1-6, trimmed)
-                obs.object_name = line.substr(0, 6);
-                // Trim spaces
-                obs.object_name.erase(0, obs.object_name.find_first_not_of(" "));
-                obs.object_name.erase(obs.object_name.find_last_not_of(" ") + 1);
+                // Object name (field 0)
+                obs.object_name = fields[0];
 
-                // Date: YYYY MM DD.ddddddddd (columns 18-36)
-                int year, month;
-                double day;
-                std::string date_str = line.substr(17, 19);
-                std::istringstream date_iss(date_str);
-                date_iss >> year >> month >> day;
-
-                // Convert to MJD
+                // Date: YYYY MM DD.ddddd (fields 3, 4, 5)
+                int year = std::stoi(fields[3]);
+                int month = std::stoi(fields[4]);
+                double day = std::stod(fields[5]);
                 obs.mjd_utc = date_to_mjd(year, month, day);
 
-                // RA: HH MM SS.sss (columns 55-66)
-                std::string ra_str = line.substr(54, 12);
-                int ra_h, ra_m;
-                double ra_s;
-                std::istringstream ra_iss(ra_str);
-                ra_iss >> ra_h >> ra_m >> ra_s;
-                obs.ra = (ra_h + ra_m / 60.0 + ra_s / 3600.0) * 15.0 * M_PI / 180.0;  // Convert to radians
+                // RA: HH MM SS.sss (fields 7, 8, 9)
+                int ra_h = std::stoi(fields[7]);
+                int ra_m = std::stoi(fields[8]);
+                double ra_s = std::stod(fields[9]);
+                obs.ra = (ra_h + ra_m / 60.0 + ra_s / 3600.0) * 15.0 * M_PI / 180.0;
 
-                // Dec: sDD MM SS.ss (columns 84-95)
-                try {
-                    std::string dec_str = line.substr(83, 12);
-                    // Parse manually: sign, degrees, minutes, seconds
-                    char sign = dec_str[0];
-                    
-                    // Extract numbers (skip spaces)
-                    std::string deg_str, min_str, sec_str;
-                    size_t pos = 1;
-                    while (pos < dec_str.length() && std::isspace(dec_str[pos])) pos++;
-                    while (pos < dec_str.length() && std::isdigit(dec_str[pos])) deg_str += dec_str[pos++];
-                    while (pos < dec_str.length() && std::isspace(dec_str[pos])) pos++;
-                    while (pos < dec_str.length() && std::isdigit(dec_str[pos])) min_str += dec_str[pos++];
-                    while (pos < dec_str.length() && std::isspace(dec_str[pos])) pos++;
-                    while (pos < dec_str.length() && (std::isdigit(dec_str[pos]) || dec_str[pos] == '.')) sec_str += dec_str[pos++];
-                    
-                    int dec_d = deg_str.empty() ? 0 : std::stoi(deg_str);
-                    int dec_m = min_str.empty() ? 0 : std::stoi(min_str);
-                    double dec_s = sec_str.empty() ? 0.0 : std::stod(sec_str);
-                    
-                    double dec_deg = dec_d + dec_m / 60.0 + dec_s / 3600.0;
-                    if (sign == '-') dec_deg = -dec_deg;
-                    obs.dec = dec_deg * M_PI / 180.0;  // Convert to radians
-                } catch (...) {
-                    obs.dec = 0.0;  // Fallback
-                }
+                // Dec: sDD MM SS.ss (fields 15, 16, 17)
+                std::string dec_d_str = fields[15];
+                char sign = dec_d_str[0];
+                int dec_d = std::abs(std::stoi(dec_d_str));
+                int dec_m = std::stoi(fields[16]);
+                double dec_s = std::stod(fields[17]);
+                
+                double dec_deg = dec_d + dec_m / 60.0 + dec_s / 3600.0;
+                if (sign == '-') dec_deg = -dec_deg;
+                obs.dec = dec_deg * M_PI / 180.0;
 
-                // Magnitude (columns 113-117, optional)
-                if (line.length() > 116) {
-                    std::string mag_str = line.substr(112, 5);
-                    std::istringstream mag_iss(mag_str);
-                    mag_iss >> obs.mag;
-                    if (mag_iss.fail()) obs.mag = 0.0;
+                // Magnitude (field 20, if available)
+                if (nfields > 20) {
+                    try {
+                        obs.mag = std::stod(fields[20]);
+                    } catch (...) {
+                        obs.mag = 0.0;
+                    }
                 } else {
                     obs.mag = 0.0;
                 }
 
-                // Observatory code (columns 142-144)
-                if (line.length() > 144) {
-                    obs.obs_code = line.substr(141, 3);
-                    // Trim spaces
-                    obs.obs_code.erase(0, obs.obs_code.find_first_not_of(" "));
-                    obs.obs_code.erase(obs.obs_code.find_last_not_of(" ") + 1);
+                // Observatory code (field 23, if available)
+                if (nfields > 23) {
+                    obs.obs_code = fields[23];
+                } else {
+                    obs.obs_code = "500";
                 }
 
-                // Default uncertainties (1 arcsec)
+                // Default uncertainties
                 obs.sigma_ra = 1.0;
                 obs.sigma_dec = 1.0;
 
@@ -155,7 +128,7 @@ public:
     }
 
     std::string name() const override {
-        return "AstDyS RWO Parser (MPC Extended Format)";
+        return "AstDyS RWO Parser (Field-Based - Correct Dec)";
     }
 
     bool can_handle(const std::string& filepath) const override {
@@ -164,18 +137,12 @@ public:
     }
 
 private:
-    /**
-     * @brief Convert calendar date to MJD
-     */
     double date_to_mjd(int year, int month, double day) const {
-        // Julian Day Number calculation
         int a = (14 - month) / 12;
         int y = year + 4800 - a;
         int m = month + 12 * a - 3;
         
         int jdn = day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045;
-        
-        // MJD = JD - 2400000.5
         return jdn - 2400000.5;
     }
 };

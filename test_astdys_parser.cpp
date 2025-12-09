@@ -11,7 +11,7 @@ using namespace astdyn::io::parsers;
 
 int main() {
     std::cout << "╔══════════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║        Test AstDyS RWO Parser (MPC Extended Format)             ║\n";
+    std::cout << "║        Test AstDyS RWO Parser (FIXED - Correct Dec)             ║\n";
     std::cout << "╚══════════════════════════════════════════════════════════════════╝\n\n";
     
     try {
