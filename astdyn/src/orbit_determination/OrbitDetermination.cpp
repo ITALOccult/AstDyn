@@ -94,11 +94,17 @@ FitResult OrbitDetermination::fit() {
     fitter_->set_tolerance(tolerance_);
     fitter_->set_outlier_threshold(outlier_threshold_);
     
-    // Residual function
+    // Residual function - FIXED: propagate to observation epoch!
     auto residual_func = [this](const Eigen::Vector<double, 6>& state, double epoch) {
         std::vector<ObservationResidual> residuals;
         for (const auto& obs : observations_) {
-            auto res_calc_result = residual_calculator_->compute_residual(obs, state, epoch);
+            // CRITICAL: Propagate state from epoch to observation time
+            auto prop_result = stm_propagator_->propagate(state, epoch, obs.epoch_mjd);
+            
+            // Compute residual with propagated state
+            auto res_calc_result = residual_calculator_->compute_residual(
+                obs, prop_result.state, obs.epoch_mjd
+            );
             
             ObservationResidual obs_res;
             obs_res.epoch_mjd = res_calc_result.epoch_mjd;
