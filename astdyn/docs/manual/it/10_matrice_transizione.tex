@@ -198,7 +198,7 @@ auto force_func = [mu](double t, const Vector6d& y) {
     return dydt;
 };
 
-// 2. Configurazione Jacobiano (Analitico è più veloce/preciso)
+// 2. Configurazione Jacobiano (Analitico e' piu' veloce/preciso)
 auto jac_func = [mu](double t, const Vector6d& y) {
     return AnalyticalJacobian::two_body(y, mu);
 };

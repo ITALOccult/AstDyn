@@ -265,9 +265,9 @@ public:
             Vector6d k[13];
             // ... calcola stadi ...
             
-            // Soluzioni 7° e 8° ordine
-            Vector6d y7 = y + h * (/* combinazione 7° ordine */);
-            Vector6d y8 = y + h * (/* combinazione 8° ordine */);
+            // Soluzioni 7o e 8o ordine
+            Vector6d y7 = y + h * (/* combinazione 7o ordine */);
+            Vector6d y8 = y + h * (/* combinazione 8o ordine */);
             
             // Stima errore
             double err = (y8 - y7).norm();
