@@ -104,28 +104,42 @@ The orbit shape depends on eccentricity and energy:
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[scale=1.2]
+\begin{tikzpicture}[scale=1.0]
     % Sun at focus
     \filldraw[yellow,draw=orange,thick] (0,0) circle (3pt);
     \node[below left] at (0,-0.2) {Sun};
     
     % Ellipse (e = 0.5)
     \draw[thick,blue,rotate=0] (0,0) ellipse (3cm and 2.6cm);
-    \node[blue] at (3.5,2) {Ellipse ($e=0.5$)};
-    \filldraw[blue] (1.5,0) circle (2pt);
-    \draw[blue,dashed] (0,0) -- (1.5,0);
+    \node[blue] at (3.0,2.2) {Ellipse ($e=0.5$)};
+    % Center of ellipse is (0,0)? No, TikZ ellipse is centered. Focus needs shift.
+    % If ellipse is centered at (0,0), focus is at (-c, 0).
+    % c = sqrt(3^2 - 2.6^2) = sqrt(9 - 6.76) = sqrt(2.24) = 1.5
+    % So Sun should be at Focus. Let's shift Sun to (-1.5, 0) relative to ellipse center.
+    % Or shift ellipse. Let's shift ellipse right by 1.5 so Sun is at left focus (0,0).
+    % Previous code had Sun at (0,0) and Ellipse at (0,0) -> Sun at Center (Wrong for Kepler).
+    % Let's fix geometry visually too while we are at it.
     
-    % Circle (e = 0)
-    \draw[thick,green!60!black] (0,0) circle (2cm);
+    % Corrected Ellipse: Center at (-1.5, 0)
+    \draw[thick,blue] (-1.5,0) ellipse (3cm and 2.6cm);
+    
+    % Circle (e = 0) - Center at (0,0) creates focus at (0,0). Correct.
+    \draw[thick,green!60!black] (0,0) circle (1.8cm);
     \node[green!60!black] at (1.5,-1.5) {Circle ($e=0$)};
     
-    % Parabola (e = 1)
-    \draw[thick,red,domain=-2:2,samples=50] plot ({-0.5*\x*\x + 2}, {\x});
-    \node[red] at (2.5,2.5) {Parabola ($e=1$)};
+    % Parabola (e = 1) - Focus at (0,0). Vertex at (p/2, 0).
+    % y^2 = 4ax. If focus (0,0) and vertex (-a,0).
+    % Let's use simple plot y = x^2/4 - 1. Vert at (0,-1), Focus (0,0).
+    % Or rotated: x = y^2/4 - 1.
+    \draw[thick,red,domain=-2.5:2.5,samples=50] plot ({\x*\x/4 - 1}, {\x});
+    \node[red] at (1.5,2.5) {Parabola ($e=1$)};
     
     % Hyperbola (e = 1.5)
-    \draw[thick,purple,domain=-1.5:1.5,samples=50] plot ({-0.7/(1-1.5*cos(\x r)) * cos(\x r)}, {-0.7/(1-1.5*cos(\x r)) * sin(\x r)});
-    \node[purple] at (-2.5,1.5) {Hyperbola ($e=1.5$)};
+    % r = p / (1 + e cos theta). p=1.
+    % Focus at (0,0).
+    % Domain: -60 to 60 degrees is safe (cos > 0.5, denom > 1.75).
+    \draw[thick,purple,domain=-1.2:1.2,samples=100] plot ({\x r}:{1.0/(1 + 1.5*cos(\x r))});
+    \node[purple] at (-1.5,1.5) {Hyperbola ($e=1.5$)};
 \end{tikzpicture}
 \caption{Conic section orbits for different eccentricities. The Sun is at one focus of each conic.}
 \label{fig:conic_sections}
