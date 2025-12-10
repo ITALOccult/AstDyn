@@ -401,11 +401,11 @@ Compare solutions using different observation spans:
 
 \begin{table}[h]
 \centering
-\small
 \caption{Solution quality vs. arc length}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{cccc}
 \toprule
-\textbf{Arc (days)} & \textbf{Obs} & \textbf{RMS ($''$)} & \textbf{$\sigma_a$ (AU)} \\
+\textbf{Arc (d)} & \textbf{Obs} & \textbf{RMS ($''$)} & \textbf{$\sigma_a$ (AU)} \\
 \midrule
 10 & 17 & 0.712 & $8.3 \times 10^{-7}$ \\
 20 & 34 & 0.684 & $3.1 \times 10^{-7}$ \\
@@ -413,7 +413,8 @@ Compare solutions using different observation spans:
 40 & 67 & 0.663 & $1.4 \times 10^{-7}$ \\
 60 & 100 & 0.658 & $1.2 \times 10^{-7}$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \textbf{Trend}: Longer arcs improve parameter determination. Diminishing returns beyond $\sim$30 days for this case.
