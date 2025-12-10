@@ -66,51 +66,60 @@ The \textbf{classical Keplerian elements} are the most widely used set. They dir
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[scale=1.0]
-    % Reference plane (ecliptic or equator) - Standardized size (2.5-3.0 scale)
-    \draw[thick,blue!20,fill=blue!5] (-3.5,-1.5) -- (3.5,-1.5) -- (3.5,1.5) -- (-3.5,1.5) -- cycle;
-    \node[blue] at (2.8,-1.2) {Reference plane};
+\begin{tikzpicture}[scale=1.1]
+    % REFERENCE PLANE (Ecliptic/Equator)
+    \draw[thick, gray!40] (0,0) ellipse (3.5cm and 1.2cm);
+    \node[gray, below right] at (2.5,-1.0) {Reference Plane};
+
+    % SUN (at Focus/Origin)
+    \filldraw[yellow, draw=orange, thick] (0,0) circle (6pt);
+    \node[below left] at (0,-0.2) {Sun (Focus)};
+
+    % REFERENCE DIRECTION (Gamma)
+    \draw[->, thick, blue] (0,0) -- (4,0) node[right] {$\gamma$};
+
+    % LINE OF NODES
+    % Visual intersection roughly at -30 degrees
+    \draw[dashed, black] (0,0) -- (-2.6, 1.5); % Descending node side
+    \draw[thick, black] (0,0) -- (2.6, -1.5) node[right] {Line of Nodes};
     
-    % Sun at focus
-    \filldraw[yellow,draw=orange,thick] (0,0) circle (4pt);
-    \node[below] at (0,-0.3) {Sun};
-    
-    % Orbital plane (tilted ellipse)
-    \begin{scope}[rotate around={15:(0,0)}]
-        % Ellipse - Standardized to ~2.5cm major radius
-        \draw[thick,red,rotate=20] (0,0) ellipse (2.5cm and 1.3cm);
+    % Ascending Node point
+    \filldraw[black] (2.0, -1.15) circle (1.5pt);
+    \node[below] at (2.0, -1.25) {Ascending Node};
+
+    % LONGITUDE OF ASCENDING NODE (Omega)
+    % Arc from Gamma to Node
+    \draw[->, purple, thick] (1.5,0) arc (0:-30:1.5);
+    \node[purple, right] at (1.6,-0.4) {$\Omega$};
+
+    % ORBITAL PLANE
+    % Rotated so Perihelion is distinct from Node
+    % Let's orient perihelion at +30 degrees visual.
+    % Ellipse parameters: a=2.5, e=0.6 => c=1.5. Center at (-1.5, 0) relative to axis.
+    \begin{scope}[rotate=30]
+        % Orbit Path
+        \draw[thick, red] (-1.5, 0) ellipse (2.5cm and 1.4cm);
         
-        % Perihelion
-        \filldraw[red] (-2.0,0.7) circle (2pt);
-        \node[red,above] at (-2.0,1.0) {Perihelion};
+        % Perihelion (closest point to focus at 0,0)
+        \filldraw[red] (1.0, 0) circle (2pt) node[above right] {Perihelion};
+        \draw[thick, red, dashed] (0,0) -- (1.0, 0); % Radius vector to perihelion
         
-        % Ascending node (Intersection approx)
-        \filldraw[green!60!black] (1.3,-0.6) circle (2pt);
-        \node[green!60!black,below] at (1.3,-0.9) {Ascending node};
-        
-        % Longitude of ascending node (Ω) - Arc on reference plane actually
-        % But here we draw relative angle components
-        
-        % Argument of perihelion (ω)
-        \draw[->,orange,thick] (1.3,-0.6) arc (-25:40:1.0);
-        \node[orange] at (0.4,0.3) {$\omega$};
-        
-        % Inclination line visual
-        \draw[dashed,green!60!black] (1.3,-1.5) -- (1.3,1.5);
+        % Body Position (True Anomaly nu)
+        \filldraw[blue] (1.0, 1.2) circle (3pt) node[above] {Body};
+        \draw[dotted, blue] (0,0) -- (1.0, 1.2);
     \end{scope}
+
+    % ARGUMENT OF PERIHELION (omega)
+    % Angle from Node (-30 deg) to PeriAxis (+30 deg)
+    \draw[->, orange, thick] (1.0, -0.58) arc (-30:30:1.15);
+    \node[orange, right] at (1.2, -0.1) {$\omega$};
+
+    % INCLINATION (i)
+    % Symbolized by vector relations or just label
+    \node[red!80!black] at (-2, 2) {Orbital Plane};
     
-    % Reference direction (vernal equinox) - Length 3.5 to match plane
-    \draw[->,thick,blue] (0,0) -- (3.5,0);
-    \node[blue,right] at (3.5,0) {$\gamma$};
-    
-    % Longitude of Ascending Node (Omega) on Ref Plane
-    \draw[->,purple,thick] (1.5,0) arc (0:-20:1.5);
-    \node[purple] at (1.6,-0.3) {$\Omega$};
-    
-    % Inclination angle
-    \draw[->,dashed,green!60!black] (2.5,0) arc (0:15:2.5);
-    \node[green!60!black] at (2.8,0.4) {$i$};
 \end{tikzpicture}
+
 \caption{Classical Keplerian orbital elements. The orbital plane (red ellipse) is tilted relative to the reference plane. The ascending node is where the orbit crosses the reference plane going northward.}
 \label{fig:keplerian_elements}
 \end{figure}
