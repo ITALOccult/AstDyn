@@ -33,40 +33,41 @@ The equatorial system uses Earth's equator and rotation axis:
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[scale=1.2]
-    % Celestial sphere
-    \draw[thick] (0,0) circle (3);
+\begin{tikzpicture}[scale=1.0]
+    % Sphere outline
+    \draw (0,0) circle (2.5cm);
+    \shade[ball color=blue!5!white, opacity=0.3] (0,0) circle (2.5cm);
     
-    % Equator
-    \draw[thick, blue] (-3,0) -- (3,0);
-    \node[blue, right] at (3,0.2) {Celestial Equator};
+    % Equator (Blue)
+    \draw[blue, thick] (-2.5,0) arc (180:360:2.5 and 0.8);
+    \draw[blue, dashed] (2.5,0) arc (0:180:2.5 and 0.8);
+    \node[blue, right] at (2.5,0) {Equator};
     
-    % Ecliptic
-    \draw[thick, red] (-3,-0.7) -- (3,0.7);
-    \node[red, right] at (2.5,1) {Ecliptic};
+    % Ecliptic (Red, tilted 23.5 degrees)
+    \begin{scope}[rotate=23.5]
+        \draw[red, thick] (-2.5,0) arc (180:360:2.5 and 0.8);
+        \draw[red, dashed] (2.5,0) arc (0:180:2.5 and 0.8);
+        \node[red, above right] at (2.5,0) {Ecliptic};
+    \end{scope}
+
+    % North Pole
+    \draw[->, thick] (0,0) -- (0,3.0) node[above] {NCP};
+    \draw[dashed] (0,0) -- (0,-2.5);
     
-    % Vernal equinox
-    \fill (1.5,0.35) circle (0.08);
-    \node[below] at (1.5,0.15) {$\gamma$};
+    % Vernal Equinox (Gamma)
+    % Placed at the front intersection for simple visualization
+    \filldraw (0, -0.8) circle (1.5pt) node[below left] {$\gamma$};
     
-    % Poles
-    \draw[dashed] (0,-3) -- (0,3);
-    \node[above] at (0,3) {North Pole};
+    % Angle epsilon
+    \draw[<->] (2.8, 0) arc (0:23.5:2.8);
+    \node at (3.0, 0.4) {$\varepsilon$};
+
+    % Star vector
+    \draw[->, thick, black!70] (0,0) -- (1.5, 1.8) node[midway, fill=white, inner sep=1pt] {$r$} node[above right] {Star};
+    \fill (1.5, 1.8) circle (1.5pt);
     
-    % Obliquity
-    \draw[<->, thick] (2,0) arc (0:23.4:2);
-    \node at (2.5,0.5) {$\varepsilon$};
-    
-    % Star position
-    \fill[green!60!black] (2,2) circle (0.08);
-    \draw[dashed] (0,0) -- (2,2);
-    \draw[dashed] (2,0) -- (2,2);
-    \draw[->] (0,0) -- (2,0);
-    \node at (1,0.3) {$\alpha$};
-    \node[right] at (2,1) {$\delta$};
-    \node[above right] at (2,2.2) {Star};
 \end{tikzpicture}
-\caption{Equatorial coordinate system showing right ascension ($\alpha$) and declination ($\delta$). The obliquity $\varepsilon \approx 23.4^\circ$.}
+\caption{The Celestial Sphere showing the Equatorial (blue) and Ecliptic (red) planes. The angle between them is the obliquity of the ecliptic $\varepsilon \approx 23.4^\circ$.}
 \label{fig:equatorial}
 \end{figure}
 
@@ -124,7 +125,7 @@ The transformation involves rotation about the $x$-axis (vernal equinox directio
 \begin{equation}
 \begin{bmatrix} x \\ y \\ z \end{bmatrix}_{\text{eq}}
 = 
-\mathbf{R}_x(\varepsilon)
+\mathbf{R}_x(-\varepsilon)
 \begin{bmatrix} x \\ y \\ z \end{bmatrix}_{\text{ecl}}
 =
 \begin{bmatrix}
@@ -134,8 +135,6 @@ The transformation involves rotation about the $x$-axis (vernal equinox directio
 \end{bmatrix}
 \begin{bmatrix} x \\ y \\ z \end{bmatrix}_{\text{ecl}}
 \end{equation}
-
-For the inverse transformation (equatorial → ecliptic), use $\mathbf{R}_x(-\varepsilon) = \mathbf{R}_x(\varepsilon)^T$.
 
 \subsection{Implementation}
 
@@ -173,14 +172,33 @@ Earth's rotation axis precesses (wobbles) with a period of ~26,000 years due to 
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}
-    \draw[thick] (0,0) circle (2.5);
-    \draw[thick, ->] (0,0) -- (2.5,0) node[right] {$\gamma_{2000}$};
-    \draw[thick, ->, blue] (0,0) -- (2.3,0.8) node[right] {$\gamma_{2050}$};
-    \draw[<->, red] (1.5,0) arc (0:20:1.5);
-    \node[red] at (1.8,0.5) {Precession};
+\begin{tikzpicture}[scale=1.0]
+    % Same base size as the sphere (radius 2.5) for consistency
+    % Ecliptic Pole
+    \draw[->, thick] (0,0) -- (0,3.0) node[above] {NEP};
+    
+    % Precession Cone
+    \draw[dashed] (0,2.2) ellipse (0.9 and 0.25); % Cone top
+    \draw[dashed] (0,0) -- (-0.9, 2.2);
+    \draw[dashed] (0,0) -- (0.9, 2.2);
+    
+    % Earth Axis (NCP)
+    \draw[->, thick, blue] (0,0) -- (0.9, 3.0) node[right] {NCP (J2000)};
+    \draw[->, thick, red, dashed] (0,0) -- (-0.9, 3.0) node[left] {NCP (Future)};
+    
+    % Direction
+    \draw[->] (0.5, 2.5) arc (15:165:0.5 and 0.15);
+    \node at (0, 2.8) {\scriptsize 26,000 yr};
+
+    % Base Ecliptic Plane (Visualize it same size as Fig 1)
+    \draw (0,0) ellipse (2.5 and 0.6);
+    \node at (2.5,0.5) {Ecliptic Plane};
+    
+    % Earth at center
+    \shade[ball color=blue!50] (0,0) circle (0.3);
 \end{tikzpicture}
-\caption{Precession of the equinoxes over 50 years}
+\caption{Precession of the Earth's rotation axis (NCP) around the North Ecliptic Pole (NEP).}
+\label{fig:precession}
 \end{figure}
 
 The J2000.0 frame freezes the equinox at January 1, 2000, 12:00 TT, providing a fixed reference for long-term calculations.
