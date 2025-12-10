@@ -211,10 +211,18 @@ Flag if $|r_i - \text{median}| > k\hat{\sigma}$.
 
 \textbf{Test}: Compute along-track vs. cross-track residuals:
 
-\begin{align}
-    r_{\parallel} &= \Delta\alpha \cos\delta \cos\theta + \Delta\delta \sin\theta \\
-    r_{\perp} &= -\Delta\alpha \cos\delta \sin\theta + \Delta\delta \cos\theta
-\end{align}
+\begin{equation}
+\begin{split}
+    r_{\parallel} &= \Delta\alpha \cos\delta \cos\theta \\
+                  &\quad + \Delta\delta \sin\theta
+\end{split}
+\end{equation}
+\begin{equation}
+\begin{split}
+    r_{\perp} &= -\Delta\alpha \cos\delta \sin\theta \\
+              &\quad + \Delta\delta \cos\theta
+\end{split}
+\end{equation}
 
 where $\theta = \arctan2(\dot{\delta}, \dot{\alpha}\cos\delta)$ is direction of motion.
 
