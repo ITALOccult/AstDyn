@@ -198,43 +198,62 @@ Three related angles describe position in an elliptical orbit:
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[scale=1.5]
-    % Ellipse
+\begin{tikzpicture}[scale=1.0]
+    % Ellipse a=3, b=2
     \draw[thick] (0,0) ellipse (3cm and 2cm);
     
-    % Circumscribed circle
+    % Circumscribed circle r=3
     \draw[dashed,gray] (0,0) circle (3cm);
     
-    % Sun at focus
-    \filldraw[yellow,draw=orange] (-1.8,0) circle (3pt);
-    \node[below] at (-1.8,-0.3) {Sun};
+    % Sun at focus c = sqrt(9-4) = 2.236
+    \filldraw[yellow,draw=orange] (2.236,0) circle (3pt);
+    \node[below] at (2.236,-0.3) {Sun};
     
     % Center
     \filldraw[black] (0,0) circle (1.5pt);
-    \node[below right] at (0,0) {$C$};
+    \node[below left] at (0,0) {$C$};
+    
+    % Use x = 1.5
+    % y_ell = 2 * sqrt(1 - 0.5^2) = 1.732
+    % y_circ = 3 * sqrt(1 - 0.5^2) = 2.598
+    
+    % Perihelion (right side for positive x focus)
+    % Wait, usually nu is measured from Perihelion.
+    % If Sun is at right focus (2.236,0), Perihelion is at (3,0).
+    % Let's stick to standard: Focus at origin? No, TikZ draws ellipse centered at 0.
+    % Let's put Sun at LEFT focus (-2.236,0), Perihelion at (-3,0).
+    
+    % Sun at LEFT focus
+    \filldraw[yellow,draw=orange] (-2.236,0) circle (3pt);
+    \node[below] at (-2.236,-0.3) {Sun};
     
     % Perihelion
     \draw[dashed] (-3,0) -- (3,0);
     \node[left] at (-3,0) {Perihelion};
     
-    % Planet position
-    \filldraw[blue] (1.5,1.5) circle (2pt);
-    \node[above right,blue] at (1.5,1.5) {Planet};
+    % Planet position at x=1.5, y=1.732
+    \filldraw[blue] (1.5,1.732) circle (2pt);
+    \node[above right,blue] at (1.5,1.732) {Planet};
     
     % Point on circle (for eccentric anomaly)
-    \filldraw[red] (1.5,2.12) circle (1.5pt);
+    \filldraw[red] (1.5,2.598) circle (1.5pt);
     
-    % True anomaly
-    \draw[->,purple,thick] (-1.8,0) -- (1.5,1.5);
-    \draw[->,purple] (-1.3,0) arc (0:45:0.5);
-    \node[purple] at (-0.8,0.4) {$\nu$};
+    % True anomaly vector (from Sun to Planet)
+    \draw[->,purple,thick] (-2.236,0) -- (1.5,1.732);
+    % Angle arc
+    \draw[->,purple] (-1.736,0) arc (0:25:0.5); 
+    \node[purple] at (-1.5,0.3) {$\nu$};
     
-    % Eccentric anomaly
-    \draw[->,red] (0.5,0) arc (0:55:0.5);
-    \node[red] at (0.8,0.4) {$E$};
+    % Eccentric anomaly vector (from Center to Circle Point)
+    \draw[->,red] (0,0) -- (1.5,2.598);
+    \draw[->,red] (0.5,0) arc (0:60:0.5);
+    \node[red] at (0.6,0.3) {$E$};
     
     % Vertical line
-    \draw[dotted] (1.5,0) -- (1.5,2.12);
+    \draw[dotted] (1.5,0) -- (1.5,2.598);
+    
+    % Label x-axis projection
+    \draw (1.5,0.1) -- (1.5,-0.1);
 \end{tikzpicture}
 \caption{Relationship between true anomaly $\nu$ and eccentric anomaly $E$ in an elliptical orbit.}
 \label{fig:anomalies}

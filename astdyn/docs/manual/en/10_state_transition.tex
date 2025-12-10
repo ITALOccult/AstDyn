@@ -198,10 +198,24 @@ auto force_func = [mu](double t, const Vector6d& y) {
     return dydt;
 };
 
-// 2. Setup Jacobian Function (Analytical is faster/more precise)
+// 2. Setup Jacobian Function (Analytical)
 auto jac_func = [mu](double t, const Vector6d& y) {
     return AnalyticalJacobian::two_body(y, mu);
 };
+
+\begin{algorithm}
+\caption{Analytical STM Computation}
+\begin{algorithmic}[1]
+\REQUIRE Position $\mathbf{r}$
+\ENSURE Jacobian $\mathbf{G} = \partial \mathbf{a} / \partial \mathbf{r}$
+\STATE Initialize $\mathbf{G} = \mathbf{0}$
+\STATE Add Keplerian term: $\mathbf{G} \leftarrow \mathbf{G} + \frac{\mu}{r^5}(3\mathbf{r}\mathbf{r}^T - r^2 \mathbf{I})$
+\FOR{each planet $j$}
+   \STATE $\boldsymbol{\rho}_j = \mathbf{r} - \mathbf{r}_j$
+   \STATE $\mathbf{G} \leftarrow \mathbf{G} + \mu_j \left( \frac{3 \boldsymbol{\rho}_j \boldsymbol{\rho}_j^T}{\rho_j^5} - \frac{\mathbf{I}}{\rho_j^3} \right)$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
 
 // 3. Instantiate STMPropagator
 auto integrator = std::make_unique<RKF78Integrator>(0.1, 1e-12);

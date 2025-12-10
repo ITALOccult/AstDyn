@@ -76,12 +76,59 @@ For adaptive step size control, we use \textbf{embedded} methods that provide tw
     \item Default in MATLAB's ode45
 \end{itemize}
 
-\textbf{Runge-Kutta 7(8)} (RK78):
+\textbf{Runge-Kutta-Fehlberg 7(8)} (RKF78):
 \begin{itemize}
     \item 7th and 8th order solutions
     \item 13 function evaluations
     \item Best for high-accuracy requirements
 \end{itemize}
+
+\begin{algorithm}
+\caption{RKF78 Integration Step}
+\begin{algorithmic}[1]
+\REQUIRE Current state $t_n, \mathbf{y}_n$, Step size $h$
+\ENSURE Next state $t_{n+1}, \mathbf{y}_{n+1}$, Next step $h_{new}$
+\STATE \textbf{Compute Stages}:
+\FOR{$i=1$ to $13$}
+    \STATE $T_i = t_n + c_i h$
+    \STATE $\mathbf{Y}_i = \mathbf{y}_n + h \sum_{j=1}^{i-1} a_{ij} \mathbf{k}_j$
+    \STATE $\mathbf{k}_i = \mathbf{f}(T_i, \mathbf{Y}_i)$
+\ENDFOR
+\STATE \textbf{Update State}: $\mathbf{y}_{n+1} = \mathbf{y}_n + h \sum_{i=1}^{13} b_i \mathbf{k}_i$
+\STATE \textbf{Error Estimation}: $\hat{\mathbf{y}}_{n+1} = \mathbf{y}_n + h \sum_{i=1}^{13} \hat{b}_i \mathbf{k}_i$
+\STATE $\epsilon = \norm{\mathbf{y}_{n+1} - \hat{\mathbf{y}}_{n+1}}_\infty$
+\STATE \textbf{Step Size Control}:
+\IF{$\epsilon \le TOL$}
+    \STATE Accept step: $t_{n+1} = t_n + h$
+    \STATE $h_{new} = h \cdot 0.9 \cdot \left(\frac{TOL}{\epsilon}\right)^{1/8}$
+\ELSE
+    \STATE Reject step: $t_{n+1} = t_n$
+    \STATE $h_{new} = h \cdot 0.9 \cdot \left(\frac{TOL}{\epsilon}\right)^{1/8}$
+    \STATE Repeat step with $h \leftarrow h_{new}$
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+\section{Implicit Gauss-Legendre Integrator}
+For symplectic integration, we solve the implicit Runge-Kutta equations using a simplified Newton-Raphson iteration.
+
+\begin{algorithm}
+\caption{Implicit Gauss-Legendre Step (Order $2s$)}
+\begin{algorithmic}[1]
+\REQUIRE $t_n, \mathbf{y}_n, h$, Stages $s=4$
+\STATE Initialize stages $\mathbf{Z}_i^{(0)} = \mathbf{0}$
+\STATE \textbf{Newton Iteration} $k=0 \dots k_{max}$:
+\FOR{$i=1$ to $s$}
+    \STATE $\mathbf{Y}_i = \mathbf{y}_n + \mathbf{Z}_i^{(k)}$
+    \STATE $\mathbf{R}_i = \mathbf{Z}_i^{(k)} - h \sum_{j=1}^s a_{ij} \mathbf{f}(t_n + c_j h, \mathbf{y}_n + \mathbf{Z}_j^{(k)})$
+    \STATE Solve linear system to update $\mathbf{Z}^{(k+1)}$
+\ENDFOR
+\IF{Converged}
+    \STATE $\mathbf{y}_{n+1} = \mathbf{y}_n + h \sum_{i=1}^s b_i \mathbf{f}(t_n+c_i h, \mathbf{y}_n + \mathbf{Z}_i)$
+    \RETURN
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{Step Size Control}
 
@@ -318,10 +365,10 @@ RK4Integrator<Vector6d> rk4;
 double h = 1.0;  // 1-day steps
 auto result_rk4 = rk4.integrate(ode, t0, y0, tf, h);
 
-// Option 2: Adaptive DOPRI54
-DOPRI54Integrator<Vector6d> dopri;
-dopri.set_tolerance(1e-12);
-auto result_dopri = dopri.integrate(ode, t0, y0, tf);
+// Option 2: Adaptive RKF78
+RKF78Integrator<Vector6d> integrator;
+integrator.set_tolerance(1e-12);
+auto result_rkf = integrator.integrate(ode, t0, y0, tf);
 
 std::cout << "Final position (RK4):    " 
           << result_rk4.transpose() << "\n";

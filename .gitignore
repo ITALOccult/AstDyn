@@ -1,17 +1,78 @@
-# Compiled binaries
-astdyn/tools/astdyn_propagator
-astdyn/tools/astdyn_oc_fitter
-astdyn/tools/sierks_position
-astdyn/tools/sierks_precision
-astdyn/tools/test_*
-!astdyn/tools/test_*.cpp
-astdyn/tools/*.o
+# Compiled binaries and objects
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+astdyn/tools/astdyn_*
+test_*
+!test_*.cpp
+generate_*
+!generate_*.py
+!generate_*.cpp
+examples/italoccultcalc
 
-# OS files
+# Build directories
+build/
+cmake-build-*/
+bin/
+lib/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+*.cmake
+!CMakeLists.txt
+
+# LaTeX temporary files
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.lof
+*.lot
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# IDEs and Editors
 .DS_Store
+.vscode/
+.idea/
 *.swp
 *~
 
-# IDE
-.vscode/
-.idea/
+# Test outputs and reports
+*.csv
+*.html
+!astdyn/docs/*.html # Keep docs HTML if any
+*.txt
+!CMakeLists.txt
+!README.txt
+!LICENSE.txt
+!CITATION.txt
+!src/*.txt
+!docs/*.txt
+!astdyn/docs/*.txt
+ephemeris_comparison_*
+POMPEJA_*
+*_REPORT.md
+!astdyn/docs/manual/*.tex
+!astdyn/docs/scientific_paper/*.tex
+validation_plots/
+
+# Project specific huge files (if any Ephemerides)
+*.bsp
+*.eq1
+*.rwo

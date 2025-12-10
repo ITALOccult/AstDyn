@@ -143,27 +143,30 @@ Combine geometric partials, rotation, and $\Phi$:
 Note: RA/Dec depend only on position, not velocity, in geometric partials. Velocity affects observations through propagation ($\Phi$).
 
 \section{Algorithm}
+The differential correction algorithm implemented in AstDyn is detailed below.
 
-\textbf{Input}: Initial orbit $\mathbf{y}_0^{(0)}$, observations $\{(\mathbf{o}_i, t_i, \mathbf{W}_i)\}$
-
-\textbf{Iterate}:
-\begin{enumerate}
-    \item For each observation $i$:
-    \begin{enumerate}
-        \item Propagate to $t_i$ with STM: $[\mathbf{y}(t_i), \Phi(t_i, t_0)]$
-        \item Compute prediction $\mathbf{c}_i = \mathbf{h}(\mathbf{y}(t_i))$
-        \item Compute geometric partials
-        \item Compute full partials $\mathbf{H}_i$ using STM
-    \end{enumerate}
-    \item Form normal matrix: $\mathbf{N} = \sum_i \mathbf{H}_i^T \mathbf{W}_i \mathbf{H}_i$
-    \item Form RHS: $\mathbf{b} = \sum_i \mathbf{H}_i^T \mathbf{W}_i (\mathbf{o}_i - \mathbf{c}_i)$
-    \item Solve: $\mathbf{N} \Delta\mathbf{y}_0 = \mathbf{b}$
-    \item Update: $\mathbf{y}_0^{(k+1)} = \mathbf{y}_0^{(k)} + \Delta\mathbf{y}_0$
-    \item Compute RMS: $\text{RMS} = \sqrt{\frac{1}{m-n} \sum_i w_i r_i^2}$ where $r_i = \mathbf{o}_i - \mathbf{c}_i$
-    \item Check convergence: $|\Delta\mathbf{y}_0| < \epsilon$ and $|\Delta\text{RMS}| < \epsilon_{\text{RMS}}$
-\end{enumerate}
-
-\textbf{Output}: Converged state $\mathbf{y}_0^*$, covariance $\mathbf{C} = \mathbf{N}^{-1}$, residuals
+\begin{algorithm}
+\caption{Differential Correction (Newton-Raphson)}
+\begin{algorithmic}[1]
+\REQUIRE Initial guess $\mathbf{y}_0^{(0)}$, Observations $\{(\mathbf{o}_i, t_i, \mathbf{W}_i)\}$, Max Iterations $k_{max}$
+\STATE $k \leftarrow 0$
+\REPEAT
+    \STATE $\mathbf{N} \leftarrow \mathbf{0}, \mathbf{b} \leftarrow \mathbf{0}$
+    \FOR{each observation $i$}
+        \STATE Propagate to $t_i$: $[\mathbf{y}(t_i), \Phi(t_i, t_0)]$
+        \STATE Compute prediction $\mathbf{c}_i = \mathbf{h}(\mathbf{y}(t_i))$ and residual $\boldsymbol{\xi}_i = \mathbf{o}_i - \mathbf{c}_i$
+        \STATE Compute Partial $\mathbf{H}_i = \frac{\partial \mathbf{h}}{\partial \mathbf{y}(t_i)} \Phi(t_i, t_0)$
+        \STATE Accumulate: $\mathbf{N} \leftarrow \mathbf{N} + \mathbf{H}_i^T \mathbf{W}_i \mathbf{H}_i$
+        \STATE Accumulate: $\mathbf{b} \leftarrow \mathbf{b} + \mathbf{H}_i^T \mathbf{W}_i \boldsymbol{\xi}_i$
+    \ENDFOR
+    \STATE Solve $\mathbf{N} \Delta \mathbf{y}_0 = \mathbf{b}$
+    \STATE Update $\mathbf{y}_0^{(k+1)} \leftarrow \mathbf{y}_0^{(k)} + \Delta \mathbf{y}_0$
+    \STATE Compute new RMS $\sigma_{post}$
+    \STATE $k \leftarrow k+1$
+\UNTIL{Converged ($\|\Delta \mathbf{y}_0\| < \epsilon$) OR $k \ge k_{max}$}
+\RETURN $\mathbf{y}_0^{(k)}$, Covariance $\mathbf{C} = \mathbf{N}^{-1}$
+\end{algorithmic}
+\end{algorithm}
 
 \section{Convergence Criteria}
 

@@ -1,0 +1,155 @@
+\documentclass[11pt,a4paper]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{geometry}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\geometry{margin=2.5cm}
+
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\br}{\mathbf{r}}
+\newcommand{\bv}{\mathbf{v}}
+\newcommand{\ba}{\mathbf{a}}
+\newcommand{\bPhi}{\mathbf{\Phi}}
+\newcommand{\bI}{\mathbf{I}}
+
+\title{\textbf{\LARGE AstDyn: Scientific Reference Manual}\\ \large Algorithm Description and Mathematical Formulation}
+\author{Michele Bigi \\ ITALOccult Project}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\chapter{Introduction}
+This document serves as the scientific reference manual for the \texttt{AstDyn} library. It details the mathematical models and numerical algorithms implemented in the core engine. Unlike the API documentation (Doxygen), which focuses on software interfaces, this manual focuses on the Physics and Mathematics.
+
+\chapter{Dynamical Model}
+\section{Equations of Motion}
+The state vector $\mathbf{y} = [\br^T, \bv^T]^T \in \R^6$ evolves according to:
+\begin{equation}
+    \dot{\mathbf{y}} = \begin{bmatrix} \bv \\ \ba(\br, \bv, t) \end{bmatrix}
+\end{equation}
+The total acceleration $\ba$ is the sum of:
+\begin{itemize}
+    \item \textbf{Central Newtonian Gravity}: $\ba_{2B} = -\frac{\mu}{r^3}\br$
+    \item \textbf{N-Body Perturbations}: Sum of direct and indirect terms from planets.
+    \item \textbf{Relativistic Corrections (1PN)}: Einstein-Infeld-Hoffmann equation approximation.
+    \item \textbf{Solar Radiation Pressure}: Cannonball model.
+\end{itemize}
+
+\chapter{Numerical Integration Algorithms}
+
+\section{Explicit Runge-Kutta-Fehlberg 7(8)}
+The RKF78 integrator is an explicit method with adaptive step size control. It uses 13 stages to produce a 7th order solution and an 8th order solution for error estimation.
+
+\begin{algorithm}
+\caption{RKF78 Integration Step}
+\begin{algorithmic}[1]
+\REQUIRE Current state $t_n, \mathbf{y}_n$, Step size $h$
+\ENSURE Next state $t_{n+1}, \mathbf{y}_{n+1}$, Next step $h_{new}$
+\STATE \textbf{Compute Stages}:
+\FOR{$i=1$ to $13$}
+    \STATE $T_i = t_n + c_i h$
+    \STATE $\mathbf{Y}_i = \mathbf{y}_n + h \sum_{j=1}^{i-1} a_{ij} \mathbf{k}_j$
+    \STATE $\mathbf{k}_i = \mathbf{f}(T_i, \mathbf{Y}_i)$
+\ENDFOR
+\STATE \textbf{Update State}: $\mathbf{y}_{n+1} = \mathbf{y}_n + h \sum_{i=1}^{13} b_i \mathbf{k}_i$
+\STATE \textbf{Error Estimation}: $\hat{\mathbf{y}}_{n+1} = \mathbf{y}_n + h \sum_{i=1}^{13} \hat{b}_i \mathbf{k}_i$
+\STATE $\epsilon = \norm{\mathbf{y}_{n+1} - \hat{\mathbf{y}}_{n+1}}_\infty$
+\STATE \textbf{Step Size Control}:
+\IF{$\epsilon \le TOL$}
+    \STATE Accept step: $t_{n+1} = t_n + h$
+    \STATE $h_{new} = h \cdot 0.9 \cdot \left(\frac{TOL}{\epsilon}\right)^{1/8}$
+\ELSE
+    \STATE Reject step: $t_{n+1} = t_n$
+    \STATE $h_{new} = h \cdot 0.9 \cdot \left(\frac{TOL}{\epsilon}\right)^{1/8}$
+    \STATE Repeat step with $h \leftarrow h_{new}$
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+\section{Implicit Gauss-Legendre Integrator}
+For symplectic integration, we solve the implicit Runge-Kutta equations using a simplified Newton-Raphson iteration.
+
+\begin{algorithm}
+\caption{Implicit Gauss-Legendre Step (Order $2s$)}
+\begin{algorithmic}[1]
+\REQUIRE $t_n, \mathbf{y}_n, h$, Stages $s=4$
+\STATE Initialize stages $\mathbf{Z}_i^{(0)} = \mathbf{0}$ (or extrapolate from previous step)
+\STATE \textbf{Newton Iteration} $k=0 \dots k_{max}$:
+\FOR{$i=1$ to $s$}
+    \STATE $\mathbf{Y}_i = \mathbf{y}_n + \mathbf{Z}_i^{(k)}$
+    \STATE $\mathbf{R}_i = \mathbf{Z}_i^{(k)} - h \sum_{j=1}^s a_{ij} \mathbf{f}(t_n + c_j h, \mathbf{y}_n + \mathbf{Z}_j^{(k)})$
+    \STATE Solve linear system (approx Jacobian $\mathbf{J} \approx \mathbf{I} - h \mathbf{A} \otimes \frac{\partial \mathbf{f}}{\partial \mathbf{y}}$) to find corrections $\Delta \mathbf{Z}$
+    \STATE $\mathbf{Z}^{(k+1)} = \mathbf{Z}^{(k)} - \Delta \mathbf{Z}$
+\ENDFOR
+\IF{$\norm{\Delta \mathbf{Z}} < TOL$}
+    \STATE \textbf{Converged}
+    \STATE $\mathbf{y}_{n+1} = \mathbf{y}_n + h \sum_{i=1}^s b_i \mathbf{f}(t_n+c_i h, \mathbf{y}_n + \mathbf{Z}_i)$
+    \RETURN
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+\chapter{Orbit Determination Algorithms}
+
+\section{State Transition Matrix (STM)}
+The STM $\bPhi(t, t_0) = \frac{\partial \mathbf{y}(t)}{\partial \mathbf{y}(t_0)}$ satisfies $\dot{\bPhi} = \mathbf{A}(t)\bPhi$.
+The calculation is performed simultaneously with the orbit integration.
+
+\begin{algorithm}
+\caption{Analytical STM Computation}
+\begin{algorithmic}[1]
+\REQUIRE Current State $\mathbf{r}$
+\ENSURE Jacobian Matrix $\mathbf{G} = \frac{\partial \mathbf{a}}{\partial \mathbf{r}}$
+\STATE Initialize $\mathbf{G} = \mathbf{0}_{3 \times 3}$
+\STATE \textbf{Add 2-Body Term}:
+\STATE $r^{-5} = (\mathbf{r} \cdot \mathbf{r})^{-5/2}$
+\STATE $\mathbf{G} \leftarrow \mathbf{G} + \frac{\mu}{r^5} (3 \mathbf{r}\mathbf{r}^T - r^2 \mathbf{I})$
+\STATE \textbf{Add N-Body Terms}:
+\FOR{each planet $j$}
+    \STATE $\boldsymbol{\rho}_j = \mathbf{r} - \mathbf{r}_j$
+    \STATE $\mathbf{G} \leftarrow \mathbf{G} + \mu_j \left( \frac{3 \boldsymbol{\rho}_j \boldsymbol{\rho}_j^T}{\rho_j^5} - \frac{\mathbf{I}}{\rho_j^3} \right)$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+\section{Differential Correction}
+The iterative least-squares procedure to correct the initial orbit.
+
+\begin{algorithm}
+\caption{Differential Correction Loop}
+\begin{algorithmic}[1]
+\REQUIRE Initial Guess $\mathbf{y}_0$, Observations $\{\mathcal{O}_k\}$
+\STATE $iter = 0$
+\WHILE{$iter < MAX\_ITER$}
+    \STATE Initialize Normal Matrix $\mathbf{B} = \mathbf{0}$, Gradient $\mathbf{D} = \mathbf{0}$
+    \STATE \textbf{Propagate} state and STM to all observation epochs $t_k$
+    \FOR{each observation $k$}
+        \STATE Computed $\mathbf{C}_k = \text{RaDec}(\mathbf{y}(t_k))$
+        \STATE Residual $\boldsymbol{\xi}_k = \mathcal{O}_k - \mathbf{C}_k$
+        \STATE Design Matrix $\mathbf{H}_k = \frac{\partial \mathbf{C}}{\partial \mathbf{y}} \bPhi(t_k, t_0)$
+        \STATE Accumulate:
+        \STATE $\mathbf{B} \leftarrow \mathbf{B} + \mathbf{H}_k^T W_k \mathbf{H}_k$
+        \STATE $\mathbf{D} \leftarrow \mathbf{D} + \mathbf{H}_k^T W_k \boldsymbol{\xi}_k$
+    \ENDFOR
+    \STATE \textbf{Solve}: $\delta \mathbf{y}_0 = \mathbf{B}^{-1} \mathbf{D}$
+    \STATE \textbf{Update}: $\mathbf{y}_0 \leftarrow \mathbf{y}_0 + \delta \mathbf{y}_0$
+    \IF{$\text{RMS}(\boldsymbol{\xi})$ converged OR $\norm{\delta \mathbf{y}_0} < \epsilon$}
+        \RETURN $\mathbf{y}_0, \mathbf{P}_{cov} = \mathbf{B}^{-1}$
+    \ENDIF
+    \STATE $iter \leftarrow iter + 1$
+\ENDWHILE
+\end{algorithmic}
+\end{algorithm}
+
+\end{document}
