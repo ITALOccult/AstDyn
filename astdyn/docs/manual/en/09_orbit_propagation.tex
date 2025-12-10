@@ -197,6 +197,32 @@ Three strategies for output:
     \item \textbf{Fixed output}: Specify output times, integrator stops there
 \end{enumerate}
 
+\begin{algorithm}
+\caption{Adaptive Propagation Loop}
+\begin{algorithmic}[1]
+\REQUIRE Initial state $\mathbf{y}_0, t_0$, Target time $t_f$, Tolerance $TOL$
+\ENSURE Final state $\mathbf{y}_f$
+\STATE $t \leftarrow t_0, \quad \mathbf{y} \leftarrow \mathbf{y}_0$
+\STATE Estimate initial step $h$ based on curvature
+\WHILE{$t < t_f$}
+    \STATE \textbf{Step Limiting}: If $t + h > t_f$, set $h \leftarrow t_f - t$
+    \REPEAT
+        \STATE \textbf{Integrate}: $\mathbf{y}_{new}, \mathbf{e} \leftarrow \text{Step}(\mathbf{y}, t, h)$
+        \STATE \textbf{Error Check}: $\epsilon \leftarrow \max_i |e_i / (ATOL + RTOL \cdot |y_i|)|$
+        \IF{$\epsilon > 1.0$}
+            \STATE \textbf{Reject}: $h \leftarrow h \cdot 0.9 \cdot \epsilon^{-1/q}$
+        \ELSE
+            \STATE \textbf{Accept}: $\mathbf{y} \leftarrow \mathbf{y}_{new}, \quad t \leftarrow t + h$
+            \STATE \textbf{Output}: Store interpolated state if dense output enabled
+            \STATE \textbf{Next Step}: $h_{next} \leftarrow h \cdot 0.9 \cdot \epsilon^{-1/q}$
+            \STATE $h \leftarrow \min(h_{max}, \max(h_{min}, h_{next}))$
+        \ENDIF
+    \UNTIL{Accepted}
+\ENDWHILE
+\RETURN $\mathbf{y}$
+\end{algorithmic}
+\end{algorithm}
+
 AstDyn supports all three modes.
 
 \section{Propagation Modes}
