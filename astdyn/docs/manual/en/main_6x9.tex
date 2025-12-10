@@ -4,9 +4,9 @@
 % 6x9 INCH FORMAT SETUP
 % ============================================================================
 \usepackage[paperwidth=6in, paperheight=9in, 
-            top=1.6cm, bottom=1.6cm, 
-            inner=2.3cm, outer=1.3cm, 
-            headheight=15pt, footskip=1.0cm]{geometry}
+            top=0.85in, bottom=0.85in, 
+            inner=1.0in, outer=0.6in, 
+            headheight=15pt, headsep=15pt, footskip=0.5in]{geometry}
 
 % ============================================================================
 % PACKAGES
@@ -28,14 +28,30 @@
 \usepackage{float}
 \usepackage{algorithm}
 \usepackage{algorithmic}
+\usepackage{microtype} % KEY FIX: Improves justification in narrow columns
+
+% Global Table Spacing - reduced for 6x9
+\setlength{\tabcolsep}{3pt} 
+
+% Aggressive Line Breaking policies for narrow pages to prevent overflows
+\emergencystretch=3em
+\tolerance=2000
+\hfuzz=2pt % Don't complain about tiny overflows
 
 % Fonts
 \usepackage{mathpazo} 
 \usepackage[scaled=0.92]{helvet} 
 
-% Line spacing - slightly tighter for 6x9
+% Line spacing
 \usepackage{setspace}
 \setstretch{1.15}
+
+% ============================================================================
+% GLOBAL TIKZ SCALING FOR 6x9
+% ============================================================================
+% Force all figures to fit within narrow margins
+\tikzset{every picture/.style={scale=0.70, transform shape}}
+\pgfplotsset{compat=1.16, width=8cm} % Fit plots too
 
 % ============================================================================
 % COLORS
@@ -66,25 +82,25 @@
 % ============================================================================
 \lstset{
     backgroundcolor=\color{codebackground},
-    basicstyle=\ttfamily\scriptsize, % Smaller font for code in 6x9
+    basicstyle=\ttfamily\tiny, % Tiny font to prevent overflow
     keywordstyle=\color{codekeyword}\bfseries,
     commentstyle=\color{codecomment}\itshape,
     stringstyle=\color{codestring},
     numbers=left,
     numberstyle=\tiny\color{gray},
     stepnumber=1,
-    numbersep=5pt,
+    numbersep=4pt,
     showspaces=false,
     showstringspaces=false,
     showtabs=false,
     frame=single,
     rulecolor=\color{black},
-    tabsize=2, % Smaller tab for narrower pages
+    tabsize=2,
     captionpos=b,
     breaklines=true,
-    breakatwhitespace=false,
+    breakatwhitespace=true, % Allow breaking at whitespace
     escapeinside={\%*}{*)},
-    xleftmargin=1.0em,
+    xleftmargin=0.5em,
     xrightmargin=0.0em
 }
 

@@ -96,7 +96,7 @@ Planetary positions $\mathbf{r}_p(t)$ are obtained from:
 Post-Newtonian (1PN) term:
 
 \begin{equation}
-    \mathbf{a}_{\text{GR}} = \frac{\mu_\odot}{c^2 r^3}\left[4\frac{\mu_\odot}{r}\mathbf{r} - v^2\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
+    \mathbf{a}_{\text{GR}} = \frac{\mu_\odot}{c^2 r^3}\left[ (4\frac{\mu_\odot}{r} - v^2)\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v} \right]
 \end{equation}
 
 This is typically $\sim 10^{-10}$ m/s$^2$ for asteroids, but accumulates over long timescales.
@@ -450,14 +450,15 @@ Include only necessary perturbations:
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{lcc}
+\small
+\begin{tabular}{@{}l p{3.5cm} p{3.5cm}@{}}
 \toprule
 \textbf{Object} & \textbf{Essential Forces} & \textbf{Optional} \\
 \midrule
-Main-belt asteroid & Sun, Jup, Sat & Mars, Earth, relativity \\
-Near-Earth asteroid & Sun, all planets & Relativity, asteroids \\
+Main-belt asteroid & Sun, Jup, Sat & Mars, Earth, GR \\
+Near-Earth asteroid & Sun, all planets & GR, asteroids \\
 Jupiter Trojan & Sun, Jup, Sat & Uranus, Neptune \\
-Trans-Neptunian & Sun, Jup, Sat, Ura, Nep & Relativity \\
+Trans-Neptunian object & Sun, Giants & GR \\
 \bottomrule
 \end{tabular}
 \caption{Recommended force models for different object types.}
