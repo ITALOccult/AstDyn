@@ -338,10 +338,12 @@ int main() {
     std::cout << "  a = " << std::setprecision(6) << result.elements.a 
               << " AU (error: " << std::scientific << std::setprecision(2)
               << (result.elements.a - true_elem.a) << ")\n";
-    std::cout << "  e = " << std::fixed << std::setprecision(6) 
+    std::cout << "  e = " 
+              << std::fixed << std::setprecision(6) 
               << result.elements.e 
               << " (error: " << std::scientific 
-              << (result.elements.e - true_elem.e) << ")\n";
+              << (result.elements.e - true_elem.e) 
+              << ")\n";
     
     return 0;
 }
@@ -402,12 +404,16 @@ int main(int argc, char* argv[]) {
     
     for (size_t i = 0; i < std::min<size_t>(5, observations.size()); ++i) {
         const auto& obs = observations[i];
-        std::cout << std::setw(14) << std::setprecision(5) 
+        std::cout << std::setw(14) 
+                  << std::setprecision(5) 
                   << obs.epoch << "  "
-                  << std::setw(12) << std::setprecision(6) 
-                  << obs.ra * constants::RAD_TO_DEG << "  "
                   << std::setw(12) 
-                  << obs.dec * constants::RAD_TO_DEG << "  "
+                  << std::setprecision(6) 
+                  << obs.ra * constants::RAD_TO_DEG 
+                  << "  "
+                  << std::setw(12) 
+                  << obs.dec * constants::RAD_TO_DEG 
+                  << "  "
                   << obs.obs_code << "\n";
     }
     
