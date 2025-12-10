@@ -66,59 +66,90 @@ The \textbf{classical Keplerian elements} are the most widely used set. They dir
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[scale=1.1]
-    % REFERENCE PLANE (Ecliptic/Equator)
-    \draw[thick, gray!40] (0,0) ellipse (3.5cm and 1.2cm);
-    \node[gray, below right] at (2.5,-1.0) {Reference Plane};
+\begin{tikzpicture}[scale=1.2, >=stealth]
+    % PARAMETERS & COORDINATES
+    \coordinate (Sun) at (0,0);
+    \def\OmegaAngle{-35} % Longitude of Node (visual Perspective)
+    \def\omegaAngle{50}  % Argument of Perihelion
+    \def\orbA{2.8}       % Semi-major axis
+    \def\orbE{0.6}       % Eccentricity
+    \def\orbB{2.24}      % Semi-minor axis approx (b = a*sqrt(1-e^2)) - manually tuned for view
+    \def\orbC{1.68}      % Focal distance c = a*e
 
-    % SUN (at Focus/Origin)
-    \filldraw[yellow, draw=orange, thick] (0,0) circle (6pt);
-    \node[below left] at (0,-0.2) {Sun (Focus)};
+    % 1. REFERENCE PLANE (e.g. Ecliptic)
+    % Represented as a flat gray ellipse
+    \fill[gray!5] (0,0) ellipse (4.0cm and 1.2cm);
+    \draw[gray, thin] (0,0) ellipse (4.0cm and 1.2cm);
+    \node[gray, below right] at (3.0,-0.8) {Reference Plane};
 
-    % REFERENCE DIRECTION (Gamma)
-    \draw[->, thick, blue] (0,0) -- (4,0) node[right] {$\gamma$};
+    % 2. SUN (Focus)
+    \shade[ball color=orange] (Sun) circle (0.15);
+    \node[below=0.3cm] at (Sun) {Sun};
 
-    % LINE OF NODES
-    % Visual intersection roughly at -30 degrees
-    \draw[dashed, black] (0,0) -- (-2.6, 1.5); % Descending node side
-    \draw[thick, black] (0,0) -- (2.6, -1.5) node[right] {Line of Nodes};
-    
-    % Ascending Node point
-    \filldraw[black] (2.0, -1.15) circle (1.5pt);
-    \node[below] at (2.0, -1.25) {Ascending Node};
+    % 3. REFERENCE DIRECTION (Gamma)
+    \draw[->, blue, thick] (Sun) -- (4.2, 0) node[right] {$\gamma$};
 
-    % LONGITUDE OF ASCENDING NODE (Omega)
-    % Arc from Gamma to Node
-    \draw[->, purple, thick] (1.5,0) arc (0:-30:1.5);
-    \node[purple, right] at (1.6,-0.4) {$\Omega$};
+    % 4. LINE OF NODES
+    % Intersection of planes. Passes through Sun.
+    \draw[dashed, black!60] (Sun) -- ({4*cos(\OmegaAngle+180)}, {1.2*sin(\OmegaAngle+180)});
+    % Visible part
+    \draw[thick, black] (Sun) -- ({4*cos(\OmegaAngle)}, {1.2*sin(\OmegaAngle)}) coordinate (Node);
+    \node[below right] at (Node) {Line of Nodes};
+    \filldraw (Node) circle (1.5pt) node[above right, xshift=-2pt] {$\ascnode$};
 
-    % ORBITAL PLANE
-    % Rotated so Perihelion is distinct from Node
-    % Let's orient perihelion at +30 degrees visual.
-    % Ellipse parameters: a=2.5, e=0.6 => c=1.5. Center at (-1.5, 0) relative to axis.
-    \begin{scope}[rotate=30]
-        % Orbit Path
-        \draw[thick, red] (-1.5, 0) ellipse (2.5cm and 1.4cm);
+    % Longitude of Ascending Node (Omega)
+    \draw[->, purple, thick] (1.5, 0) arc (0:\OmegaAngle:1.5);
+    \node[purple, right] at (1.7, -0.4) {$\Omega$};
+
+    % 5. ORBITAL PLANE & ORBIT
+    % We rotate to the Node Frame
+    \begin{scope}[rotate=\OmegaAngle]
+        % Now X-axis is the Line of Nodes.
+        % We draw the orbit. The orbit's major axis is rotated by 'omega' from the Node line.
         
-        % Perihelion (closest point to focus at 0,0)
-        \filldraw[red] (1.0, 0) circle (2pt) node[above right] {Perihelion};
-        \draw[thick, red, dashed] (0,0) -- (1.0, 0); % Radius vector to perihelion
+        \begin{scope}[rotate=\omegaAngle]
+            % Now X-axis is the Major Axis (towards Perihelion).
+            % The Sun is at (0,0). The Ellipse center is at (-c, 0).
+            \coordinate (Center) at (-\orbC, 0);
+            
+            % Draw Ellipse (Orbit Path)
+            % Uses red color
+            \draw[red, thick] (Center) ellipse (\orbA cm and \orbB cm);
+            
+            % Perihelion
+            \coordinate (Perihelion) at (\orbA-\orbC, 0);
+            \filldraw[red] (Perihelion) circle (2pt) node[right] {Perihelion};
+            \draw[dashed, red] (Sun) -- (Perihelion);
+            
+            % Planet / Body Position (True Anomaly)
+            \def\nuAngle{65} % True anomaly
+            % Parametric point on ellipse relative to center (shifted)
+            % x = -c + a*cos(E), y = b*sin(E). 
+            % Let's just approximate visually for diagram using polar from Sun
+            \path (Sun) -- ++(\nuAngle:2.2) coordinate (Planet); 
+            % Note: Mathematically exact requires Kepler eq, visual approx is fine here
+            
+            \filldraw[blue] (Planet) circle (3pt) node[above] {Body};
+            \draw[dotted, blue] (Sun) -- (Planet) node[midway, fill=white, inner sep=0.5pt] {$r$};
+            
+            % True Anomaly Arc
+            \draw[->, blue] (0.8, 0) arc (0:\nuAngle:0.8);
+            \node[blue, above] at (0.6, 0.3) {$\nu$};
+        \end{scope}
         
-        % Body Position (True Anomaly nu)
-        \filldraw[blue] (1.0, 1.2) circle (3pt) node[above] {Body};
-        \draw[dotted, blue] (0,0) -- (1.0, 1.2);
+        % Argument of Perihelion (omega)
+        % From Node (X-axis here) to Major Axis
+        \draw[->, orange, thick] (1.0, 0) arc (0:\omegaAngle:1.0);
+        \node[orange, right] at (1.1, 0.4) {$\omega$};
     \end{scope}
 
-    % ARGUMENT OF PERIHELION (omega)
-    % Angle from Node (-30 deg) to PeriAxis (+30 deg)
-    \draw[->, orange, thick] (1.0, -0.58) arc (-30:30:1.15);
-    \node[orange, right] at (1.2, -0.1) {$\omega$};
-
-    % INCLINATION (i)
-    % Symbolized by vector relations or just label
-    \node[red!80!black] at (-2, 2) {Orbital Plane};
+    % 6. INCLINATION (i)
+    % Visual indicator of plane tilt
+    \draw[green!50!black, thick] (3.5, -1.2) arc (-90:-60:2);
+    \node[green!50!black, right] at (3.6, -0.8) {$i$};
     
 \end{tikzpicture}
+
 
 \caption{Classical Keplerian orbital elements. The orbital plane (red ellipse) is tilted relative to the reference plane. The ascending node is where the orbit crosses the reference plane going northward.}
 \label{fig:keplerian_elements}
