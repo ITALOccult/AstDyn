@@ -8,6 +8,7 @@ This appendix lists the physical and astronomical constants used in the AstDyn l
 \begin{table}[htbp]
 \centering
 \caption{Fundamental physical constants employed in AstDyn.}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{llrl}
 \toprule
 \textbf{Symbol} & \textbf{Description} & \textbf{Value} & \textbf{Units} \\
@@ -20,7 +21,8 @@ $J2000.0$ & Standard Epoch (JD) & 2451545.0 & days \\
 $MJD2000.0$ & Standard Epoch (MJD) & 51544.5 & days \\
 $\epsilon_0$ & Obliquity of ecliptic (J2000) & 23.43929111 & degrees \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \section{Planetary Gravitational Parameters}
@@ -31,9 +33,10 @@ AstDyn uses the standard gravitational parameters ($GM$) consistent with the DE4
 \centering
 \caption{Gravitational parameters ($GM$) of solar system bodies.}
 \label{tab:gm_values}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrl}
 \toprule
-\textbf{Body} & \textbf{GM value ($km^3 s^{-2}$)} & \textbf{Reciprocal Mass Ratio ($M_{\odot}/M_p$)} \\
+\textbf{Body} & \textbf{GM value ($km^3 s^{-2}$)} & \textbf{Inv. Mass Ratio ($M_{\odot}/M_p$)} \\
 \midrule
 Sun & 132712440041.939400 & 1 \\
 Mercury & 22031.868551 & 6023600.0 \\
@@ -46,9 +49,10 @@ Jupiter System & 126712764.100000 & 1047.3486 \\
 Saturn System & 37940584.841800 & 3497.898 \\
 Uranus System & 5794556.400000 & 22902.98 \\
 Neptune System & 6836527.100580 & 19412.24 \\
-Pluto System & 975.500000 & 1.35 $\times 10^8$ \\
+Pluto System & 975.500000 & $1.35 \times 10^8$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \section{Time Scale Definitions}

@@ -52,7 +52,10 @@ Account for correlation in fit:
     \xi_i = \frac{r_i}{\sigma_i \sqrt{1 - h_{ii}}}
 \end{equation}
 
-where $h_{ii}$ is the $i$-th diagonal element of the hat matrix $\mathbf{H}(\mathbf{H}^T\mathbf{W}\mathbf{H})^{-1}\mathbf{H}^T\mathbf{W}$.
+where $h_{ii}$ is the $i$-th diagonal element of the hat matrix $\mathbf{S}$:
+\begin{equation}
+    \mathbf{S} = \mathbf{H}(\mathbf{H}^T\mathbf{W}\mathbf{H})^{-1}\mathbf{H}^T\mathbf{W}
+\end{equation}
 
 \section{Quality Metrics}
 
