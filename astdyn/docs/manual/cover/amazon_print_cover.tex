@@ -42,8 +42,9 @@
         };
 
         % Graphics
-        \begin{scope}[shift={(341, 150)}, scale=22.0]
-            \shade[inner color=stargold!50!white, outer color=deepnavy] (0,0) circle (2.0);
+        % Adjusted scale and position to avoid overlap with Title block
+        \begin{scope}[shift={(341, 115)}, scale=14.0]
+            \shade[inner color=stargold!50!white, outer color=deepnavy] (0,0) circle (2.0); % Sun glow
             \fill[stargold] (0,0) circle (0.15);
             \draw[accentblue!40, thick, rotate=15] (0,0) ellipse (3.5 and 1.2);
             \draw[accentblue!80, very thick, rotate=-10] (0,0) ellipse (2.0 and 1.8);
@@ -52,7 +53,8 @@
             
             \shade[ball color=accentblue] (1.9, 0.4) circle (0.12); 
             \shade[ball color=red] (-3.2, -0.6) circle (0.08); 
-            \draw[white!40, thin, ->, >=stealth] (0,0) -- node[midway, fill=deepnavy, text=white, font=\tiny, scale=0.1] {$\mathbf{r}$} (-3.2, -0.6);
+            % Scale down arrow head/linewidth relative to zoom? No, stick to thick.
+            \draw[white!40, thin, ->, >=stealth] (0,0) -- node[midway, fill=deepnavy, text=white, font=\tiny, scale=0.15] {$\mathbf{r}$} (-3.2, -0.6);
         \end{scope}
 
         % Author
