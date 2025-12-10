@@ -1,20 +1,20 @@
 \begin{titlepage}
     \centering
-    \vspace*{1.5cm}
+    \vspace*{0.5cm}
     
-    {\scshape\LARGE AstDyn Project \par}
-    \vspace{1cm}
+    {\scshape\LARGE ITALOccult Project \par}
+    \vspace{0.5cm}
     
-    \rule{\linewidth}{0.5mm} \\[0.4cm]
+    \rule{\linewidth}{0.5mm} \\[0.3cm]
     {\Huge\bfseries Scientific Reference Manual \par}
-    \vspace{0.4cm} 
-    \rule{\linewidth}{0.5mm} \\[1.5cm]
+    \vspace{0.3cm} 
+    \rule{\linewidth}{0.5mm} \\[0.8cm]
     
     {\Large\textit{High-Fidelity C++ Library for Asteroid Dynamics\\and Occultation Prediction} \par}
     
-    \vspace{2cm}
+    \vspace{1.5cm}
     
-    \begin{tikzpicture}[scale=1.3]
+    \begin{tikzpicture}[scale=1.1]
         % Abstract representation of solar system dynamics
         % Sun
         \shade[ball color=orange!90!yellow] (0,0) circle (0.5);
@@ -31,28 +31,29 @@
         \draw[->, >=latex, red, thick] (0,0) -- node[above, sloped, black] {\small $\mathbf{r}$} (-1.1, -1.5);
     \end{tikzpicture}
     
-    \vspace{2.5cm}
+    \vspace{3cm}
     
-    \begin{minipage}{0.4\textwidth}
-        \begin{flushleft} \large
-        \emph{Author:}\\
-        Michele \textsc{Bigi}
-        \end{flushleft}
-    \end{minipage}
-    \begin{minipage}{0.4\textwidth}
-        \begin{flushright} \large
-        \emph{Version:}\\
-        1.0.0 \\
-        \vspace{0.2cm}
-        \emph{Date:}\\
-        \today
-        \end{flushright}
-    \end{minipage}
+    {\Large \textbf{Michele Bigi} \par}
     
     \vfill
     
-    {\large \textit{Validated against JPL DE441 Ephemerides}}
+    % --- Controcopertina (Verso Page) ---
+    \newpage
+    \thispagestyle{empty}
+    \null
+    \vfill
     
-    \vspace{1.5cm}
+    \begin{flushleft}
+        \small
+        \textbf{Document Information:}\\
+        Version: 1.0.0 \\
+        Date: \today \\[0.5cm]
+        
+        \textit{Validated against JPL DE441 Ephemerides}\\[2cm]
+        
+        \copyright\ \the\year\ Michele Bigi -- ITALOccult Project\\
+        All rights reserved.
+    \end{flushleft}
+
 \end{titlepage}
 \clearpage
