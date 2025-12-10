@@ -34,14 +34,15 @@
         % ==========================================================================================
         % Title
         \node[anchor=north, align=center] at (341, 260) {
-            {\fontsize{60}{72}\selectfont \bfseries \textcolor{white}{AstDyn}}\\[15mm]
-            {\fontsize{30}{36}\selectfont \bfseries \textcolor{accentblue}{Scientific Reference Manual}}\\[10mm]
+            {\fontsize{60}{72}\selectfont \bfseries \textcolor{white}{AstDyn}}\\[10mm]
+            {\fontsize{30}{36}\selectfont \bfseries \textcolor{accentblue}{Scientific Reference Manual}}\\[5mm]
+            {\fontsize{24}{29}\selectfont \bfseries \textcolor{white}{of the C++ Library}}\\[10mm]
             {\fontsize{18}{22}\selectfont \itshape \textcolor{white!80}{The ITALOccult Framework for High-Precision}}\\
             {\fontsize{18}{22}\selectfont \itshape \textcolor{white!80}{Asteroid Dynamics \& Occultation Prediction}}
         };
 
         % Graphics
-        \begin{scope}[shift={(341, 150)}, scale=2.5]
+        \begin{scope}[shift={(341, 150)}, scale=22.0]
             \shade[inner color=stargold!50!white, outer color=deepnavy] (0,0) circle (2.0);
             \fill[stargold] (0,0) circle (0.15);
             \draw[accentblue!40, thick, rotate=15] (0,0) ellipse (3.5 and 1.2);
@@ -51,7 +52,7 @@
             
             \shade[ball color=accentblue] (1.9, 0.4) circle (0.12); 
             \shade[ball color=red] (-3.2, -0.6) circle (0.08); 
-            \draw[white!40, thin, ->, >=stealth] (0,0) -- node[midway, fill=deepnavy, text=white, font=\tiny] {$\mathbf{r}$} (-3.2, -0.6);
+            \draw[white!40, thin, ->, >=stealth] (0,0) -- node[midway, fill=deepnavy, text=white, font=\tiny, scale=0.1] {$\mathbf{r}$} (-3.2, -0.6);
         \end{scope}
 
         % Author
@@ -110,7 +111,10 @@
 
         % Barcode Box
         \fill[white] (160, 25) rectangle (200, 60);
-        \node[black] at (180, 42.5) {\footnotesize Barcode};
+        \node[black, align=center] at (180, 42.5) {
+            \textbf{ISBN 979-8-278-20937-9}\\
+            \footnotesize (Place Barcode Here)
+        };
 
     \end{scope}
 \end{tikzpicture}
