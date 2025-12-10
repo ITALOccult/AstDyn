@@ -1,0 +1,112 @@
+\documentclass[12pt]{article}
+\usepackage[paperwidth=326.8mm, paperheight=234.6mm, margin=0mm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usepackage{mathpazo} 
+\usepackage{anyfontsize}
+\usepackage{xcolor}
+
+% Color Definition
+\definecolor{deepnavy}{HTML}{0B1021}
+\definecolor{accentblue}{HTML}{1E90FF}
+\definecolor{stargold}{HTML}{FFD700}
+
+% Force Background Color
+\pagecolor{deepnavy}
+
+\begin{document}
+\pagestyle{empty}
+
+\begin{tikzpicture}[remember picture, overlay]
+    % Anchor to bottom-left
+    \begin{scope}[shift={(current page.south west)}, x=1mm, y=1mm]
+        
+        % --- STAR FIELD ---
+        \foreach \i in {1,...,150} {
+             \fill[white, opacity=0.4] ({random(5,320)}, {random(5,229)}) circle ({0.1+random(0,2)/10});
+        }
+
+        % ==========================================================================================
+        % FRONT COVER (Right Side) - Center X = 247.6 mm
+        % ==========================================================================================
+        
+        % Title Block
+        \node[anchor=north, align=center] at (247.6, 210) {
+            {\fontsize{40}{48}\selectfont \bfseries \textcolor{white}{AstDyn}}\\[6mm]
+            {\fontsize{22}{26}\selectfont \bfseries \textcolor{accentblue}{Scientific Reference Manual}}\\[4mm]
+            {\fontsize{18}{22}\selectfont \bfseries \textcolor{white}{of the C++ Library}}\\[8mm]
+            {\fontsize{14}{17}\selectfont \itshape \textcolor{white!80}{The ITALOccult Framework for High-Precision}}\\
+            {\fontsize{14}{17}\selectfont \itshape \textcolor{white!80}{Asteroid Dynamics \& Occultation Prediction}}
+        };
+
+        % Graphics
+        \begin{scope}[shift={(247.6, 95)}, scale=10.0]
+            \shade[inner color=stargold!50!white, outer color=deepnavy] (0,0) circle (2.0);
+            \fill[stargold] (0,0) circle (0.15);
+            \draw[accentblue!40, thick, rotate=15] (0,0) ellipse (3.5 and 1.2);
+            \draw[accentblue!80, very thick, rotate=-10] (0,0) ellipse (2.0 and 1.8);
+            \draw[white!20, thin, dashed] (0,0) circle (2.8);
+            \shade[ball color=accentblue] (1.9, 0.4) circle (0.12); 
+            \shade[ball color=red] (-3.2, -0.6) circle (0.08); 
+            \draw[white!40, thin, ->, >=stealth] (0,0) -- node[midway, fill=deepnavy, text=white, font=\tiny, scale=0.2] {$\mathbf{r}$} (-3.2, -0.6);
+        \end{scope}
+
+        % Author
+        \node[anchor=south] at (247.6, 15) {
+            {\fontsize{18}{22}\selectfont \bfseries \textcolor{white}{Michele Bigi}}
+        };
+
+        % ==========================================================================================
+        % SPINE (Center) - X = 163.4 mm (Width 16mm)
+        % ==========================================================================================
+        \node[rotate=-90, anchor=center] at (163.4, 190) {
+            {\fontsize{14}{17}\selectfont \bfseries \textcolor{white}{AstDyn}}
+        };
+        % Subtitle might be too long for 234mm height? No, it fits.
+        \node[rotate=-90, anchor=center] at (163.4, 117) {
+            {\fontsize{10}{12}\selectfont \bfseries \textcolor{accentblue}{Scientific Reference Manual}}
+        };
+        \node[rotate=-90, anchor=center] at (163.4, 40) {
+            {\fontsize{10}{12}\selectfont \bfseries \textcolor{white}{Michele Bigi}}
+        };
+
+        % ==========================================================================================
+        % BACK COVER (Left Side) - Center X = 79.2 mm
+        % ==========================================================================================
+        \node[anchor=north west, align=left] at (25, 210) {
+            {\fontsize{16}{19}\selectfont \bfseries \textcolor{accentblue}{About the Library}}
+        };
+
+        % Abstract Text
+        \node[anchor=north west, align=justify, text width=105mm] at (25, 195) {
+            \color{white!90}
+            \fontsize{10}{12}\selectfont
+            \textbf{AstDyn (Asteroid Dynamics)} is a high-fidelity C++ library designed for the precise orbit determination and propagation of celestial bodies, specifically focusing on Main Belt asteroids and Near-Earth Objects (NEOs).
+            
+            \vspace{0.8em}
+            Developed within the \textbf{ITALOccult project}, this software represents the state-of-the-art in computational astrodynamics, aimed at reducing ephemeris uncertainties to sub-milliarcsecond levels.
+            
+            \vspace{0.8em}
+            \textbf{Key Features:}
+            \begin{itemize}
+                \item[--] \textbf{Rigorous Dynamics}: Relativistic models (EIH) \& JPL DE441.
+                \item[--] \textbf{High-Order Integration}: Adaptive RKF78.
+                \item[--] \textbf{Precision}: Validated against NASA/JPL Horizons.
+            \end{itemize}
+        };
+
+        % Bottom Info
+        \node[anchor=south west, text width=80mm] at (25, 15) {
+            \color{white!60}
+            \fontsize{9}{11}\selectfont
+            \textbf{ITALOccult Project}\\
+            Open Source Scientific Software
+        };
+
+        % Barcode Box (White only)
+        \fill[white] (100, 15) rectangle (140, 45);
+
+    \end{scope}
+\end{tikzpicture}
+\end{document}

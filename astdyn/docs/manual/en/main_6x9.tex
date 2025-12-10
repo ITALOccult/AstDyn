@@ -1,0 +1,192 @@
+\documentclass[11pt,twoside,openright]{book}
+
+% ============================================================================
+% 6x9 INCH FORMAT SETUP
+% ============================================================================
+\usepackage[paperwidth=6in, paperheight=9in, 
+            top=1.6cm, bottom=1.6cm, 
+            inner=2.3cm, outer=1.3cm, 
+            headheight=15pt, footskip=1.0cm]{geometry}
+
+% ============================================================================
+% PACKAGES
+% ============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{booktabs}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
+\usepackage{titlesec}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+% Fonts
+\usepackage{mathpazo} 
+\usepackage[scaled=0.92]{helvet} 
+
+% Line spacing - slightly tighter for 6x9
+\usepackage{setspace}
+\setstretch{1.15}
+
+% ============================================================================
+% COLORS
+% ============================================================================
+\definecolor{codebackground}{rgb}{0.95,0.95,0.95}
+\definecolor{codekeyword}{rgb}{0.0,0.0,0.5}
+\definecolor{codecomment}{rgb}{0.25,0.5,0.35}
+\definecolor{codestring}{rgb}{0.6,0.1,0.1}
+\definecolor{linkcolor}{rgb}{0.0,0.2,0.6}
+
+% ============================================================================
+% HYPERREF SETUP
+% ============================================================================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=linkcolor,
+    citecolor=linkcolor,
+    urlcolor=linkcolor,
+    bookmarksnumbered=true,
+    pdfauthor={Michele Bigi},
+    pdftitle={AstDyn: Scientific Reference Manual (6x9)},
+    pdfsubject={The ITALOccult Framework for High-Precision Asteroid Dynamics},
+    pdfkeywords={celestial mechanics, orbit determination, astrodynamics, italoccult}
+}
+
+% ============================================================================
+% CODE LISTINGS
+% ============================================================================
+\lstset{
+    backgroundcolor=\color{codebackground},
+    basicstyle=\ttfamily\scriptsize, % Smaller font for code in 6x9
+    keywordstyle=\color{codekeyword}\bfseries,
+    commentstyle=\color{codecomment}\itshape,
+    stringstyle=\color{codestring},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    rulecolor=\color{black},
+    tabsize=2, % Smaller tab for narrower pages
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)},
+    xleftmargin=1.0em,
+    xrightmargin=0.0em
+}
+
+\lstdefinestyle{cpp}{
+    language=C++,
+    morekeywords={constexpr,nullptr,override,final}
+}
+
+% ============================================================================
+% TIKZ
+% ============================================================================
+\usetikzlibrary{shapes,arrows,positioning,calc,decorations.markings}
+\pgfplotsset{compat=1.16}
+
+% ============================================================================
+% THEOREMS & MACROS
+% ============================================================================
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[chapter]
+\newtheorem{example}{Example}[chapter]
+
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{proposition}{Proposition}[chapter]
+\newtheorem{lemma}{Lemma}[chapter]
+
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[chapter]
+\newtheorem{note}{Note}[chapter]
+
+% ============================================================================
+% HEADER/FOOTER
+% ============================================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\footnotesize \leftmark}
+\fancyhead[RO]{\footnotesize \rightmark} % Use small headers
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% ============================================================================
+% DOCUMENT
+% ============================================================================
+\begin{document}
+
+\frontmatter
+
+% Titlepage might need adjustment, but let's include existing one
+\include{00_titlepage_6x9}
+\include{00_abstract}
+\include{00_preface}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\mainmatter
+
+% Part I
+\part{Theoretical Foundations of Celestial Mechanics}
+\include{01_introduction}
+\include{02_time_systems}
+\include{03_coordinate_systems}
+\include{04_reference_frames}
+\include{05_orbital_elements}
+\include{06_two_body_problem}
+\include{07_perturbations}
+
+% Part II
+\part{Numerical Methods and Algorithms}
+\include{08_numerical_integration}
+\include{09_orbit_propagation}
+\include{10_state_transition}
+\include{11_ephemeris}
+
+% Part III
+\part{Orbit Determination}
+\include{12_observations}
+\include{13_initial_orbit}
+\include{14_differential_correction}
+\include{15_residuals}
+
+% Part IV
+\part{AstDyn Library Implementation}
+\include{16_architecture}
+\include{17_core_modules}
+\include{18_parsers}
+\include{19_api_reference}
+\include{20_examples}
+
+% Part V
+\part{Validation and Applications}
+\include{21_validation}
+\include{22_case_studies}
+
+% Back matter
+\backmatter
+\include{A_constants}
+% \include{25_appendices} 
+% Placeholder for bibliography if needed
+
+\end{document}

@@ -1,0 +1,61 @@
+\begin{titlepage}
+    \centering
+    \vspace*{0.2cm} % Reduced top space
+    
+    {\scshape\Large ITALOccult Project \par} % Slightly smaller font
+    \vspace{0.3cm}
+    
+    \rule{\linewidth}{0.5mm} \\[0.2cm]
+    {\huge\bfseries AstDyn \par} % huge instead of Huge
+    \vspace{0.1cm}
+    {\Large\bfseries Scientific Reference Manual \par} % Large instead of Huge
+    \vspace{0.2cm} 
+    \rule{\linewidth}{0.5mm} \\[0.5cm]
+    
+    {\large\textit{High-Fidelity C++ Library for Asteroid Dynamics\\and Occultation Prediction} \par}
+    
+    \vspace{1.0cm} % Reduced from 1.5cm
+    
+    \begin{tikzpicture}[scale=0.85] % Reduced scale for 6x9 page
+        % Abstract representation of solar system dynamics
+        % Sun
+        \shade[ball color=orange!90!yellow] (0,0) circle (0.5);
+        
+        % Orbits (Scaled down geometrically)
+        \draw[gray!40, thick, rotate=15] (0,0) ellipse (3.0 and 1.8);
+        \draw[gray!60, thick, dashed, rotate=-10] (0,0) ellipse (1.8 and 1.6);
+        
+        % Bodies
+        \shade[ball color=blue!70!cyan] (2.7, 1.1) circle (0.18); 
+        \shade[ball color=brown!80!red] (-1.0, -1.3) circle (0.12); 
+        
+        % Vector annotation
+        \draw[->, >=latex, red, thick] (0,0) -- node[above, sloped, black] {\small $\mathbf{r}$} (-1.0, -1.3);
+    \end{tikzpicture}
+    
+    \vspace{1.5cm} % Reduced from 3cm
+    
+    {\Large \textbf{Michele Bigi} \par}
+    
+    \vfill
+    
+    % --- Controcopertina ---
+    \newpage
+    \thispagestyle{empty}
+    \null
+    \vfill
+    
+    \begin{flushleft}
+        \footnotesize % Smaller text for copyright page on 6x9
+        \textbf{Document Information:}\\
+        Version: 1.0.0 \\
+        Date: \today \\[0.5cm]
+        
+        \textit{Validated against JPL DE441 Ephemerides}\\[1.5cm]
+        
+        \copyright\ \the\year\ Michele Bigi -- ITALOccult Project\\
+        All rights reserved.
+    \end{flushleft}
+
+\end{titlepage}
+\clearpage
