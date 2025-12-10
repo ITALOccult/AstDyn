@@ -1,0 +1,140 @@
+\documentclass[12pt]{article}
+\usepackage[paperwidth=448mm, paperheight=303mm, margin=0mm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usepackage{mathpazo} % Palatino font
+\usepackage{anyfontsize}
+\usepackage{xcolor}
+
+% Color Palette "Deep Space Scientific"
+\definecolor{deepnavy}{HTML}{0B1021} % Very dark blue/black
+\definecolor{accentblue}{HTML}{1E90FF} % Dodger Blue
+\definecolor{stargold}{HTML}{FFD700}
+\definecolor{orbitgray}{HTML}{4A5568}
+
+\begin{document}
+\pagestyle{empty}
+
+\begin{tikzpicture}[remember picture, overlay]
+    % --- BACKGROUND ---
+    \fill[deepnavy] (current page.south west) rectangle (current page.north east);
+    
+    % --- STAR FIELD (Background Texture) ---
+    \foreach \i in {1,...,100} {
+        \fill[white, opacity=rand*0.6+0.1] (rand*224+224, rand*151.5) circle (rand*0.03); % Right side stars
+        \fill[white, opacity=rand*0.6+0.1] (rand*224-224, rand*151.5) circle (rand*0.03); % Left side stars
+    }
+
+    % ==========================================================================================
+    % GUIDES (Removed in final print, useful for debug. Uncomment to see trim lines)
+    % \draw[red, dashed] (213mm, 0) -- (213mm, 303mm); % Spine Left
+    % \draw[red, dashed] (235mm, 0) -- (235mm, 303mm); % Spine Right
+    % ==========================================================================================
+
+    % ==========================================================================================
+    % FRONT COVER (Right Side)
+    % Center X approx: 3mm (bleed) + 210mm (back) + 22mm (spine) + 105mm (half front) = 340mm
+    % ==========================================================================================
+    
+    % Title Block
+    \node[anchor=north, align=center] at (341.5mm, 260mm) {
+        {\fontsize{60}{70}\selectfont \bfseries \textcolor{white}{AstDyn}}\\[1.5cm]
+        {\fontsize{30}{40}\selectfont \bfseries \textcolor{accentblue}{Scientific Reference Manual}}\\[1cm]
+        {\fontsize{18}{22}\selectfont \itshape \textcolor{white!80}{The ITALOccult Framework for High-Precision}}\\
+        {\fontsize{18}{22}\selectfont \itshape \textcolor{white!80}{Asteroid Dynamics \& Occultation Prediction}}
+    };
+
+    % Central Graphic (Stylized Orbital Dynamics)
+    \begin{scope}[shift={(341.5mm, 150mm)}, scale=2.5]
+        % Sun glow
+        \shade[inner color=stargold!50!white, outer color=deepnavy] (0,0) circle (2.0);
+        \fill[stargold] (0,0) circle (0.15);
+        
+        % Orbits
+        \draw[accentblue!40, thick, rotate=15] (0,0) ellipse (3.5 and 1.2);
+        \draw[accentblue!80, very thick, rotate=-10] (0,0) ellipse (2.0 and 1.8);
+        \draw[white!20, thin, dashed] (0,0) circle (2.8);
+        
+        % Bodies
+        \shade[ball color=accentblue] (1.9, 0.4) circle (0.12); % Planet
+        \shade[ball color=red] (-3.2, -0.6) circle (0.08); % Asteroid
+        
+        % Geometric lines (Scientific feel)
+        \draw[white!40, thin, ->, >=stealth] (0,0) -- node[midway, fill=deepnavy, text=white, font=\tiny] {$\mathbf{r}$} (-3.2, -0.6);
+        \draw[white!30, thin] (0,0) -- (1.9, 0.4);
+    \end{scope}
+
+    % Author Name
+    \node[anchor=south] at (341.5mm, 25mm) {
+        {\fontsize{24}{30}\selectfont \bfseries \textcolor{white}{Michele Bigi}}
+    };
+
+    % ==========================================================================================
+    % SPINE (Center)
+    % Width: 22mm. Center X: 213 + 11 = 224mm
+    % ==========================================================================================
+    
+    \node[rotate=-90, anchor=center] at (224mm, 250mm) {
+        {\fontsize{18}{22}\selectfont \bfseries \textcolor{white}{AstDyn}}
+    };
+    
+    \node[rotate=-90, anchor=center] at (224mm, 150mm) {
+        {\fontsize{14}{16}\selectfont \bfseries \textcolor{accentblue}{Scientific Reference Manual}}
+    };
+    
+    \node[rotate=-90, anchor=center] at (224mm, 50mm) {
+        {\fontsize{14}{16}\selectfont \bfseries \textcolor{white}{Michele Bigi}}
+    };
+
+    % ==========================================================================================
+    % BACK COVER (Left Side)
+    % Center X approx: 3mm (bleed) + 105mm (half back) = 108mm
+    % ==========================================================================================
+
+    % Abstract Title
+    \node[anchor=north west, align=left] at (40mm, 260mm) {
+        {\fontsize{20}{24}\selectfont \bfseries \textcolor{accentblue}{About the Library}}
+    };
+
+    % Abstract Text (Justified with parbox)
+    \node[anchor=north west, align=justify] at (40mm, 245mm) {
+        \parbox{140mm}{
+            \color{white!90}
+            \fontsize{12}{15}\selectfont
+            \setlength{\parskip}{0.5em}
+            
+            \textbf{AstDyn (Asteroid Dynamics)} is a high-fidelity C++ library designed for the precise orbit determination and propagation of celestial bodies, specifically focusing on Main Belt asteroids and Near-Earth Objects (NEOs).
+            
+            Developed within the \textbf{ITALOccult project}, this software represents the state-of-the-art in computational astrodynamics, aimed at reducing ephemeris uncertainties to sub-milliarcsecond levels for accurate stellar occultation predictions.
+            
+            \textbf{Key Features:}
+            \begin{itemize}
+                \item[--] \textbf{Rigorous Dynamics}: Complete Relativistic models (EIH) and JPL DE441 perturbations.
+                \item[--] \textbf{High-Order Integration}: Adaptive Runge-Kutta-Fehlberg 7/8 (RKF78).
+                \item[--] \textbf{Precision}: Validated against NASA/JPL Horizons ($\pm 2$m accuracy).
+                \item[--] \textbf{Comprehensive Tools}: From coordinate transformations (IAU 2006) to differential correction.
+            \end{itemize}
+            
+            This manual serves as the definitive reference for researchers, astronomers, and software engineers working with high-precision orbital mechanics.
+        }
+    };
+
+    % Bottom Back Details
+    \node[anchor=south west] at (40mm, 25mm) {
+        \parbox{100mm}{
+            \color{white!60}
+            \fontsize{10}{12}\selectfont
+            \textbf{ITALOccult Project}\\
+            Open Source Scientific Software\\
+            \textit{C++ / Space Science / Astrodynamics}
+        }
+    };
+
+    % Barcode Placeholder (White Box) - Amazon usually places this
+    \fill[white] (160mm, 25mm) rectangle (200mm, 60mm);
+    \node[black] at (180mm, 42.5mm) {\footnotesize ISBN / Barcode Area};
+
+\end{tikzpicture}
+
+\end{document}
