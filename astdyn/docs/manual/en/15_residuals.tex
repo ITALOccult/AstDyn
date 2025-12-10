@@ -287,17 +287,23 @@ ResidualAnalysis analyze_residuals(
     for (size_t i = 0; i < obs.size(); ++i) {
         // Propagate and predict
         Vector6d y_obs = propagate(state, epoch, obs[i].epoch, forces);
-        Vector2d computed = predict_observation(y_obs, obs[i].epoch, obs[i].obs_code, ephemeris);
+        Vector2d computed = predict_observation(y_obs, 
+                                              obs[i].epoch, 
+                                              obs[i].obs_code, 
+                                              ephemeris);
         
         // Compute residual (in arcsec)
-        double dRA = (obs[i].ra - computed(0)) * cos(obs[i].dec) * RAD_TO_ARCSEC;
+        double dRA = (obs[i].ra - computed(0)) * cos(obs[i].dec) 
+                     * RAD_TO_ARCSEC;
         double dDec = (obs[i].dec - computed(1)) * RAD_TO_ARCSEC;
         double residual = sqrt(dRA*dRA + dDec*dDec);
         
         result.residuals.push_back(residual);
         
         // Normalized residual
-        double sigma = sqrt(obs[i].sigma_ra*obs[i].sigma_ra + obs[i].sigma_dec*obs[i].sigma_dec) * RAD_TO_ARCSEC;
+        double sigma = sqrt(obs[i].sigma_ra*obs[i].sigma_ra + 
+                          obs[i].sigma_dec*obs[i].sigma_dec) 
+                       * RAD_TO_ARCSEC;
         double zeta = residual / sigma;
         result.normalized_residuals.push_back(zeta);
         

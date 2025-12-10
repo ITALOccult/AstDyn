@@ -323,7 +323,8 @@ int main() {
         std::make_shared<propagation::Propagator>(integrator, forces, eph),
         20, 1e-8);
     
-    auto result = dc.solve(initial_guess, observations, 
+    auto result = dc.solve(initial_guess, 
+                          observations, 
                           std::vector{obs_coord});
     
     // Results
@@ -401,10 +402,12 @@ int main(int argc, char* argv[]) {
     
     for (size_t i = 0; i < std::min<size_t>(5, observations.size()); ++i) {
         const auto& obs = observations[i];
-        std::cout << std::setw(14) << std::setprecision(5) << obs.epoch << "  "
+        std::cout << std::setw(14) << std::setprecision(5) 
+                  << obs.epoch << "  "
                   << std::setw(12) << std::setprecision(6) 
                   << obs.ra * constants::RAD_TO_DEG << "  "
-                  << std::setw(12) << obs.dec * constants::RAD_TO_DEG << "  "
+                  << std::setw(12) 
+                  << obs.dec * constants::RAD_TO_DEG << "  "
                   << obs.obs_code << "\n";
     }
     
