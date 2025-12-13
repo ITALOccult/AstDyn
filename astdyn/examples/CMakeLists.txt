@@ -24,9 +24,11 @@ target_link_libraries(propagation_diagnostic PRIVATE astdyn)
 add_executable(example_astdys_fitter example_astdys_fitter.cpp)
 target_link_libraries(example_astdys_fitter PRIVATE astdyn)
 
-# Example: Simple Pompeja orbit fitting (has API errors - disabled for now)
-# add_executable(simple_pompeja_fit simple_pompeja_fit.cpp)
-# target_link_libraries(simple_pompeja_fit PRIVATE astdyn)
+# Example: Simple Pompeja orbit fitting
+add_executable(simple_pompeja_fit simple_pompeja_fit.cpp)
+# Fitorb API Demo
+add_executable(fitorb_api_demo fitorb_api_demo.cpp)
+target_link_libraries(fitorb_api_demo PRIVATE astdyn)
 
 # Example: Configurable parsers system
 add_executable(example_configurable_parsers example_configurable_parsers.cpp)
