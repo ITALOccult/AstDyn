@@ -192,42 +192,26 @@ Residual ResidualCalculator::compute_residual(
     res.epoch_mjd = obs.epoch_mjd;
     res.rejected = obs.rejected;
     
-    // 1. Get Earth position (Ecliptic J2000)
-    Eigen::Vector3d r_earth_ecl = get_earth_position(obs.epoch_mjd);
+    // 1. Get Earth position (ALREADY Equatorial J2000 from DE441/EphemerisProvider)
+    Eigen::Vector3d r_earth_eq = get_earth_position(obs.epoch_mjd);
     
     // 2. Get Observatory position (Geocentric Equatorial)
-    Eigen::Vector3d r_obs_eq = get_observatory_position(obs.observatory_code, obs.epoch_mjd);
+    Eigen::Vector3d r_obs_site_eq = get_observatory_position(obs.observatory_code, obs.epoch_mjd);
     
-    // Convert Observatory to Ecliptic to sum with Earth
-    // Rotation Equatorial -> Ecliptic (rotate by +epsilon around x)
-    double eps = 23.4392911 * DEG_TO_RAD; // Obliquity J2000
-    double sin_eps = std::sin(eps);
-    double cos_eps = std::cos(eps);
+    // 3. Total Observer position (Heliocentric Equatorial)
+    Eigen::Vector3d r_observer_eq = r_earth_eq + r_obs_site_eq;
     
-    Eigen::Vector3d r_obs_ecl;
-    r_obs_ecl.x() = r_obs_eq.x(); // x is same (vernal equinox)
-    r_obs_ecl.y() = r_obs_eq.y() * cos_eps + r_obs_eq.z() * sin_eps;
-    r_obs_ecl.z() = -r_obs_eq.y() * sin_eps + r_obs_eq.z() * cos_eps;
+    // 4. Asteroid State (ALREADY Equatorial J2000 from Propagator)
+    Eigen::Vector3d r_ast_eq = state_at_obs.head<3>();
+    Eigen::Vector3d v_ast_eq = state_at_obs.tail<3>();
     
-    // 3. Total Observer position (Ecliptic)
-    Eigen::Vector3d r_observer_ecl = r_earth_ecl + r_obs_ecl;
-    
-    // 4. Asteroid State (Ecliptic, propagated)
-    Eigen::Vector3d r_ast_ecl = state_at_obs.head<3>();
-    Eigen::Vector3d v_ast_ecl = state_at_obs.tail<3>();
-    
-    // 5. Light-time Correction (in Ecliptic frame)
+    // 5. Light-time Correction (in Equatorial frame)
     double light_time_days = 0.0;
-    Eigen::Vector3d rho_vec_ecl = apply_light_time_correction(r_ast_ecl, v_ast_ecl, r_observer_ecl, light_time_days);
+    Eigen::Vector3d rho_vec_eq = apply_light_time_correction(r_ast_eq, v_ast_eq, r_observer_eq, light_time_days);
     
-    // 6. Convert Topocentric vector to Equatorial for RA/Dec
-    // Rotation Ecliptic -> Equatorial (rotate by -epsilon around x)
-    Eigen::Vector3d rho_vec_eq;
-    rho_vec_eq.x() = rho_vec_ecl.x();
-    rho_vec_eq.y() = rho_vec_ecl.y() * cos_eps - rho_vec_ecl.z() * sin_eps;
-    rho_vec_eq.z() = rho_vec_ecl.y() * sin_eps + rho_vec_ecl.z() * cos_eps;
+    // 6. Convert Topocentric vector to RA/Dec
+    // No rotations needed. The vector is already Equator J2000 -> RA/Dec J2000.
     
-    // 7. Convert to RA/Dec
     double ra_comp, dec_comp;
     cartesian_to_radec(rho_vec_eq, ra_comp, dec_comp);
     
