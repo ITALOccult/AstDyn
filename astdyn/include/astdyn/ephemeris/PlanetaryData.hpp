@@ -135,6 +135,16 @@ public:
             default: return "Unknown";
         }
     }
+
+    /**
+     * @brief Get mass of celestial body [kg]
+     */
+    static double getMass(CelestialBody body);
+
+    /**
+     * @brief Get full planetary data structure
+     */
+    static PlanetaryBody getBodyData(CelestialBody body);
 };
 
 } // namespace astdyn::ephemeris
