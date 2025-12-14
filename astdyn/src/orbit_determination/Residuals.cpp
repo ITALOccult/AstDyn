@@ -58,7 +58,7 @@ static double utc_to_tdb_internal(double mjd_utc) {
     // TDB periodic correction (Fairhead & Bretagnon 1990)
     // Simplified formula accurate to ~10 microseconds
     double jd_tt = mjd_tt + 2400000.5;
-    double T = (jd_tt - 2451545.0) / 36525.0; // Julian centuries from J2000.0
+    // Julian centuries from J2000.0
     
     // Mean anomaly of Sun [degrees]
     double g = 357.53 + 0.9856003 * (jd_tt - 2451545.0);
@@ -217,15 +217,29 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     result.range_rate = range_rate;
     
     // Convert to RA/Dec (directly from Equatorial vector)
-    double computed_ra, computed_dec;
-    cartesian_to_radec(direction, computed_ra, computed_dec);
+    double computed_ra_deg, computed_dec_deg;
     
-    result.computed_ra = computed_ra;
-    result.computed_dec = computed_dec;
+    // Note: The first parameter 'direction' logic is handled inside cartesian_to_radec using rho_vec
+    // We pass rho as the "direction" placeholder (unused) and rho as the vector to be normalized.
+    // Plus observer_pos for deflection.
+    cartesian_to_radec(direction, rho, observer_pos, computed_ra_deg, computed_dec_deg);
     
-    // Compute residuals O-C
-    result.residual_ra = obs.ra - computed_ra;
-    result.residual_dec = obs.dec - computed_dec;
+    // Convert to Radians for consistent residual calculation
+    double computed_ra_rad = computed_ra_deg * DEG_TO_RAD;
+    double computed_dec_rad = computed_dec_deg * DEG_TO_RAD;
+    
+    result.computed_ra = computed_ra_rad;
+    result.computed_dec = computed_dec_rad;
+    
+    // Compute residuals O-C (Radians)
+    double d_ra = obs.ra - computed_ra_rad;
+    
+    // Normalize angular difference to [-PI, PI]
+    while (d_ra > M_PI) d_ra -= TWO_PI;
+    while (d_ra < -M_PI) d_ra += TWO_PI;
+    
+    result.residual_ra = d_ra;
+    result.residual_dec = obs.dec - computed_dec_rad;
     
     // Normalize RA residual by cos(dec) for spherical geometry
     result.residual_ra *= std::cos(obs.dec);
@@ -263,24 +277,60 @@ Vector3d ResidualCalculator::compute_topocentric_direction(
 }
 
 void ResidualCalculator::cartesian_to_radec(
-    const Vector3d& direction,
-    double& ra,
-    double& dec) const {
+    const Vector3d& direction_placeholder, // Unused, kept for signature comp or if needed later
+    const Vector3d& rho_vec,
+    const Vector3d& observer_pos,
+    double& ra_deg,
+    double& dec_deg) const {
+    
+    // Unit direction vector (Geometric)
+    Eigen::Vector3d direction = rho_vec.normalized();
+
+    // --------------------------------------------------------
+    // GRAVITATIONAL DEFLECTION (Relativistic Light Bending)
+    // --------------------------------------------------------
+    // Effect: Light passing near the Sun is bent.
+    // Formula: Δφ = (1 + γ) * GM_sun / (c^2 * d) * tan(φ/2)
+    // Vector form (simplified for Sun only):
+    // s_hat = n_hat + (2*GM/c^2) * ( (n_hat x (q_hat x n_hat)) / ( |q| (1 + q_hat . n_hat) ) )
+    
+    // Sun position is Origin (0,0,0) in Heliocentric
+    Eigen::Vector3d p_sun = -observer_pos; // Vector Observer -> Sun
+    double d_sun = p_sun.norm();
+    Eigen::Vector3d u_sun = p_sun.normalized();
+    
+    // Check elongation 
+    double cos_elongation = u_sun.dot(direction);
+    
+    // Thresholds: d_sun > 1e-6 AU (not inside Sun), cos < 0.999 (not directly at Sun)
+    if (d_sun > 1e-6 && cos_elongation < 0.999) { 
+        constexpr double TWO_GM_C2_AU = 1.97412422e-8; 
+        
+        Eigen::Vector3d cross_prod = u_sun.cross(direction);
+        if (cross_prod.norm() > 1e-10) { 
+            Eigen::Vector3d delta_dir = (TWO_GM_C2_AU / d_sun) * (cross_prod.cross(direction)) / (1.0 + cos_elongation);
+            direction = (direction + delta_dir).normalized();
+        }
+    }
     
     double x = direction[0];
     double y = direction[1];
     double z = direction[2];
     
     // Declination: arcsin(z)
-    dec = std::asin(z);
+    // z is sin(dec) because direction is normalized
+    double dec_rad = std::asin(z);
     
     // Right ascension: atan2(y, x)
-    ra = std::atan2(y, x);
+    double ra_rad = std::atan2(y, x);
     
     // Normalize RA to [0, 2π)
-    if (ra < 0.0) {
-        ra += TWO_PI;
+    if (ra_rad < 0.0) {
+        ra_rad += TWO_PI;
     }
+    
+    ra_deg = ra_rad / DEG_TO_RAD;
+    dec_deg = dec_rad / DEG_TO_RAD;
 }
 
 std::optional<Vector3d> ResidualCalculator::get_observer_position(

@@ -11,7 +11,9 @@
 #include "astdyn/observations/MPCReader.hpp"
 #include "astdyn/coordinates/KeplerianElements.hpp"
 #include "astdyn/time/TimeScale.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include "astdyn/io/AstDynConfig.hpp"
+#include "astdyn/ephemeris/DE441Provider.hpp"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -70,6 +72,38 @@ void AstDynEngine::update_propagator() {
             config_.initial_step_size);
     }
     
+    
+    // Update Ephemeris Provider based on config
+    if (config_.ephemeris_type == "DE441" && !config_.ephemeris_file.empty()) {
+        static std::string loaded_file = "";
+        static bool is_loaded = false;
+        
+        // Avoid reloading if same file
+        if (!is_loaded || loaded_file != config_.ephemeris_file) {
+            try {
+                if (config_.verbose) std::cout << "Loading DE441 Ephemeris: " << config_.ephemeris_file << "...\n";
+                auto provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
+                ephemeris::PlanetaryEphemeris::setProvider(provider);
+                loaded_file = config_.ephemeris_file;
+                is_loaded = true;
+                if (config_.verbose) std::cout << "DE441 Loaded successfully.\n";
+            } catch (const std::exception& e) {
+                std::cerr << "Error loading DE441: " << e.what() << ". Using analytical ephemeris.\n";
+                // Fallback
+                ephemeris::PlanetaryEphemeris::setProvider(nullptr);
+                is_loaded = false;
+            }
+        }
+    } else {
+        // Default / Analytical
+        // ephemeris::PlanetaryEphemeris::setProvider(nullptr); 
+        // Note: we don't reset to nullptr automatically to preserve "manual" setting if user did it elsewhere? 
+        // No, config should rule.
+        if (config_.ephemeris_type == "Analytical") {
+             ephemeris::PlanetaryEphemeris::setProvider(nullptr);
+        }
+    }
+
     propagator_ = std::make_shared<Propagator>(
         std::move(integrator),
         ephemeris_,
@@ -96,6 +130,10 @@ void AstDynEngine::load_config(const std::string& oop_file) {
     config_.propagator_settings.include_planets = parser.getBool("perturb.planets", true);
     config_.propagator_settings.include_asteroids = parser.getBool("perturb.asteroids", false);
     config_.propagator_settings.include_relativity = parser.getBool("perturb.relativity", false);
+    
+    // Load Ephemeris settings
+    config_.ephemeris_type = parser.getString("ephemeris.type", "Analytical");
+    config_.ephemeris_file = parser.getString("ephemeris.file", "");
     
     // Load differential correction settings
     config_.max_iterations = parser.getInt("diffcorr.max_iter", 20);

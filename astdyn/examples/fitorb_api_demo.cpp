@@ -12,9 +12,9 @@
 #include <iomanip>
 
 int main(int argc, char** argv) {
-    std::string eq1_file = "203_astdys.eq1";
-    std::string rwo_file = "203.rwo";
-    std::string oop_file = "203.oop"; // Optional configuration
+    std::string eq1_file = (argc > 1) ? argv[1] : "203_astdys.eq1";
+    std::string rwo_file = (argc > 2) ? argv[2] : "203.rwo";
+    std::string oop_file = (argc > 3) ? argv[3] : ""; // Optional configuration
 
     std::cout << "=== Running OrbitFitAPI Demo ===\n";
     std::cout << "Orbit: " << eq1_file << "\n";

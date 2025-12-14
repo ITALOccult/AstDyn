@@ -43,6 +43,10 @@ struct AstDynConfig {
     std::string integrator_type = "RK4";    ///< Integrator type: RK4, RKF78
     double initial_step_size = 0.1;         ///< Initial step size [days]
     double tolerance = 1e-12;                ///< Integration tolerance
+
+    // Ephemeris settings
+    std::string ephemeris_type = "Analytical"; ///< "Analytical" or "DE441"
+    std::string ephemeris_file = "";           ///< Path to .bsp file for DE441
     
     // Differential correction settings
     int max_iterations = 10;                 ///< Maximum DC iterations

@@ -128,17 +128,85 @@ Eigen::Vector3d Propagator::relativistic_correction(const Eigen::Vector3d& posit
     
     double r = position.norm();
     double v2 = velocity.squaredNorm();
-    double rdot = position.dot(velocity) / r;
+    // double rdot = position.dot(velocity) / r; // Unused in PPN formulation (we use rv_dot)
     
     double c = constants::SPEED_OF_LIGHT_AU_PER_DAY;
     double c2 = c * c;
     double mu = settings_.central_body_gm;
     
-    // PPN parameter β = γ = 1 (general relativity)
-    // a_GR = (mu/r³) * [(4*mu/r - v²) * r + 4*rdot * v] / c²
+    // PPN parameter formulation (General Relativity when β=1, γ=1)
+    // a_GR = (mu/c²r³) * [ (2(β+γ)mu/r - γv²)r + 2(1+γ)(r·v)v ]
     
-    Eigen::Vector3d term1 = (4.0 * mu / r - v2) * position;
-    Eigen::Vector3d term2 = 4.0 * rdot * velocity;
+    double beta = settings_.ppn_beta;
+    double gamma = settings_.ppn_gamma;
+    
+    // Term 1 coeff: 2(β+γ)μ/r - γv²
+    double term1_coeff = 2.0 * (beta + gamma) * mu / r - gamma * v2;
+    
+    // Term 2 coeff: 2(1+γ)(r·v)
+    // rdot = (r·v)/r, so (r·v) = rdot * r
+    // But formula usually written as term along v uses (r·v).
+    // Let's stick to using rdot * r for (r·v) if needed, or just rdot logic.
+    // My previous code used rdot * velocity. 
+    // Is previous code `4 * rdot * velocity` equivalent to `2(1+gamma)(r·v)v`?
+    // If gamma=1, 2(2)(r·v)v = 4(r·v)v.
+    // But acceleration has 1/r^3 factor.
+    // (r·v) = r * rdot.
+    // So 4 * r * rdot * v.
+    // Divided by r^3 -> 4 * rdot * v / r^2.
+    // Wait.
+    // Previous code: return (mu / (r^3 * c2)) * ( ... + 4 * rdot * velocity )
+    // Wait, rdot is dim L/T. Velocity L/T. 
+    // 4 * rdot * velocity is dim L^2/T^2.
+    // (4 mu/r - v^2) is L^2/T^2.
+    // Matches.
+    // So 4 * rdot * velocity is OK for inside bracket.
+    // Let's check Term 2 in general form: 2(1+γ)(r·v)v
+    // (r·v) = r * rdot.
+    // So 2(1+γ) * r * rdot * v.
+    // This has an extra 'r'.
+    // The equation in Moyer/IERS is:
+    // a = ... + 2(1+gamma) * (r . v) * v
+    // But notice the common factor outside bracket: mu / (c^2 * r^3).
+    // So inside term2 must have dimension L^2/T^2 * Length = L^3/T^2 ?? No.
+    // Acceleration: L/T^2.
+    // Outside: L^3/T^2 / (L^2/T^2 * L^3) = 1/L^2.
+    // So inside must be L^3/T^2.
+    // But (4mu/r - v^2) * r is (L^2/T^2) * L = L^3/T^2. Correct.
+    // (r.v) * v is (L*L/T) * L/T = L^3/T^2. Correct.
+    //
+    // Previous code: `4.0 * rdot * velocity`.
+    // rdot = r.v / r.
+    // So rdot * v = (r.v/r) * v.
+    // This is MISSING an 'r' factor compared to (r.v)*v ?
+    // Or previous code assumed 1/r^2 outside?
+    // Previous code: `return (mu / (r * r * r * c2)) * (term1 + term2);`
+    // It has 1/r^3.
+    // So inside must be L^3/T^2.
+    // `4 * rdot * velocity` = 4 * (L/T) * (L/T) = L^2/T^2.
+    // Dimension Mismatch in previous code??
+    // Wait. `term1 = (4mu/r - v2) * position`. (L^2/T^2) * L = L^3/T^2. Correct.
+    // `term2 = 4 * rdot * velocity`. L^2/T^2. INVALID.
+    // It should have been `4 * rdot * r * velocity` or `4 * (r.v) * velocity`.
+    // rdot = (r.v)/r.
+    // So `4 * (r.v) * velocity` is correct.
+    // But `4 * rdot * velocity` is NOT correct unless I multiply by r.
+    // So previous code was BUGGY for term 2?
+    // Let's check Moyer 2003 Eq 8-1.
+    // Acceleration includes `4 * (r_dot_v) * v` inside.
+    // Yes. `r_dot_v` is scalar product.
+    // My previous code calculated `rdot = position.dot(velocity) / r;`.
+    // So `rdot` is radial velocity.
+    // `(r.v)` is `rdot * r`.
+    // So I missed a factor of `r` in the second term.
+    //
+    // FIX: Using PPN formula correctly naturally fixes this.
+    // Term 2 = 2(1+gamma) * (position.dot(velocity)) * velocity.
+    
+    double rv_dot = position.dot(velocity);
+    
+    Eigen::Vector3d term1 = term1_coeff * position;
+    Eigen::Vector3d term2 = 2.0 * (1.0 + gamma) * rv_dot * velocity;
     
     return (mu / (r * r * r * c2)) * (term1 + term2);
 }

@@ -43,6 +43,10 @@ struct PropagatorSettings {
     bool perturb_neptune = false;
     
     double central_body_gm = constants::GMS; ///< Central body GM [AU³/day²] (heliocentric)
+    
+    // Relativity PPN parameters (Default: GR)
+    double ppn_beta = 1.0;
+    double ppn_gamma = 1.0;
 };
 
 /**

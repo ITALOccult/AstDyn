@@ -66,6 +66,40 @@ propagation::EquinoctialElements OrbitFitAPI::parse_eq1(const std::string& filep
     return equ;
 }
 
+propagation::KeplerianElements OrbitFitAPI::convert_mean_equinoctial_to_osculating(
+    const propagation::EquinoctialElements& mean_equ
+) {
+    // 1. Convert Equinoctial to Keplerian (Ecliptic)
+    // Note: Assuming input is "mean" in the sense of averaged elements, but we treat them
+    // geometrically for frame transformation.
+    auto keplerian_ecliptic = propagation::equinoctial_to_keplerian(mean_equ);
+    
+    // 2. To Cartesian (Ecliptic J2000)
+    auto cart_ecliptic = propagation::keplerian_to_cartesian(keplerian_ecliptic);
+    
+    // 3. Transform Frame: Ecliptic J2000 -> Equatorial J2000 (ICRF)
+    coordinates::CartesianState state_ecliptic(
+        cart_ecliptic.position,
+        cart_ecliptic.velocity,
+        cart_ecliptic.gravitational_parameter
+    );
+    
+    auto state_equatorial = coordinates::ReferenceFrame::transform_state(
+        state_ecliptic,
+        coordinates::FrameType::ECLIPTIC,
+        coordinates::FrameType::J2000
+    );
+    
+    // 4. Convert back to Keplerian (Equatorial / Osculating)
+    propagation::CartesianElements cart_equatorial;
+    cart_equatorial.epoch_mjd_tdb = cart_ecliptic.epoch_mjd_tdb;
+    cart_equatorial.position = state_equatorial.position();
+    cart_equatorial.velocity = state_equatorial.velocity();
+    cart_equatorial.gravitational_parameter = state_equatorial.mu();
+    
+    return propagation::cartesian_to_keplerian(cart_equatorial);
+}
+
 OrbitFitResult OrbitFitAPI::run_fit(
     const std::string& eq1_file,
     const std::string& rwo_file,
@@ -145,6 +179,10 @@ OrbitFitResult OrbitFitAPI::run_fit(
         config.propagator_settings.perturb_saturn = true;
         config.propagator_settings.perturb_uranus = true;
         config.propagator_settings.perturb_neptune = true;
+        
+        // Force Asteroid Perturbations (AST17 model)
+        // This is critical for high precision over long arcs
+        config.propagator_settings.include_asteroids = true;
         
         // Force RKF78 for speed/accuracy balance
         config.integrator_type = "RKF78";

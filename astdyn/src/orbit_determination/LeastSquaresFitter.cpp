@@ -125,7 +125,17 @@ int LeastSquaresFitter::reject_outliers(std::vector<ObservationResidual>& residu
     }
     
     double rms = std::sqrt(sum_sq / count);
+    
+    // Safety: Do not reject outliers if the fit is still very poor (RMS > 100 arcsec)
+    // This allows the fitter to converge from a bad guess without losing data.
+    if (rms > 100.0) {
+        return 0; 
+    }
+    
     double threshold = outlier_threshold_ * rms;
+    
+    // Safety: Ensure threshold is not too small (e.g. < 0.1 arcsec)
+    threshold = std::max(threshold, 0.1);
     
     // Reject outliers
     int num_rejected = 0;
@@ -242,6 +252,17 @@ FitResult LeastSquaresFitter::fit(
         
         // Solve for full step dx
         Eigen::Vector<double, 6> dx_full = solve_normal_equations(A, res_vec, weights, result.covariance);
+        
+        // Safety: Limit step size to avoid divergence (Trust Region)
+        // Especially for position components [0,1,2] (AU)
+        double pos_step_norm = dx_full.head<3>().norm();
+        constexpr double MAX_STEP_AU = 0.1; // Max 0.1 AU correction per step
+        
+        if (pos_step_norm > MAX_STEP_AU) {
+            double scale_factor = MAX_STEP_AU / pos_step_norm;
+            dx_full *= scale_factor;
+            // std::cout << "Step limited: " << pos_step_norm << " AU -> " << MAX_STEP_AU << " AU\n";
+        }
         
         // --- LINE SEARCH (Step Halving) ---
         double scale = 1.0;

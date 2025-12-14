@@ -74,6 +74,19 @@ public:
      * Handles specific OrbFit format quirks and units.
      */
     static propagation::EquinoctialElements parse_eq1(const std::string& filepath);
+    
+    /**
+     * @brief Convert Mean Equinoctial elements (Ecliptic) to Osculating Keplerian (Equatorial)
+     * 
+     * Applies the necessary frame transformations (Ecliptic -> Equatorial J2000)
+     * to prepare elements for numerical propagation.
+     * 
+     * @param mean_equ Input elements (from .eq1)
+     * @return Osculating Keplerian Elements (Equatorial J2000)
+     */
+    static propagation::KeplerianElements convert_mean_equinoctial_to_osculating(
+        const propagation::EquinoctialElements& mean_equ
+    );
 
 private:
      // Helper to trim strings
