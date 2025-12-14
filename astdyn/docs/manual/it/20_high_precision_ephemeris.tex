@@ -1,0 +1,51 @@
+\chapter{Effemeridi ad Alta Precisione (JPL DE441)}
+\label{chap:de441}
+
+La libreria \textit{AstDyn} supporta nativamente l'utilizzo delle effemeridi planetarie ad alta precisione del JPL (Jet Propulsion Laboratory), specificamente la serie DE441 (o compatibili come DE440), senza richiedere dipendenze esterne come la libreria CSPICE. Questo è reso possibile da un lettore nativo di file SPK (.bsp) implementato internamente.
+
+\section{Introduzione}
+Le effemeridi analitiche integrate di default in \textit{AstDyn} offrono una precisione sufficiente per molti scopi (errore tipico 10-20 arcosecondi per i pianeti maggiori), ma per applicazioni critiche come le occultazioni asteroidali è necessaria una precisione dell'ordine del milli-arcosecondo (mas). Utilizzando i file binari JPL DE441, la posizione della Terra e degli altri corpi maggiori può essere calcolata con accuratezza centimetrica.
+
+\section{Requisiti}
+Per abilitare questa funzionalità è necessario scaricare il file delle effemeridi JPL:
+\begin{itemize}
+    \item \textbf{File}: \texttt{de441.bsp} (o \texttt{de440.bsp})
+    \item \textbf{Dimensione}: Circa 3.3 GB (DE441) o 100 MB (DE440s per intervalli ridotti)
+    \item \textbf{Fonte}: \url{https://ssd.jpl.nasa.gov/ftp/ssd/}
+\end{itemize}
+
+\section{Utilizzo tramite API}
+La classe \texttt{HighPrecisionPropagator} fornisce un'interfaccia semplificata per configurare e utilizzare il propagatore N-corpi con le effemeridi JPL.
+
+\begin{lstlisting}[language=C++, caption=Esempio di utilizzo HighPrecisionPropagator]
+#include "astdyn/propagation/HighPrecisionPropagator.hpp"
+
+// Configurazione
+astdyn::propagation::HighPrecisionPropagator::Config config;
+config.de441_path = "/Users/user/.ioccultcalc/ephemerides/de440.bsp"; // Path al file
+config.step_size = 0.5; // Passo integratore (giorni)
+
+// Inizializzazione Propagatore
+astdyn::propagation::HighPrecisionPropagator propagator(config);
+
+// Definizione Elementi Iniziali (es. Keplero)
+KeplerianElements initial_state = ...; 
+double target_jd = ...; // Julian Date TDB
+
+// Calcolo Posizione Geocentrica
+auto result = propagator.calculateGeocentricObservation(initial_state, target_jd);
+
+// Accesso ai risultati
+std::cout << "RA: " << result.ra_deg << " deg\n";
+std::cout << "DEC: " << result.dec_deg << " deg\n";
+\end{lstlisting}
+
+Se il file specificato in \texttt{de441\_path} non viene trovato o è illeggibile, il sistema effettuerà automaticamente un fallback alle effemeridi analitiche interne, emettendo un warning su \texttt{std::cerr}.
+
+\section{Dettagli Tecnici}
+L'implementazione utilizza la classe \texttt{DE441Provider} che estende l'interfaccia \texttt{EphemerisProvider}.
+\begin{itemize}
+    \item \textbf{Native Reader}: Il parsing del formato DAF/SPK è realizzato in C++ puro (\texttt{astdyn::io::SPKReader}), supportando file Big Endian e Little Endian e segmenti di Tipo 2 (Chebyshev Position).
+    \item \textbf{Performance}: L'accesso diretto al file binario è ottimizzato e non introduce overhead significativi rispetto al calcolo analitico complesso.
+    \item \textbf{Sistema di Riferimento}: Le coordinate restituite sono automaticamente convertite nel frame Eclittico J2000 interno alla libreria, garantendo coerenza con il resto del motore dinamico.
+\end{itemize}

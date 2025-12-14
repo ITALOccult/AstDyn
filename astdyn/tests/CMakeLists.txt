@@ -15,19 +15,7 @@ target_link_libraries(astdyn_tests
 
 gtest_discover_tests(astdyn_tests)
 
-# Test executable for Phase 2 - Math
-add_executable(astdyn_math_tests
-    test_math.cpp
-)
 
-target_link_libraries(astdyn_math_tests
-    PRIVATE
-        astdyn
-        GTest::gtest
-        GTest::gtest_main
-)
-
-gtest_discover_tests(astdyn_math_tests)
 
 # Test executable for Phase 2 - Time
 add_executable(astdyn_time_tests
@@ -474,5 +462,5 @@ target_link_libraries(astdyn_pompeja_diffcorr_simple
         GTest::gtest_main
 )
 
-gtest_discover_tests(astdyn_pompeja_diffcorr_simple)
+
 

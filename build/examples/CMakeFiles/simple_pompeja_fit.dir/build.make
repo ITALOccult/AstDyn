@@ -53,10 +53,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn"
+CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build"
+CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build
 
 # Include any dependencies generated for this target.
 include examples/CMakeFiles/simple_pompeja_fit.dir/depend.make
@@ -73,18 +73,18 @@ examples/CMakeFiles/simple_pompeja_fit.dir/codegen:
 .PHONY : examples/CMakeFiles/simple_pompeja_fit.dir/codegen
 
 examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o: examples/CMakeFiles/simple_pompeja_fit.dir/flags.make
-examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o: /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/examples/simple_pompeja_fit.cpp
+examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o: /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/simple_pompeja_fit.cpp
 examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o: examples/CMakeFiles/simple_pompeja_fit.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o -MF CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o.d -o CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o -c "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples/simple_pompeja_fit.cpp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o -MF CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o.d -o CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o -c /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/simple_pompeja_fit.cpp
 
 examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.i"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples/simple_pompeja_fit.cpp" > CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/simple_pompeja_fit.cpp > CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.i
 
 examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.s"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples/simple_pompeja_fit.cpp" -o CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/simple_pompeja_fit.cpp -o CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.s
 
 # Object files for target simple_pompeja_fit
 simple_pompeja_fit_OBJECTS = \
@@ -100,19 +100,20 @@ examples/simple_pompeja_fit: /opt/homebrew/lib/libboost_filesystem.dylib
 examples/simple_pompeja_fit: /opt/homebrew/lib/libboost_atomic.dylib
 examples/simple_pompeja_fit: /opt/homebrew/lib/libboost_program_options.dylib
 examples/simple_pompeja_fit: /opt/homebrew/lib/libboost_date_time.dylib
+examples/simple_pompeja_fit: /opt/homebrew/lib/libcspice.a
 examples/simple_pompeja_fit: examples/CMakeFiles/simple_pompeja_fit.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir="/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable simple_pompeja_fit"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/simple_pompeja_fit.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable simple_pompeja_fit"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/simple_pompeja_fit.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 examples/CMakeFiles/simple_pompeja_fit.dir/build: examples/simple_pompeja_fit
 .PHONY : examples/CMakeFiles/simple_pompeja_fit.dir/build
 
 examples/CMakeFiles/simple_pompeja_fit.dir/clean:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && $(CMAKE_COMMAND) -P CMakeFiles/simple_pompeja_fit.dir/cmake_clean.cmake
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && $(CMAKE_COMMAND) -P CMakeFiles/simple_pompeja_fit.dir/cmake_clean.cmake
 .PHONY : examples/CMakeFiles/simple_pompeja_fit.dir/clean
 
 examples/CMakeFiles/simple_pompeja_fit.dir/depend:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/simple_pompeja_fit.dir/DependInfo.cmake" "--color=$(COLOR)"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/simple_pompeja_fit.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : examples/CMakeFiles/simple_pompeja_fit.dir/depend
 

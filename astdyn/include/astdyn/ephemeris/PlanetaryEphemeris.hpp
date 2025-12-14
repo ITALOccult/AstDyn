@@ -25,8 +25,10 @@
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
 #include "astdyn/ephemeris/PlanetaryData.hpp"
+#include "astdyn/ephemeris/EphemerisProvider.hpp"
 #include <Eigen/Dense>
 #include <vector>
+#include <memory> // for std::shared_ptr
 
 namespace astdyn {
 namespace ephemeris {
@@ -100,7 +102,19 @@ public:
         double jd_tdb
     );
 
+    /**
+     * @brief Set a high-precision ephemeris provider (e.g. DE441)
+     * 
+     * If set, getPosition/getVelocity will use this provider instead of
+     * the internal analytical approximations.
+     * 
+     * @param provider Shared pointer to provider (can be null to reset to default)
+     */
+    static void setProvider(std::shared_ptr<EphemerisProvider> provider);
+
 private:
+    static std::shared_ptr<EphemerisProvider> global_provider_;
+
     /**
      * @brief Compute Julian centuries from J2000.0
      * @param jd_tdb Julian Date in TDB

@@ -43,6 +43,11 @@ struct AstDynConfig {
     std::string integrator_type = "RK4";    ///< Integrator type: RK4, RKF78
     double initial_step_size = 0.1;         ///< Initial step size [days]
     double tolerance = 1e-12;                ///< Integration tolerance
+
+        // Ephemeris Configuration
+        std::string ephemeris_type = "Analytical"; // "Analytical", "DE441"
+        std::string ephemeris_file;                // Path to .bsp file (if DE441)
+        std::string asteroid_ephemeris_file;       // Path to asteroid .bsp file (optional)
     
     // Differential correction settings
     int max_iterations = 10;                 ///< Maximum DC iterations
@@ -52,10 +57,17 @@ struct AstDynConfig {
     // Close approach settings
     close_approach::CloseApproachSettings ca_settings;
     
+    // Residual calculation settings
+    bool aberration_correction = true;       ///< Apply annual aberration
+    bool light_time_correction = true;       ///< Apply light-time correction
+    
     // Output settings
     bool verbose = true;                     ///< Verbose output
     bool save_residuals = true;              ///< Save residual plots
     bool compute_ephemeris = true;           ///< Compute ephemeris
+    
+    // Time settings
+    std::string eop_file = "";               ///< Path to IERS EOP file (finals.all)
 };
 
 /**

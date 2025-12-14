@@ -57,10 +57,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn"
+CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build"
+CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -97,7 +97,7 @@ rebuild_cache/fast: rebuild_cache
 
 # Special rule for the target list_install_components
 list_install_components:
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Available install components are: \"Unspecified\" \"gmock\" \"gtest\""
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Available install components are: \"Unspecified\""
 .PHONY : list_install_components
 
 # Special rule for the target list_install_components
@@ -142,14 +142,14 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -E cmake_progress_start "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src//CMakeFiles/progress.marks"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/all
-	$(CMAKE_COMMAND) -E cmake_progress_start "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" 0
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src//CMakeFiles/progress.marks
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/clean
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/clean
 .PHONY : clean
 
 # The main clean target
@@ -158,22 +158,22 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/preinstall
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/preinstall
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
 # Convenience name for target.
 src/CMakeFiles/astdyn.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/astdyn.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/astdyn.dir/rule
 .PHONY : src/CMakeFiles/astdyn.dir/rule
 
 # Convenience name for target.
@@ -182,12 +182,12 @@ astdyn: src/CMakeFiles/astdyn.dir/rule
 
 # fast build rule for target.
 astdyn/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/build
 .PHONY : astdyn/fast
 
 # Convenience name for target.
 src/CMakeFiles/astdyn_shared.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/astdyn_shared.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/astdyn_shared.dir/rule
 .PHONY : src/CMakeFiles/astdyn_shared.dir/rule
 
 # Convenience name for target.
@@ -196,12 +196,12 @@ astdyn_shared: src/CMakeFiles/astdyn_shared.dir/rule
 
 # fast build rule for target.
 astdyn_shared/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/build
 .PHONY : astdyn_shared/fast
 
 # Convenience name for target.
 src/CMakeFiles/astdyn_program.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/astdyn_program.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/astdyn_program.dir/rule
 .PHONY : src/CMakeFiles/astdyn_program.dir/rule
 
 # Convenience name for target.
@@ -210,12 +210,12 @@ astdyn_program: src/CMakeFiles/astdyn_program.dir/rule
 
 # fast build rule for target.
 astdyn_program/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_program.dir/build.make src/CMakeFiles/astdyn_program.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_program.dir/build.make src/CMakeFiles/astdyn_program.dir/build
 .PHONY : astdyn_program/fast
 
 # Convenience name for target.
 src/CMakeFiles/astdyn_convert.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/astdyn_convert.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/CMakeFiles/astdyn_convert.dir/rule
 .PHONY : src/CMakeFiles/astdyn_convert.dir/rule
 
 # Convenience name for target.
@@ -224,7 +224,7 @@ astdyn_convert: src/CMakeFiles/astdyn_convert.dir/rule
 
 # fast build rule for target.
 astdyn_convert/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/build
 .PHONY : astdyn_convert/fast
 
 AstDynEngine.o: AstDynEngine.cpp.o
@@ -232,8 +232,8 @@ AstDynEngine.o: AstDynEngine.cpp.o
 
 # target to build an object file
 AstDynEngine.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/AstDynEngine.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/AstDynEngine.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/AstDynEngine.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/AstDynEngine.cpp.o
 .PHONY : AstDynEngine.cpp.o
 
 AstDynEngine.i: AstDynEngine.cpp.i
@@ -241,8 +241,8 @@ AstDynEngine.i: AstDynEngine.cpp.i
 
 # target to preprocess a source file
 AstDynEngine.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/AstDynEngine.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/AstDynEngine.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/AstDynEngine.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/AstDynEngine.cpp.i
 .PHONY : AstDynEngine.cpp.i
 
 AstDynEngine.s: AstDynEngine.cpp.s
@@ -250,16 +250,43 @@ AstDynEngine.s: AstDynEngine.cpp.s
 
 # target to generate assembly for a file
 AstDynEngine.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/AstDynEngine.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/AstDynEngine.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/AstDynEngine.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/AstDynEngine.cpp.s
 .PHONY : AstDynEngine.cpp.s
+
+api/OrbitFitAPI.o: api/OrbitFitAPI.cpp.o
+.PHONY : api/OrbitFitAPI.o
+
+# target to build an object file
+api/OrbitFitAPI.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/api/OrbitFitAPI.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/api/OrbitFitAPI.cpp.o
+.PHONY : api/OrbitFitAPI.cpp.o
+
+api/OrbitFitAPI.i: api/OrbitFitAPI.cpp.i
+.PHONY : api/OrbitFitAPI.i
+
+# target to preprocess a source file
+api/OrbitFitAPI.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/api/OrbitFitAPI.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/api/OrbitFitAPI.cpp.i
+.PHONY : api/OrbitFitAPI.cpp.i
+
+api/OrbitFitAPI.s: api/OrbitFitAPI.cpp.s
+.PHONY : api/OrbitFitAPI.s
+
+# target to generate assembly for a file
+api/OrbitFitAPI.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/api/OrbitFitAPI.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/api/OrbitFitAPI.cpp.s
+.PHONY : api/OrbitFitAPI.cpp.s
 
 astdyn_convert.o: astdyn_convert.cpp.o
 .PHONY : astdyn_convert.o
 
 # target to build an object file
 astdyn_convert.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o
 .PHONY : astdyn_convert.cpp.o
 
 astdyn_convert.i: astdyn_convert.cpp.i
@@ -267,7 +294,7 @@ astdyn_convert.i: astdyn_convert.cpp.i
 
 # target to preprocess a source file
 astdyn_convert.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.i
 .PHONY : astdyn_convert.cpp.i
 
 astdyn_convert.s: astdyn_convert.cpp.s
@@ -275,7 +302,7 @@ astdyn_convert.s: astdyn_convert.cpp.s
 
 # target to generate assembly for a file
 astdyn_convert.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.s
 .PHONY : astdyn_convert.cpp.s
 
 astdyn_main.o: astdyn_main.cpp.o
@@ -283,7 +310,7 @@ astdyn_main.o: astdyn_main.cpp.o
 
 # target to build an object file
 astdyn_main.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_program.dir/build.make src/CMakeFiles/astdyn_program.dir/astdyn_main.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_program.dir/build.make src/CMakeFiles/astdyn_program.dir/astdyn_main.cpp.o
 .PHONY : astdyn_main.cpp.o
 
 astdyn_main.i: astdyn_main.cpp.i
@@ -291,7 +318,7 @@ astdyn_main.i: astdyn_main.cpp.i
 
 # target to preprocess a source file
 astdyn_main.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_program.dir/build.make src/CMakeFiles/astdyn_program.dir/astdyn_main.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_program.dir/build.make src/CMakeFiles/astdyn_program.dir/astdyn_main.cpp.i
 .PHONY : astdyn_main.cpp.i
 
 astdyn_main.s: astdyn_main.cpp.s
@@ -299,7 +326,7 @@ astdyn_main.s: astdyn_main.cpp.s
 
 # target to generate assembly for a file
 astdyn_main.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_program.dir/build.make src/CMakeFiles/astdyn_program.dir/astdyn_main.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_program.dir/build.make src/CMakeFiles/astdyn_program.dir/astdyn_main.cpp.s
 .PHONY : astdyn_main.cpp.s
 
 close_approach/CloseApproach.o: close_approach/CloseApproach.cpp.o
@@ -307,8 +334,8 @@ close_approach/CloseApproach.o: close_approach/CloseApproach.cpp.o
 
 # target to build an object file
 close_approach/CloseApproach.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/close_approach/CloseApproach.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/close_approach/CloseApproach.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/close_approach/CloseApproach.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/close_approach/CloseApproach.cpp.o
 .PHONY : close_approach/CloseApproach.cpp.o
 
 close_approach/CloseApproach.i: close_approach/CloseApproach.cpp.i
@@ -316,8 +343,8 @@ close_approach/CloseApproach.i: close_approach/CloseApproach.cpp.i
 
 # target to preprocess a source file
 close_approach/CloseApproach.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/close_approach/CloseApproach.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/close_approach/CloseApproach.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/close_approach/CloseApproach.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/close_approach/CloseApproach.cpp.i
 .PHONY : close_approach/CloseApproach.cpp.i
 
 close_approach/CloseApproach.s: close_approach/CloseApproach.cpp.s
@@ -325,8 +352,8 @@ close_approach/CloseApproach.s: close_approach/CloseApproach.cpp.s
 
 # target to generate assembly for a file
 close_approach/CloseApproach.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/close_approach/CloseApproach.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/close_approach/CloseApproach.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/close_approach/CloseApproach.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/close_approach/CloseApproach.cpp.s
 .PHONY : close_approach/CloseApproach.cpp.s
 
 coordinates/KeplerianElements.o: coordinates/KeplerianElements.cpp.o
@@ -334,8 +361,8 @@ coordinates/KeplerianElements.o: coordinates/KeplerianElements.cpp.o
 
 # target to build an object file
 coordinates/KeplerianElements.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/coordinates/KeplerianElements.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/coordinates/KeplerianElements.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/coordinates/KeplerianElements.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/coordinates/KeplerianElements.cpp.o
 .PHONY : coordinates/KeplerianElements.cpp.o
 
 coordinates/KeplerianElements.i: coordinates/KeplerianElements.cpp.i
@@ -343,8 +370,8 @@ coordinates/KeplerianElements.i: coordinates/KeplerianElements.cpp.i
 
 # target to preprocess a source file
 coordinates/KeplerianElements.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/coordinates/KeplerianElements.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/coordinates/KeplerianElements.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/coordinates/KeplerianElements.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/coordinates/KeplerianElements.cpp.i
 .PHONY : coordinates/KeplerianElements.cpp.i
 
 coordinates/KeplerianElements.s: coordinates/KeplerianElements.cpp.s
@@ -352,8 +379,8 @@ coordinates/KeplerianElements.s: coordinates/KeplerianElements.cpp.s
 
 # target to generate assembly for a file
 coordinates/KeplerianElements.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/coordinates/KeplerianElements.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/coordinates/KeplerianElements.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/coordinates/KeplerianElements.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/coordinates/KeplerianElements.cpp.s
 .PHONY : coordinates/KeplerianElements.cpp.s
 
 ephemeris/AsteroidPerturbations.o: ephemeris/AsteroidPerturbations.cpp.o
@@ -361,8 +388,8 @@ ephemeris/AsteroidPerturbations.o: ephemeris/AsteroidPerturbations.cpp.o
 
 # target to build an object file
 ephemeris/AsteroidPerturbations.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/AsteroidPerturbations.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/AsteroidPerturbations.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/AsteroidPerturbations.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/AsteroidPerturbations.cpp.o
 .PHONY : ephemeris/AsteroidPerturbations.cpp.o
 
 ephemeris/AsteroidPerturbations.i: ephemeris/AsteroidPerturbations.cpp.i
@@ -370,8 +397,8 @@ ephemeris/AsteroidPerturbations.i: ephemeris/AsteroidPerturbations.cpp.i
 
 # target to preprocess a source file
 ephemeris/AsteroidPerturbations.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/AsteroidPerturbations.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/AsteroidPerturbations.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/AsteroidPerturbations.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/AsteroidPerturbations.cpp.i
 .PHONY : ephemeris/AsteroidPerturbations.cpp.i
 
 ephemeris/AsteroidPerturbations.s: ephemeris/AsteroidPerturbations.cpp.s
@@ -379,17 +406,44 @@ ephemeris/AsteroidPerturbations.s: ephemeris/AsteroidPerturbations.cpp.s
 
 # target to generate assembly for a file
 ephemeris/AsteroidPerturbations.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/AsteroidPerturbations.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/AsteroidPerturbations.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/AsteroidPerturbations.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/AsteroidPerturbations.cpp.s
 .PHONY : ephemeris/AsteroidPerturbations.cpp.s
+
+ephemeris/DE441Provider.o: ephemeris/DE441Provider.cpp.o
+.PHONY : ephemeris/DE441Provider.o
+
+# target to build an object file
+ephemeris/DE441Provider.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/DE441Provider.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/DE441Provider.cpp.o
+.PHONY : ephemeris/DE441Provider.cpp.o
+
+ephemeris/DE441Provider.i: ephemeris/DE441Provider.cpp.i
+.PHONY : ephemeris/DE441Provider.i
+
+# target to preprocess a source file
+ephemeris/DE441Provider.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/DE441Provider.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/DE441Provider.cpp.i
+.PHONY : ephemeris/DE441Provider.cpp.i
+
+ephemeris/DE441Provider.s: ephemeris/DE441Provider.cpp.s
+.PHONY : ephemeris/DE441Provider.s
+
+# target to generate assembly for a file
+ephemeris/DE441Provider.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/DE441Provider.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/DE441Provider.cpp.s
+.PHONY : ephemeris/DE441Provider.cpp.s
 
 ephemeris/PlanetaryData.o: ephemeris/PlanetaryData.cpp.o
 .PHONY : ephemeris/PlanetaryData.o
 
 # target to build an object file
 ephemeris/PlanetaryData.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryData.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryData.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryData.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryData.cpp.o
 .PHONY : ephemeris/PlanetaryData.cpp.o
 
 ephemeris/PlanetaryData.i: ephemeris/PlanetaryData.cpp.i
@@ -397,8 +451,8 @@ ephemeris/PlanetaryData.i: ephemeris/PlanetaryData.cpp.i
 
 # target to preprocess a source file
 ephemeris/PlanetaryData.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryData.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryData.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryData.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryData.cpp.i
 .PHONY : ephemeris/PlanetaryData.cpp.i
 
 ephemeris/PlanetaryData.s: ephemeris/PlanetaryData.cpp.s
@@ -406,8 +460,8 @@ ephemeris/PlanetaryData.s: ephemeris/PlanetaryData.cpp.s
 
 # target to generate assembly for a file
 ephemeris/PlanetaryData.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryData.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryData.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryData.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryData.cpp.s
 .PHONY : ephemeris/PlanetaryData.cpp.s
 
 ephemeris/PlanetaryEphemeris.o: ephemeris/PlanetaryEphemeris.cpp.o
@@ -415,8 +469,8 @@ ephemeris/PlanetaryEphemeris.o: ephemeris/PlanetaryEphemeris.cpp.o
 
 # target to build an object file
 ephemeris/PlanetaryEphemeris.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryEphemeris.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryEphemeris.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryEphemeris.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryEphemeris.cpp.o
 .PHONY : ephemeris/PlanetaryEphemeris.cpp.o
 
 ephemeris/PlanetaryEphemeris.i: ephemeris/PlanetaryEphemeris.cpp.i
@@ -424,8 +478,8 @@ ephemeris/PlanetaryEphemeris.i: ephemeris/PlanetaryEphemeris.cpp.i
 
 # target to preprocess a source file
 ephemeris/PlanetaryEphemeris.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryEphemeris.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryEphemeris.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryEphemeris.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryEphemeris.cpp.i
 .PHONY : ephemeris/PlanetaryEphemeris.cpp.i
 
 ephemeris/PlanetaryEphemeris.s: ephemeris/PlanetaryEphemeris.cpp.s
@@ -433,8 +487,8 @@ ephemeris/PlanetaryEphemeris.s: ephemeris/PlanetaryEphemeris.cpp.s
 
 # target to generate assembly for a file
 ephemeris/PlanetaryEphemeris.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryEphemeris.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryEphemeris.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/ephemeris/PlanetaryEphemeris.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/ephemeris/PlanetaryEphemeris.cpp.s
 .PHONY : ephemeris/PlanetaryEphemeris.cpp.s
 
 io/AstDynConfig.o: io/AstDynConfig.cpp.o
@@ -442,9 +496,9 @@ io/AstDynConfig.o: io/AstDynConfig.cpp.o
 
 # target to build an object file
 io/AstDynConfig.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDynConfig.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDynConfig.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDynConfig.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDynConfig.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o
 .PHONY : io/AstDynConfig.cpp.o
 
 io/AstDynConfig.i: io/AstDynConfig.cpp.i
@@ -452,9 +506,9 @@ io/AstDynConfig.i: io/AstDynConfig.cpp.i
 
 # target to preprocess a source file
 io/AstDynConfig.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDynConfig.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDynConfig.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDynConfig.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDynConfig.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.i
 .PHONY : io/AstDynConfig.cpp.i
 
 io/AstDynConfig.s: io/AstDynConfig.cpp.s
@@ -462,9 +516,9 @@ io/AstDynConfig.s: io/AstDynConfig.cpp.s
 
 # target to generate assembly for a file
 io/AstDynConfig.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDynConfig.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDynConfig.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDynConfig.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDynConfig.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_convert.dir/build.make src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.s
 .PHONY : io/AstDynConfig.cpp.s
 
 io/AstDysOrbitFitter.o: io/AstDysOrbitFitter.cpp.o
@@ -472,8 +526,8 @@ io/AstDysOrbitFitter.o: io/AstDysOrbitFitter.cpp.o
 
 # target to build an object file
 io/AstDysOrbitFitter.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDysOrbitFitter.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDysOrbitFitter.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDysOrbitFitter.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDysOrbitFitter.cpp.o
 .PHONY : io/AstDysOrbitFitter.cpp.o
 
 io/AstDysOrbitFitter.i: io/AstDysOrbitFitter.cpp.i
@@ -481,8 +535,8 @@ io/AstDysOrbitFitter.i: io/AstDysOrbitFitter.cpp.i
 
 # target to preprocess a source file
 io/AstDysOrbitFitter.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDysOrbitFitter.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDysOrbitFitter.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDysOrbitFitter.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDysOrbitFitter.cpp.i
 .PHONY : io/AstDysOrbitFitter.cpp.i
 
 io/AstDysOrbitFitter.s: io/AstDysOrbitFitter.cpp.s
@@ -490,8 +544,8 @@ io/AstDysOrbitFitter.s: io/AstDysOrbitFitter.cpp.s
 
 # target to generate assembly for a file
 io/AstDysOrbitFitter.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDysOrbitFitter.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDysOrbitFitter.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/AstDysOrbitFitter.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/AstDysOrbitFitter.cpp.s
 .PHONY : io/AstDysOrbitFitter.cpp.s
 
 io/ParserFactory.o: io/ParserFactory.cpp.o
@@ -499,8 +553,8 @@ io/ParserFactory.o: io/ParserFactory.cpp.o
 
 # target to build an object file
 io/ParserFactory.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/ParserFactory.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/ParserFactory.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/ParserFactory.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/ParserFactory.cpp.o
 .PHONY : io/ParserFactory.cpp.o
 
 io/ParserFactory.i: io/ParserFactory.cpp.i
@@ -508,8 +562,8 @@ io/ParserFactory.i: io/ParserFactory.cpp.i
 
 # target to preprocess a source file
 io/ParserFactory.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/ParserFactory.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/ParserFactory.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/ParserFactory.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/ParserFactory.cpp.i
 .PHONY : io/ParserFactory.cpp.i
 
 io/ParserFactory.s: io/ParserFactory.cpp.s
@@ -517,17 +571,44 @@ io/ParserFactory.s: io/ParserFactory.cpp.s
 
 # target to generate assembly for a file
 io/ParserFactory.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/ParserFactory.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/ParserFactory.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/ParserFactory.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/ParserFactory.cpp.s
 .PHONY : io/ParserFactory.cpp.s
+
+io/SPKReader.o: io/SPKReader.cpp.o
+.PHONY : io/SPKReader.o
+
+# target to build an object file
+io/SPKReader.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/SPKReader.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/SPKReader.cpp.o
+.PHONY : io/SPKReader.cpp.o
+
+io/SPKReader.i: io/SPKReader.cpp.i
+.PHONY : io/SPKReader.i
+
+# target to preprocess a source file
+io/SPKReader.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/SPKReader.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/SPKReader.cpp.i
+.PHONY : io/SPKReader.cpp.i
+
+io/SPKReader.s: io/SPKReader.cpp.s
+.PHONY : io/SPKReader.s
+
+# target to generate assembly for a file
+io/SPKReader.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/io/SPKReader.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/io/SPKReader.cpp.s
+.PHONY : io/SPKReader.cpp.s
 
 math/LinearAlgebra.o: math/LinearAlgebra.cpp.o
 .PHONY : math/LinearAlgebra.o
 
 # target to build an object file
 math/LinearAlgebra.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/LinearAlgebra.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/LinearAlgebra.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/LinearAlgebra.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/LinearAlgebra.cpp.o
 .PHONY : math/LinearAlgebra.cpp.o
 
 math/LinearAlgebra.i: math/LinearAlgebra.cpp.i
@@ -535,8 +616,8 @@ math/LinearAlgebra.i: math/LinearAlgebra.cpp.i
 
 # target to preprocess a source file
 math/LinearAlgebra.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/LinearAlgebra.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/LinearAlgebra.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/LinearAlgebra.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/LinearAlgebra.cpp.i
 .PHONY : math/LinearAlgebra.cpp.i
 
 math/LinearAlgebra.s: math/LinearAlgebra.cpp.s
@@ -544,8 +625,8 @@ math/LinearAlgebra.s: math/LinearAlgebra.cpp.s
 
 # target to generate assembly for a file
 math/LinearAlgebra.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/LinearAlgebra.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/LinearAlgebra.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/LinearAlgebra.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/LinearAlgebra.cpp.s
 .PHONY : math/LinearAlgebra.cpp.s
 
 math/MathUtils.o: math/MathUtils.cpp.o
@@ -553,8 +634,8 @@ math/MathUtils.o: math/MathUtils.cpp.o
 
 # target to build an object file
 math/MathUtils.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/MathUtils.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/MathUtils.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.o
 .PHONY : math/MathUtils.cpp.o
 
 math/MathUtils.i: math/MathUtils.cpp.i
@@ -562,8 +643,8 @@ math/MathUtils.i: math/MathUtils.cpp.i
 
 # target to preprocess a source file
 math/MathUtils.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/MathUtils.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/MathUtils.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.i
 .PHONY : math/MathUtils.cpp.i
 
 math/MathUtils.s: math/MathUtils.cpp.s
@@ -571,8 +652,8 @@ math/MathUtils.s: math/MathUtils.cpp.s
 
 # target to generate assembly for a file
 math/MathUtils.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/MathUtils.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/math/MathUtils.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.s
 .PHONY : math/MathUtils.cpp.s
 
 observations/MPCReader.o: observations/MPCReader.cpp.o
@@ -580,8 +661,8 @@ observations/MPCReader.o: observations/MPCReader.cpp.o
 
 # target to build an object file
 observations/MPCReader.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/MPCReader.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/MPCReader.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/MPCReader.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/MPCReader.cpp.o
 .PHONY : observations/MPCReader.cpp.o
 
 observations/MPCReader.i: observations/MPCReader.cpp.i
@@ -589,8 +670,8 @@ observations/MPCReader.i: observations/MPCReader.cpp.i
 
 # target to preprocess a source file
 observations/MPCReader.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/MPCReader.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/MPCReader.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/MPCReader.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/MPCReader.cpp.i
 .PHONY : observations/MPCReader.cpp.i
 
 observations/MPCReader.s: observations/MPCReader.cpp.s
@@ -598,8 +679,8 @@ observations/MPCReader.s: observations/MPCReader.cpp.s
 
 # target to generate assembly for a file
 observations/MPCReader.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/MPCReader.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/MPCReader.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/MPCReader.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/MPCReader.cpp.s
 .PHONY : observations/MPCReader.cpp.s
 
 observations/Observation.o: observations/Observation.cpp.o
@@ -607,8 +688,8 @@ observations/Observation.o: observations/Observation.cpp.o
 
 # target to build an object file
 observations/Observation.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/Observation.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/Observation.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/Observation.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/Observation.cpp.o
 .PHONY : observations/Observation.cpp.o
 
 observations/Observation.i: observations/Observation.cpp.i
@@ -616,8 +697,8 @@ observations/Observation.i: observations/Observation.cpp.i
 
 # target to preprocess a source file
 observations/Observation.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/Observation.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/Observation.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/Observation.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/Observation.cpp.i
 .PHONY : observations/Observation.cpp.i
 
 observations/Observation.s: observations/Observation.cpp.s
@@ -625,8 +706,8 @@ observations/Observation.s: observations/Observation.cpp.s
 
 # target to generate assembly for a file
 observations/Observation.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/Observation.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/Observation.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/Observation.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/Observation.cpp.s
 .PHONY : observations/Observation.cpp.s
 
 observations/ObservatoryDatabase.o: observations/ObservatoryDatabase.cpp.o
@@ -634,8 +715,8 @@ observations/ObservatoryDatabase.o: observations/ObservatoryDatabase.cpp.o
 
 # target to build an object file
 observations/ObservatoryDatabase.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/ObservatoryDatabase.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/ObservatoryDatabase.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/ObservatoryDatabase.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/ObservatoryDatabase.cpp.o
 .PHONY : observations/ObservatoryDatabase.cpp.o
 
 observations/ObservatoryDatabase.i: observations/ObservatoryDatabase.cpp.i
@@ -643,8 +724,8 @@ observations/ObservatoryDatabase.i: observations/ObservatoryDatabase.cpp.i
 
 # target to preprocess a source file
 observations/ObservatoryDatabase.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/ObservatoryDatabase.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/ObservatoryDatabase.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/ObservatoryDatabase.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/ObservatoryDatabase.cpp.i
 .PHONY : observations/ObservatoryDatabase.cpp.i
 
 observations/ObservatoryDatabase.s: observations/ObservatoryDatabase.cpp.s
@@ -652,8 +733,8 @@ observations/ObservatoryDatabase.s: observations/ObservatoryDatabase.cpp.s
 
 # target to generate assembly for a file
 observations/ObservatoryDatabase.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/ObservatoryDatabase.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/ObservatoryDatabase.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/ObservatoryDatabase.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/ObservatoryDatabase.cpp.s
 .PHONY : observations/ObservatoryDatabase.cpp.s
 
 observations/RWOReader.o: observations/RWOReader.cpp.o
@@ -661,8 +742,8 @@ observations/RWOReader.o: observations/RWOReader.cpp.o
 
 # target to build an object file
 observations/RWOReader.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/RWOReader.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/RWOReader.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/RWOReader.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/RWOReader.cpp.o
 .PHONY : observations/RWOReader.cpp.o
 
 observations/RWOReader.i: observations/RWOReader.cpp.i
@@ -670,8 +751,8 @@ observations/RWOReader.i: observations/RWOReader.cpp.i
 
 # target to preprocess a source file
 observations/RWOReader.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/RWOReader.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/RWOReader.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/RWOReader.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/RWOReader.cpp.i
 .PHONY : observations/RWOReader.cpp.i
 
 observations/RWOReader.s: observations/RWOReader.cpp.s
@@ -679,8 +760,8 @@ observations/RWOReader.s: observations/RWOReader.cpp.s
 
 # target to generate assembly for a file
 observations/RWOReader.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/RWOReader.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/RWOReader.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/observations/RWOReader.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/observations/RWOReader.cpp.s
 .PHONY : observations/RWOReader.cpp.s
 
 orbit_determination/DifferentialCorrector.o: orbit_determination/DifferentialCorrector.cpp.o
@@ -688,8 +769,8 @@ orbit_determination/DifferentialCorrector.o: orbit_determination/DifferentialCor
 
 # target to build an object file
 orbit_determination/DifferentialCorrector.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/DifferentialCorrector.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/DifferentialCorrector.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/DifferentialCorrector.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/DifferentialCorrector.cpp.o
 .PHONY : orbit_determination/DifferentialCorrector.cpp.o
 
 orbit_determination/DifferentialCorrector.i: orbit_determination/DifferentialCorrector.cpp.i
@@ -697,8 +778,8 @@ orbit_determination/DifferentialCorrector.i: orbit_determination/DifferentialCor
 
 # target to preprocess a source file
 orbit_determination/DifferentialCorrector.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/DifferentialCorrector.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/DifferentialCorrector.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/DifferentialCorrector.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/DifferentialCorrector.cpp.i
 .PHONY : orbit_determination/DifferentialCorrector.cpp.i
 
 orbit_determination/DifferentialCorrector.s: orbit_determination/DifferentialCorrector.cpp.s
@@ -706,8 +787,8 @@ orbit_determination/DifferentialCorrector.s: orbit_determination/DifferentialCor
 
 # target to generate assembly for a file
 orbit_determination/DifferentialCorrector.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/DifferentialCorrector.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/DifferentialCorrector.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/DifferentialCorrector.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/DifferentialCorrector.cpp.s
 .PHONY : orbit_determination/DifferentialCorrector.cpp.s
 
 orbit_determination/GaussIOD.o: orbit_determination/GaussIOD.cpp.o
@@ -715,8 +796,8 @@ orbit_determination/GaussIOD.o: orbit_determination/GaussIOD.cpp.o
 
 # target to build an object file
 orbit_determination/GaussIOD.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/GaussIOD.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/GaussIOD.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/GaussIOD.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/GaussIOD.cpp.o
 .PHONY : orbit_determination/GaussIOD.cpp.o
 
 orbit_determination/GaussIOD.i: orbit_determination/GaussIOD.cpp.i
@@ -724,8 +805,8 @@ orbit_determination/GaussIOD.i: orbit_determination/GaussIOD.cpp.i
 
 # target to preprocess a source file
 orbit_determination/GaussIOD.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/GaussIOD.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/GaussIOD.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/GaussIOD.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/GaussIOD.cpp.i
 .PHONY : orbit_determination/GaussIOD.cpp.i
 
 orbit_determination/GaussIOD.s: orbit_determination/GaussIOD.cpp.s
@@ -733,17 +814,44 @@ orbit_determination/GaussIOD.s: orbit_determination/GaussIOD.cpp.s
 
 # target to generate assembly for a file
 orbit_determination/GaussIOD.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/GaussIOD.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/GaussIOD.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/GaussIOD.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/GaussIOD.cpp.s
 .PHONY : orbit_determination/GaussIOD.cpp.s
+
+orbit_determination/LeastSquaresFitter.o: orbit_determination/LeastSquaresFitter.cpp.o
+.PHONY : orbit_determination/LeastSquaresFitter.o
+
+# target to build an object file
+orbit_determination/LeastSquaresFitter.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/LeastSquaresFitter.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/LeastSquaresFitter.cpp.o
+.PHONY : orbit_determination/LeastSquaresFitter.cpp.o
+
+orbit_determination/LeastSquaresFitter.i: orbit_determination/LeastSquaresFitter.cpp.i
+.PHONY : orbit_determination/LeastSquaresFitter.i
+
+# target to preprocess a source file
+orbit_determination/LeastSquaresFitter.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/LeastSquaresFitter.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/LeastSquaresFitter.cpp.i
+.PHONY : orbit_determination/LeastSquaresFitter.cpp.i
+
+orbit_determination/LeastSquaresFitter.s: orbit_determination/LeastSquaresFitter.cpp.s
+.PHONY : orbit_determination/LeastSquaresFitter.s
+
+# target to generate assembly for a file
+orbit_determination/LeastSquaresFitter.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/LeastSquaresFitter.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/LeastSquaresFitter.cpp.s
+.PHONY : orbit_determination/LeastSquaresFitter.cpp.s
 
 orbit_determination/Residuals.o: orbit_determination/Residuals.cpp.o
 .PHONY : orbit_determination/Residuals.o
 
 # target to build an object file
 orbit_determination/Residuals.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/Residuals.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/Residuals.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/Residuals.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/Residuals.cpp.o
 .PHONY : orbit_determination/Residuals.cpp.o
 
 orbit_determination/Residuals.i: orbit_determination/Residuals.cpp.i
@@ -751,8 +859,8 @@ orbit_determination/Residuals.i: orbit_determination/Residuals.cpp.i
 
 # target to preprocess a source file
 orbit_determination/Residuals.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/Residuals.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/Residuals.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/Residuals.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/Residuals.cpp.i
 .PHONY : orbit_determination/Residuals.cpp.i
 
 orbit_determination/Residuals.s: orbit_determination/Residuals.cpp.s
@@ -760,8 +868,8 @@ orbit_determination/Residuals.s: orbit_determination/Residuals.cpp.s
 
 # target to generate assembly for a file
 orbit_determination/Residuals.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/Residuals.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/Residuals.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/Residuals.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/Residuals.cpp.s
 .PHONY : orbit_determination/Residuals.cpp.s
 
 orbit_determination/StateTransitionMatrix.o: orbit_determination/StateTransitionMatrix.cpp.o
@@ -769,8 +877,8 @@ orbit_determination/StateTransitionMatrix.o: orbit_determination/StateTransition
 
 # target to build an object file
 orbit_determination/StateTransitionMatrix.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/StateTransitionMatrix.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/StateTransitionMatrix.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/StateTransitionMatrix.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/StateTransitionMatrix.cpp.o
 .PHONY : orbit_determination/StateTransitionMatrix.cpp.o
 
 orbit_determination/StateTransitionMatrix.i: orbit_determination/StateTransitionMatrix.cpp.i
@@ -778,8 +886,8 @@ orbit_determination/StateTransitionMatrix.i: orbit_determination/StateTransition
 
 # target to preprocess a source file
 orbit_determination/StateTransitionMatrix.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/StateTransitionMatrix.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/StateTransitionMatrix.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/StateTransitionMatrix.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/StateTransitionMatrix.cpp.i
 .PHONY : orbit_determination/StateTransitionMatrix.cpp.i
 
 orbit_determination/StateTransitionMatrix.s: orbit_determination/StateTransitionMatrix.cpp.s
@@ -787,17 +895,98 @@ orbit_determination/StateTransitionMatrix.s: orbit_determination/StateTransition
 
 # target to generate assembly for a file
 orbit_determination/StateTransitionMatrix.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/StateTransitionMatrix.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/StateTransitionMatrix.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/orbit_determination/StateTransitionMatrix.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/orbit_determination/StateTransitionMatrix.cpp.s
 .PHONY : orbit_determination/StateTransitionMatrix.cpp.s
+
+propagation/AnalyticalJacobian.o: propagation/AnalyticalJacobian.cpp.o
+.PHONY : propagation/AnalyticalJacobian.o
+
+# target to build an object file
+propagation/AnalyticalJacobian.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/AnalyticalJacobian.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/AnalyticalJacobian.cpp.o
+.PHONY : propagation/AnalyticalJacobian.cpp.o
+
+propagation/AnalyticalJacobian.i: propagation/AnalyticalJacobian.cpp.i
+.PHONY : propagation/AnalyticalJacobian.i
+
+# target to preprocess a source file
+propagation/AnalyticalJacobian.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/AnalyticalJacobian.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/AnalyticalJacobian.cpp.i
+.PHONY : propagation/AnalyticalJacobian.cpp.i
+
+propagation/AnalyticalJacobian.s: propagation/AnalyticalJacobian.cpp.s
+.PHONY : propagation/AnalyticalJacobian.s
+
+# target to generate assembly for a file
+propagation/AnalyticalJacobian.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/AnalyticalJacobian.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/AnalyticalJacobian.cpp.s
+.PHONY : propagation/AnalyticalJacobian.cpp.s
+
+propagation/GaussIntegrator.o: propagation/GaussIntegrator.cpp.o
+.PHONY : propagation/GaussIntegrator.o
+
+# target to build an object file
+propagation/GaussIntegrator.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/GaussIntegrator.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/GaussIntegrator.cpp.o
+.PHONY : propagation/GaussIntegrator.cpp.o
+
+propagation/GaussIntegrator.i: propagation/GaussIntegrator.cpp.i
+.PHONY : propagation/GaussIntegrator.i
+
+# target to preprocess a source file
+propagation/GaussIntegrator.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/GaussIntegrator.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/GaussIntegrator.cpp.i
+.PHONY : propagation/GaussIntegrator.cpp.i
+
+propagation/GaussIntegrator.s: propagation/GaussIntegrator.cpp.s
+.PHONY : propagation/GaussIntegrator.s
+
+# target to generate assembly for a file
+propagation/GaussIntegrator.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/GaussIntegrator.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/GaussIntegrator.cpp.s
+.PHONY : propagation/GaussIntegrator.cpp.s
+
+propagation/HighPrecisionPropagator.o: propagation/HighPrecisionPropagator.cpp.o
+.PHONY : propagation/HighPrecisionPropagator.o
+
+# target to build an object file
+propagation/HighPrecisionPropagator.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/HighPrecisionPropagator.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/HighPrecisionPropagator.cpp.o
+.PHONY : propagation/HighPrecisionPropagator.cpp.o
+
+propagation/HighPrecisionPropagator.i: propagation/HighPrecisionPropagator.cpp.i
+.PHONY : propagation/HighPrecisionPropagator.i
+
+# target to preprocess a source file
+propagation/HighPrecisionPropagator.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/HighPrecisionPropagator.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/HighPrecisionPropagator.cpp.i
+.PHONY : propagation/HighPrecisionPropagator.cpp.i
+
+propagation/HighPrecisionPropagator.s: propagation/HighPrecisionPropagator.cpp.s
+.PHONY : propagation/HighPrecisionPropagator.s
+
+# target to generate assembly for a file
+propagation/HighPrecisionPropagator.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/HighPrecisionPropagator.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/HighPrecisionPropagator.cpp.s
+.PHONY : propagation/HighPrecisionPropagator.cpp.s
 
 propagation/Integrator.o: propagation/Integrator.cpp.o
 .PHONY : propagation/Integrator.o
 
 # target to build an object file
 propagation/Integrator.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Integrator.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Integrator.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Integrator.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Integrator.cpp.o
 .PHONY : propagation/Integrator.cpp.o
 
 propagation/Integrator.i: propagation/Integrator.cpp.i
@@ -805,8 +994,8 @@ propagation/Integrator.i: propagation/Integrator.cpp.i
 
 # target to preprocess a source file
 propagation/Integrator.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Integrator.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Integrator.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Integrator.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Integrator.cpp.i
 .PHONY : propagation/Integrator.cpp.i
 
 propagation/Integrator.s: propagation/Integrator.cpp.s
@@ -814,8 +1003,8 @@ propagation/Integrator.s: propagation/Integrator.cpp.s
 
 # target to generate assembly for a file
 propagation/Integrator.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Integrator.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Integrator.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Integrator.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Integrator.cpp.s
 .PHONY : propagation/Integrator.cpp.s
 
 propagation/OrbitalElements.o: propagation/OrbitalElements.cpp.o
@@ -823,8 +1012,8 @@ propagation/OrbitalElements.o: propagation/OrbitalElements.cpp.o
 
 # target to build an object file
 propagation/OrbitalElements.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/OrbitalElements.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/OrbitalElements.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/OrbitalElements.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/OrbitalElements.cpp.o
 .PHONY : propagation/OrbitalElements.cpp.o
 
 propagation/OrbitalElements.i: propagation/OrbitalElements.cpp.i
@@ -832,8 +1021,8 @@ propagation/OrbitalElements.i: propagation/OrbitalElements.cpp.i
 
 # target to preprocess a source file
 propagation/OrbitalElements.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/OrbitalElements.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/OrbitalElements.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/OrbitalElements.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/OrbitalElements.cpp.i
 .PHONY : propagation/OrbitalElements.cpp.i
 
 propagation/OrbitalElements.s: propagation/OrbitalElements.cpp.s
@@ -841,8 +1030,8 @@ propagation/OrbitalElements.s: propagation/OrbitalElements.cpp.s
 
 # target to generate assembly for a file
 propagation/OrbitalElements.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/OrbitalElements.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/OrbitalElements.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/OrbitalElements.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/OrbitalElements.cpp.s
 .PHONY : propagation/OrbitalElements.cpp.s
 
 propagation/Propagator.o: propagation/Propagator.cpp.o
@@ -850,8 +1039,8 @@ propagation/Propagator.o: propagation/Propagator.cpp.o
 
 # target to build an object file
 propagation/Propagator.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Propagator.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Propagator.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Propagator.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Propagator.cpp.o
 .PHONY : propagation/Propagator.cpp.o
 
 propagation/Propagator.i: propagation/Propagator.cpp.i
@@ -859,8 +1048,8 @@ propagation/Propagator.i: propagation/Propagator.cpp.i
 
 # target to preprocess a source file
 propagation/Propagator.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Propagator.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Propagator.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Propagator.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Propagator.cpp.i
 .PHONY : propagation/Propagator.cpp.i
 
 propagation/Propagator.s: propagation/Propagator.cpp.s
@@ -868,17 +1057,71 @@ propagation/Propagator.s: propagation/Propagator.cpp.s
 
 # target to generate assembly for a file
 propagation/Propagator.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Propagator.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Propagator.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/Propagator.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/Propagator.cpp.s
 .PHONY : propagation/Propagator.cpp.s
+
+propagation/RadauIntegrator.o: propagation/RadauIntegrator.cpp.o
+.PHONY : propagation/RadauIntegrator.o
+
+# target to build an object file
+propagation/RadauIntegrator.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/RadauIntegrator.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/RadauIntegrator.cpp.o
+.PHONY : propagation/RadauIntegrator.cpp.o
+
+propagation/RadauIntegrator.i: propagation/RadauIntegrator.cpp.i
+.PHONY : propagation/RadauIntegrator.i
+
+# target to preprocess a source file
+propagation/RadauIntegrator.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/RadauIntegrator.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/RadauIntegrator.cpp.i
+.PHONY : propagation/RadauIntegrator.cpp.i
+
+propagation/RadauIntegrator.s: propagation/RadauIntegrator.cpp.s
+.PHONY : propagation/RadauIntegrator.s
+
+# target to generate assembly for a file
+propagation/RadauIntegrator.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/RadauIntegrator.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/RadauIntegrator.cpp.s
+.PHONY : propagation/RadauIntegrator.cpp.s
+
+propagation/STMPropagator.o: propagation/STMPropagator.cpp.o
+.PHONY : propagation/STMPropagator.o
+
+# target to build an object file
+propagation/STMPropagator.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/STMPropagator.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/STMPropagator.cpp.o
+.PHONY : propagation/STMPropagator.cpp.o
+
+propagation/STMPropagator.i: propagation/STMPropagator.cpp.i
+.PHONY : propagation/STMPropagator.i
+
+# target to preprocess a source file
+propagation/STMPropagator.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/STMPropagator.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/STMPropagator.cpp.i
+.PHONY : propagation/STMPropagator.cpp.i
+
+propagation/STMPropagator.s: propagation/STMPropagator.cpp.s
+.PHONY : propagation/STMPropagator.s
+
+# target to generate assembly for a file
+propagation/STMPropagator.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/propagation/STMPropagator.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/propagation/STMPropagator.cpp.s
+.PHONY : propagation/STMPropagator.cpp.s
 
 time/TimeScale.o: time/TimeScale.cpp.o
 .PHONY : time/TimeScale.o
 
 # target to build an object file
 time/TimeScale.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/time/TimeScale.cpp.o
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/time/TimeScale.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/time/TimeScale.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/time/TimeScale.cpp.o
 .PHONY : time/TimeScale.cpp.o
 
 time/TimeScale.i: time/TimeScale.cpp.i
@@ -886,8 +1129,8 @@ time/TimeScale.i: time/TimeScale.cpp.i
 
 # target to preprocess a source file
 time/TimeScale.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/time/TimeScale.cpp.i
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/time/TimeScale.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/time/TimeScale.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/time/TimeScale.cpp.i
 .PHONY : time/TimeScale.cpp.i
 
 time/TimeScale.s: time/TimeScale.cpp.s
@@ -895,8 +1138,8 @@ time/TimeScale.s: time/TimeScale.cpp.s
 
 # target to generate assembly for a file
 time/TimeScale.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/time/TimeScale.cpp.s
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/time/TimeScale.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn.dir/build.make src/CMakeFiles/astdyn.dir/time/TimeScale.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/astdyn_shared.dir/build.make src/CMakeFiles/astdyn_shared.dir/time/TimeScale.cpp.s
 .PHONY : time/TimeScale.cpp.s
 
 # Help Target
@@ -919,6 +1162,9 @@ help:
 	@echo "... AstDynEngine.o"
 	@echo "... AstDynEngine.i"
 	@echo "... AstDynEngine.s"
+	@echo "... api/OrbitFitAPI.o"
+	@echo "... api/OrbitFitAPI.i"
+	@echo "... api/OrbitFitAPI.s"
 	@echo "... astdyn_convert.o"
 	@echo "... astdyn_convert.i"
 	@echo "... astdyn_convert.s"
@@ -934,6 +1180,9 @@ help:
 	@echo "... ephemeris/AsteroidPerturbations.o"
 	@echo "... ephemeris/AsteroidPerturbations.i"
 	@echo "... ephemeris/AsteroidPerturbations.s"
+	@echo "... ephemeris/DE441Provider.o"
+	@echo "... ephemeris/DE441Provider.i"
+	@echo "... ephemeris/DE441Provider.s"
 	@echo "... ephemeris/PlanetaryData.o"
 	@echo "... ephemeris/PlanetaryData.i"
 	@echo "... ephemeris/PlanetaryData.s"
@@ -949,6 +1198,9 @@ help:
 	@echo "... io/ParserFactory.o"
 	@echo "... io/ParserFactory.i"
 	@echo "... io/ParserFactory.s"
+	@echo "... io/SPKReader.o"
+	@echo "... io/SPKReader.i"
+	@echo "... io/SPKReader.s"
 	@echo "... math/LinearAlgebra.o"
 	@echo "... math/LinearAlgebra.i"
 	@echo "... math/LinearAlgebra.s"
@@ -973,12 +1225,24 @@ help:
 	@echo "... orbit_determination/GaussIOD.o"
 	@echo "... orbit_determination/GaussIOD.i"
 	@echo "... orbit_determination/GaussIOD.s"
+	@echo "... orbit_determination/LeastSquaresFitter.o"
+	@echo "... orbit_determination/LeastSquaresFitter.i"
+	@echo "... orbit_determination/LeastSquaresFitter.s"
 	@echo "... orbit_determination/Residuals.o"
 	@echo "... orbit_determination/Residuals.i"
 	@echo "... orbit_determination/Residuals.s"
 	@echo "... orbit_determination/StateTransitionMatrix.o"
 	@echo "... orbit_determination/StateTransitionMatrix.i"
 	@echo "... orbit_determination/StateTransitionMatrix.s"
+	@echo "... propagation/AnalyticalJacobian.o"
+	@echo "... propagation/AnalyticalJacobian.i"
+	@echo "... propagation/AnalyticalJacobian.s"
+	@echo "... propagation/GaussIntegrator.o"
+	@echo "... propagation/GaussIntegrator.i"
+	@echo "... propagation/GaussIntegrator.s"
+	@echo "... propagation/HighPrecisionPropagator.o"
+	@echo "... propagation/HighPrecisionPropagator.i"
+	@echo "... propagation/HighPrecisionPropagator.s"
 	@echo "... propagation/Integrator.o"
 	@echo "... propagation/Integrator.i"
 	@echo "... propagation/Integrator.s"
@@ -988,6 +1252,12 @@ help:
 	@echo "... propagation/Propagator.o"
 	@echo "... propagation/Propagator.i"
 	@echo "... propagation/Propagator.s"
+	@echo "... propagation/RadauIntegrator.o"
+	@echo "... propagation/RadauIntegrator.i"
+	@echo "... propagation/RadauIntegrator.s"
+	@echo "... propagation/STMPropagator.o"
+	@echo "... propagation/STMPropagator.i"
+	@echo "... propagation/STMPropagator.s"
 	@echo "... time/TimeScale.o"
 	@echo "... time/TimeScale.i"
 	@echo "... time/TimeScale.s"
@@ -1002,6 +1272,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

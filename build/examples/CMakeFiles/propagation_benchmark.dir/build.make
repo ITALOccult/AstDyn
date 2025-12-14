@@ -53,10 +53,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn"
+CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build"
+CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build
 
 # Include any dependencies generated for this target.
 include examples/CMakeFiles/propagation_benchmark.dir/depend.make
@@ -73,18 +73,18 @@ examples/CMakeFiles/propagation_benchmark.dir/codegen:
 .PHONY : examples/CMakeFiles/propagation_benchmark.dir/codegen
 
 examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o: examples/CMakeFiles/propagation_benchmark.dir/flags.make
-examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o: /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/examples/propagation_benchmark.cpp
+examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o: /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/propagation_benchmark.cpp
 examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o: examples/CMakeFiles/propagation_benchmark.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o -MF CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o.d -o CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o -c "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples/propagation_benchmark.cpp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o -MF CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o.d -o CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o -c /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/propagation_benchmark.cpp
 
 examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.i"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples/propagation_benchmark.cpp" > CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/propagation_benchmark.cpp > CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.i
 
 examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.s"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples/propagation_benchmark.cpp" -o CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/propagation_benchmark.cpp -o CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.s
 
 # Object files for target propagation_benchmark
 propagation_benchmark_OBJECTS = \
@@ -100,19 +100,20 @@ examples/propagation_benchmark: /opt/homebrew/lib/libboost_filesystem.dylib
 examples/propagation_benchmark: /opt/homebrew/lib/libboost_atomic.dylib
 examples/propagation_benchmark: /opt/homebrew/lib/libboost_program_options.dylib
 examples/propagation_benchmark: /opt/homebrew/lib/libboost_date_time.dylib
+examples/propagation_benchmark: /opt/homebrew/lib/libcspice.a
 examples/propagation_benchmark: examples/CMakeFiles/propagation_benchmark.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir="/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable propagation_benchmark"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/propagation_benchmark.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable propagation_benchmark"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/propagation_benchmark.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 examples/CMakeFiles/propagation_benchmark.dir/build: examples/propagation_benchmark
 .PHONY : examples/CMakeFiles/propagation_benchmark.dir/build
 
 examples/CMakeFiles/propagation_benchmark.dir/clean:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" && $(CMAKE_COMMAND) -P CMakeFiles/propagation_benchmark.dir/cmake_clean.cmake
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples && $(CMAKE_COMMAND) -P CMakeFiles/propagation_benchmark.dir/cmake_clean.cmake
 .PHONY : examples/CMakeFiles/propagation_benchmark.dir/clean
 
 examples/CMakeFiles/propagation_benchmark.dir/depend:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/propagation_benchmark.dir/DependInfo.cmake" "--color=$(COLOR)"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/propagation_benchmark.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : examples/CMakeFiles/propagation_benchmark.dir/depend
 

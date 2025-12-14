@@ -1,5 +1,5 @@
-if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_residual_single[1]_tests.cmake")
-  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_residual_single[1]_tests.cmake")
+if(EXISTS "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/astdyn_residual_single[1]_tests.cmake")
+  include("/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/astdyn_residual_single[1]_tests.cmake")
 else()
   add_test(astdyn_residual_single_NOT_BUILT astdyn_residual_single_NOT_BUILT)
 endif()

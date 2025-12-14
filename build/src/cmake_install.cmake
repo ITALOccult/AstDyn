@@ -1,4 +1,4 @@
-# Install script for directory: /Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src
+# Install script for directory: /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -38,7 +38,7 @@ if(NOT DEFINED CMAKE_OBJDUMP)
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE STATIC_LIBRARY FILES "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/libastdyn.a")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE STATIC_LIBRARY FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/libastdyn.a")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libastdyn.a" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libastdyn.a")
     execute_process(COMMAND "/usr/bin/ranlib" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libastdyn.a")
@@ -46,14 +46,14 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/astdyn" TYPE FILE FILES "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/../include/astdyn/AstDyn.hpp")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/astdyn" TYPE FILE FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/../include/astdyn/AstDyn.hpp")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/AstDyn/AstDynTargets.cmake")
     file(DIFFERENT _cmake_export_file_changed FILES
          "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/AstDyn/AstDynTargets.cmake"
-         "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/Export/d0f14bfedb73bee9f03e0455d806645c/AstDynTargets.cmake")
+         "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/Export/d0f14bfedb73bee9f03e0455d806645c/AstDynTargets.cmake")
     if(_cmake_export_file_changed)
       file(GLOB _cmake_old_config_files "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/AstDyn/AstDynTargets-*.cmake")
       if(_cmake_old_config_files)
@@ -66,14 +66,14 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
     endif()
     unset(_cmake_export_file_changed)
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/AstDyn" TYPE FILE FILES "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/Export/d0f14bfedb73bee9f03e0455d806645c/AstDynTargets.cmake")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/AstDyn" TYPE FILE FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/Export/d0f14bfedb73bee9f03e0455d806645c/AstDynTargets.cmake")
   if(CMAKE_INSTALL_CONFIG_NAME MATCHES "^([Rr][Ee][Ll][Ee][Aa][Ss][Ee])$")
-    file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/AstDyn" TYPE FILE FILES "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/Export/d0f14bfedb73bee9f03e0455d806645c/AstDynTargets-release.cmake")
+    file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/AstDyn" TYPE FILE FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/Export/d0f14bfedb73bee9f03e0455d806645c/AstDynTargets-release.cmake")
   endif()
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/bin" TYPE EXECUTABLE FILES "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/astdyn")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/bin" TYPE EXECUTABLE FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/astdyn")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/bin/astdyn" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/bin/astdyn")
     if(CMAKE_INSTALL_DO_STRIP)
@@ -83,7 +83,7 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/bin" TYPE EXECUTABLE FILES "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/astdyn_convert")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/bin" TYPE EXECUTABLE FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/astdyn_convert")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/bin/astdyn_convert" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/bin/astdyn_convert")
     if(CMAKE_INSTALL_DO_STRIP)
@@ -95,6 +95,6 @@ endif()
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/install_local_manifest.txt"
+  file(WRITE "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

@@ -38,6 +38,10 @@ struct ObservationResidual {
     double residual_ra;                  ///< O-C in right ascension
     double residual_dec;                 ///< O-C in declination
     
+    // Weights (1/sigma^2)
+    double weight_ra;                    ///< Weight for RA equation
+    double weight_dec;                   ///< Weight for Dec equation
+    
     // Normalized residuals (dimensionless)
     double normalized_ra;                ///< (O-C) / sigma_ra
     double normalized_dec;               ///< (O-C) / sigma_dec
@@ -218,6 +222,9 @@ private:
      */
     void cartesian_to_radec(
         const astdyn::Vector3d& direction,
+        const astdyn::Vector3d& rho_vec,
+        const astdyn::Vector3d& observer_pos,
+        const astdyn::Vector3d& observer_vel,
         double& ra,
         double& dec) const;
 

@@ -47,77 +47,88 @@ public:
                 continue;
             }
 
-            try {
-                // Parse fields (whitespace-separated)
-                std::istringstream iss(line);
-                std::string fields[25];
-                int nfields = 0;
-                while (nfields < 25 && iss >> fields[nfields]) {
-                    nfields++;
-                }
+                // --- STRICT POSITION-BASED PARSING ---
                 
-                if (nfields < 18) continue;  // Need at least 18 fields
-                
-                OpticalObservation obs;
+                // Helper lambda to extract and trim
+                auto extract_field = [&](int start, int len) -> std::string {
+                    if (start >= (int)line.length()) return "";
+                    size_t actual_len = std::min((size_t)len, line.length() - start);
+                    std::string s = line.substr(start, actual_len);
+                    
+                    // Trim whitespace
+                    const auto strBegin = s.find_first_not_of(" ");
+                    if (strBegin == std::string::npos) return ""; // All spaces
+                    const auto strEnd = s.find_last_not_of(" ");
+                    return s.substr(strBegin, strEnd - strBegin + 1);
+                };
 
-                // Object name (field 0)
-                obs.object_name = fields[0];
+                // Filter short lines immediately
+                if (line.length() < 90) continue; // Minimum length for Coordinates
 
-                // Date: YYYY MM DD.ddddd (fields 3, 4, 5)
-                int year = std::stoi(fields[3]);
-                int month = std::stoi(fields[4]);
-                double day = std::stod(fields[5]);
-                obs.mjd_utc = date_to_mjd(year, month, day);
+                try {
+                    OpticalObservation obs;
+                    
+                    // 1. Object Name: 0-10
+                    obs.object_name = extract_field(0, 10);
+                    
+                    // 2. Date: YYYY (17,4) MM (22,2) DD (25,9)
+                    std::string y_str = extract_field(17, 4);
+                    std::string m_str = extract_field(22, 2);
+                    std::string d_str = extract_field(25, 9);
+                    
+                    // Robust conversion
+                    if (y_str.empty() || m_str.empty() || d_str.empty()) continue;
+                    int year = std::stoi(y_str);
+                    int month = std::stoi(m_str);
+                    double day = std::stod(d_str);
+                    obs.mjd_utc = date_to_mjd(year, month, day);
 
-                // RA: HH MM SS.sss (fields 7, 8, 9)
-                int ra_h = std::stoi(fields[7]);
-                int ra_m = std::stoi(fields[8]);
-                double ra_s = std::stod(fields[9]);
-                obs.ra = (ra_h + ra_m / 60.0 + ra_s / 3600.0) * 15.0 * M_PI / 180.0;
+                    // 3. RA: H (47,3) M (50,3) S (53,8)
+                    // Tolerant offsets
+                    int ra_h = std::stoi(extract_field(47, 3));
+                    int ra_m = std::stoi(extract_field(50, 3));
+                    double ra_s = std::stod(extract_field(53, 8));
+                    obs.ra = (ra_h + ra_m / 60.0 + ra_s / 3600.0) * 15.0 * M_PI / 180.0;
 
-                // Dec: sDD MM SS.ss (fields 15, 16, 17)
-                std::string dec_d_str = fields[15];
-                char sign = dec_d_str[0];
-                int dec_d = std::abs(std::stoi(dec_d_str));
-                int dec_m = std::stoi(fields[16]);
-                double dec_s = std::stod(fields[17]);
-                
-                double dec_deg = dec_d + dec_m / 60.0 + dec_s / 3600.0;
-                if (sign == '-') dec_deg = -dec_deg;
-                obs.dec = dec_deg * M_PI / 180.0;
+                    // 4. Dec: sDD(102-105) MM(106-107) SS(109-115)
+                    // " +31" or "-13" -> Start 102
+                    std::string dec_d_str = extract_field(102, 3);
+                    
+                    int dec_d = std::abs(std::stoi(dec_d_str));
+                    int dec_m = std::stoi(extract_field(106, 2));
+                    double dec_s = std::stod(extract_field(109, 8));
+                    
+                    double dec_deg = dec_d + dec_m / 60.0 + dec_s / 3600.0;
+                    if (dec_d_str.find('-') != std::string::npos) dec_deg = -dec_deg;
+                    obs.dec = dec_deg * M_PI / 180.0;
 
-                // Magnitude (field 20, if available)
-                if (nfields > 20) {
-                    try {
-                        obs.mag = std::stod(fields[20]);
-                    } catch (...) {
-                        obs.mag = 0.0;
-                    }
-                } else {
+                    // 5. Magnitude: Unknown offset, skip or guess
                     obs.mag = 0.0;
+
+                    // 6. Obs Code: Try end of line logic
+                    size_t p_pos = line.rfind("p "); 
+                    std::string code = "";
+                    if (line.length() > 20) {
+                        std::string c1 = extract_field(143, 3);
+                        if (!c1.empty() && isdigit(c1[0])) code = c1;
+                    }
+                    if (code.empty()) code = extract_field(137, 3); 
+
+                    if (code.empty() || !isdigit(code[0])) code = "500";
+                    obs.obs_code = code;
+
+
+                    // Defaults
+                    obs.sigma_ra = 1.0; 
+                    obs.sigma_dec = 1.0;
+
+                    observations.push_back(obs);
+                    
+                     if (max_count > 0 && ++count >= max_count) break;
+
+                } catch (const std::exception& e) {
+                    continue; // Skip lines with bad numbers
                 }
-
-                // Observatory code (field 23, if available)
-                if (nfields > 23) {
-                    obs.obs_code = fields[23];
-                } else {
-                    obs.obs_code = "500";
-                }
-
-                // Default uncertainties
-                obs.sigma_ra = 1.0;
-                obs.sigma_dec = 1.0;
-
-                observations.push_back(obs);
-
-                if (max_count > 0 && ++count >= max_count) {
-                    break;
-                }
-
-            } catch (const std::exception& e) {
-                // Skip malformed lines
-                continue;
-            }
         }
 
         if (observations.empty()) {

@@ -1,0 +1,86 @@
+\chapter{High-Precision Workflow}
+\label{chap:high_precision}
+
+Achieving sub-arcsecond accuracy in asteroid orbit propagation requires rigorous attention to detail in initialization, physical modeling, and coordinate frame definition. This chapter outlines the workflow verified to match JPL Horizons trajectories to within $\sim 0.2$ arcseconds.
+
+\section{Prerequisites}
+To follow this workflow, ensure the following ephemeris files are available to the engine:
+\begin{itemize}
+    \item \textbf{Planetary Ephemeris}: JPL DE441 (e.g., \texttt{de441\_part-2.bsp}).
+    \item \textbf{Asteroid Ephemerides}: SPK kernels for perturbing asteroids (e.g., \texttt{codes\_300ast.bsp}).
+\end{itemize}
+
+\section{Precise Initialization}
+Standard analytical Keplerian elements, often provided with 6-7 decimal places, are insufficient for high-precision validation. A precision limit of $10^{-7}$ AU in the semi-major axis can accumulate to arcsecond-level discrepancies over integration periods of several years.
+
+\textbf{Best Practice}: Initialize the propagator using a \textbf{Heliocentric Cartesian State Vector} (Position and Velocity) with full double precision (16 digits).
+
+\subsection{Retrieving State from JPL Horizons}
+You can use the JPL Horizons API to retrieve the exact initial state vector. It is crucial to request the state in the \textbf{Heliocentric ICRF} frame (Center \texttt{@10}, Ref System \texttt{J2000}).
+
+\begin{lstlisting}[language=bash, caption={Retrieving Heliocentric State Vector via curl}]
+curl -sG "https://ssd.jpl.nasa.gov/api/horizons.api" \
+    --data-urlencode "format=text" \
+    --data-urlencode "COMMAND='20079148'" \
+    --data-urlencode "OBJ_DATA='NO'" \
+    --data-urlencode "MAKE_EPHEM='YES'" \
+    --data-urlencode "EPHEM_TYPE='VECTORS'" \
+    --data-urlencode "CENTER='@10'" \ 
+    --data-urlencode "START_TIME='JD2458749.5'" \
+    --data-urlencode "STOP_TIME='JD2458749.6'" \
+    --data-urlencode "STEP_SIZE='1 d'" \
+    --data-urlencode "VEC_TABLE='2'" \
+    --data-urlencode "REF_SYSTEM='J2000'" \
+    --data-urlencode "CSV_FORMAT='YES'"
+\end{lstlisting}
+
+Use the output \texttt{X, Y, Z, VX, VY, VZ} directly in your C++ code to initialize the \texttt{CartesianElements} structure.
+
+\section{Reference Frame Consistency}
+\label{sec:frame_consistency}
+
+A common source of systematic error is the confusion between \textbf{Heliocentric} and \textbf{Barycentric} frames.
+\begin{itemize}
+    \item \textbf{AstDyn Propagator}: Integrates equations of motion in a \textit{Heliocentric} frame (origin at Sun center).
+    \item \textbf{JPL DE441}: Provides positions relative to the \textit{Solar System Barycenter} (SSB).
+\end{itemize}
+
+The offset between the Sun and the SSB can be up to $\sim 0.01$ AU (approx. 1.5 million km), primarily due to Jupiter. Neglecting this offset introduces a systematic error of $\sim 30$ arcseconds in geocentric observations.
+
+\subsection{Frame Correction Logic}
+The AstDyn library handles this internally for perturbations, but you must manually handle it when reducing observations if you are rigorously calculating residuals.
+
+\textbf{Perturbations}: The Propagator subtracts the Sun's Barycentric position from the planet's Barycentric position:
+\begin{equation}
+    \mathbf{r}_{planet}^{helio} = \mathbf{r}_{planet}^{bary}(SSB) - \mathbf{r}_{sun}^{bary}(SSB)
+\end{equation}
+
+\textbf{Geocentric Reduction}: When calculating the range vector $\boldsymbol{\rho}$ for Astrometry, you must ensure the Earth's position is also Heliocentric:
+\begin{equation}
+    \mathbf{r}_{earth}^{helio} = \mathbf{r}_{earth}^{bary}(SSB) - \mathbf{r}_{sun}^{bary}(SSB)
+\end{equation}
+\begin{equation}
+    \boldsymbol{\rho} = \mathbf{r}_{ast}^{helio} - \mathbf{r}_{earth}^{helio}
+\end{equation}
+
+\section{Implementation Check}
+The following C++ snippet demonstrates the correct logic for computing the astrometric position:
+
+\begin{lstlisting}[style=cpp, caption={Correct Geocentric Reduction}]
+// 1. Get Sun Position (Relative to SSB)
+auto sun_state = ephemeris::PlanetaryEphemeris::getState(
+    ephemeris::CelestialBody::SUN, target_jd);
+
+// 2. Get Earth Position (Relative to SSB)
+auto earth_bary = ephemeris::PlanetaryEphemeris::getState(
+    ephemeris::CelestialBody::EARTH, target_jd);
+
+// 3. Convert Earth to Heliocentric Frame
+Vector3d earth_helio = earth_bary.position() - sun_state.position();
+
+// 4. Calculate Range Vector
+// (Asteroid state from propagator is already Heliocentric)
+Vector3d rho = asteroid_helio_state.position - earth_helio;
+
+// 5. Proceed with Light Time and Aberration corrections...
+\end{lstlisting}

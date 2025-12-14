@@ -258,6 +258,25 @@ SPICE uses integer IDs:
     \item DE441: 3.2 GB (includes high-rate Moon)
 \end{itemize}
 
+\subsection{Native DE441 Provider}
+
+AstDyn now includes a native, dependency-free implementation for reading JPL DE441 ephemerides directly from standard SPK binary kernels (.bsp files). This removes the need for the external CSPICE toolkit for standard planetary positions.
+
+\textbf{Features}:
+\begin{itemize}
+    \item Full precision evaluation of Chebyshev polynomials.
+    \item Supports Type 2 and Type 3 SPK segments.
+    \item No external library dependencies.
+    \item Optimized for AstDyn's internal data structures.
+\end{itemize}
+
+\textbf{Configuration}:
+Enable via \texttt{PropagatorSettings} or .oop config:
+\begin{lstlisting}[language=bash]
+ephemeris.type = DE441
+ephemeris.file = /path/to/de441.bsp
+\end{lstlisting}
+
 \subsection{VSOP87}
 
 Analytical series developed by Bretagnon \& Francou (1988).

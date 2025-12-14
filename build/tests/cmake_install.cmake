@@ -1,4 +1,4 @@
-# Install script for directory: /Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests
+# Install script for directory: /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/tests
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -40,6 +40,6 @@ endif()
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/install_local_manifest.txt"
+  file(WRITE "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

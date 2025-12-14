@@ -171,12 +171,48 @@ bool load_dut1_data(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip comments and headers
         if (line.empty() || line[0] == '#') continue;
+
+        double mjd = 0.0;
+        double dut1 = 0.0;
+        bool found = false;
+
+        // Try parsing as standard IERS finals.all (Fixed width)
+        // Col 7-14: MJD (F8.2) -> Index 6, length 8
+        // Col 59-68: UT1-UTC (F10.7) -> Index 58, length 10
+        if (line.length() >= 68) {
+            try {
+                std::string mjd_str = line.substr(6, 8);
+                std::string dut1_str = line.substr(58, 10);
+                
+                // Check if MJD is valid number (not empty or headers)
+                // trim
+                mjd_str.erase(0, mjd_str.find_first_not_of(" "));
+                if (!mjd_str.empty() && (std::isdigit(mjd_str[0]) || mjd_str[0] == '.')) {
+                    mjd = std::stod(mjd_str);
+                    
+                    // UT1-UTC might be blank if predicted? Usually IERS fills it.
+                    // But if it's "       " (empty), we skip or assume 0?
+                    // finals.all has it.
+                    if (dut1_str.find_first_not_of(" ") != std::string::npos) {
+                        dut1 = std::stod(dut1_str);
+                        found = true;
+                    }
+                }
+            } catch (...) {
+                // Ignore parse errors for specific lines
+            }
+        }
+
+        // If FIXED WIDTH failed or line was short, try simple "MJD DUT1" format
+        if (!found) {
+             std::istringstream iss(line);
+             // clear errors
+             if (iss >> mjd >> dut1) {
+                 found = true;
+             }
+        }
         
-        std::istringstream iss(line);
-        double mjd, dut1;
-        
-        // Try to parse MJD and ΔUT1 (typically columns 1 and 2)
-        if (iss >> mjd >> dut1) {
+        if (found) {
             dut1_table[mjd] = dut1;
         }
     }

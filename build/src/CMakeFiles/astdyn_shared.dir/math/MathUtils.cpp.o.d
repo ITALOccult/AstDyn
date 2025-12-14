@@ -1,11 +1,11 @@
 src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.o: \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/src/math/MathUtils.cpp \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/include/astdyn/math/MathUtils.hpp \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/include/astdyn/core/Types.hpp \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/Dense \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/Core \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/DisableStupidWarnings.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/Macros.h \
+  /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/math/MathUtils.cpp \
+  /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/include/astdyn/math/MathUtils.hpp \
+  /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/include/astdyn/core/Types.hpp \
+  /usr/local/include/eigen3/Eigen/Dense \
+  /usr/local/include/eigen3/Eigen/Core \
+  /usr/local/include/eigen3/Eigen/src/Core/util/DisableStupidWarnings.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/Macros.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cmath \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__config \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__config_site \
@@ -209,7 +209,7 @@ src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_abort.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_dev_t.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_mode_t.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/ConfigureVectorization.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/ConfigureVectorization.h \
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/arm_neon.h \
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/arm_bf16.h \
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/arm_vector_types.h \
@@ -801,191 +801,191 @@ src/CMakeFiles/astdyn_shared.dir/math/MathUtils.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/stack.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/print \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/unistd.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/MKL_support.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/MKL_support.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cassert \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/assert.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_static_assert.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/Constants.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/Meta.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/ForwardDeclarations.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/StaticAssert.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/XprHelper.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/Memory.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/IntegralConstant.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/SymbolicIndex.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/NumTraits.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/MathFunctions.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/GenericPacketMath.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/MathFunctionsImpl.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/Default/ConjHelper.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/Default/Half.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/Default/BFloat16.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/Default/TypeCasting.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/Default/GenericPacketMathFunctionsFwd.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/NEON/PacketMath.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/NEON/TypeCasting.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/NEON/MathFunctions.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/NEON/Complex.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/Default/Settings.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/Default/GenericPacketMathFunctions.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/functors/TernaryFunctors.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/functors/BinaryFunctors.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/functors/UnaryFunctors.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/functors/NullaryFunctors.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/functors/StlFunctors.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/functors/AssignmentFunctors.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/IndexedViewHelper.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/ReshapedHelper.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/ArithmeticSequence.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/IO.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/DenseCoeffsBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/DenseBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/CommonCwiseUnaryOps.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/BlockMethods.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/IndexedViewMethods.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/ReshapedMethods.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/MatrixBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/CommonCwiseBinaryOps.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/MatrixCwiseUnaryOps.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/MatrixCwiseBinaryOps.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/EigenBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Product.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/CoreEvaluators.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/AssignEvaluator.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Assign.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/ArrayBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/ArrayCwiseUnaryOps.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/../plugins/ArrayCwiseBinaryOps.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/BlasUtil.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/DenseStorage.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/NestByValue.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/ReturnByValue.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/NoAlias.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/PlainObjectBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Matrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Array.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/CwiseTernaryOp.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/CwiseBinaryOp.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/CwiseUnaryOp.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/CwiseNullaryOp.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/CwiseUnaryView.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/SelfCwiseBinaryOp.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Dot.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/StableNorm.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Stride.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/MapBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Map.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Ref.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Block.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/VectorBlock.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/IndexedView.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Reshaped.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Transpose.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/DiagonalMatrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Diagonal.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/DiagonalProduct.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Redux.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Visitor.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Fuzzy.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Swap.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/CommaInitializer.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/GeneralProduct.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Solve.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Inverse.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/SolverBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/PermutationMatrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Transpositions.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/TriangularMatrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/SelfAdjointView.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/GeneralBlockPanelKernel.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/Parallelizer.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/ProductEvaluators.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/GeneralMatrixVector.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/GeneralMatrixMatrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/SolveTriangular.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/SelfadjointMatrixVector.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/SelfadjointMatrixMatrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/SelfadjointProduct.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/SelfadjointRank2Update.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/TriangularMatrixVector.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/TriangularMatrixMatrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/TriangularSolverMatrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/products/TriangularSolverVector.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/BandMatrix.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/CoreIterators.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/ConditionEstimator.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/arch/NEON/GeneralBlockPanelKernel.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/BooleanRedux.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Select.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/VectorwiseOp.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/PartialReduxEvaluator.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Random.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Replicate.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/Reverse.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/ArrayWrapper.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/StlIterators.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/GlobalFunctions.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Core/util/ReenableStupidWarnings.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/LU \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/misc/Kernel.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/misc/Image.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/LU/FullPivLU.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/LU/PartialPivLU.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/LU/Determinant.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/LU/InverseImpl.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/LU/arch/InverseSize4.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/Cholesky \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/Jacobi \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Jacobi/Jacobi.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Cholesky/LLT.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Cholesky/LDLT.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/QR \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/Householder \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Householder/Householder.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Householder/HouseholderSequence.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Householder/BlockHouseholder.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/QR/HouseholderQR.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/QR/FullPivHouseholderQR.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/QR/ColPivHouseholderQR.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/QR/CompleteOrthogonalDecomposition.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/SVD \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/misc/RealSvd2x2.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/SVD/UpperBidiagonalization.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/SVD/SVDBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/SVD/JacobiSVD.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/SVD/BDCSVD.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/Geometry \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/OrthoMethods.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/EulerAngles.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/Homogeneous.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/RotationBase.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/Rotation2D.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/Quaternion.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/AngleAxis.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/Transform.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/Translation.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/Scaling.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/Hyperplane.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/ParametrizedLine.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/AlignedBox.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/Umeyama.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Geometry/arch/Geometry_SIMD.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/Eigenvalues \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/Tridiagonalization.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/RealSchur.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/./HessenbergDecomposition.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/EigenSolver.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/./RealSchur.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/./Tridiagonalization.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/ComplexSchur.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/ComplexEigenSolver.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/./ComplexSchur.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/RealQZ.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/./RealQZ.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/build/_deps/eigen3-src/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h \
-  /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/include/astdyn/core/Constants.hpp
+  /usr/local/include/eigen3/Eigen/src/Core/util/Constants.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/Meta.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/ForwardDeclarations.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/StaticAssert.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/XprHelper.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/Memory.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/IntegralConstant.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/SymbolicIndex.h \
+  /usr/local/include/eigen3/Eigen/src/Core/NumTraits.h \
+  /usr/local/include/eigen3/Eigen/src/Core/MathFunctions.h \
+  /usr/local/include/eigen3/Eigen/src/Core/GenericPacketMath.h \
+  /usr/local/include/eigen3/Eigen/src/Core/MathFunctionsImpl.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/Default/ConjHelper.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/Default/Half.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/Default/BFloat16.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/Default/TypeCasting.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/Default/GenericPacketMathFunctionsFwd.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/NEON/PacketMath.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/NEON/TypeCasting.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/NEON/MathFunctions.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/NEON/Complex.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/Default/Settings.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/Default/GenericPacketMathFunctions.h \
+  /usr/local/include/eigen3/Eigen/src/Core/functors/TernaryFunctors.h \
+  /usr/local/include/eigen3/Eigen/src/Core/functors/BinaryFunctors.h \
+  /usr/local/include/eigen3/Eigen/src/Core/functors/UnaryFunctors.h \
+  /usr/local/include/eigen3/Eigen/src/Core/functors/NullaryFunctors.h \
+  /usr/local/include/eigen3/Eigen/src/Core/functors/StlFunctors.h \
+  /usr/local/include/eigen3/Eigen/src/Core/functors/AssignmentFunctors.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/IndexedViewHelper.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/ReshapedHelper.h \
+  /usr/local/include/eigen3/Eigen/src/Core/ArithmeticSequence.h \
+  /usr/local/include/eigen3/Eigen/src/Core/IO.h \
+  /usr/local/include/eigen3/Eigen/src/Core/DenseCoeffsBase.h \
+  /usr/local/include/eigen3/Eigen/src/Core/DenseBase.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/CommonCwiseUnaryOps.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/BlockMethods.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/IndexedViewMethods.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/ReshapedMethods.h \
+  /usr/local/include/eigen3/Eigen/src/Core/MatrixBase.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/CommonCwiseBinaryOps.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/MatrixCwiseUnaryOps.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/MatrixCwiseBinaryOps.h \
+  /usr/local/include/eigen3/Eigen/src/Core/EigenBase.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Product.h \
+  /usr/local/include/eigen3/Eigen/src/Core/CoreEvaluators.h \
+  /usr/local/include/eigen3/Eigen/src/Core/AssignEvaluator.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Assign.h \
+  /usr/local/include/eigen3/Eigen/src/Core/ArrayBase.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/ArrayCwiseUnaryOps.h \
+  /usr/local/include/eigen3/Eigen/src/Core/../plugins/ArrayCwiseBinaryOps.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/BlasUtil.h \
+  /usr/local/include/eigen3/Eigen/src/Core/DenseStorage.h \
+  /usr/local/include/eigen3/Eigen/src/Core/NestByValue.h \
+  /usr/local/include/eigen3/Eigen/src/Core/ReturnByValue.h \
+  /usr/local/include/eigen3/Eigen/src/Core/NoAlias.h \
+  /usr/local/include/eigen3/Eigen/src/Core/PlainObjectBase.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Matrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Array.h \
+  /usr/local/include/eigen3/Eigen/src/Core/CwiseTernaryOp.h \
+  /usr/local/include/eigen3/Eigen/src/Core/CwiseBinaryOp.h \
+  /usr/local/include/eigen3/Eigen/src/Core/CwiseUnaryOp.h \
+  /usr/local/include/eigen3/Eigen/src/Core/CwiseNullaryOp.h \
+  /usr/local/include/eigen3/Eigen/src/Core/CwiseUnaryView.h \
+  /usr/local/include/eigen3/Eigen/src/Core/SelfCwiseBinaryOp.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Dot.h \
+  /usr/local/include/eigen3/Eigen/src/Core/StableNorm.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Stride.h \
+  /usr/local/include/eigen3/Eigen/src/Core/MapBase.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Map.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Ref.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Block.h \
+  /usr/local/include/eigen3/Eigen/src/Core/VectorBlock.h \
+  /usr/local/include/eigen3/Eigen/src/Core/IndexedView.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Reshaped.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Transpose.h \
+  /usr/local/include/eigen3/Eigen/src/Core/DiagonalMatrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Diagonal.h \
+  /usr/local/include/eigen3/Eigen/src/Core/DiagonalProduct.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Redux.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Visitor.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Fuzzy.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Swap.h \
+  /usr/local/include/eigen3/Eigen/src/Core/CommaInitializer.h \
+  /usr/local/include/eigen3/Eigen/src/Core/GeneralProduct.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Solve.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Inverse.h \
+  /usr/local/include/eigen3/Eigen/src/Core/SolverBase.h \
+  /usr/local/include/eigen3/Eigen/src/Core/PermutationMatrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Transpositions.h \
+  /usr/local/include/eigen3/Eigen/src/Core/TriangularMatrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/SelfAdjointView.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/GeneralBlockPanelKernel.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/Parallelizer.h \
+  /usr/local/include/eigen3/Eigen/src/Core/ProductEvaluators.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/GeneralMatrixVector.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/GeneralMatrixMatrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/SolveTriangular.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/SelfadjointMatrixVector.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/SelfadjointMatrixMatrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/SelfadjointProduct.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/SelfadjointRank2Update.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/TriangularMatrixVector.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/TriangularMatrixMatrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/TriangularSolverMatrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/products/TriangularSolverVector.h \
+  /usr/local/include/eigen3/Eigen/src/Core/BandMatrix.h \
+  /usr/local/include/eigen3/Eigen/src/Core/CoreIterators.h \
+  /usr/local/include/eigen3/Eigen/src/Core/ConditionEstimator.h \
+  /usr/local/include/eigen3/Eigen/src/Core/arch/NEON/GeneralBlockPanelKernel.h \
+  /usr/local/include/eigen3/Eigen/src/Core/BooleanRedux.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Select.h \
+  /usr/local/include/eigen3/Eigen/src/Core/VectorwiseOp.h \
+  /usr/local/include/eigen3/Eigen/src/Core/PartialReduxEvaluator.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Random.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Replicate.h \
+  /usr/local/include/eigen3/Eigen/src/Core/Reverse.h \
+  /usr/local/include/eigen3/Eigen/src/Core/ArrayWrapper.h \
+  /usr/local/include/eigen3/Eigen/src/Core/StlIterators.h \
+  /usr/local/include/eigen3/Eigen/src/Core/GlobalFunctions.h \
+  /usr/local/include/eigen3/Eigen/src/Core/util/ReenableStupidWarnings.h \
+  /usr/local/include/eigen3/Eigen/LU \
+  /usr/local/include/eigen3/Eigen/src/misc/Kernel.h \
+  /usr/local/include/eigen3/Eigen/src/misc/Image.h \
+  /usr/local/include/eigen3/Eigen/src/LU/FullPivLU.h \
+  /usr/local/include/eigen3/Eigen/src/LU/PartialPivLU.h \
+  /usr/local/include/eigen3/Eigen/src/LU/Determinant.h \
+  /usr/local/include/eigen3/Eigen/src/LU/InverseImpl.h \
+  /usr/local/include/eigen3/Eigen/src/LU/arch/InverseSize4.h \
+  /usr/local/include/eigen3/Eigen/Cholesky \
+  /usr/local/include/eigen3/Eigen/Jacobi \
+  /usr/local/include/eigen3/Eigen/src/Jacobi/Jacobi.h \
+  /usr/local/include/eigen3/Eigen/src/Cholesky/LLT.h \
+  /usr/local/include/eigen3/Eigen/src/Cholesky/LDLT.h \
+  /usr/local/include/eigen3/Eigen/QR \
+  /usr/local/include/eigen3/Eigen/Householder \
+  /usr/local/include/eigen3/Eigen/src/Householder/Householder.h \
+  /usr/local/include/eigen3/Eigen/src/Householder/HouseholderSequence.h \
+  /usr/local/include/eigen3/Eigen/src/Householder/BlockHouseholder.h \
+  /usr/local/include/eigen3/Eigen/src/QR/HouseholderQR.h \
+  /usr/local/include/eigen3/Eigen/src/QR/FullPivHouseholderQR.h \
+  /usr/local/include/eigen3/Eigen/src/QR/ColPivHouseholderQR.h \
+  /usr/local/include/eigen3/Eigen/src/QR/CompleteOrthogonalDecomposition.h \
+  /usr/local/include/eigen3/Eigen/SVD \
+  /usr/local/include/eigen3/Eigen/src/misc/RealSvd2x2.h \
+  /usr/local/include/eigen3/Eigen/src/SVD/UpperBidiagonalization.h \
+  /usr/local/include/eigen3/Eigen/src/SVD/SVDBase.h \
+  /usr/local/include/eigen3/Eigen/src/SVD/JacobiSVD.h \
+  /usr/local/include/eigen3/Eigen/src/SVD/BDCSVD.h \
+  /usr/local/include/eigen3/Eigen/Geometry \
+  /usr/local/include/eigen3/Eigen/src/Geometry/OrthoMethods.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/EulerAngles.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/Homogeneous.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/RotationBase.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/Rotation2D.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/Quaternion.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/AngleAxis.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/Transform.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/Translation.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/Scaling.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/Hyperplane.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/ParametrizedLine.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/AlignedBox.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/Umeyama.h \
+  /usr/local/include/eigen3/Eigen/src/Geometry/arch/Geometry_SIMD.h \
+  /usr/local/include/eigen3/Eigen/Eigenvalues \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/Tridiagonalization.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/RealSchur.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/./HessenbergDecomposition.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/EigenSolver.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/./RealSchur.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/./Tridiagonalization.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/ComplexSchur.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/ComplexEigenSolver.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/./ComplexSchur.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/RealQZ.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/./RealQZ.h \
+  /usr/local/include/eigen3/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h \
+  /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/include/astdyn/core/Constants.hpp

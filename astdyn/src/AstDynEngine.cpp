@@ -11,7 +11,9 @@
 #include "astdyn/observations/MPCReader.hpp"
 #include "astdyn/coordinates/KeplerianElements.hpp"
 #include "astdyn/time/TimeScale.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include "astdyn/io/AstDynConfig.hpp"
+#include "astdyn/ephemeris/DE441Provider.hpp"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -70,6 +72,44 @@ void AstDynEngine::update_propagator() {
             config_.initial_step_size);
     }
     
+    
+    // Update Ephemeris Provider based on config
+    if (config_.ephemeris_type == "DE441" && !config_.ephemeris_file.empty()) {
+        static std::string loaded_file = "";
+        static bool is_loaded = false;
+        
+        // Avoid reloading if same file
+        if (!is_loaded || loaded_file != config_.ephemeris_file) {
+            try {
+                if (config_.verbose) std::cout << "Loading DE441 Ephemeris: " << config_.ephemeris_file << "...\n";
+                auto provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
+                ephemeris::PlanetaryEphemeris::setProvider(provider);
+                loaded_file = config_.ephemeris_file;
+                is_loaded = true;
+                if (config_.verbose) std::cout << "DE441 Loaded successfully.\n";
+            } catch (const std::exception& e) {
+                std::cerr << "Error loading DE441: " << e.what() << ". Using analytical ephemeris.\n";
+                // Fallback
+                ephemeris::PlanetaryEphemeris::setProvider(nullptr);
+                is_loaded = false;
+            }
+        }
+    } else {
+        // Default / Analytical
+        // ephemeris::PlanetaryEphemeris::setProvider(nullptr); 
+        // Note: we don't reset to nullptr automatically to preserve "manual" setting if user did it elsewhere? 
+        // No, config should rule.
+        if (config_.ephemeris_type == "Analytical") {
+             ephemeris::PlanetaryEphemeris::setProvider(nullptr);
+        }
+    }
+
+        // Ephemeris Provider based on config
+    // ...
+    
+    // Sync asteroid file to settings
+    config_.propagator_settings.asteroid_ephemeris_file = config_.asteroid_ephemeris_file;
+
     propagator_ = std::make_shared<Propagator>(
         std::move(integrator),
         ephemeris_,
@@ -97,10 +137,30 @@ void AstDynEngine::load_config(const std::string& oop_file) {
     config_.propagator_settings.include_asteroids = parser.getBool("perturb.asteroids", false);
     config_.propagator_settings.include_relativity = parser.getBool("perturb.relativity", false);
     
+    // Load Ephemeris settings
+    config_.ephemeris_type = parser.getString("ephemeris.type", "Analytical");
+    config_.ephemeris_file = parser.getString("ephemeris.file", "");
+    
+    // Load EOP settings
+    config_.eop_file = parser.getString("eop.file", "");
+    if (!config_.eop_file.empty()) {
+        if (config_.verbose) std::cout << "Loading EOP file: " << config_.eop_file << "...\n";
+        if (time::load_dut1_data(config_.eop_file)) {
+             if (config_.verbose) std::cout << "EOP data loaded successfully.\n";
+        } else {
+             if (config_.verbose) std::cerr << "WARNING: Failed to load EOP file: " << config_.eop_file << "\n";
+        }
+    }
+    
     // Load differential correction settings
     config_.max_iterations = parser.getInt("diffcorr.max_iter", 20);
     config_.convergence_threshold = parser.getDouble("diffcorr.convergence", 1e-6);
+    config_.convergence_threshold = parser.getDouble("diffcorr.convergence", 1e-6);
     config_.outlier_sigma = parser.getDouble("diffcorr.outlier_threshold", 3.0);
+    
+    // Load residual settings
+    config_.aberration_correction = parser.getBool("residuals.aberration", true);
+    config_.light_time_correction = parser.getBool("residuals.light_time", true);
     
     // Load output settings
     config_.verbose = parser.getBool("verbose", true);
@@ -114,6 +174,9 @@ void AstDynEngine::load_config(const std::string& oop_file) {
     std::cout << "   • Step size: " << config_.initial_step_size << " days\n";
     std::cout << "   • Tolerance: " << config_.tolerance << "\n";
     std::cout << "   • Max iterations: " << config_.max_iterations << "\n";
+    if (!config_.eop_file.empty()) {
+        std::cout << "   • EOP File: " << config_.eop_file << "\n";
+    }
 }
 
 // ============================================================================
@@ -315,6 +378,9 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
     
     // Create residual calculator and STM computer (both need propagator)
     auto residual_calc = std::make_shared<orbit_determination::ResidualCalculator>(ephemeris_, propagator_);
+    residual_calc->set_aberration_correction(config_.aberration_correction);
+    residual_calc->set_light_time_correction(config_.light_time_correction);
+    
     auto stm_computer = std::make_shared<orbit_determination::StateTransitionMatrix>(propagator_);
     
     // Create differential corrector

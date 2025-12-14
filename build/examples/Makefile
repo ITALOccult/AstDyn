@@ -57,10 +57,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn"
+CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build"
+CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -97,7 +97,7 @@ rebuild_cache/fast: rebuild_cache
 
 # Special rule for the target list_install_components
 list_install_components:
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Available install components are: \"Unspecified\" \"gmock\" \"gtest\""
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Available install components are: \"Unspecified\""
 .PHONY : list_install_components
 
 # Special rule for the target list_install_components
@@ -142,14 +142,14 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -E cmake_progress_start "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples//CMakeFiles/progress.marks"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/all
-	$(CMAKE_COMMAND) -E cmake_progress_start "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" 0
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples//CMakeFiles/progress.marks
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/clean
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/clean
 .PHONY : clean
 
 # The main clean target
@@ -158,22 +158,22 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/preinstall
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/preinstall
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
 # Convenience name for target.
 examples/CMakeFiles/example_basic.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_basic.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_basic.dir/rule
 .PHONY : examples/CMakeFiles/example_basic.dir/rule
 
 # Convenience name for target.
@@ -182,12 +182,12 @@ example_basic: examples/CMakeFiles/example_basic.dir/rule
 
 # fast build rule for target.
 example_basic/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_basic.dir/build.make examples/CMakeFiles/example_basic.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_basic.dir/build.make examples/CMakeFiles/example_basic.dir/build
 .PHONY : example_basic/fast
 
 # Convenience name for target.
 examples/CMakeFiles/example_coordinates.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_coordinates.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_coordinates.dir/rule
 .PHONY : examples/CMakeFiles/example_coordinates.dir/rule
 
 # Convenience name for target.
@@ -196,12 +196,12 @@ example_coordinates: examples/CMakeFiles/example_coordinates.dir/rule
 
 # fast build rule for target.
 example_coordinates/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_coordinates.dir/build.make examples/CMakeFiles/example_coordinates.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_coordinates.dir/build.make examples/CMakeFiles/example_coordinates.dir/build
 .PHONY : example_coordinates/fast
 
 # Convenience name for target.
 examples/CMakeFiles/example_ephemeris.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_ephemeris.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_ephemeris.dir/rule
 .PHONY : examples/CMakeFiles/example_ephemeris.dir/rule
 
 # Convenience name for target.
@@ -210,12 +210,12 @@ example_ephemeris: examples/CMakeFiles/example_ephemeris.dir/rule
 
 # fast build rule for target.
 example_ephemeris/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_ephemeris.dir/build.make examples/CMakeFiles/example_ephemeris.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_ephemeris.dir/build.make examples/CMakeFiles/example_ephemeris.dir/build
 .PHONY : example_ephemeris/fast
 
 # Convenience name for target.
 examples/CMakeFiles/propagation_benchmark.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/propagation_benchmark.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/propagation_benchmark.dir/rule
 .PHONY : examples/CMakeFiles/propagation_benchmark.dir/rule
 
 # Convenience name for target.
@@ -224,12 +224,12 @@ propagation_benchmark: examples/CMakeFiles/propagation_benchmark.dir/rule
 
 # fast build rule for target.
 propagation_benchmark/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_benchmark.dir/build.make examples/CMakeFiles/propagation_benchmark.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_benchmark.dir/build.make examples/CMakeFiles/propagation_benchmark.dir/build
 .PHONY : propagation_benchmark/fast
 
 # Convenience name for target.
 examples/CMakeFiles/propagation_diagnostic.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/propagation_diagnostic.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/propagation_diagnostic.dir/rule
 .PHONY : examples/CMakeFiles/propagation_diagnostic.dir/rule
 
 # Convenience name for target.
@@ -238,12 +238,12 @@ propagation_diagnostic: examples/CMakeFiles/propagation_diagnostic.dir/rule
 
 # fast build rule for target.
 propagation_diagnostic/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_diagnostic.dir/build.make examples/CMakeFiles/propagation_diagnostic.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_diagnostic.dir/build.make examples/CMakeFiles/propagation_diagnostic.dir/build
 .PHONY : propagation_diagnostic/fast
 
 # Convenience name for target.
 examples/CMakeFiles/example_astdys_fitter.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_astdys_fitter.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_astdys_fitter.dir/rule
 .PHONY : examples/CMakeFiles/example_astdys_fitter.dir/rule
 
 # Convenience name for target.
@@ -252,12 +252,40 @@ example_astdys_fitter: examples/CMakeFiles/example_astdys_fitter.dir/rule
 
 # fast build rule for target.
 example_astdys_fitter/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_astdys_fitter.dir/build.make examples/CMakeFiles/example_astdys_fitter.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_astdys_fitter.dir/build.make examples/CMakeFiles/example_astdys_fitter.dir/build
 .PHONY : example_astdys_fitter/fast
 
 # Convenience name for target.
+examples/CMakeFiles/simple_pompeja_fit.dir/rule:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/simple_pompeja_fit.dir/rule
+.PHONY : examples/CMakeFiles/simple_pompeja_fit.dir/rule
+
+# Convenience name for target.
+simple_pompeja_fit: examples/CMakeFiles/simple_pompeja_fit.dir/rule
+.PHONY : simple_pompeja_fit
+
+# fast build rule for target.
+simple_pompeja_fit/fast:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/simple_pompeja_fit.dir/build.make examples/CMakeFiles/simple_pompeja_fit.dir/build
+.PHONY : simple_pompeja_fit/fast
+
+# Convenience name for target.
+examples/CMakeFiles/fitorb_api_demo.dir/rule:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/fitorb_api_demo.dir/rule
+.PHONY : examples/CMakeFiles/fitorb_api_demo.dir/rule
+
+# Convenience name for target.
+fitorb_api_demo: examples/CMakeFiles/fitorb_api_demo.dir/rule
+.PHONY : fitorb_api_demo
+
+# fast build rule for target.
+fitorb_api_demo/fast:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/fitorb_api_demo.dir/build.make examples/CMakeFiles/fitorb_api_demo.dir/build
+.PHONY : fitorb_api_demo/fast
+
+# Convenience name for target.
 examples/CMakeFiles/example_configurable_parsers.dir/rule:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_configurable_parsers.dir/rule
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/example_configurable_parsers.dir/rule
 .PHONY : examples/CMakeFiles/example_configurable_parsers.dir/rule
 
 # Convenience name for target.
@@ -266,15 +294,29 @@ example_configurable_parsers: examples/CMakeFiles/example_configurable_parsers.d
 
 # fast build rule for target.
 example_configurable_parsers/fast:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/build
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/build
 .PHONY : example_configurable_parsers/fast
+
+# Convenience name for target.
+examples/CMakeFiles/propagate_79148.dir/rule:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 examples/CMakeFiles/propagate_79148.dir/rule
+.PHONY : examples/CMakeFiles/propagate_79148.dir/rule
+
+# Convenience name for target.
+propagate_79148: examples/CMakeFiles/propagate_79148.dir/rule
+.PHONY : propagate_79148
+
+# fast build rule for target.
+propagate_79148/fast:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagate_79148.dir/build.make examples/CMakeFiles/propagate_79148.dir/build
+.PHONY : propagate_79148/fast
 
 basic_usage.o: basic_usage.cpp.o
 .PHONY : basic_usage.o
 
 # target to build an object file
 basic_usage.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_basic.dir/build.make examples/CMakeFiles/example_basic.dir/basic_usage.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_basic.dir/build.make examples/CMakeFiles/example_basic.dir/basic_usage.cpp.o
 .PHONY : basic_usage.cpp.o
 
 basic_usage.i: basic_usage.cpp.i
@@ -282,7 +324,7 @@ basic_usage.i: basic_usage.cpp.i
 
 # target to preprocess a source file
 basic_usage.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_basic.dir/build.make examples/CMakeFiles/example_basic.dir/basic_usage.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_basic.dir/build.make examples/CMakeFiles/example_basic.dir/basic_usage.cpp.i
 .PHONY : basic_usage.cpp.i
 
 basic_usage.s: basic_usage.cpp.s
@@ -290,7 +332,7 @@ basic_usage.s: basic_usage.cpp.s
 
 # target to generate assembly for a file
 basic_usage.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_basic.dir/build.make examples/CMakeFiles/example_basic.dir/basic_usage.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_basic.dir/build.make examples/CMakeFiles/example_basic.dir/basic_usage.cpp.s
 .PHONY : basic_usage.cpp.s
 
 coordinates_example.o: coordinates_example.cpp.o
@@ -298,7 +340,7 @@ coordinates_example.o: coordinates_example.cpp.o
 
 # target to build an object file
 coordinates_example.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_coordinates.dir/build.make examples/CMakeFiles/example_coordinates.dir/coordinates_example.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_coordinates.dir/build.make examples/CMakeFiles/example_coordinates.dir/coordinates_example.cpp.o
 .PHONY : coordinates_example.cpp.o
 
 coordinates_example.i: coordinates_example.cpp.i
@@ -306,7 +348,7 @@ coordinates_example.i: coordinates_example.cpp.i
 
 # target to preprocess a source file
 coordinates_example.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_coordinates.dir/build.make examples/CMakeFiles/example_coordinates.dir/coordinates_example.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_coordinates.dir/build.make examples/CMakeFiles/example_coordinates.dir/coordinates_example.cpp.i
 .PHONY : coordinates_example.cpp.i
 
 coordinates_example.s: coordinates_example.cpp.s
@@ -314,7 +356,7 @@ coordinates_example.s: coordinates_example.cpp.s
 
 # target to generate assembly for a file
 coordinates_example.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_coordinates.dir/build.make examples/CMakeFiles/example_coordinates.dir/coordinates_example.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_coordinates.dir/build.make examples/CMakeFiles/example_coordinates.dir/coordinates_example.cpp.s
 .PHONY : coordinates_example.cpp.s
 
 ephemeris_example.o: ephemeris_example.cpp.o
@@ -322,7 +364,7 @@ ephemeris_example.o: ephemeris_example.cpp.o
 
 # target to build an object file
 ephemeris_example.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_ephemeris.dir/build.make examples/CMakeFiles/example_ephemeris.dir/ephemeris_example.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_ephemeris.dir/build.make examples/CMakeFiles/example_ephemeris.dir/ephemeris_example.cpp.o
 .PHONY : ephemeris_example.cpp.o
 
 ephemeris_example.i: ephemeris_example.cpp.i
@@ -330,7 +372,7 @@ ephemeris_example.i: ephemeris_example.cpp.i
 
 # target to preprocess a source file
 ephemeris_example.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_ephemeris.dir/build.make examples/CMakeFiles/example_ephemeris.dir/ephemeris_example.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_ephemeris.dir/build.make examples/CMakeFiles/example_ephemeris.dir/ephemeris_example.cpp.i
 .PHONY : ephemeris_example.cpp.i
 
 ephemeris_example.s: ephemeris_example.cpp.s
@@ -338,7 +380,7 @@ ephemeris_example.s: ephemeris_example.cpp.s
 
 # target to generate assembly for a file
 ephemeris_example.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_ephemeris.dir/build.make examples/CMakeFiles/example_ephemeris.dir/ephemeris_example.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_ephemeris.dir/build.make examples/CMakeFiles/example_ephemeris.dir/ephemeris_example.cpp.s
 .PHONY : ephemeris_example.cpp.s
 
 example_astdys_fitter.o: example_astdys_fitter.cpp.o
@@ -346,7 +388,7 @@ example_astdys_fitter.o: example_astdys_fitter.cpp.o
 
 # target to build an object file
 example_astdys_fitter.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_astdys_fitter.dir/build.make examples/CMakeFiles/example_astdys_fitter.dir/example_astdys_fitter.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_astdys_fitter.dir/build.make examples/CMakeFiles/example_astdys_fitter.dir/example_astdys_fitter.cpp.o
 .PHONY : example_astdys_fitter.cpp.o
 
 example_astdys_fitter.i: example_astdys_fitter.cpp.i
@@ -354,7 +396,7 @@ example_astdys_fitter.i: example_astdys_fitter.cpp.i
 
 # target to preprocess a source file
 example_astdys_fitter.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_astdys_fitter.dir/build.make examples/CMakeFiles/example_astdys_fitter.dir/example_astdys_fitter.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_astdys_fitter.dir/build.make examples/CMakeFiles/example_astdys_fitter.dir/example_astdys_fitter.cpp.i
 .PHONY : example_astdys_fitter.cpp.i
 
 example_astdys_fitter.s: example_astdys_fitter.cpp.s
@@ -362,7 +404,7 @@ example_astdys_fitter.s: example_astdys_fitter.cpp.s
 
 # target to generate assembly for a file
 example_astdys_fitter.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_astdys_fitter.dir/build.make examples/CMakeFiles/example_astdys_fitter.dir/example_astdys_fitter.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_astdys_fitter.dir/build.make examples/CMakeFiles/example_astdys_fitter.dir/example_astdys_fitter.cpp.s
 .PHONY : example_astdys_fitter.cpp.s
 
 example_configurable_parsers.o: example_configurable_parsers.cpp.o
@@ -370,7 +412,7 @@ example_configurable_parsers.o: example_configurable_parsers.cpp.o
 
 # target to build an object file
 example_configurable_parsers.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/example_configurable_parsers.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/example_configurable_parsers.cpp.o
 .PHONY : example_configurable_parsers.cpp.o
 
 example_configurable_parsers.i: example_configurable_parsers.cpp.i
@@ -378,7 +420,7 @@ example_configurable_parsers.i: example_configurable_parsers.cpp.i
 
 # target to preprocess a source file
 example_configurable_parsers.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/example_configurable_parsers.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/example_configurable_parsers.cpp.i
 .PHONY : example_configurable_parsers.cpp.i
 
 example_configurable_parsers.s: example_configurable_parsers.cpp.s
@@ -386,15 +428,63 @@ example_configurable_parsers.s: example_configurable_parsers.cpp.s
 
 # target to generate assembly for a file
 example_configurable_parsers.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/example_configurable_parsers.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/example_configurable_parsers.cpp.s
 .PHONY : example_configurable_parsers.cpp.s
+
+fitorb_api_demo.o: fitorb_api_demo.cpp.o
+.PHONY : fitorb_api_demo.o
+
+# target to build an object file
+fitorb_api_demo.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/fitorb_api_demo.dir/build.make examples/CMakeFiles/fitorb_api_demo.dir/fitorb_api_demo.cpp.o
+.PHONY : fitorb_api_demo.cpp.o
+
+fitorb_api_demo.i: fitorb_api_demo.cpp.i
+.PHONY : fitorb_api_demo.i
+
+# target to preprocess a source file
+fitorb_api_demo.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/fitorb_api_demo.dir/build.make examples/CMakeFiles/fitorb_api_demo.dir/fitorb_api_demo.cpp.i
+.PHONY : fitorb_api_demo.cpp.i
+
+fitorb_api_demo.s: fitorb_api_demo.cpp.s
+.PHONY : fitorb_api_demo.s
+
+# target to generate assembly for a file
+fitorb_api_demo.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/fitorb_api_demo.dir/build.make examples/CMakeFiles/fitorb_api_demo.dir/fitorb_api_demo.cpp.s
+.PHONY : fitorb_api_demo.cpp.s
+
+propagate_79148.o: propagate_79148.cpp.o
+.PHONY : propagate_79148.o
+
+# target to build an object file
+propagate_79148.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagate_79148.dir/build.make examples/CMakeFiles/propagate_79148.dir/propagate_79148.cpp.o
+.PHONY : propagate_79148.cpp.o
+
+propagate_79148.i: propagate_79148.cpp.i
+.PHONY : propagate_79148.i
+
+# target to preprocess a source file
+propagate_79148.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagate_79148.dir/build.make examples/CMakeFiles/propagate_79148.dir/propagate_79148.cpp.i
+.PHONY : propagate_79148.cpp.i
+
+propagate_79148.s: propagate_79148.cpp.s
+.PHONY : propagate_79148.s
+
+# target to generate assembly for a file
+propagate_79148.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagate_79148.dir/build.make examples/CMakeFiles/propagate_79148.dir/propagate_79148.cpp.s
+.PHONY : propagate_79148.cpp.s
 
 propagation_benchmark.o: propagation_benchmark.cpp.o
 .PHONY : propagation_benchmark.o
 
 # target to build an object file
 propagation_benchmark.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_benchmark.dir/build.make examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_benchmark.dir/build.make examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.o
 .PHONY : propagation_benchmark.cpp.o
 
 propagation_benchmark.i: propagation_benchmark.cpp.i
@@ -402,7 +492,7 @@ propagation_benchmark.i: propagation_benchmark.cpp.i
 
 # target to preprocess a source file
 propagation_benchmark.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_benchmark.dir/build.make examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_benchmark.dir/build.make examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.i
 .PHONY : propagation_benchmark.cpp.i
 
 propagation_benchmark.s: propagation_benchmark.cpp.s
@@ -410,7 +500,7 @@ propagation_benchmark.s: propagation_benchmark.cpp.s
 
 # target to generate assembly for a file
 propagation_benchmark.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_benchmark.dir/build.make examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_benchmark.dir/build.make examples/CMakeFiles/propagation_benchmark.dir/propagation_benchmark.cpp.s
 .PHONY : propagation_benchmark.cpp.s
 
 propagation_diagnostic.o: propagation_diagnostic.cpp.o
@@ -418,7 +508,7 @@ propagation_diagnostic.o: propagation_diagnostic.cpp.o
 
 # target to build an object file
 propagation_diagnostic.cpp.o:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_diagnostic.dir/build.make examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.o
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_diagnostic.dir/build.make examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.o
 .PHONY : propagation_diagnostic.cpp.o
 
 propagation_diagnostic.i: propagation_diagnostic.cpp.i
@@ -426,7 +516,7 @@ propagation_diagnostic.i: propagation_diagnostic.cpp.i
 
 # target to preprocess a source file
 propagation_diagnostic.cpp.i:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_diagnostic.dir/build.make examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_diagnostic.dir/build.make examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.i
 .PHONY : propagation_diagnostic.cpp.i
 
 propagation_diagnostic.s: propagation_diagnostic.cpp.s
@@ -434,8 +524,32 @@ propagation_diagnostic.s: propagation_diagnostic.cpp.s
 
 # target to generate assembly for a file
 propagation_diagnostic.cpp.s:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_diagnostic.dir/build.make examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagation_diagnostic.dir/build.make examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.s
 .PHONY : propagation_diagnostic.cpp.s
+
+simple_pompeja_fit.o: simple_pompeja_fit.cpp.o
+.PHONY : simple_pompeja_fit.o
+
+# target to build an object file
+simple_pompeja_fit.cpp.o:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/simple_pompeja_fit.dir/build.make examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.o
+.PHONY : simple_pompeja_fit.cpp.o
+
+simple_pompeja_fit.i: simple_pompeja_fit.cpp.i
+.PHONY : simple_pompeja_fit.i
+
+# target to preprocess a source file
+simple_pompeja_fit.cpp.i:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/simple_pompeja_fit.dir/build.make examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.i
+.PHONY : simple_pompeja_fit.cpp.i
+
+simple_pompeja_fit.s: simple_pompeja_fit.cpp.s
+.PHONY : simple_pompeja_fit.s
+
+# target to generate assembly for a file
+simple_pompeja_fit.cpp.s:
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(MAKE) $(MAKESILENT) -f examples/CMakeFiles/simple_pompeja_fit.dir/build.make examples/CMakeFiles/simple_pompeja_fit.dir/simple_pompeja_fit.cpp.s
+.PHONY : simple_pompeja_fit.cpp.s
 
 # Help Target
 help:
@@ -455,8 +569,11 @@ help:
 	@echo "... example_configurable_parsers"
 	@echo "... example_coordinates"
 	@echo "... example_ephemeris"
+	@echo "... fitorb_api_demo"
+	@echo "... propagate_79148"
 	@echo "... propagation_benchmark"
 	@echo "... propagation_diagnostic"
+	@echo "... simple_pompeja_fit"
 	@echo "... basic_usage.o"
 	@echo "... basic_usage.i"
 	@echo "... basic_usage.s"
@@ -472,12 +589,21 @@ help:
 	@echo "... example_configurable_parsers.o"
 	@echo "... example_configurable_parsers.i"
 	@echo "... example_configurable_parsers.s"
+	@echo "... fitorb_api_demo.o"
+	@echo "... fitorb_api_demo.i"
+	@echo "... fitorb_api_demo.s"
+	@echo "... propagate_79148.o"
+	@echo "... propagate_79148.i"
+	@echo "... propagate_79148.s"
 	@echo "... propagation_benchmark.o"
 	@echo "... propagation_benchmark.i"
 	@echo "... propagation_benchmark.s"
 	@echo "... propagation_diagnostic.o"
 	@echo "... propagation_diagnostic.i"
 	@echo "... propagation_diagnostic.s"
+	@echo "... simple_pompeja_fit.o"
+	@echo "... simple_pompeja_fit.i"
+	@echo "... simple_pompeja_fit.s"
 .PHONY : help
 
 
@@ -489,6 +615,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

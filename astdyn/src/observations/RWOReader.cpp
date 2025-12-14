@@ -98,9 +98,63 @@ std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) 
         // Magnitude
         obs.magnitude = parseMagnitude(line);
         
-        // Set default uncertainties (0.5 arcsec)
-        obs.sigma_ra = 0.5 * constants::ARCSEC_TO_RAD;
-        obs.sigma_dec = 0.5 * constants::ARCSEC_TO_RAD;
+        
+        
+        // Parse RMS/Weights from explicit columns based on file inspection
+        // Corrected positions (0-indexed):
+        // RA RMS:  Index 73, Length 9
+        // Dec RMS: Index 126, Length 9
+        
+        // Default to conservative 1.0 arcsec if parsing fails
+        double sigma_ra_arcsec = 1.0; 
+        double sigma_dec_arcsec = 1.0;
+        
+        // robustly parse RA RMS
+        if (line.length() >= 82) {
+            try {
+                std::string rms_str = line.substr(73, 9);
+                // trim
+                size_t first = rms_str.find_first_not_of(" ");
+                if (first != std::string::npos) {
+                    size_t last = rms_str.find_last_not_of(" ");
+                    rms_str = rms_str.substr(first, (last - first + 1));
+                    
+                    if (!rms_str.empty()) {
+                        double val = std::stod(rms_str);
+                        if (val > 0.001 && val < 100.0) {
+                            sigma_ra_arcsec = val;
+                        }
+                    }
+                }
+            } catch (...) {
+                // Keep default
+            }
+        }
+
+        // robustly parse Dec RMS
+        if (line.length() >= 135) {
+             try {
+                std::string rms_str = line.substr(126, 9);
+                // trim
+                size_t first = rms_str.find_first_not_of(" ");
+                 if (first != std::string::npos) {
+                    size_t last = rms_str.find_last_not_of(" ");
+                    rms_str = rms_str.substr(first, (last - first + 1));
+                    
+                    if (!rms_str.empty()) {
+                        double val = std::stod(rms_str);
+                        if (val > 0.001 && val < 100.0) {
+                            sigma_dec_arcsec = val;
+                        }
+                    }
+                }
+            } catch (...) {
+                // Keep default
+            }
+        }
+
+        obs.sigma_ra = sigma_ra_arcsec * constants::ARCSEC_TO_RAD;
+        obs.sigma_dec = sigma_dec_arcsec * constants::ARCSEC_TO_RAD;
         
         return obs;
         

@@ -587,6 +587,50 @@ public:
 
 \textbf{Algorithm}: Iterative least squares with numerical derivatives via STM.
 
+\section{High-Level Algorithms}
+
+\subsection{astdyn::api::OrbitFitAPI}
+
+\begin{lstlisting}[language=C++]
+class OrbitFitAPI {
+public:
+    static OrbitFitResult run_fit(
+        const std::string& eq1_file,
+        const std::string& rwo_file,
+        const std::string& oop_file = "",
+        bool verbose = true);
+
+    static propagation::KeplerianElements convert_mean_equinoctial_to_osculating(
+        const propagation::EquinoctialElements& mean_equ);
+};
+\end{lstlisting}
+
+\subsubsection{run\_fit}
+
+\textbf{Purpose}: Execute a complete orbit determination workflow using OrbFit-compatible files.
+
+\textbf{Parameters}:
+\begin{itemize}
+    \item \texttt{eq1\_file}: Initial orbit file (.eq1) containing equinoctial elements.
+    \item \texttt{rwo\_file}: Observations file (.rwo).
+    \item \texttt{oop\_file}: Configuration file (.oop), optional.
+    \item \texttt{verbose}: Print progress to stdout (default: true).
+\end{itemize}
+
+\textbf{Returns}: \texttt{OrbitFitResult} structure containing:
+\begin{itemize}
+    \item \texttt{fitted\_orbit}: Final osculating Keplerian elements (Equatorial J2000).
+    \item \texttt{rms\_ra}, \texttt{rms\_dec}: RMS residuals [arcsec].
+    \item \texttt{converged}: Success flag.
+    \item \texttt{delta\_a\_km}, \texttt{delta\_i\_arcsec}: Changes from initial orbit.
+\end{itemize}
+
+\subsubsection{convert\_mean\_equinoctial\_to\_osculating}
+
+\textbf{Purpose}: Convert "mean" equinoctial elements (typically from catalogs) to valid osculating elements for propagation, applying frame transformations (Ecliptic $\to$ Equatorial J2000) without performing a fit.
+
+\textbf{Note}: This function is essential when initializing a propagator with catalog values defined in a different frame (e.g. AstDys Ecliptic).
+
 \section{Input/Output}
 
 \subsection{astdyn::io::ParserFactory}
@@ -626,6 +670,70 @@ public:
 \section{Ephemeris}
 
 \subsection{astdyn::ephemeris::IEphemeris}
+
+\begin{lstlisting}[language=C++]
+class IEphemeris {
+    // ...
+};
+\end{lstlisting}
+
+\subsection{astdyn::ephemeris::DE441Provider}
+
+\begin{lstlisting}[language=C++]
+class DE441Provider : public EphemerisProvider {
+public:
+    explicit DE441Provider(const std::string& bsp_file);
+    
+    Vector3d getPosition(CelestialBody body, double jd_tdb) override;
+    Vector3d getVelocity(CelestialBody body, double jd_tdb) override;
+};
+\end{lstlisting}
+
+\textbf{Purpose}: Provides high-precision planetary positions (cm-level) using JPL DE441 ephemerides.
+
+\textbf{Key Feature}: Implements a \textbf{native SPK reader}, removing the dependency on the external CSPICE toolkit. It directly parses standard \texttt{.bsp} files.
+
+\textbf{Usage}:
+\begin{lstlisting}[language=C++]
+#include <astdyn/ephemeris/DE441Provider.hpp>
+
+// Load the kernel file
+auto de441 = std::make_shared<ephemeris::DE441Provider>("/path/to/de441.bsp");
+
+// Use via static PlanetaryEphemeris interface
+ephemeris::PlanetaryEphemeris::setProvider(de441);
+
+// Get position of Earth at J2000
+Vector3d pos = ephemeris::PlanetaryEphemeris::getPosition(
+    ephemeris::CelestialBody::EARTH, 2451545.0
+);
+\end{lstlisting}
+
+\subsection{astdyn::ephemeris::AsteroidPerturbations}
+
+\begin{lstlisting}[language=C++]
+class AsteroidPerturbations {
+public:
+    AsteroidPerturbations(); // Loads default AST17 set
+    
+    Vector3d computePerturbation(const Vector3d& position, double mjd_tdb) const;
+    
+    void setAsteroidEnabled(int number, bool enabled);
+    double getTotalMass() const;
+};
+\end{lstlisting}
+
+\textbf{Purpose}: Computes gravitational perturbations from massive Main Belt asteroids (Ceres, Pallas, Vesta, etc.) to improve orbit propagator accuracy.
+
+\textbf{Default Model}: AST17 (Baer et al., 2011), including the 16 most massive asteroids.
+
+\textbf{Usage}:
+\begin{lstlisting}[language=C++]
+auto perturbations = std::make_shared<ephemeris::AsteroidPerturbations>();
+
+// Compute total acceleration on a test particle at 'pos'
+Vector3d acc = perturbations->computePerturbation(pos, mjd);
+\end{lstlisting}
 
 \begin{lstlisting}[language=C++]
 class IEphemeris {
@@ -758,6 +866,35 @@ if (result.converged) {
     std::cout << "  a = " << result.elements.a << " AU\n";
     std::cout << "  e = " << result.elements.e << "\n";
 }
+\end{lstlisting}
+
+
+\subsection{Calculating Position at Epoch t}
+
+A frequent requirement is to compute the position of an asteroid at a specific time $t$, different from the catalog epoch.
+
+\textbf{Using AstDynEngine (High-Level)}:
+\begin{lstlisting}[language=C++]
+// 1. Initialize engine and load orbit
+AstDynEngine engine;
+engine.set_initial_orbit(initial_elements);
+
+// 2. Propagate to target time (e.g., for observation planning)
+double target_mjd = 60100.0;
+auto state_at_t = engine.propagate_to(target_mjd);
+
+Vector3d pos = state_at_t.to_cartesian().position;
+std::cout << "Position: " << pos.transpose() << " AU\n";
+\end{lstlisting}
+
+\textbf{Using Propagator (Low-Level)}:
+\begin{lstlisting}[language=C++]
+// 1. Setup propagator (forces, integrator)
+Propagator prop(forces);
+
+// 2. Propagate state vector
+Vector6d y0 = elements.to_cartesian();
+Vector6d y_at_t = prop.propagate(y0, elements.epoch, target_mjd);
 \end{lstlisting}
 
 \section{Summary}

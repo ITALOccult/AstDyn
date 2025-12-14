@@ -5,7 +5,10 @@
 
 #include <astdyn/ephemeris/AsteroidPerturbations.hpp>
 #include <astdyn/propagation/OrbitalElements.hpp>
+#include <astdyn/coordinates/ReferenceFrame.hpp>
+#include <astdyn/io/SPKReader.hpp>
 #include <cmath>
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -19,6 +22,8 @@ AsteroidPerturbations::AsteroidPerturbations() {
     loadDefaultAsteroids();
     enabled_flags_.resize(asteroids_.size(), true);
 }
+
+AsteroidPerturbations::~AsteroidPerturbations() = default;
 
 AsteroidPerturbations::AsteroidPerturbations(const std::string& filename) {
     // Load from file
@@ -57,10 +62,52 @@ void AsteroidPerturbations::loadDefaultAsteroids() {
     asteroids_ = ast17::getDefaultAsteroids();
 }
 
+void AsteroidPerturbations::loadSPK(const std::string& filename) {
+    try {
+        spk_reader_ = std::make_unique<io::SPKReader>(filename);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to load Asteroid SPK: " + std::string(e.what()));
+    }
+}
+
 Eigen::Vector3d AsteroidPerturbations::getPosition(
     const AsteroidData& asteroid, 
     double mjd_tdb) const 
 {
+    // Try SPK first if loaded
+    if (spk_reader_) {
+        try {
+            // Mapping: Asteroid Number -> NAIF ID (2000000 + Number)
+            int naif_id = 2000000 + asteroid.number;
+            
+            // Time: MJD TDB -> ET (Seconds past J2000)
+            double et = (mjd_tdb - constants::MJD2000) * constants::SECONDS_PER_DAY;
+            
+            // Get state from SPK (returns km, km/s)
+            Eigen::VectorXd state = spk_reader_->getState(naif_id, et);
+            
+            // Convert km -> AU
+            Eigen::Vector3d pos_km = state.head<3>();
+            return pos_km * constants::KM_TO_AU;
+            
+        } catch (...) {
+            // Fallback to analytical if specific asteroid not found in kernel
+            // or if kernel doesn't cover the time.
+            
+            // Try lookup with raw number (e.g. 1 instead of 2000001)
+            try {
+                 int raw_id = asteroid.number;
+                 double et = (mjd_tdb - constants::MJD2000) * constants::SECONDS_PER_DAY;
+                 Eigen::VectorXd state = spk_reader_->getState(raw_id, et);
+                 Eigen::Vector3d pos_km = state.head<3>();
+                 return pos_km * constants::KM_TO_AU;
+            } catch (...) {
+                 // Ignore lookup failures (fallback to analytical)
+            }
+        }
+    }
+
+    // Analytical Fallback (J2000 Elements)
     // Compute mean anomaly at epoch
     double M = asteroid.meanAnomalyAt(mjd_tdb);
     
@@ -71,26 +118,48 @@ Eigen::Vector3d AsteroidPerturbations::getPosition(
         M * DEG_TO_RAD, GM_SUN);
 }
 
-Eigen::Vector3d AsteroidPerturbations::computePerturbation(
-    const Eigen::Vector3d& position, 
-    double mjd_tdb) const 
-{
-    Eigen::Vector3d total_accel = Eigen::Vector3d::Zero();
+Eigen::Vector3d AsteroidPerturbations::computePerturbation(const Eigen::Vector3d& position, double mjd_tdb, const Eigen::Vector3d& sun_pos_bary) const {
+    Eigen::Vector3d acc = Eigen::Vector3d::Zero();
     
     for (size_t i = 0; i < asteroids_.size(); ++i) {
         if (!enabled_flags_[i]) continue;
         
         const auto& asteroid = asteroids_[i];
         
-        // Get asteroid position
-        Eigen::Vector3d ast_pos = getPosition(asteroid, mjd_tdb);
-        
-        // Compute perturbation
-        double gm_au3day2 = asteroid.gm * GM_KM3S2_TO_AU3DAY2;
-        total_accel += computeSinglePerturbation(position, ast_pos, gm_au3day2);
+        try {
+            // Get asteroid position (Barycentric from SPK)
+            Eigen::Vector3d ast_pos_bary = getPosition(asteroid, mjd_tdb);
+            
+            // Convert to Heliocentric
+            Eigen::Vector3d ast_pos_helio = ast_pos_bary - sun_pos_bary;
+            
+            // Relative vector (Asteroid -> Target)
+            // position is target heliocentric
+            Eigen::Vector3d delta = ast_pos_helio - position;
+            double dist2 = delta.squaredNorm();
+            double dist3 = dist2 * std::sqrt(dist2);
+            
+            double r_ast = ast_pos_helio.norm();
+            double r_ast3 = r_ast * r_ast * r_ast;
+            
+            // Direct + Indirect term
+            // GM * ( (r_ast - r)/|...|^3 - r_ast/|r_ast|^3 )
+            // delta = r_ast - r (Wait. delta = ast_pos - target_pos? No.)
+            // acc_direct = GM * (r_ast - r) / |r_ast - r|^3
+            // Vector Target->Asteroid is (ast_pos - position).
+            // Force on Target is TOWARDS Asteroid.
+            // F = GM * (r_ast - r) / |r_ast - r|^3.  Yes.
+            
+            // Convert asteroid.gm from km^3/s^2 to AU^3/day^2 for consistency with other units
+            double gm_au3day2 = asteroid.gm * GM_KM3S2_TO_AU3DAY2;
+            acc += gm_au3day2 * (delta / dist3 - ast_pos_helio / r_ast3);
+            
+        } catch (...) {
+            // Skip asteroids with missing data
+        }
     }
     
-    return total_accel;
+    return acc;
 }
 
 Eigen::Vector3d AsteroidPerturbations::computeSinglePerturbation(
@@ -178,14 +247,21 @@ Eigen::Vector3d AsteroidPerturbations::keplerianToCartesian(
     double cos_i = std::cos(i);
     double sin_i = std::sin(i);
     
-    Eigen::Vector3d pos;
-    pos[0] = (cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i) * x_orb
+    // ... (previous calculation of pos in Ecliptic) ...
+    Eigen::Vector3d pos_ecliptic;
+    pos_ecliptic[0] = (cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i) * x_orb
            + (-cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i) * y_orb;
-    pos[1] = (sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i) * x_orb
+    pos_ecliptic[1] = (sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i) * x_orb
            + (-sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i) * y_orb;
-    pos[2] = (sin_omega * sin_i) * x_orb + (cos_omega * sin_i) * y_orb;
+    pos_ecliptic[2] = (sin_omega * sin_i) * x_orb + (cos_omega * sin_i) * y_orb;
     
-    return pos;
+    // Transform Ecliptic J2000 -> Equatorial J2000
+    // We utilize the ReferenceFrame static method for consistency
+    return coordinates::ReferenceFrame::transform_position(
+        pos_ecliptic,
+        coordinates::FrameType::ECLIPTIC,
+        coordinates::FrameType::J2000
+    );
 }
 
 // AST17 default data implementation

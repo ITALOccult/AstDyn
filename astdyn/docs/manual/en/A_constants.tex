@@ -1,0 +1,69 @@
+\chapter{Physical Constants and Reference Data}
+\label{app:constants}
+
+This appendix lists the physical and astronomical constants used in the AstDyn library. These values are hard-coded in the \texttt{astdyn/core/Constants.hpp} header and ensure consistency with the IAU 2015 System of Astronomical Constants and JPL DE440/441 ephemerides.
+
+\section{Fundamental Constants}
+
+\begin{table}[htbp]
+\centering
+\caption{Fundamental physical constants employed in AstDyn.}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{llrl}
+\toprule
+\textbf{Symbol} & \textbf{Description} & \textbf{Value} & \textbf{Units} \\
+\midrule
+$c$ & Speed of light in vacuum & 299792.458 & km $s^{-1}$ \\
+$au$ & Astronomical Unit & 149597870.700 & km \\
+$k$ & Gaussian gravitational constant & 0.01720209895 & $au^{3/2} d^{-1} M_{\odot}^{-1/2}$ \\
+$G M_{\odot}$ & Heliocentric gravitational constant & $2.9591220828559 \times 10^{-4}$ & $au^3 d^{-2}$ \\
+$J2000.0$ & Standard Epoch (JD) & 2451545.0 & days \\
+$MJD2000.0$ & Standard Epoch (MJD) & 51544.5 & days \\
+$\epsilon_0$ & Obliquity of ecliptic (J2000) & 23.43929111 & degrees \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Planetary Gravitational Parameters}
+
+AstDyn uses the standard gravitational parameters ($GM$) consistent with the DE440 ephemeris generation.
+
+\begin{table}[htbp]
+\centering
+\caption{Gravitational parameters ($GM$) of solar system bodies.}
+\label{tab:gm_values}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrl}
+\toprule
+\textbf{Body} & \textbf{GM value ($km^3 s^{-2}$)} & \textbf{Inv. Mass Ratio ($M_{\odot}/M_p$)} \\
+\midrule
+Sun & 132712440041.939400 & 1 \\
+Mercury & 22031.868551 & 6023600.0 \\
+Venus & 324858.592000 & 408523.71 \\
+Earth & 398600.435507 & 332946.05 \\
+Moon & 4902.800066 & 27068700.38 \\
+Earth+Moon & 403503.235502 & 328900.56 \\
+Mars System & 42828.375816 & 3098708.0 \\
+Jupiter System & 126712764.100000 & 1047.3486 \\
+Saturn System & 37940584.841800 & 3497.898 \\
+Uranus System & 5794556.400000 & 22902.98 \\
+Neptune System & 6836527.100580 & 19412.24 \\
+Pluto System & 975.500000 & $1.35 \times 10^8$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Time Scale Definitions}
+\begin{itemize}
+    \item \textbf{Day}: 86400 SI seconds.
+    \item \textbf{Julian Year}: 365.25 days = 31557600 seconds.
+    \item \textbf{Julian Century}: 36525 days.
+\end{itemize}
+
+\section{Relativistic Parameters}
+\begin{itemize}
+    \item Schwarzschild radius of the Sun ($2GM_{\odot}/c^2$): 2.95325 km.
+    \item PPN parameters used: $\gamma = 1, \beta = 1$ (General Relativity).
+\end{itemize}

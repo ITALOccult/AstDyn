@@ -53,10 +53,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn"
+CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build"
+CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build
 
 # Include any dependencies generated for this target.
 include src/CMakeFiles/astdyn_convert.dir/depend.make
@@ -73,32 +73,32 @@ src/CMakeFiles/astdyn_convert.dir/codegen:
 .PHONY : src/CMakeFiles/astdyn_convert.dir/codegen
 
 src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o: src/CMakeFiles/astdyn_convert.dir/flags.make
-src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o: /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp
+src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o: /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp
 src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o: src/CMakeFiles/astdyn_convert.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o -MF CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o.d -o CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o -c "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o -MF CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o.d -o CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o -c /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp
 
 src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.i"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp" > CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp > CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.i
 
 src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.s"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp" -o CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp -o CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.s
 
 src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o: src/CMakeFiles/astdyn_convert.dir/flags.make
-src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o: /Users/michelebigi/VisualStudio\ Code/GitHub/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp
+src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o: /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp
 src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o: src/CMakeFiles/astdyn_convert.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o -MF CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o.d -o CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o -c "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o -MF CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o.d -o CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o -c /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp
 
 src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.i"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp" > CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.i
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp > CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.i
 
 src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.s"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp" -o CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.s
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp -o CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.s
 
 # Object files for target astdyn_convert
 astdyn_convert_OBJECTS = \
@@ -116,19 +116,20 @@ src/astdyn_convert: /opt/homebrew/lib/libboost_filesystem.dylib
 src/astdyn_convert: /opt/homebrew/lib/libboost_atomic.dylib
 src/astdyn_convert: /opt/homebrew/lib/libboost_program_options.dylib
 src/astdyn_convert: /opt/homebrew/lib/libboost_date_time.dylib
+src/astdyn_convert: /opt/homebrew/lib/libcspice.a
 src/astdyn_convert: src/CMakeFiles/astdyn_convert.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir="/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX executable astdyn_convert"
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/astdyn_convert.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX executable astdyn_convert"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/astdyn_convert.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 src/CMakeFiles/astdyn_convert.dir/build: src/astdyn_convert
 .PHONY : src/CMakeFiles/astdyn_convert.dir/build
 
 src/CMakeFiles/astdyn_convert.dir/clean:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" && $(CMAKE_COMMAND) -P CMakeFiles/astdyn_convert.dir/cmake_clean.cmake
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src && $(CMAKE_COMMAND) -P CMakeFiles/astdyn_convert.dir/cmake_clean.cmake
 .PHONY : src/CMakeFiles/astdyn_convert.dir/clean
 
 src/CMakeFiles/astdyn_convert.dir/depend:
-	cd "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/astdyn_convert.dir/DependInfo.cmake" "--color=$(COLOR)"
+	cd /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/astdyn_convert.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : src/CMakeFiles/astdyn_convert.dir/depend
 

@@ -2,7 +2,7 @@
 #define ASTDYN_CONFIG_HPP
 
 // Build configuration
-/* #undef ASTDYN_USE_SPICE */
+#define ASTDYN_USE_SPICE
 /* #undef ASTDYN_ENABLE_PROFILING */
 
 // Build type

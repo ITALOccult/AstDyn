@@ -16,7 +16,7 @@
 namespace astdyn {
 namespace observations {
 
-using namespace utils;
+using namespace astdyn::utils;
 
 std::vector<OpticalObservation> MPCReader::readFile(const std::string& filepath) {
     std::vector<OpticalObservation> observations;

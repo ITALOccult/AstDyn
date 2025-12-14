@@ -1,5 +1,6 @@
 \chapter{Case Study: (203) Pompeja}
 \label{ch:case_pompeja}
+\label{ch:case_studies}
 
 \section{Introduction}
 
@@ -401,17 +402,19 @@ Compare solutions using different observation spans:
 \begin{table}[h]
 \centering
 \caption{Solution quality vs. arc length}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{cccc}
-\hline
-\textbf{Arc (days)} & \textbf{Observations} & \textbf{RMS (arcsec)} & \textbf{$\sigma_a$ (AU)} \\
-\hline
+\toprule
+\textbf{Arc (d)} & \textbf{Obs} & \textbf{RMS ($''$)} & \textbf{$\sigma_a$ (AU)} \\
+\midrule
 10 & 17 & 0.712 & $8.3 \times 10^{-7}$ \\
 20 & 34 & 0.684 & $3.1 \times 10^{-7}$ \\
 30 & 50 & 0.669 & $1.8 \times 10^{-7}$ \\
 40 & 67 & 0.663 & $1.4 \times 10^{-7}$ \\
 60 & 100 & 0.658 & $1.2 \times 10^{-7}$ \\
-\hline
-\end{tabular}
+\bottomrule
+\end{tabular}%
+}
 \end{table}
 
 \textbf{Trend}: Longer arcs improve parameter determination. Diminishing returns beyond $\sim$30 days for this case.
@@ -422,20 +425,21 @@ Compare solutions using different observation spans:
 
 \begin{table}[h]
 \centering
+\small
 \caption{Timing breakdown (Intel i7-10700K, single core)}
 \begin{tabular}{lcc}
-\hline
-\textbf{Operation} & \textbf{Time (ms)} & \textbf{Percentage} \\
-\hline
-Parse observations & 2.3 & 0.1\% \\
-Initial orbit (Gauss) & 15.7 & 0.9\% \\
-Propagation (4 iters) & 1456.2 & 80.0\% \\
-Compute residuals & 234.5 & 12.9\% \\
-Matrix operations & 98.4 & 5.4\% \\
-Other & 12.9 & 0.7\% \\
-\hline
-\textbf{Total} & \textbf{1820.0} & \textbf{100\%} \\
-\hline
+\toprule
+\textbf{Operation} & \textbf{Time (ms)} & \textbf{\%} \\
+\midrule
+Parse observations & 2.3 & 0.1 \\
+Initial orbit (Gauss) & 15.7 & 0.9 \\
+Propagation (4 iters) & 1456.2 & 80.0 \\
+Compute residuals & 234.5 & 12.9 \\
+Matrix operations & 98.4 & 5.4 \\
+Other & 12.9 & 0.7 \\
+\midrule
+\textbf{Total} & \textbf{1820.0} & \textbf{100} \\
+\bottomrule
 \end{tabular}
 \end{table}
 

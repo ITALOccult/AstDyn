@@ -12,6 +12,7 @@
 #include <string>
 #include <cstdint>
 #include <limits>
+#include <cmath>
 
 namespace astdyn {
 

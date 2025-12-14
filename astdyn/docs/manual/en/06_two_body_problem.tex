@@ -104,30 +104,46 @@ The orbit shape depends on eccentricity and energy:
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[scale=1.2]
-    % Sun at focus
-    \filldraw[yellow,draw=orange,thick] (0,0) circle (3pt);
-    \node[below left] at (0,-0.2) {Sun};
+\begin{tikzpicture}[scale=1.1, >=stealth]
+    % PARAMETRI
+    \def\q{1.5} % Distanza Perielio comune
     
-    % Ellipse (e = 0.5)
-    \draw[thick,blue,rotate=0] (0,0) ellipse (3cm and 2.6cm);
-    \node[blue] at (3.5,2) {Ellipse ($e=0.5$)};
-    \filldraw[blue] (1.5,0) circle (2pt);
-    \draw[blue,dashed] (0,0) -- (1.5,0);
-    
-    % Circle (e = 0)
-    \draw[thick,green!60!black] (0,0) circle (2cm);
-    \node[green!60!black] at (1.5,-1.5) {Circle ($e=0$)};
-    
-    % Parabola (e = 1)
-    \draw[thick,red,domain=-2:2,samples=50] plot ({-0.5*\x*\x + 2}, {\x});
-    \node[red] at (2.5,2.5) {Parabola ($e=1$)};
-    
-    % Hyperbola (e = 1.5)
-    \draw[thick,purple,domain=-1.5:1.5,samples=50] plot ({-0.7/(1-1.5*cos(\x r)) * cos(\x r)}, {-0.7/(1-1.5*cos(\x r)) * sin(\x r)});
-    \node[purple] at (-2.5,1.5) {Hyperbola ($e=1.5$)};
+    % 1. SOLE (Focus)
+    \coordinate (Sun) at (0,0);
+    \shade[ball color=orange] (Sun) circle (0.15);
+    \draw[<-] (Sun) -- ++(-0.2, -0.6) node[below] {Sun (Focus)};
+
+    % 2. LINEA PERIELIO (Common Perihelion)
+    \draw[dotted, gray, thick] (0,0) -- (\q+0.5, 0);
+    \filldraw[black] (\q, 0) circle (1.5pt);
+    \node[right, font=\footnotesize, text width=2cm] at (\q+0.1, 0) {Common\\Perihelion};
+
+    % 3. CERCHIO (e=0)
+    \draw[thick, green!50!black] (0,0) circle (\q);
+    % Etichetta: Basso
+    \node[green!50!black] (circle_label) at (0.5, -2.5) {Circle ($e=0$)};
+    \draw[->, green!50!black, thin] (circle_label) -- (0.5, -\q);
+
+    % 4. ELLISSE (e=0.6)
+    \draw[thick, blue, samples=200, domain=0:360] plot ({\x}:{2.4/(1+0.6*cos(\x))});
+    % Etichetta: Sinistra Alto
+    \node[blue, anchor=east] (ellipse_label) at (-3.5, 2.0) {Ellipse ($e=0.6$)};
+    \draw[->, blue, thin] (ellipse_label.east) -- (110:2.5);
+
+    % 5. PARABOLA (e=1.0)
+    \draw[thick, red, samples=100, domain=-120:120] plot ({\x}:{3.0/(1+cos(\x))});
+    % Etichetta: Sinistra Più Alto
+    \node[red, anchor=east] (parabola_label) at (-3.5, 3.2) {Parabola ($e=1.0$)};
+    \draw[->, red, thin] (parabola_label.east) -- (110:4.0);
+
+    % 6. IPERBOLE (e=1.5)
+    \draw[thick, purple, samples=100, domain=-95:95] plot ({\x}:{3.75/(1+1.5*cos(\x))});
+    % Etichetta: Sinistra Altissimo
+    \node[purple, anchor=east] (hyperbola_label) at (-3.5, 4.5) {Hyperbola ($e=1.5$)};
+    \draw[->, purple, thin] (hyperbola_label.east) -- (105:5.8);
+
 \end{tikzpicture}
-\caption{Conic section orbits for different eccentricities. The Sun is at one focus of each conic.}
+\caption{Family of conic orbits sharing a common focus (Sun) and perihelion distance. The eccentricity $e$ determines the "openness" of the orbit.}
 \label{fig:conic_sections}
 \end{figure}
 

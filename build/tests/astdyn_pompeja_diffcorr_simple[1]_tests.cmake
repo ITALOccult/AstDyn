@@ -1,3 +1,0 @@
-add_test([=[PompejaDifferentialCorrectionTest.FitWithAllObservations]=]  [==[/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/astdyn_pompeja_diffcorr_simple]==] [==[--gtest_filter=PompejaDifferentialCorrectionTest.FitWithAllObservations]==] --gtest_also_run_disabled_tests)
-set_tests_properties([=[PompejaDifferentialCorrectionTest.FitWithAllObservations]=]  PROPERTIES WORKING_DIRECTORY [==[/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests]==] SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-set(  astdyn_pompeja_diffcorr_simple_TESTS PompejaDifferentialCorrectionTest.FitWithAllObservations)

@@ -146,6 +146,7 @@ Figure~\ref{fig:timescales} illustrates the relationships between time scales:
 
 \begin{figure}[H]
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tikzpicture}[
     node distance=2.5cm,
     box/.style={rectangle, draw, fill=blue!10, text width=2cm, align=center, minimum height=1cm},
@@ -161,7 +162,8 @@ Figure~\ref{fig:timescales} illustrates the relationships between time scales:
     \draw[arrow] (tai) -- node[above] {\small $+32.184$ s} (tt);
     \draw[arrow] (tt) -- node[above] {\small $+\Delta T_{rel}$} (tdb);
     \draw[arrow] (utc) -- node[left] {\small $+\Delta UT$} (ut1);
-\end{tikzpicture}
+\end{tikzpicture}%
+}
 \caption{Relationships between major time scales}
 \label{fig:timescales}
 \end{figure}

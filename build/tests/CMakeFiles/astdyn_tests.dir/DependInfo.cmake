@@ -8,8 +8,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/test_constants.cpp" "tests/CMakeFiles/astdyn_tests.dir/test_constants.cpp.o" "gcc" "tests/CMakeFiles/astdyn_tests.dir/test_constants.cpp.o.d"
-  "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/test_types.cpp" "tests/CMakeFiles/astdyn_tests.dir/test_types.cpp.o" "gcc" "tests/CMakeFiles/astdyn_tests.dir/test_types.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/tests/test_constants.cpp" "tests/CMakeFiles/astdyn_tests.dir/test_constants.cpp.o" "gcc" "tests/CMakeFiles/astdyn_tests.dir/test_constants.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/tests/test_types.cpp" "tests/CMakeFiles/astdyn_tests.dir/test_types.cpp.o" "gcc" "tests/CMakeFiles/astdyn_tests.dir/test_types.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

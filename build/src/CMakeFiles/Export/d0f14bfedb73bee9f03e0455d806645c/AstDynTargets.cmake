@@ -60,7 +60,7 @@ add_library(AstDyn::astdyn STATIC IMPORTED)
 
 set_target_properties(AstDyn::astdyn PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"
-  INTERFACE_LINK_LIBRARIES "Eigen3::Eigen;Boost::filesystem;Boost::program_options;Boost::date_time"
+  INTERFACE_LINK_LIBRARIES "Eigen3::Eigen;Boost::filesystem;Boost::program_options;Boost::date_time;CSPICE::CSPICE"
 )
 
 # Load information for each installed configuration.

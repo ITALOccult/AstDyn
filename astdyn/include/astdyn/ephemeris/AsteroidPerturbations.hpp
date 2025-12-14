@@ -23,7 +23,12 @@
 #include <astdyn/core/Constants.hpp>
 #include <Eigen/Dense>
 #include <vector>
+#include <vector>
 #include <string>
+#include <memory>
+
+// Forward declaration
+namespace astdyn { namespace io { class SPKReader; } }
 
 namespace astdyn {
 namespace ephemeris {
@@ -61,6 +66,7 @@ public:
      * @brief Default constructor - loads 16 most massive asteroids
      */
     AsteroidPerturbations();
+    ~AsteroidPerturbations(); // Defined in cpp
     
     /**
      * @brief Load asteroid data from file
@@ -80,13 +86,13 @@ public:
     Eigen::Vector3d getPosition(const AsteroidData& asteroid, double mjd_tdb) const;
     
     /**
-     * @brief Compute perturbation acceleration from all asteroids
-     * @param position Spacecraft/asteroid position [AU]
+     * @brief Compute total perturbation acceleration from all loaded asteroids
+     * @param position Helper position of target body (Heliocentric) [AU]
      * @param mjd_tdb Time [MJD TDB]
-     * @return Acceleration [AU/day²]
+     * @param sun_pos_bary Position of Sun relative to SSB [AU]
+     * @return Acceleration vector [AU/d^2]
      */
-    Eigen::Vector3d computePerturbation(const Eigen::Vector3d& position, 
-                                        double mjd_tdb) const;
+    Eigen::Vector3d computePerturbation(const Eigen::Vector3d& position, double mjd_tdb, const Eigen::Vector3d& sun_pos_bary) const;
     
     /**
      * @brief Compute perturbation from single asteroid
@@ -124,6 +130,11 @@ public:
      * @brief Load default AST17 asteroid data
      */
     void loadDefaultAsteroids();
+
+    /**
+     * @brief Load asteroid SPK file for precise positions
+     */
+    void loadSPK(const std::string& filename);
     
 private:
     
@@ -137,6 +148,9 @@ private:
     
     std::vector<AsteroidData> asteroids_;
     std::vector<bool> enabled_flags_;
+    
+    // Optional SPK Reader for precise positions
+    std::unique_ptr<io::SPKReader> spk_reader_;
 };
 
 /**

@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/examples/propagation_diagnostic.cpp" "examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.o" "gcc" "examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/examples/propagation_diagnostic.cpp" "examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.o" "gcc" "examples/CMakeFiles/propagation_diagnostic.dir/propagation_diagnostic.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

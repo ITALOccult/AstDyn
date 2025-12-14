@@ -135,6 +135,31 @@ public:
             default: return "Unknown";
         }
     }
+
+    /**
+     * @brief Get mass of celestial body [kg]
+     */
+    static double getMass(CelestialBody body) {
+        switch (body) {
+            case CelestialBody::SUN: return MASS_SUN;
+            case CelestialBody::MERCURY: return MASS_MERCURY;
+            case CelestialBody::VENUS: return MASS_VENUS;
+            case CelestialBody::EARTH: return MASS_EARTH;
+            case CelestialBody::MARS: return MASS_MARS;
+            case CelestialBody::JUPITER: return MASS_JUPITER;
+            case CelestialBody::SATURN: return MASS_SATURN;
+            case CelestialBody::URANUS: return MASS_URANUS;
+            case CelestialBody::NEPTUNE: return MASS_NEPTUNE;
+            case CelestialBody::PLUTO: return MASS_PLUTO;
+            case CelestialBody::MOON: return MASS_MOON;
+            default: return 0.0;
+        }
+    }
+
+    /**
+     * @brief Get full planetary data structure
+     */
+    static PlanetaryBody getBodyData(CelestialBody body);
 };
 
 } // namespace astdyn::ephemeris

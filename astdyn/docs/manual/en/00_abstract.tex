@@ -1,0 +1,18 @@
+\clearpage
+\thispagestyle{plain}
+
+\begin{center}
+    {\Large\bfseries Abstract}
+\end{center}
+\vspace{1cm}
+
+\noindent
+AstDyn (Asteroid Dynamics) is a high-fidelity C++ library designed for the precise orbit determination and propagation of celestial bodies, with a specific focus on Main Belt asteroids and Near-Earth Objects (NEOs). Developed within the ITALOccult project, the software aims to support the prediction of stellar occultations by reducing ephemeris uncertainties to sub-milliarcsecond levels.
+
+The library implements a rigorous dynamical model that accounts for relativistic effects (Einstein-Infeld-Hoffmann equations), planetary perturbations based on JPL DE440/DE441 ephemerides, and non-gravitational forces such as the Yarkovsky effect. Numerical integration is performed using high-order adaptive schemes, primarily a Runge-Kutta-Fehlberg 7/8 integrator, ensuring stability over century-long propagation intervals. Time and coordinate systems are handled with strict adherence to IAU 2006/2000A resolutions, supporting conversions between TDB, TT, and UTC, as well as transformations between ICRS and GCRS frames.
+
+Validation against NASA/JPL Horizons benchmarks demonstrates agreement within $\pm 2$ meters for major planets over a 50-year span and sub-kilometer accuracy for perturbed asteroid trajectories. Beyond propagation, AstDyn provides tools for differential correction, covariance analysis, and the processing of optical astrometry. This manual serves as the comprehensive scientific and technical reference for the library, detailing its mathematical foundations, algorithmic implementations, and usage patterns for high-precision computational astronomy.
+
+\vspace{1cm}
+\noindent
+\textbf{Keywords:} Celestial Mechanics, Orbit Determination, Numerical Integration, Ephemerides, Astrometry, Stellar Occultations, C++ Library.

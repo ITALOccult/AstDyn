@@ -43,6 +43,14 @@ struct PropagatorSettings {
     bool perturb_neptune = false;
     
     double central_body_gm = constants::GMS; ///< Central body GM [AU³/day²] (heliocentric)
+    
+    // Relativity PPN parameters (Default: GR)
+    double ppn_beta = 1.0;
+    double ppn_gamma = 1.0;
+
+    // Optional: Path to Asteroid SPK kernel (e.g. codes_300ast.bsp)
+    // If empty, uses analytical approximation (AST17 constants)
+    std::string asteroid_ephemeris_file = "";
 };
 
 /**
@@ -149,36 +157,22 @@ private:
     Eigen::Vector3d two_body_acceleration(const Eigen::Vector3d& position) const;
     
     /**
-     * @brief Compute planetary perturbations
-     * 
-     * @param position Position of small body [AU]
-     * @param mjd_tdb Time (MJD TDB)
-     * @return Perturbation acceleration [AU/day²]
+     * @brief Compute planetary perturbations (Heliocentric frame corrected)
      */
-    Eigen::Vector3d planetary_perturbations(const Eigen::Vector3d& position,
-                                           double mjd_tdb);
-    
+    Eigen::Vector3d planetary_perturbations(const Eigen::Vector3d& position, 
+                                          double mjd_tdb,
+                                          const Eigen::Vector3d& sun_pos_bary);
+                                          
     /**
-     * @brief Compute relativistic correction (Schwarzschild)
-     * 
-     * First-order GR correction to acceleration.
-     * 
-     * @param position Position [AU]
-     * @param velocity Velocity [AU/day]
-     * @return Correction to acceleration [AU/day²]
+     * @brief Compute asteroid perturbations (Heliocentric frame corrected)
      */
-    Eigen::Vector3d relativistic_correction(const Eigen::Vector3d& position,
-                                           const Eigen::Vector3d& velocity) const;
-    
-    /**
-     * @brief Compute asteroid perturbations
-     * 
-     * @param position Position of small body [AU]
-     * @param mjd_tdb Time (MJD TDB)
-     * @return Perturbation acceleration [AU/day²]
-     */
-    Eigen::Vector3d asteroid_perturbations(const Eigen::Vector3d& position,
-                                          double mjd_tdb);
+    Eigen::Vector3d asteroid_perturbations(const Eigen::Vector3d& position, 
+                                         double mjd_tdb,
+                                         const Eigen::Vector3d& sun_pos_bary);
+                                         
+    // Relativistic correction (PPN)
+    Eigen::Vector3d relativistic_correction(const Eigen::Vector3d& position, 
+                                          const Eigen::Vector3d& velocity) const;
     
     std::unique_ptr<Integrator> integrator_;
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;

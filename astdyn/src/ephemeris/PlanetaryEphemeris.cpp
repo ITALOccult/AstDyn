@@ -11,6 +11,7 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/math/MathUtils.hpp"
 #include <cmath>
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 
 namespace astdyn {
 namespace ephemeris {
@@ -25,7 +26,17 @@ static constexpr double GM_SUN_AU_DAY2 = 1.32712440018e11 / (1.49597870700e8 * 1
 // Public Interface
 // ============================================================================
 
+std::shared_ptr<EphemerisProvider> PlanetaryEphemeris::global_provider_ = nullptr;
+
+void PlanetaryEphemeris::setProvider(std::shared_ptr<EphemerisProvider> provider) {
+    global_provider_ = provider;
+}
+
 Vector3d PlanetaryEphemeris::getPosition(CelestialBody body, double jd_tdb) {
+    if (global_provider_ && global_provider_->isAvailable()) {
+        return global_provider_->getPosition(body, jd_tdb);
+    }
+
     if (body == CelestialBody::SUN) {
         return Vector3d::Zero();
     }
@@ -41,6 +52,10 @@ Vector3d PlanetaryEphemeris::getPosition(CelestialBody body, double jd_tdb) {
 }
 
 Vector3d PlanetaryEphemeris::getVelocity(CelestialBody body, double jd_tdb) {
+    if (global_provider_ && global_provider_->isAvailable()) {
+        return global_provider_->getVelocity(body, jd_tdb);
+    }
+
     if (body == CelestialBody::SUN) {
         return Vector3d::Zero();
     }
@@ -53,6 +68,14 @@ Vector3d PlanetaryEphemeris::getVelocity(CelestialBody body, double jd_tdb) {
 }
 
 CartesianState PlanetaryEphemeris::getState(CelestialBody body, double jd_tdb) {
+    // If provider is available, use it (optimized if getState() exists in interface, but getPos/getVel work too)
+    // EphemerisProvider interface typically has getPosition/getVelocity separately.
+    if (global_provider_ && global_provider_->isAvailable()) {
+        Vector3d pos = global_provider_->getPosition(body, jd_tdb);
+        Vector3d vel = global_provider_->getVelocity(body, jd_tdb);
+        return CartesianState(pos, vel);
+    }
+
     Vector3d pos = getPosition(body, jd_tdb);
     Vector3d vel = getVelocity(body, jd_tdb);
     return CartesianState(pos, vel);
@@ -283,7 +306,15 @@ Vector3d PlanetaryEphemeris::elementsToPosition(const double elements[6]) {
     double z = (sin_omega * sin_i) * x_orb +
                (cos_omega * sin_i) * y_orb;
     
-    return Vector3d(x, y, z);
+    Vector3d pos_ecliptic(x, y, z);
+    
+    // Convert Ecliptic J2000 -> Equatorial J2000
+    // This rotation is critical for consistency with JPL ephemerides and the propagator frame
+    return coordinates::ReferenceFrame::transform_position(
+        pos_ecliptic, 
+        coordinates::FrameType::ECLIPTIC, 
+        coordinates::FrameType::J2000
+    );
 }
 
 Vector3d PlanetaryEphemeris::elementsToVelocity(const double elements[6], double gm) {
@@ -344,7 +375,16 @@ Vector3d PlanetaryEphemeris::elementsToVelocity(const double elements[6], double
     double vz = (sin_omega * sin_i) * vx_orb +
                 (cos_omega * sin_i) * vy_orb;
     
-    return Vector3d(vx, vy, vz);
+    Vector3d vel_ecliptic(vx, vy, vz);
+    
+    // Convert Ecliptic J2000 -> Equatorial J2000
+    // (Velocity rotation is same as position for inertial frames)
+    return coordinates::ReferenceFrame::transform_velocity(
+        Vector3d::Zero(), // Position doesn't matter for inertial rotation
+        vel_ecliptic,
+        coordinates::FrameType::ECLIPTIC,
+        coordinates::FrameType::J2000
+    );
 }
 
 Vector3d PlanetaryEphemeris::computePerturbations(CelestialBody body, double T) {

@@ -111,6 +111,9 @@
 \newtheorem{example}{Example}[chapter]
 %\newtheorem{algorithm}{Algorithm}[chapter]
 
+% Definizioni matematiche custom
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+
 \theoremstyle{plain}
 \newtheorem{theorem}{Theorem}[chapter]
 \newtheorem{proposition}{Proposition}[chapter]
@@ -150,6 +153,7 @@
 % Front matter
 \frontmatter
 \include{00_titlepage}
+\include{00_abstract}
 \include{00_preface}
 
 \tableofcontents
@@ -204,6 +208,8 @@
 % Back matter
 \backmatter
 \include{24_references}
+\appendix
+\include{A_constants}
 \include{25_appendices}
 
 \end{document}

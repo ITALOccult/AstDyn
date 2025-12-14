@@ -8,8 +8,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp" "tests/CMakeFiles/astdyn_config_tests.dir/__/src/io/AstDynConfig.cpp.o" "gcc" "tests/CMakeFiles/astdyn_config_tests.dir/__/src/io/AstDynConfig.cpp.o.d"
-  "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/test_astdyn_config.cpp" "tests/CMakeFiles/astdyn_config_tests.dir/test_astdyn_config.cpp.o" "gcc" "tests/CMakeFiles/astdyn_config_tests.dir/test_astdyn_config.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp" "tests/CMakeFiles/astdyn_config_tests.dir/__/src/io/AstDynConfig.cpp.o" "gcc" "tests/CMakeFiles/astdyn_config_tests.dir/__/src/io/AstDynConfig.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/tests/test_astdyn_config.cpp" "tests/CMakeFiles/astdyn_config_tests.dir/test_astdyn_config.cpp.o" "gcc" "tests/CMakeFiles/astdyn_config_tests.dir/test_astdyn_config.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

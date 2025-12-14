@@ -8,8 +8,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp" "src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o" "gcc" "src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o.d"
-  "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp" "src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o" "gcc" "src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/astdyn_convert.cpp" "src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o" "gcc" "src/CMakeFiles/astdyn_convert.dir/astdyn_convert.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn/src/io/AstDynConfig.cpp" "src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o" "gcc" "src/CMakeFiles/astdyn_convert.dir/io/AstDynConfig.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

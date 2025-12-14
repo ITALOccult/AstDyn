@@ -116,7 +116,13 @@ private:
         if (kep.argument_perihelion < 0) kep.argument_perihelion += 2.0 * M_PI;
         
         // Mean anomaly: M = lambda - atan2(k, h)
+        // Note: Standard .eq1 (AstDyS) uses Degrees for lambda. 
+        // Some internal formats use Radians.
+#ifdef ASTDYN_EQ1_LAMBDA_RADIANS
+        double lambda_rad = eq.lambda;
+#else
         double lambda_rad = eq.lambda * M_PI / 180.0;
+#endif
         kep.mean_anomaly = lambda_rad - omega_plus_Omega;
         if (kep.mean_anomaly < 0) kep.mean_anomaly += 2.0 * M_PI;
 

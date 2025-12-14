@@ -12,49 +12,50 @@
 #include <astdyn/AstDynEngine.hpp>
 #include <astdyn/observations/RWOReader.hpp>
 #include <astdyn/core/Constants.hpp>
+#include <astdyn/coordinates/ReferenceFrame.hpp>
+#include <astdyn/coordinates/CartesianState.hpp>
+#include <astdyn/propagation/OrbitalElements.hpp>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include <numeric>
+#include <algorithm>
 
 using namespace astdyn;
 
-// Structure for equinoctial elements
-struct EquinoctialElements {
-    double epoch_mjd_tdb;
-    double semi_major_axis;  // a
-    double h;                // e·sin(ϖ)
-    double k;                // e·cos(ϖ)
-    double p;                // tan(i/2)·sin(Ω)
-    double q;                // tan(i/2)·cos(Ω)
-    double mean_longitude;   // λ (radians)
-};
+// Helper to trim leading whitespace
+std::string ltrim(const std::string& s) {
+    size_t start = s.find_first_not_of(" \t");
+    return (start == std::string::npos) ? "" : s.substr(start);
+}
 
-// Parse OrbFit .eq1 file
-EquinoctialElements parse_eq1_file(const std::string& filepath) {
+// Parse OrbFit .eq1 file into propagation::EquinoctialElements
+propagation::EquinoctialElements parse_eq1_file(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open file: " + filepath);
     }
 
-    EquinoctialElements equ;
+    propagation::EquinoctialElements equ;
     std::string line;
     bool found_equ = false;
     bool found_mjd = false;
 
     while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '!') continue;
+        std::string trimmed = ltrim(line);
+        if (trimmed.empty() || trimmed[0] == '!') continue;
 
-        if (line.substr(0, 3) == "EQU") {
-            std::istringstream iss(line.substr(3));
-            iss >> equ.semi_major_axis >> equ.h >> equ.k >> equ.p >> equ.q >> equ.mean_longitude;
+        if (trimmed.substr(0, 3) == "EQU") {
+            std::istringstream iss(trimmed.substr(3));
+            iss >> equ.a >> equ.h >> equ.k >> equ.p >> equ.q >> equ.lambda;
             // Convert mean longitude from degrees to radians
-            equ.mean_longitude *= constants::PI / 180.0;
+            equ.lambda *= constants::PI / 180.0;
             found_equ = true;
         }
-        else if (line.substr(0, 3) == "MJD") {
-            std::istringstream iss(line.substr(3));
+        else if (trimmed.substr(0, 3) == "MJD") {
+            std::istringstream iss(trimmed.substr(3));
             iss >> equ.epoch_mjd_tdb;
             found_mjd = true;
         }
@@ -66,105 +67,144 @@ EquinoctialElements parse_eq1_file(const std::string& filepath) {
         throw std::runtime_error("Could not parse equinoctial elements from file");
     }
 
+    equ.gravitational_parameter = constants::GMS;
     return equ;
 }
 
-// Convert equinoctial to Keplerian
-orbit::KeplerianOrbit equinoctial_to_keplerian(const EquinoctialElements& equ) {
-    orbit::KeplerianOrbit kep;
-
-    kep.semi_major_axis = equ.semi_major_axis;
-    kep.epoch_mjd_tdb = equ.epoch_mjd_tdb;
-
-    // Eccentricity
-    kep.eccentricity = std::sqrt(equ.h * equ.h + equ.k * equ.k);
-
-    // Inclination
-    double tan_half_i = std::sqrt(equ.p * equ.p + equ.q * equ.q);
-    kep.inclination = 2.0 * std::atan(tan_half_i);
-
-    // Longitude of ascending node
-    kep.longitude_ascending_node = std::atan2(equ.p, equ.q);
-    if (kep.longitude_ascending_node < 0) {
-        kep.longitude_ascending_node += 2.0 * constants::PI;
-    }
-
-    // Argument of perihelion
-    double omega_plus_Omega = std::atan2(equ.h, equ.k);
-    if (omega_plus_Omega < 0) {
-        omega_plus_Omega += 2.0 * constants::PI;
-    }
-    kep.argument_perihelion = omega_plus_Omega - kep.longitude_ascending_node;
-    if (kep.argument_perihelion < 0) {
-        kep.argument_perihelion += 2.0 * constants::PI;
-    }
-
-    // Mean anomaly
-    kep.mean_anomaly = equ.mean_longitude - omega_plus_Omega;
-    while (kep.mean_anomaly < 0) kep.mean_anomaly += 2.0 * constants::PI;
-    while (kep.mean_anomaly >= 2.0 * constants::PI) kep.mean_anomaly -= 2.0 * constants::PI;
-
-    return kep;
-}
-
-int main(int argc, char* argv[]) {
+int main(int argc, char** argv) {
     try {
-        if (argc < 4) {
-            std::cerr << "Usage: " << argv[0] << " <observations.rwo> <elements.eq1> <config.oop>\n\n";
-            std::cerr << "Example:\n";
-            std::cerr << "  " << argv[0] << " astdyn/tools/203_astdys_recent100.rwo "
-                      << "astdyn/tools/203_astdys_latest.eq1 astdyn/tools/203.oop\n";
-            return 1;
-        }
+        std::string eq1_file = "17030_astdys.eq1";
+        std::string rwo_file = "17030_astdys.rwo";
+        std::string oop_file = "17030.oop"; // Use the existing config file
 
-        std::string rwo_file = argv[1];
-        std::string eq1_file = argv[2];
-        std::string oop_file = argv[3];
-
-        std::cout << "╔═══════════════════════════════════════════════════════════╗\n";
-        std::cout << "║          Simple Pompeja Orbit Fitting Example            ║\n";
-        std::cout << "╚═══════════════════════════════════════════════════════════╝\n\n";
 
         // Step 1: Parse OrbFit elements
         std::cout << "1. Loading OrbFit elements from " << eq1_file << "...\n";
         auto equ = parse_eq1_file(eq1_file);
-        auto orbfit_orbit = equinoctial_to_keplerian(equ);
+        
+        // Convert to Keplerian (Ecliptic J2000)
+        auto orbfit_orbit_ecliptic = propagation::equinoctial_to_keplerian(equ);
 
-        std::cout << "   Epoch: MJD " << std::fixed << std::setprecision(1) << orbfit_orbit.epoch_mjd_tdb << "\n";
-        std::cout << "   a = " << std::setprecision(6) << orbfit_orbit.semi_major_axis << " AU\n";
-        std::cout << "   e = " << std::setprecision(6) << orbfit_orbit.eccentricity << "\n";
-        std::cout << "   i = " << std::setprecision(6) << orbfit_orbit.inclination * 180.0 / constants::PI << "°\n\n";
+        std::cout << "   Epoch: MJD " << std::fixed << std::setprecision(1) << orbfit_orbit_ecliptic.epoch_mjd_tdb << "\n";
+        std::cout << "   a = " << std::setprecision(6) << orbfit_orbit_ecliptic.semi_major_axis << " AU\n";
+        std::cout << "   e = " << std::setprecision(6) << orbfit_orbit_ecliptic.eccentricity << "\n";
+        std::cout << "   i = " << std::setprecision(6) << orbfit_orbit_ecliptic.inclination * 180.0 / constants::PI << "° (Ecliptic)\n\n";
+
+        // Convert Ecliptic J2000 -> Equatorial J2000
+        std::cout << "   Converting Frame: Ecliptic J2000 -> Equatorial J2000\n";
+        
+        // 1. Keplerian (Ecliptic) -> Cartesian (Ecliptic)
+        auto cart_ecliptic_elem = propagation::keplerian_to_cartesian(orbfit_orbit_ecliptic);
+        
+        // Convert to CartesianState for rotation
+        coordinates::CartesianState state_ecliptic(
+            cart_ecliptic_elem.position,
+            cart_ecliptic_elem.velocity,
+            cart_ecliptic_elem.gravitational_parameter
+        );
+        
+        // 2. Rotate Cartesian State: Ecliptic -> Equatorial
+        auto state_equatorial = coordinates::ReferenceFrame::transform_state(
+            state_ecliptic,
+            coordinates::FrameType::ECLIPTIC,
+            coordinates::FrameType::J2000
+        );
+        
+        // Convert back to CartesianElements
+        propagation::CartesianElements cart_equatorial_elem;
+        cart_equatorial_elem.epoch_mjd_tdb = cart_ecliptic_elem.epoch_mjd_tdb;
+        cart_equatorial_elem.position = state_equatorial.position();
+        cart_equatorial_elem.velocity = state_equatorial.velocity();
+        cart_equatorial_elem.gravitational_parameter = state_equatorial.mu();
+        
+        // 3. Cartesian (Equatorial) -> Keplerian (Equatorial)
+        auto orbfit_orbit_equatorial = propagation::cartesian_to_keplerian(cart_equatorial_elem);
+        
+        std::cout << "   Transformed Orbit (Equatorial):\n";
+        std::cout << "   i = " << std::setprecision(6) << orbfit_orbit_equatorial.inclination * 180.0 / constants::PI << "°\n";
+        std::cout << "   Ω = " << std::setprecision(6) << orbfit_orbit_equatorial.longitude_ascending_node * 180.0 / constants::PI << "°\n\n";
 
         // Step 2: Load observations
         std::cout << "2. Loading observations from " << rwo_file << "...\n";
-        observations::RWOReader reader;
-        auto obs_list = reader.read_file(rwo_file);
-        std::cout << "   Loaded " << obs_list.size() << " observations\n\n";
+        auto obs_list = observations::RWOReader::readFile(rwo_file); 
+
 
         // Step 3: Setup AstDyn engine
         std::cout << "3. Setting up AstDyn engine...\n";
-        AstDynEngine engine(oop_file);
-        engine.set_observations(obs_list);
+        AstDynEngine engine;
+        
+        std::ifstream oop_check(oop_file);
+        if (oop_check.good()) {
+            std::cout << "   Loading configuration from " << oop_file << "...\n";
+            engine.load_config(oop_file);
+        } else {
+            std::cout << "   Warning: " << oop_file << " not found, using default configuration.\n";
+            std::cout << "   Forcing planetary perturbations ON (Sun+Planets).\n";
+            AstDynConfig config = engine.config();
+            config.propagator_settings.include_planets = true;
+            config.propagator_settings.perturb_mercury = true;
+            config.propagator_settings.perturb_venus = true;
+            config.propagator_settings.perturb_earth = true;
+            config.propagator_settings.perturb_mars = true;
+            config.propagator_settings.perturb_jupiter = true;
+            config.propagator_settings.perturb_saturn = true;
+            config.propagator_settings.perturb_uranus = true;
+            config.propagator_settings.perturb_neptune = true;
+            engine.set_config(config);
+        }
 
-        // Get mean observation epoch
-        double mean_epoch = engine.get_mean_observation_epoch();
-        std::cout << "   Mean observation epoch: MJD " << std::fixed << std::setprecision(2) << mean_epoch << "\n\n";
+        // Force RKF78 Integrator for speed (RK4 is too slow for 100 years of data)
+        AstDynConfig eco_config = engine.config();
+        eco_config.integrator_type = "RKF78";
+        eco_config.initial_step_size = 1.0; 
+        eco_config.tolerance = 1e-12;
+        engine.set_config(eco_config);
+        
+        // Add observations
+        engine.clear_observations();
+        for (const auto& obs : obs_list) {
+            engine.add_observation(obs);
+        }
 
-        // Propagate OrbFit orbit to mean epoch
+        // Calculate mean epoch
+        double sum_mjd = 0.0;
+        for (const auto& obs : obs_list) {
+            sum_mjd += obs.mjd_utc; 
+        }
+        double mean_epoch = obs_list.empty() ? orbfit_orbit_equatorial.epoch_mjd_tdb : (sum_mjd / obs_list.size());
+        
+        std::cout << "   Current Working Directory: " << "(current path)" << "\n";
+        
+        // Debug: Check Earth Ephemeris
+        double check_epoch = 2451545.0; // J2000
+        try {
+            auto earth = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, check_epoch);
+            std::cout << "   DEBUG: Earth at J2000: " << earth.position().transpose() << " AU\n";
+            std::cout << "   DEBUG: Earth Radius: " << earth.position().norm() << " AU\n";
+            if (earth.position().norm() < 0.1) std::cout << "   CRITICAL WARNING: Earth position near zero! Ephemeris likely not loaded.\n";
+        } catch (const std::exception& e) {
+             std::cout << "   CRITICAL ERROR: Ephemeris lookup failed: " << e.what() << "\n";
+        }
+
+        // Set initial orbit (Equatorial)
+        engine.set_initial_orbit(orbfit_orbit_equatorial);
+
         std::cout << "4. Propagating orbit to mean epoch...\n";
-        auto initial_state = engine.propagate_orbit(orbfit_orbit, mean_epoch);
-        engine.set_initial_state(initial_state);
+        auto initial_state_at_mean = engine.propagate_to(mean_epoch);
+        engine.set_initial_orbit(initial_state_at_mean);
         std::cout << "   Done.\n\n";
 
         // Step 4: Run differential correction
         std::cout << "5. Running differential correction...\n";
-        orbit_determination::DifferentialCorrectorSettings settings;
-        settings.max_iterations = 20;
-        settings.convergence_tolerance = 1e-6;
-        settings.reject_outliers = true;
-        settings.outlier_sigma = 3.0;
+        
+        AstDynConfig config = engine.config();
+        config.max_iterations = 20;
+        config.convergence_threshold = 1e-6;
+        config.outlier_sigma = 3.0;
+        config.verbose = true;
+        engine.set_config(config);
 
-        auto result = engine.run_differential_correction(settings);
+        auto result = engine.fit_orbit();
 
         // Step 5: Display results
         std::cout << "\n╔═══════════════════════════════════════════════════════════╗\n";
@@ -172,13 +212,14 @@ int main(int argc, char* argv[]) {
         std::cout << "╚═══════════════════════════════════════════════════════════╝\n\n";
 
         std::cout << "Converged: " << (result.converged ? "YES" : "NO") << "\n";
-        std::cout << "Iterations: " << result.iterations << "\n";
-        std::cout << "RMS: " << std::fixed << std::setprecision(3) << result.rms_arcsec << " arcsec\n";
-        std::cout << "Observations used: " << result.num_observations_used << " / " << obs_list.size() << "\n";
-        std::cout << "Outliers rejected: " << (obs_list.size() - result.num_observations_used) << "\n\n";
+        std::cout << "Iterations: " << result.num_iterations << "\n";
+        std::cout << "RMS RA: " << std::fixed << std::setprecision(3) << result.rms_ra << " arcsec\n";
+        std::cout << "RMS Dec: " << std::fixed << std::setprecision(3) << result.rms_dec << " arcsec\n";
+        std::cout << "Observations used: " << result.num_observations << " / " << obs_list.size() << "\n";
+        std::cout << "Outliers rejected: " << result.num_rejected << "\n\n";
 
         // Fitted orbit
-        auto fitted_orbit = result.final_orbit;
+        auto fitted_orbit = result.orbit;
         std::cout << "Fitted orbit at MJD " << std::setprecision(2) << fitted_orbit.epoch_mjd_tdb << ":\n";
         std::cout << "  a = " << std::setprecision(6) << fitted_orbit.semi_major_axis << " AU\n";
         std::cout << "  e = " << std::setprecision(6) << fitted_orbit.eccentricity << "\n";
@@ -187,13 +228,15 @@ int main(int argc, char* argv[]) {
         std::cout << "  ω = " << std::setprecision(4) << fitted_orbit.argument_perihelion * 180.0 / constants::PI << "°\n";
         std::cout << "  M = " << std::setprecision(4) << fitted_orbit.mean_anomaly * 180.0 / constants::PI << "°\n\n";
 
-        // Comparison (propagate OrbFit to same epoch)
-        auto orbfit_at_mean = engine.propagate_orbit(orbfit_orbit, mean_epoch);
-        double delta_a_km = (fitted_orbit.semi_major_axis - orbfit_at_mean.semi_major_axis) * constants::AU / 1000.0;
-        double delta_e = fitted_orbit.eccentricity - orbfit_at_mean.eccentricity;
-        double delta_i_arcsec = (fitted_orbit.inclination - orbfit_at_mean.inclination) * 180.0 * 3600.0 / constants::PI;
+        // Comparison
+        engine.set_initial_orbit(orbfit_orbit_equatorial);
+        auto orbfit_at_result_epoch = engine.propagate_to(fitted_orbit.epoch_mjd_tdb);
+        
+        double delta_a_km = (fitted_orbit.semi_major_axis - orbfit_at_result_epoch.semi_major_axis) * constants::AU / 1000.0;
+        double delta_e = fitted_orbit.eccentricity - orbfit_at_result_epoch.eccentricity;
+        double delta_i_arcsec = (fitted_orbit.inclination - orbfit_at_result_epoch.inclination) * 180.0 * 3600.0 / constants::PI;
 
-        std::cout << "Comparison with OrbFit (at same epoch):\n";
+        std::cout << "Comparison with OrbFit (at result epoch):\n";
         std::cout << "  Δa = " << std::fixed << std::setprecision(2) << delta_a_km << " km\n";
         std::cout << "  Δe = " << std::scientific << std::setprecision(3) << delta_e << "\n";
         std::cout << "  Δi = " << std::fixed << std::setprecision(2) << delta_i_arcsec << " arcsec\n\n";

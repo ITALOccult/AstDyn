@@ -91,15 +91,21 @@ Planetary positions $\mathbf{r}_p(t)$ are obtained from:
     \item Simplified Keplerian ephemerides (lower accuracy)
 \end{itemize}
 
-\subsection{Relativistic Correction}
+\subsection{Relativistic Correction (PPN)}
 
-Post-Newtonian (1PN) term:
+AstDyn implements the Einstein-Infeld-Hoffmann (EIH) equations of motion using the Parameterized Post-Newtonian (PPN) formalism:
 
 \begin{equation}
-    \mathbf{a}_{\text{GR}} = \frac{\mu_\odot}{c^2 r^3}\left[4\frac{\mu_\odot}{r}\mathbf{r} - v^2\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
+    \mathbf{a}_{\text{GR}} = \frac{\mu_\odot}{c^2 r^3} \left[ \left(2(\beta+\gamma)\frac{\mu_\odot}{r} - \gamma v^2\right)\mathbf{r} + 2(1+\gamma)(\mathbf{r} \cdot \mathbf{v})\mathbf{v} \right]
 \end{equation}
 
-This is typically $\sim 10^{-10}$ m/s$^2$ for asteroids, but accumulates over long timescales.
+where:
+\begin{itemize}
+    \item $\beta$: measure of non-linearity in superposition (GR: $\beta=1$)
+    \item $\gamma$: measure of space curvature (GR: $\gamma=1$)
+\end{itemize}
+
+Default values in AstDyn are $\beta=\gamma=1$ (General Relativity), but can be configured for testing alternative theories. This correction is typically $\sim 10^{-10}$ m/s$^2$ for asteroids, but is essential for sub-arcsecond precision.
 
 \subsection{Solar Radiation Pressure}
 
@@ -196,6 +202,32 @@ Three strategies for output:
     \item \textbf{Interpolation}: Use Hermite interpolation between steps
     \item \textbf{Fixed output}: Specify output times, integrator stops there
 \end{enumerate}
+
+\begin{algorithm}
+\caption{Adaptive Propagation Loop}
+\begin{algorithmic}[1]
+\REQUIRE Initial state $\mathbf{y}_0, t_0$, Target time $t_f$, Tolerance $TOL$
+\ENSURE Final state $\mathbf{y}_f$
+\STATE $t \leftarrow t_0, \quad \mathbf{y} \leftarrow \mathbf{y}_0$
+\STATE Estimate initial step $h$ based on curvature
+\WHILE{$t < t_f$}
+    \STATE \textbf{Step Limiting}: If $t + h > t_f$, set $h \leftarrow t_f - t$
+    \REPEAT
+        \STATE \textbf{Integrate}: $\mathbf{y}_{new}, \mathbf{e} \leftarrow \text{Step}(\mathbf{y}, t, h)$
+        \STATE \textbf{Error Check}: $\epsilon \leftarrow \max_i |e_i / (ATOL + RTOL \cdot |y_i|)|$
+        \IF{$\epsilon > 1.0$}
+            \STATE \textbf{Reject}: $h \leftarrow h \cdot 0.9 \cdot \epsilon^{-1/q}$
+        \ELSE
+            \STATE \textbf{Accept}: $\mathbf{y} \leftarrow \mathbf{y}_{new}, \quad t \leftarrow t + h$
+            \STATE \textbf{Output}: Store interpolated state if dense output enabled
+            \STATE \textbf{Next Step}: $h_{next} \leftarrow h \cdot 0.9 \cdot \epsilon^{-1/q}$
+            \STATE $h \leftarrow \min(h_{max}, \max(h_{min}, h_{next}))$
+        \ENDIF
+    \UNTIL{Accepted}
+\ENDWHILE
+\RETURN $\mathbf{y}$
+\end{algorithmic}
+\end{algorithm}
 
 AstDyn supports all three modes.
 
@@ -424,14 +456,15 @@ Include only necessary perturbations:
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{lcc}
+\small
+\begin{tabular}{@{}l p{3.5cm} p{3.5cm}@{}}
 \toprule
 \textbf{Object} & \textbf{Essential Forces} & \textbf{Optional} \\
 \midrule
-Main-belt asteroid & Sun, Jup, Sat & Mars, Earth, relativity \\
-Near-Earth asteroid & Sun, all planets & Relativity, asteroids \\
+Main-belt asteroid & Sun, Jup, Sat & Mars, Earth, GR \\
+Near-Earth asteroid & Sun, all planets & GR, asteroids \\
 Jupiter Trojan & Sun, Jup, Sat & Uranus, Neptune \\
-Trans-Neptunian & Sun, Jup, Sat, Ura, Nep & Relativity \\
+Trans-Neptunian object & Sun, Giants & GR \\
 \bottomrule
 \end{tabular}
 \caption{Recommended force models for different object types.}

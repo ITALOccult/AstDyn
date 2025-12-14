@@ -45,7 +45,11 @@ KeplerianElements OrbitalConversions::equinoctialToKeplerian(
     kep.omega = normalizeAngle(omega_rad);
     
     // 6. Anomalia media: M = λ - ϖ
+#ifdef ASTDYN_EQ1_LAMBDA_RADIANS
+    double lambda_rad = eq.lambda;
+#else
     double lambda_rad = eq.lambda * DEG_TO_RAD;
+#endif
     double M_rad = lambda_rad - LP_rad;
     kep.M = normalizeAngle(M_rad);
     

@@ -57,10 +57,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn"
+CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/astdyn
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build"
+CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -97,7 +97,7 @@ rebuild_cache/fast: rebuild_cache
 
 # Special rule for the target list_install_components
 list_install_components:
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Available install components are: \"Unspecified\" \"gmock\" \"gtest\""
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Available install components are: \"Unspecified\""
 .PHONY : list_install_components
 
 # Special rule for the target list_install_components
@@ -142,9 +142,9 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build//CMakeFiles/progress.marks"
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles" 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -170,58 +170,6 @@ preinstall/fast:
 depend:
 	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
-
-#=============================================================================
-# Target rules for targets named gmock
-
-# Build rule for target.
-gmock: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 gmock
-.PHONY : gmock
-
-# fast build rule for target.
-gmock/fast:
-	$(MAKE) $(MAKESILENT) -f _deps/googletest-build/googlemock/CMakeFiles/gmock.dir/build.make _deps/googletest-build/googlemock/CMakeFiles/gmock.dir/build
-.PHONY : gmock/fast
-
-#=============================================================================
-# Target rules for targets named gmock_main
-
-# Build rule for target.
-gmock_main: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 gmock_main
-.PHONY : gmock_main
-
-# fast build rule for target.
-gmock_main/fast:
-	$(MAKE) $(MAKESILENT) -f _deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir/build.make _deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir/build
-.PHONY : gmock_main/fast
-
-#=============================================================================
-# Target rules for targets named gtest
-
-# Build rule for target.
-gtest: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 gtest
-.PHONY : gtest
-
-# fast build rule for target.
-gtest/fast:
-	$(MAKE) $(MAKESILENT) -f _deps/googletest-build/googletest/CMakeFiles/gtest.dir/build.make _deps/googletest-build/googletest/CMakeFiles/gtest.dir/build
-.PHONY : gtest/fast
-
-#=============================================================================
-# Target rules for targets named gtest_main
-
-# Build rule for target.
-gtest_main: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 gtest_main
-.PHONY : gtest_main
-
-# fast build rule for target.
-gtest_main/fast:
-	$(MAKE) $(MAKESILENT) -f _deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/build.make _deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/build
-.PHONY : gtest_main/fast
 
 #=============================================================================
 # Target rules for targets named astdyn
@@ -287,19 +235,6 @@ astdyn_tests: cmake_check_build_system
 astdyn_tests/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/astdyn_tests.dir/build.make tests/CMakeFiles/astdyn_tests.dir/build
 .PHONY : astdyn_tests/fast
-
-#=============================================================================
-# Target rules for targets named astdyn_math_tests
-
-# Build rule for target.
-astdyn_math_tests: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 astdyn_math_tests
-.PHONY : astdyn_math_tests
-
-# fast build rule for target.
-astdyn_math_tests/fast:
-	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/astdyn_math_tests.dir/build.make tests/CMakeFiles/astdyn_math_tests.dir/build
-.PHONY : astdyn_math_tests/fast
 
 #=============================================================================
 # Target rules for targets named astdyn_time_tests
@@ -744,6 +679,32 @@ example_astdys_fitter/fast:
 .PHONY : example_astdys_fitter/fast
 
 #=============================================================================
+# Target rules for targets named simple_pompeja_fit
+
+# Build rule for target.
+simple_pompeja_fit: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 simple_pompeja_fit
+.PHONY : simple_pompeja_fit
+
+# fast build rule for target.
+simple_pompeja_fit/fast:
+	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/simple_pompeja_fit.dir/build.make examples/CMakeFiles/simple_pompeja_fit.dir/build
+.PHONY : simple_pompeja_fit/fast
+
+#=============================================================================
+# Target rules for targets named fitorb_api_demo
+
+# Build rule for target.
+fitorb_api_demo: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 fitorb_api_demo
+.PHONY : fitorb_api_demo
+
+# fast build rule for target.
+fitorb_api_demo/fast:
+	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/fitorb_api_demo.dir/build.make examples/CMakeFiles/fitorb_api_demo.dir/build
+.PHONY : fitorb_api_demo/fast
+
+#=============================================================================
 # Target rules for targets named example_configurable_parsers
 
 # Build rule for target.
@@ -755,6 +716,19 @@ example_configurable_parsers: cmake_check_build_system
 example_configurable_parsers/fast:
 	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/example_configurable_parsers.dir/build.make examples/CMakeFiles/example_configurable_parsers.dir/build
 .PHONY : example_configurable_parsers/fast
+
+#=============================================================================
+# Target rules for targets named propagate_79148
+
+# Build rule for target.
+propagate_79148: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 propagate_79148
+.PHONY : propagate_79148
+
+# fast build rule for target.
+propagate_79148/fast:
+	$(MAKE) $(MAKESILENT) -f examples/CMakeFiles/propagate_79148.dir/build.make examples/CMakeFiles/propagate_79148.dir/build
+.PHONY : propagate_79148/fast
 
 # Help Target
 help:
@@ -778,7 +752,6 @@ help:
 	@echo "... astdyn_engine_tests"
 	@echo "... astdyn_ephemeris_tests"
 	@echo "... astdyn_jacobian_tests"
-	@echo "... astdyn_math_tests"
 	@echo "... astdyn_mean_osculating_tests"
 	@echo "... astdyn_orbit_determination_tests"
 	@echo "... astdyn_pompeja_comparison"
@@ -806,12 +779,11 @@ help:
 	@echo "... example_configurable_parsers"
 	@echo "... example_coordinates"
 	@echo "... example_ephemeris"
-	@echo "... gmock"
-	@echo "... gmock_main"
-	@echo "... gtest"
-	@echo "... gtest_main"
+	@echo "... fitorb_api_demo"
+	@echo "... propagate_79148"
 	@echo "... propagation_benchmark"
 	@echo "... propagation_diagnostic"
+	@echo "... simple_pompeja_fit"
 	@echo "... test_eq1_parser"
 	@echo "... validation_ceres"
 .PHONY : help

@@ -25,94 +25,63 @@ Eigen::MatrixXd LeastSquaresFitter::build_design_matrix(
     // where ∂ρ/∂x is partial of RA/Dec w.r.t. state at obs time
     // and Φ is STM from epoch to obs time
     
-    constexpr double DEG_TO_RAD = 1.7453292519943295769e-2;
-    // Obliquity J2000
-    constexpr double eps = 23.4392911 * DEG_TO_RAD;
-    double ce = std::cos(eps);
-    double se = std::sin(eps);
+    // State is already in Equatorial Frame (Standard for Propagator)
+    // We compute partial derivatives of RA/Dec w.r.t Equatorial State.
     
-    // Rotation Matrix Ecliptic -> Equatorial
-    Eigen::Matrix3d R_ecl_to_eq;
-    R_ecl_to_eq << 1, 0, 0,
-                   0, ce, -se,
-                   0, se, ce;
+    constexpr double rad_to_arcsec = 206265.04606;
 
     for (int i = 0; i < n_obs; ++i) {
         double t_obs = residuals[i].epoch_mjd;
         
-        // Get STM from epoch to observation time (In Ecliptic Frame)
-        auto [state_at_obs_ecl, stm_ecl] = stm_func(state, epoch_mjd, t_obs);
+        // Get STM from epoch to observation time
+        auto [state_at_obs, stm] = stm_func(state, epoch_mjd, t_obs);
         
-        // We need partial derivatives of RA/Dec (Equatorial) w.r.t State (Ecliptic).
-        // By Chain Rule: d(RA)/dr_ecl = d(RA)/dr_eq * d(r_eq)/d(r_ecl)
-        // d(r_eq)/d(r_ecl) is the Rotation Matrix R
+        // Calculate Topocentric position if possible? 
+        // For partial derivatives, using Heliocentric/Barycentric State at obs time 
+        // is the standard approximation for the design matrix (H matrix).
+        // The residuals themselves (O-C) MUST use topocentric, but H can be geocentric/heliocentric approximate.
         
-        // 1. Convert State position to Hessian Equatorial Frame for derivative calculation
-        // Note: We ignore the Observer position shift here for the partials matrix 
-        // because d(r_topo)/d(r_ast) = I (assuming r_obs is constant w.r.t asteroid state)
-        // So d(RA)/d(r_ast_eq) is calculated using r_topo_eq.
-        // Ideally we should use the EXACT topocentric vector here, but using the heliocentric 
-        // rotated vector is a good approximation if Earth is far, 
-        // OR better: use the State from STM but rotated.
+        // state_at_obs is [x, y, z, vx, vy, vz] in Equatorial Frame
+        Eigen::Vector3d r = state_at_obs.head<3>();
         
-        // Strictly, Jacobian H = H_geometric * R * STM
-        // where H_geometric is d(RA,Dec)/d(r_eq) evaluated at r_topo_eq.
-        
-        // But we don't have r_topo_eq here easily (it's in ResidualCalculator).
-        // However, state_at_obs is r_ast_ecl.
-        // Let's approximate by evaluating derivatives at r_ast_eq (Heliocentric).
-        // For partial derivatives direction this is usually sufficient for convergence.
-        // For high precision convergence, we should pass r_topo from ResidualCalculator.
-        // But let's try with rotated state first.
-        
-        Eigen::Vector3d r_ast_ecl = state_at_obs_ecl.head<3>();
-        Eigen::Vector3d r_eq = R_ecl_to_eq * r_ast_ecl; // Use this for calculating d/dr_eq
-        
-        // Compute partials d/dr_eq using r_eq
-        double x = r_eq(0), y = r_eq(1), z = r_eq(2);
-        double r_norm = r_eq.norm();
+        double x = r(0), y = r(1), z = r(2);
+        double r_norm = r.norm();
         double rho_xy = std::sqrt(x*x + y*y);
         
-        // ∂RA/∂r_eq (in radians)
-        Eigen::Vector3d dRA_dr_eq;
+        // ∂RA/∂r (Equatorial)
+        Eigen::Vector3d dRA_dr; 
         if (rho_xy > 1e-10) {
-            dRA_dr_eq(0) = -y / (rho_xy * rho_xy);
-            dRA_dr_eq(1) = x / (rho_xy * rho_xy);
-            dRA_dr_eq(2) = 0.0;
+            dRA_dr(0) = -y / (rho_xy * rho_xy);
+            dRA_dr(1) =  x / (rho_xy * rho_xy);
+            dRA_dr(2) =  0.0;
         } else {
-            dRA_dr_eq.setZero();
+            dRA_dr.setZero();
         }
         
-        // ∂Dec/∂r_eq (in radians)
-        Eigen::Vector3d dDec_dr_eq;
+        // ∂Dec/∂r (Equatorial)
+        Eigen::Vector3d dDec_dr;
         if (r_norm > 1e-10) {
-            dDec_dr_eq(0) = -x * z / (r_norm * r_norm * rho_xy);
-            dDec_dr_eq(1) = -y * z / (r_norm * r_norm * rho_xy);
-            dDec_dr_eq(2) = rho_xy / (r_norm * r_norm);
+            dDec_dr(0) = -x * z / (r_norm * r_norm * rho_xy);
+            dDec_dr(1) = -y * z / (r_norm * r_norm * rho_xy);
+            dDec_dr(2) =  rho_xy / (r_norm * r_norm);
         } else {
-            dDec_dr_eq.setZero();
+            dDec_dr.setZero();
         }
         
-        // Chain Rule: d/dr_ecl = d/dr_eq * R
-        // Matrix form: [dRA/dx_ecl dRA/dy_ecl ...] = [dRA/dx_eq ...] * R
-        Eigen::Vector3d dRA_dr_ecl = dRA_dr_eq.transpose() * R_ecl_to_eq;
-        Eigen::Vector3d dDec_dr_ecl = dDec_dr_eq.transpose() * R_ecl_to_eq;
+        // Convert radian gradients to arcsec gradients
+        dRA_dr *= rad_to_arcsec;
+        dDec_dr *= rad_to_arcsec;
         
-        // Convert to arcsec (1 rad = 206265 arcsec)
-        constexpr double rad_to_arcsec = 206265.0;
-        dRA_dr_ecl *= rad_to_arcsec;
-        dDec_dr_ecl *= rad_to_arcsec;
+        // Design matrix row H_i = [dRA/dr, 0_v]
+        Eigen::Matrix<double, 2, 6> dRho_dx_state;
+        dRho_dx_state.row(0) << dRA_dr.transpose(), 0, 0, 0;   // ∂RA/∂x
+        dRho_dx_state.row(1) << dDec_dr.transpose(), 0, 0, 0;  // ∂Dec/∂x
         
-        // ∂ρ/∂x_ecl at obs time
-        Eigen::Matrix<double, 2, 6> dRho_dx_ecl;
-        dRho_dx_ecl.row(0) << dRA_dr_ecl.transpose(), 0, 0, 0;   // ∂RA/∂x
-        dRho_dx_ecl.row(1) << dDec_dr_ecl.transpose(), 0, 0, 0;  // ∂Dec/∂x
+        // Map to initial epoch: A_i = H_i * STM
+        Eigen::Matrix<double, 2, 6> A_i = dRho_dx_state * stm;
         
-        // Design matrix: A = (∂ρ/∂x_ecl) × Φ_ecl
-        Eigen::Matrix<double, 2, 6> A_i = dRho_dx_ecl * stm_ecl;
-        
-        A.row(2*i) = A_i.row(0);      // ∂RA/∂x₀
-        A.row(2*i+1) = A_i.row(1);    // ∂Dec/∂x₀
+        A.row(2*i) = A_i.row(0);
+        A.row(2*i+1) = A_i.row(1);
     }
     
     return A;
@@ -156,7 +125,17 @@ int LeastSquaresFitter::reject_outliers(std::vector<ObservationResidual>& residu
     }
     
     double rms = std::sqrt(sum_sq / count);
+    
+    // Safety: Do not reject outliers if the fit is still very poor (RMS > 100 arcsec)
+    // This allows the fitter to converge from a bad guess without losing data.
+    if (rms > 100.0) {
+        return 0; 
+    }
+    
     double threshold = outlier_threshold_ * rms;
+    
+    // Safety: Ensure threshold is not too small (e.g. < 0.1 arcsec)
+    threshold = std::max(threshold, 0.1);
     
     // Reject outliers
     int num_rejected = 0;
@@ -221,62 +200,134 @@ FitResult LeastSquaresFitter::fit(
     result.converged = false;
     result.num_iterations = 0;
     
+    // Helper to calc RMS
+    auto calc_rms = [](const std::vector<ObservationResidual>& res) -> double {
+        double sum = 0.0;
+        int count = 0;
+        for (const auto& r : res) {
+            if (!r.rejected) {
+                sum += r.ra_residual_arcsec * r.ra_residual_arcsec + 
+                       r.dec_residual_arcsec * r.dec_residual_arcsec;
+                count += 2;
+            }
+        }
+        return (count > 0) ? std::sqrt(sum / count) : 0.0;
+    };
+
+    // Initial residuals
+    auto current_residuals = residual_func(result.state, epoch_mjd);
+    double current_rms = calc_rms(current_residuals);
+    
     for (int iter = 0; iter < max_iterations_; ++iter) {
         result.num_iterations = iter + 1;
         
-        // Compute residuals
-        auto obs_residuals = residual_func(result.state, epoch_mjd);
-        
-        // Reject outliers
+        // Outlier Rejection (on accepted state)
         if (iter > 0) {
-            reject_outliers(obs_residuals);
+            reject_outliers(current_residuals);
+            // Re-calc RMS after rejection might change "current_rms", but let's keep it consistent
+            current_rms = calc_rms(current_residuals); 
         }
         
-        // Build design matrix
-        auto A = build_design_matrix(obs_residuals, result.state, epoch_mjd, stm_func);
+        // Build Design Matrix (A) and Normal Equations
+        auto A = build_design_matrix(current_residuals, result.state, epoch_mjd, stm_func);
         
-        // Pack residuals into vector
-        int n_obs = obs_residuals.size();
-        Eigen::VectorXd residuals(2 * n_obs);
+        // Pack residuals
+        int n_obs = current_residuals.size();
+        Eigen::VectorXd res_vec(2 * n_obs);
         Eigen::VectorXd weights(2 * n_obs);
         
         for (int i = 0; i < n_obs; ++i) {
-            if (!obs_residuals[i].rejected) {
-                residuals(2*i) = obs_residuals[i].ra_residual_arcsec;
-                residuals(2*i+1) = obs_residuals[i].dec_residual_arcsec;
-                weights(2*i) = obs_residuals[i].weight_ra;
-                weights(2*i+1) = obs_residuals[i].weight_dec;
+            if (!current_residuals[i].rejected) {
+                // IMPORTANT: Normal Equation is A^T * W * (y - y_model)
+                // residuals vector here contains (Observed - Computed) = y - f(x)
+                res_vec(2*i) = current_residuals[i].ra_residual_arcsec;
+                res_vec(2*i+1) = current_residuals[i].dec_residual_arcsec;
+                weights(2*i) = current_residuals[i].weight_ra;
+                weights(2*i+1) = current_residuals[i].weight_dec;
             } else {
-                residuals(2*i) = 0.0;
-                residuals(2*i+1) = 0.0;
-                weights(2*i) = 0.0;
-                weights(2*i+1) = 0.0;
+                res_vec(2*i) = 0; res_vec(2*i+1) = 0;
+                weights(2*i) = 0; weights(2*i+1) = 0;
             }
         }
         
-        // Solve normal equations
-        Eigen::Vector<double, 6> dx = solve_normal_equations(
-            A, residuals, weights, result.covariance
-        );
+        // Solve for full step dx
+        Eigen::Vector<double, 6> dx_full = solve_normal_equations(A, res_vec, weights, result.covariance);
         
-        // Update state
-        result.state += dx;
+        // Safety: Limit step size to avoid divergence (Trust Region)
+        // Especially for position components [0,1,2] (AU)
+        double pos_step_norm = dx_full.head<3>().norm();
+        constexpr double MAX_STEP_AU = 0.1; // Max 0.1 AU correction per step
         
-        // Check convergence
-        if (dx.norm() < tolerance_) {
+        if (pos_step_norm > MAX_STEP_AU) {
+            double scale_factor = MAX_STEP_AU / pos_step_norm;
+            dx_full *= scale_factor;
+            // std::cout << "Step limited: " << pos_step_norm << " AU -> " << MAX_STEP_AU << " AU\n";
+        }
+        
+        // --- LINE SEARCH (Step Halving) ---
+        double scale = 1.0;
+        bool step_accepted = false;
+        Eigen::Vector<double, 6> candidate_state;
+        std::vector<ObservationResidual> candidate_residuals;
+        double candidate_rms = 0.0;
+
+        // Try reducing step size: 1.0, 0.5, 0.25 ... 
+        for (int k = 0; k < 8; ++k) { 
+            candidate_state = result.state + dx_full * scale;
+            
+            // Compute residuals at candidate
+            candidate_residuals = residual_func(candidate_state, epoch_mjd);
+            
+            // Apply SAME rejection mask as baseline to compare apples to apples?
+            // Or re-eval rejection? Usually re-eval happens next iter.
+            // Let's assume rejection mask is fixed for the step calculation.
+            for(size_t i=0; i<candidate_residuals.size(); ++i) {
+                candidate_residuals[i].rejected = current_residuals[i].rejected;
+            }
+            
+            candidate_rms = calc_rms(candidate_residuals);
+            
+            if (candidate_rms < current_rms) {
+                // Improvement found!
+                step_accepted = true;
+                break;
+            }
+            
+            // If RMS increased (or is NaN), reduce step
+            scale *= 0.5;
+        }
+        
+        // If even small step fails, check if we are already precise enough
+        if (!step_accepted) {
+            if (dx_full.norm() < tolerance_) {
+                // Actually converged locally
+                result.converged = true;
+                break;
+            } else {
+                // Stuck in local minimum or divergence
+                // Accept the smallest step anyway? Or stop? 
+                // Let's accept smallest step to see if it escapes next time, or break.
+                // Usually break.
+                // std::cerr << "Line search failed. Stopping.\n";
+                break;
+            }
+        }
+        
+        // Apply Step
+        result.state = candidate_state;
+        current_residuals = candidate_residuals;
+        current_rms = candidate_rms;
+        
+        // Check Convergence (on the accepted scaled step)
+        if ((dx_full * scale).norm() < tolerance_) {
             result.converged = true;
-            result.residuals = obs_residuals;
-            compute_statistics(obs_residuals, result);
             break;
         }
     }
     
-    if (!result.converged) {
-        // Final statistics even if not converged
-        auto final_residuals = residual_func(result.state, epoch_mjd);
-        result.residuals = final_residuals;
-        compute_statistics(final_residuals, result);
-    }
+    // Store final results
+    result.residuals = current_residuals;
+    compute_statistics(current_residuals, result);
     
     return result;
 }

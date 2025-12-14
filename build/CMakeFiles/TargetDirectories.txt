@@ -1,94 +1,71 @@
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles/test.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles/edit_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles/rebuild_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles/list_install_components.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles/install.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles/install/local.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/CMakeFiles/install/strip.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/CMakeFiles/test.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/CMakeFiles/edit_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/CMakeFiles/rebuild_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/CMakeFiles/list_install_components.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/CMakeFiles/install.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/CMakeFiles/install/local.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/CMakeFiles/install/strip.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/gmock.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/test.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/edit_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/rebuild_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/list_install_components.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/install.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/install/local.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googlemock/CMakeFiles/install/strip.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/gtest.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/gtest_main.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/test.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/edit_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/rebuild_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/list_install_components.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/install.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/install/local.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/_deps/googletest-build/googletest/CMakeFiles/install/strip.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/astdyn.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/astdyn_shared.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/astdyn_program.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/astdyn_convert.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/test.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/edit_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/rebuild_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/list_install_components.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/install.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/install/local.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/src/CMakeFiles/install/strip.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_math_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_time_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_utils_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_coordinates_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_reference_frames_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_jacobian_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_propagation_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_validation_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_ephemeris_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_propagator_asteroids_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_engine_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/validation_ceres.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_config_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_rkf78_debug.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_orbit_determination_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_close_approach_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_mean_osculating_tests.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_validation.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_gauss_iod.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_full_dynamics.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_diffcorr.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/test_eq1_parser.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_fit.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_comparison.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_single_residual_debug.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_astdys_fitter.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_residual_debug.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_residual_single.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_diffcorr_simple.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/test.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/edit_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/rebuild_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/list_install_components.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/install.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/install/local.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/tests/CMakeFiles/install/strip.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/example_basic.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/example_coordinates.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/example_ephemeris.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/propagation_benchmark.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/propagation_diagnostic.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/example_astdys_fitter.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/example_configurable_parsers.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/test.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/edit_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/rebuild_cache.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/list_install_components.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/install.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/install/local.dir
-/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/build/examples/CMakeFiles/install/strip.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/test.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/edit_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/rebuild_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/list_install_components.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/install.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/install/local.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/install/strip.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/astdyn.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/astdyn_shared.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/astdyn_program.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/astdyn_convert.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/test.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/edit_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/rebuild_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/list_install_components.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/install.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/install/local.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/CMakeFiles/install/strip.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_time_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_utils_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_coordinates_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_reference_frames_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_jacobian_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_propagation_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_validation_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_ephemeris_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_propagator_asteroids_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_engine_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/validation_ceres.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_config_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_rkf78_debug.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_orbit_determination_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_close_approach_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_mean_osculating_tests.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_validation.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_gauss_iod.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_full_dynamics.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_diffcorr.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/test_eq1_parser.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_fit.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_comparison.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_single_residual_debug.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_astdys_fitter.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_residual_debug.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_residual_single.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/astdyn_pompeja_diffcorr_simple.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/test.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/edit_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/rebuild_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/list_install_components.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/install.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/install/local.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/CMakeFiles/install/strip.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/example_basic.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/example_coordinates.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/example_ephemeris.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/propagation_benchmark.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/propagation_diagnostic.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/example_astdys_fitter.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/simple_pompeja_fit.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/fitorb_api_demo.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/example_configurable_parsers.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/propagate_79148.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/test.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/edit_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/rebuild_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/list_install_components.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/install.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/install/local.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/CMakeFiles/install/strip.dir

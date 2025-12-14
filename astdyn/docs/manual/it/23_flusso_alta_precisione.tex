@@ -1,0 +1,59 @@
+\chapter{Flusso di Lavoro ad Alta Precisione}
+\label{ch:high_precision}
+
+Questo capitolo descrive il flusso di lavoro raccomandato per ottenere risultati astrometrici di alta precisione utilizzando le funzionalità avanzate di AstDyn.
+
+\section{Astrometria Rigorosa}
+
+Per garantire residui sub-arcosecondo e orbite di alta fedeltà, AstDyn implementa un modello astrometrico rigoroso che include:
+
+\begin{itemize}
+    \item \textbf{Sistemi di Riferimento Coerenti}: Tutte le integrazioni avvengono nel sistema baricentrico (ICRF), ma la posizione dell'osservatore (Terra) viene attentamente riferita al Sole per calcolare correttamente i vettori eliocentrici quando necessario.
+    \item \textbf{Aberrazione Annua}: Viene applicata utilizzando la velocità della Terra rispetto al Baricentro del Sistema Solare (SSB).
+    \item \textbf{Correzione Tempo di Luce}: Calcolata iterativamente per tenere conto del tempo impiegato dai fotoni per raggiungere l'osservatore.
+\end{itemize}
+
+\subsection{Configurazione del Propagatore}
+
+Per attivare la modalità ad alta precisione, configurare il propagatore come segue:
+
+\begin{lstlisting}[style=cpp,caption={Configurazione per Alta Precisione}]
+PropagationSettings settings;
+settings.include_planets = true;     // Perturbazioni planetarie (DE441)
+settings.include_asteroids = true;   // Perturbazioni dei 300+ asteroidi maggiori
+settings.include_relativity = true;  // Relatività Generale (PPN)
+settings.time_scale = TimeScale::TDB; // Utilizzo rigoroso del Tempo Dinamico
+\end{lstlisting}
+
+\section{Gestione del Tempo (TimeScale)}
+
+La precisione temporale è critica. Un errore di 1 secondo può corrispondere a decine di chilometri di errore orbitale.
+
+\subsection{Caricamento Dati IERS}
+
+Per la massima accuratezza nella rotazione terrestre (necessaria per osservatori da terra), è indispensabile caricare i prodotti IERS (International Earth Rotation Service):
+
+\begin{lstlisting}[style=cpp,caption={Caricamento EOP}]
+// Carica i dati Earth Orientation Parameters (UT1-UTC, Polar Motion)
+bool ok = astdyn::time::load_dut1_data("finals.all");
+if (!ok) {
+    std::cerr << "Attenzione: EOP non caricati. Usata approssimazione." << std::endl;
+}
+\end{lstlisting}
+
+\subsection{API di Conversione}
+
+Il modulo \texttt{TimeScale} offre funzioni collaudate per le conversioni:
+
+\begin{itemize}
+    \item \texttt{utc\_to\_tdb(mjd\_utc)}: Da usare per preparare i tempi di integrazione.
+    \item \texttt{utc\_to\_ut1(mjd\_utc)}: Usato internamente per il calcolo del Tempo Siderale (GMST/LAST).
+\end{itemize}
+
+\section{Best Practices per l'Analisi}
+
+\begin{enumerate}
+    \item \textbf{Inizializzazione}: Se possibile, inizializzare l'orbita con un vettore di stato Cartesiano (Posizione/Velocità) non singolare, idealmente ottenuto da JPL Horizons, per evitare le approssimazioni intrinseche degli elementi osculatori Kepleriani in epoche lontane.
+    \item \textbf{Effemeridi}: Utilizzare sempre file SPK binari (es. \texttt{de441.bsp}) per la posizione dei pianeti. Le formule analitiche approssimate non sono sufficienti per l'astrometria di precisione moderna.
+    \item \textbf{Verifica}: Controllare sempre che l'RMS post-fit sia compatibile con l'errore del catalogo stellare utilizzato (tipicamente $< 0.5$ arcsec per Gaia DR3).
+\end{enumerate}
