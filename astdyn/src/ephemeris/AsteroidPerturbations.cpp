@@ -5,6 +5,7 @@
 
 #include <astdyn/ephemeris/AsteroidPerturbations.hpp>
 #include <astdyn/propagation/OrbitalElements.hpp>
+#include <astdyn/coordinates/ReferenceFrame.hpp>
 #include <cmath>
 #include <fstream>
 #include <sstream>
@@ -178,14 +179,21 @@ Eigen::Vector3d AsteroidPerturbations::keplerianToCartesian(
     double cos_i = std::cos(i);
     double sin_i = std::sin(i);
     
-    Eigen::Vector3d pos;
-    pos[0] = (cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i) * x_orb
+    // ... (previous calculation of pos in Ecliptic) ...
+    Eigen::Vector3d pos_ecliptic;
+    pos_ecliptic[0] = (cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i) * x_orb
            + (-cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i) * y_orb;
-    pos[1] = (sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i) * x_orb
+    pos_ecliptic[1] = (sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i) * x_orb
            + (-sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i) * y_orb;
-    pos[2] = (sin_omega * sin_i) * x_orb + (cos_omega * sin_i) * y_orb;
+    pos_ecliptic[2] = (sin_omega * sin_i) * x_orb + (cos_omega * sin_i) * y_orb;
     
-    return pos;
+    // Transform Ecliptic J2000 -> Equatorial J2000
+    // We utilize the ReferenceFrame static method for consistency
+    return coordinates::ReferenceFrame::transform_position(
+        pos_ecliptic,
+        coordinates::FrameType::ECLIPTIC,
+        coordinates::FrameType::J2000
+    );
 }
 
 // AST17 default data implementation

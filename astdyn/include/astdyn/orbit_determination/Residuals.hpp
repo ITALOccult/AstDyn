@@ -218,6 +218,8 @@ private:
      */
     void cartesian_to_radec(
         const astdyn::Vector3d& direction,
+        const astdyn::Vector3d& rho_vec,
+        const astdyn::Vector3d& observer_pos,
         double& ra,
         double& dec) const;
 

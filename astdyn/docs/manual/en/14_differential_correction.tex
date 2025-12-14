@@ -142,6 +142,16 @@ Combine geometric partials, rotation, and $\Phi$:
 
 Note: RA/Dec depend only on position, not velocity, in geometric partials. Velocity affects observations through propagation ($\Phi$).
 
+\subsection{Robustness Enhancements}
+
+To ensure stability even when starting from poor initial orbit guesses (e.g., RMS $> 1000$ arcsec), AstDyn implements specific safeguards:
+
+\begin{description}
+    \item[Trust Region (Step Limiting)] The correction vector $\Delta\mathbf{y}_0$ is clamped to a maximum magnitude (0.1 AU for position) per iteration. This prevents "overshooting" into physically invalid regions (e.g., hyperbolic escape) due to linearity breakdown.
+    
+    \item[Outlier Safety] Outlier rejection is disabled if the global RMS is very high ($> 100$ arcsec). This prevents the algorithm from discarding valid observations when the model is still far from convergence, allowing it to "walk" towards the solution first.
+\end{description}
+
 \section{Algorithm}
 The differential correction algorithm implemented in AstDyn is detailed below.
 

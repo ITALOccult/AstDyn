@@ -91,15 +91,21 @@ Planetary positions $\mathbf{r}_p(t)$ are obtained from:
     \item Simplified Keplerian ephemerides (lower accuracy)
 \end{itemize}
 
-\subsection{Relativistic Correction}
+\subsection{Relativistic Correction (PPN)}
 
-Post-Newtonian (1PN) term:
+AstDyn implements the Einstein-Infeld-Hoffmann (EIH) equations of motion using the Parameterized Post-Newtonian (PPN) formalism:
 
 \begin{equation}
-    \mathbf{a}_{\text{GR}} = \frac{\mu_\odot}{c^2 r^3}\left[ (4\frac{\mu_\odot}{r} - v^2)\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v} \right]
+    \mathbf{a}_{\text{GR}} = \frac{\mu_\odot}{c^2 r^3} \left[ \left(2(\beta+\gamma)\frac{\mu_\odot}{r} - \gamma v^2\right)\mathbf{r} + 2(1+\gamma)(\mathbf{r} \cdot \mathbf{v})\mathbf{v} \right]
 \end{equation}
 
-This is typically $\sim 10^{-10}$ m/s$^2$ for asteroids, but accumulates over long timescales.
+where:
+\begin{itemize}
+    \item $\beta$: measure of non-linearity in superposition (GR: $\beta=1$)
+    \item $\gamma$: measure of space curvature (GR: $\gamma=1$)
+\end{itemize}
+
+Default values in AstDyn are $\beta=\gamma=1$ (General Relativity), but can be configured for testing alternative theories. This correction is typically $\sim 10^{-10}$ m/s$^2$ for asteroids, but is essential for sub-arcsecond precision.
 
 \subsection{Solar Radiation Pressure}
 
