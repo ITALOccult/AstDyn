@@ -180,9 +180,9 @@ OrbitFitResult OrbitFitAPI::run_fit(
         config.propagator_settings.perturb_uranus = true;
         config.propagator_settings.perturb_neptune = true;
         
-        // Force Asteroid Perturbations (AST17 model)
+        // Force Asteroid Perturbations (AST17 model) - DISABLED for stability defaults
         // This is critical for high precision over long arcs
-        config.propagator_settings.include_asteroids = true;
+        // config.propagator_settings.include_asteroids = true;
         
         // Force RKF78 for speed/accuracy balance
         config.integrator_type = "RKF78";

@@ -136,10 +136,26 @@ void AstDynEngine::load_config(const std::string& oop_file) {
     config_.propagator_settings.include_planets = parser.getBool("perturb.planets", true);
     config_.propagator_settings.include_asteroids = parser.getBool("perturb.asteroids", false);
     config_.propagator_settings.include_relativity = parser.getBool("perturb.relativity", false);
+    config_.propagator_settings.include_moon = parser.getBool("perturb.moon", true);
+    
+    // Detailed planetary settings (only effective if perturb.planets is true)
+    config_.propagator_settings.perturb_mercury = parser.getBool("perturb.mercury", true);
+    config_.propagator_settings.perturb_venus = parser.getBool("perturb.venus", true);
+    config_.propagator_settings.perturb_earth = parser.getBool("perturb.earth", true);
+    config_.propagator_settings.perturb_mars = parser.getBool("perturb.mars", true);
+    config_.propagator_settings.perturb_jupiter = parser.getBool("perturb.jupiter", true);
+    config_.propagator_settings.perturb_saturn = parser.getBool("perturb.saturn", true);
+    config_.propagator_settings.perturb_uranus = parser.getBool("perturb.uranus", true);
+    config_.propagator_settings.perturb_neptune = parser.getBool("perturb.neptune", true);
+
+    // Non-Gravitational
+    config_.propagator_settings.include_yarkovsky = parser.getBool("perturb.yarkovsky", false);
+    config_.propagator_settings.yarkovsky_a2 = parser.getDouble("perturb.yarkovsky_a2", 0.0);
     
     // Load Ephemeris settings
     config_.ephemeris_type = parser.getString("ephemeris.type", "Analytical");
     config_.ephemeris_file = parser.getString("ephemeris.file", "");
+    config_.asteroid_ephemeris_file = parser.getString("ephemeris.asteroid_file", "");
     
     // Load EOP settings
     config_.eop_file = parser.getString("eop.file", "");
@@ -155,8 +171,9 @@ void AstDynEngine::load_config(const std::string& oop_file) {
     // Load differential correction settings
     config_.max_iterations = parser.getInt("diffcorr.max_iter", 20);
     config_.convergence_threshold = parser.getDouble("diffcorr.convergence", 1e-6);
-    config_.convergence_threshold = parser.getDouble("diffcorr.convergence", 1e-6);
     config_.outlier_sigma = parser.getDouble("diffcorr.outlier_threshold", 3.0);
+    config_.outlier_max_sigma = parser.getDouble("diffcorr.outlier_max", 10.0);
+    config_.outlier_min_sigma = parser.getDouble("diffcorr.outlier_min", 3.0);
     
     // Load residual settings
     config_.aberration_correction = parser.getBool("residuals.aberration", true);
@@ -204,8 +221,74 @@ int AstDynEngine::load_observations(const std::string& filename) {
     return observations_.size();
 }
 
-void AstDynEngine::add_observation(const OpticalObservation& obs) {
-    observations_.push_back(obs);
+void AstDynEngine::load_catalog_biases(const std::string& filename) {
+    catalog_biases_.clear();
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        if (config_.verbose) std::cerr << "Warning: Could not open catalog bias file " << filename << std::endl;
+        return;
+    }
+    
+    std::string line;
+    // Skip header if present
+    std::getline(file, line);
+    if (line.find("Code") == std::string::npos && line.find("code") == std::string::npos) {
+        // No header? Reset stream
+        file.clear();
+        file.seekg(0);
+    }
+
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        std::stringstream ss(line);
+        std::string code, ra_bias_str, dec_bias_str;
+        
+        if (std::getline(ss, code, ',') && 
+            std::getline(ss, ra_bias_str, ',') && 
+            std::getline(ss, dec_bias_str, ',')) { // Simple CSV: Code,RA_Bias,Dec_Bias
+            
+            try {
+                // Trim code
+                code.erase(0, code.find_first_not_of(" \t\r\n"));
+                code.erase(code.find_last_not_of(" \t\r\n") + 1);
+                
+                double ra_bias = std::stod(ra_bias_str); // arcsec
+                double dec_bias = std::stod(dec_bias_str); // arcsec
+                catalog_biases_[code] = {ra_bias, dec_bias};
+            } catch (...) {
+                continue;
+            }
+        }
+    }
+    
+    if (config_.verbose) {
+        std::cout << "Loaded biases for " << catalog_biases_.size() << " observatories from " << filename << std::endl;
+    }
+}
+
+void AstDynEngine::add_observation(const observations::OpticalObservation& obs) {
+    observations::OpticalObservation corrected_obs = obs;
+    
+    // Apply catalog bias if available
+    auto it = catalog_biases_.find(obs.observatory_code);
+    if (it != catalog_biases_.end()) {
+        // Biases are usually defined as (Observed - True), so we subtract bias to get "True"
+        // Wait, bias correction means: Corrected = Observed - Bias?
+        // Usually catalogs have systematic errors. 
+        // If star catalog is shifted by +0.1", obs is +0.1". 
+        // to correct, we subtract 0.1".
+        // So Corrected = Observed - Bias.
+        // Bias units: arcsec.
+        // RA/Dec units: degrees (in OpticalObservation structure).
+        
+        double ra_bias_deg = it->second.first / 3600.0;
+        double dec_bias_deg = it->second.second / 3600.0;
+        
+        corrected_obs.ra -= ra_bias_deg;
+        corrected_obs.dec -= dec_bias_deg;
+    }
+
+    observations_.push_back(corrected_obs);
 }
 
 void AstDynEngine::validate_observations() {
@@ -394,7 +477,13 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
     orbit_determination::DifferentialCorrectorSettings dc_settings;
     dc_settings.max_iterations = config_.max_iterations;
     dc_settings.convergence_tolerance = config_.convergence_threshold;
+    // Relax outlier threshold to avoid rejecting all data initially
+    // Standard OrbFit practice: Initial large sigma, then tighten.
+    // Ideally DC handles this strategy. For now, set to 10.0 if default 3.0 is likely too tight for initial guess.
     dc_settings.outlier_sigma = config_.outlier_sigma;
+    dc_settings.outlier_max_sigma = config_.outlier_max_sigma;
+    dc_settings.outlier_min_sigma = config_.outlier_min_sigma;
+    
     dc_settings.verbose = config_.verbose;
     
     // Perform differential correction using fit() method
@@ -407,8 +496,8 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
     OrbitDeterminationResult result;
     result.orbit = current_orbit_;
     result.covariance = result_dc.covariance;
-    result.rms_ra = result_dc.statistics.rms_ra * 3600.0;  // Convert to arcsec (already in arcsec from ResidualStatistics)
-    result.rms_dec = result_dc.statistics.rms_dec * 3600.0;
+    result.rms_ra = result_dc.statistics.rms_ra;  
+    result.rms_dec = result_dc.statistics.rms_dec;
     result.chi_squared = result_dc.statistics.chi_squared;
     result.num_observations = result_dc.statistics.num_observations;
     result.num_rejected = result_dc.statistics.num_outliers;

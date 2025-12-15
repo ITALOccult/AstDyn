@@ -59,6 +59,18 @@ Eigen::VectorXd Propagator::compute_derivatives(double t, const Eigen::VectorXd&
         acceleration += asteroid_perturbations(position, t, sun_pos_bary);
     }
     
+    // Yarkovsky Effect (Non-Gravitational)
+    if (settings_.include_yarkovsky && std::abs(settings_.yarkovsky_a2) > 0.0) {
+        double r = position.norm();
+        double v_norm = velocity.norm();
+        if (r > 1e-6 && v_norm > 1e-9) { // Avoid division by zero
+            // Tangential acceleration: a = (A2 / r^2) * (v / |v|)
+            // A2 is AU/d^2 at 1 AU
+            double r2 = r * r;
+            acceleration += (settings_.yarkovsky_a2 / r2) * (velocity / v_norm);
+        }
+    }
+    
     
     // Derivative: [velocity, acceleration]
     Eigen::VectorXd derivative(6);

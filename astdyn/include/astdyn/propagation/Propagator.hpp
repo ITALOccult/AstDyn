@@ -51,6 +51,10 @@ struct PropagatorSettings {
     // Optional: Path to Asteroid SPK kernel (e.g. codes_300ast.bsp)
     // If empty, uses analytical approximation (AST17 constants)
     std::string asteroid_ephemeris_file = "";
+
+    // Non-Gravitational Forces (Yarkovsky)
+    bool include_yarkovsky = false;
+    double yarkovsky_a2 = 0.0; // AU/d^2 at 1 AU (Tangential Acceleration Parameter)
 };
 
 /**

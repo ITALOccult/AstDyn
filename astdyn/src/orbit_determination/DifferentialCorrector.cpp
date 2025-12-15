@@ -49,6 +49,9 @@ DifferentialCorrectorResult DifferentialCorrector::fit(
         std::cout << "Convergence: " << settings.convergence_tolerance << " AU\n\n";
     }
     
+    double current_sigma = std::max(settings.outlier_sigma, settings.outlier_max_sigma);
+    if (!settings.reject_outliers) current_sigma = 0.0; // Unused
+    
     // Main iteration loop
     for (int iter = 0; iter < settings.max_iterations; ++iter) {
         result.iterations = iter + 1;
@@ -68,8 +71,9 @@ DifferentialCorrectorResult DifferentialCorrector::fit(
         }
         
         // Reject outliers if requested
+        // Carpentry: Use current_sigma
         if (settings.reject_outliers && iter > 0) {
-            ResidualCalculator::identify_outliers(residuals, settings.outlier_sigma);
+            ResidualCalculator::identify_outliers(residuals, current_sigma);
         }
         
         // Compute statistics
@@ -88,7 +92,8 @@ DifferentialCorrectorResult DifferentialCorrector::fit(
                       << stats.rms_total << " arcsec, "
                       << "||Δx|| = " << std::scientific << std::setprecision(2)
                       << correction.norm() << " AU, "
-                      << "Outliers = " << stats.num_outliers << "\n";
+                      << "Outliers(" << std::fixed << std::setprecision(1) << current_sigma << "σ) = " 
+                      << stats.num_outliers << "\n";
         }
         
         // Apply correction
@@ -97,6 +102,27 @@ DifferentialCorrectorResult DifferentialCorrector::fit(
         
         // Check convergence
         if (check_convergence(correction, settings.convergence_tolerance)) {
+            
+            // CARPENTRY Check
+            // If we converged with a loose sigma, tighten it and continue iterating
+            if (settings.reject_outliers && current_sigma > settings.outlier_min_sigma + 0.1) {
+                double old_sigma = current_sigma;
+                // Tighten schema: Reduce by half, but not below min
+                current_sigma = std::max(settings.outlier_min_sigma, current_sigma * 0.5);
+                
+                if (settings.verbose) {
+                    std::cout << ">> Carpentry: Tightening sigma " 
+                              << old_sigma << " -> " << current_sigma << ". Continuing...\n";
+                }
+                
+                // Force re-identification of outliers with new sigma immediately? 
+                // Wait, identify_outliers is called at start of next iteration (if iter > 0).
+                // Actually, residuals are already computed. If I change sigma now and continue, 
+                // the next iteration will call identify_outliers(..., current_sigma). 
+                // Correct.
+                continue; 
+            }
+            
             result.converged = true;
             result.final_state = current_state;
             result.residuals = residuals;

@@ -167,6 +167,20 @@ target_link_libraries(astdyn_engine_tests
 
 gtest_discover_tests(astdyn_engine_tests)
 
+# Test executable for Asteroid Fitter Horizons comparison
+add_executable(test_asteroid_fitter_horizons
+    test_asteroid_fitter_horizons.cpp
+)
+
+target_link_libraries(test_asteroid_fitter_horizons
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(test_asteroid_fitter_horizons)
+
 # ============================================================================
 # Validation Tests
 # ============================================================================

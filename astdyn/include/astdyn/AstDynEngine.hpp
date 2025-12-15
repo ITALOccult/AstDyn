@@ -52,7 +52,9 @@ struct AstDynConfig {
     // Differential correction settings
     int max_iterations = 10;                 ///< Maximum DC iterations
     double convergence_threshold = 1e-6;     ///< Convergence threshold
-    double outlier_sigma = 3.0;              ///< Outlier rejection threshold (sigma)
+    double outlier_sigma = 3.0;              ///< Outlier rejection threshold (legacy/default)
+    double outlier_max_sigma = 10.0;         ///< Carpentry start sigma
+    double outlier_min_sigma = 3.0;          ///< Carpentry end sigma
     
     // Close approach settings
     close_approach::CloseApproachSettings ca_settings;
@@ -68,6 +70,9 @@ struct AstDynConfig {
     
     // Time settings
     std::string eop_file = "";               ///< Path to IERS EOP file (finals.all)
+    
+    // Catalog Biases
+    std::string catalog_bias_file = "";      ///< Path to catalog bias CSV file
 };
 
 /**
@@ -344,6 +349,10 @@ private:
     std::shared_ptr<propagation::Propagator> propagator_;  // Shared because used by multiple components
     std::unique_ptr<orbit_determination::DifferentialCorrector> corrector_;
     std::unique_ptr<close_approach::CloseApproachDetector> ca_detector_;
+    
+    // Catalog Biases
+    std::map<std::string, std::pair<double, double>> catalog_biases_; // Code -> {RA, Dec} arcsec
+    void load_catalog_biases(const std::string& filename);
 };
 
 } // namespace astdyn

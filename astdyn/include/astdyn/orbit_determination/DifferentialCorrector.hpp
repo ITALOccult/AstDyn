@@ -34,7 +34,12 @@ namespace astdyn::orbit_determination {
 struct DifferentialCorrectorSettings {
     int max_iterations = 20;             ///< Maximum iterations
     double convergence_tolerance = 1e-6; ///< Convergence threshold [AU]
-    double outlier_sigma = 3.0;          ///< Sigma threshold for outliers
+    double outlier_sigma = 3.0;          ///< Target Sigma threshold (default)
+    
+    // Carpentry Settings (Iterative Rejection)
+    double outlier_max_sigma = 10.0;     ///< Starting loose sigma
+    double outlier_min_sigma = 3.0;      ///< Final tight sigma
+    
     bool reject_outliers = true;         ///< Automatically reject outliers
     bool compute_covariance = true;      ///< Compute covariance matrix
     bool verbose = false;                ///< Print iteration details
