@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(OrbFit 
-    VERSION 1.0.0
-    DESCRIPTION "C++ port of OrbFit - Orbit determination and propagation software"
-    LANGUAGES CXX
+project(OrbFit
+    VERSION 1.0
+    DESCRIPTION "High-precision Asteroid Dynamics Library"
+    HOMEPAGE_URL "https://github.com/ITALOccult/AstDyn"
+    LANGUAGES CXX C
 )
 
 # ============================================================================
