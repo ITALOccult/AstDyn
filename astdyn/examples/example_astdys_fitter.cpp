@@ -17,17 +17,17 @@ int main(int argc, char* argv[]) {
     try {
         // Check arguments
         if (argc < 4) {
-            std::cerr << "Usage: " << argv[0] << " <observations.rwo> <elements.eq1> <config.oop>\n";
+            std::cerr << "Usage: " << argv[0] << " <observations.rwo> <elements.eq1> <config.json>\n";
             std::cerr << "\nExample:\n";
             std::cerr << "  " << argv[0] << " astdyn/tools/203_astdys_recent100.rwo "
                       << "astdyn/tools/203_astdys_latest.eq1 "
-                      << "astdyn/tools/astdyn.oop\n";
+                      << "astdyn/tools/astdyn.json\n";
             return 1;
         }
 
         std::string rwo_file = argv[1];
         std::string eq1_file = argv[2];
-        std::string oop_file = argv[3];
+        std::string config_file = argv[3];
 
         std::cout << "╔═══════════════════════════════════════════════════════════╗\n";
         std::cout << "║      AstDyS Orbit Fitter - Simple Example                ║\n";
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
 
         // Step 3: Load configuration
         std::cout << "3. Loading configuration...\n";
-        fitter.set_config_file(oop_file);
+        fitter.set_config_file(config_file);
         std::cout << "\n";
 
         // Step 4: Run differential correction

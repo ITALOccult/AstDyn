@@ -14,7 +14,7 @@ project(OrbFit
 option(ASTDYN_BUILD_TESTS "Build unit tests" ON)
 option(ASTDYN_BUILD_EXAMPLES "Build examples" ON)
 option(ASTDYN_BUILD_DOCS "Build documentation" OFF)
-option(ASTDYN_USE_SPICE "Use SPICE toolkit for ephemerides" ON)
+option(ASTDYN_USE_SPICE "Use SPICE toolkit for ephemerides" OFF)
 option(ASTDYN_ENABLE_PROFILING "Enable profiling support" OFF)
 option(ASTDYN_BUILD_SHARED "Build shared library in addition to static" ON)
 

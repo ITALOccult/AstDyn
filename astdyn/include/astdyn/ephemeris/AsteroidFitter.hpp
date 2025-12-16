@@ -140,70 +140,72 @@ public:
     }
 
     /**
-     * @brief Generate a temporary .oop configuration file from EngineConfig.
+     * @brief Generate a temporary .json configuration file from EngineConfig.
      */
     static std::string generateTempConfig(const AsteroidFitConfig& cfg) {
-        std::string temp_path = "temp_astdyn_fit.oop";
+        std::string temp_path = "temp_astdyn_fit.json";
         std::ofstream f(temp_path);
         if (!f) return "";
         
         const auto& ec = cfg.engine_config;
+        nlohmann::json j;
         
         // Ephemeris
         if (!ec.ephemeris_file.empty()) {
-            f << "ephemeris.type = DE441\n";
-            f << "ephemeris.file = " << ec.ephemeris_file << "\n";
+            j["ephemeris"]["type"] = "DE441";
+            j["ephemeris"]["file"] = ec.ephemeris_file;
         } else {
-            f << "ephemeris.type = Analytical\n";
+            j["ephemeris"]["type"] = "Analytical";
         }
         
         if (!ec.asteroid_ephemeris_file.empty()) {
-            f << "ephemeris.asteroid_file = " << ec.asteroid_ephemeris_file << "\n";
+            j["ephemeris"]["asteroid_file"] = ec.asteroid_ephemeris_file;
         }
         
-        // Global Perturbations
-        f << "perturb.planets = " << (ec.include_planets ? "true" : "false") << "\n";
-        f << "perturb.relativity = " << (ec.include_relativity ? "true" : "false") << "\n";
-        f << "perturb.moon = " << (ec.include_moon ? "true" : "false") << "\n";
+        // Perturbations
+        j["perturb"]["planets"] = ec.include_planets;
+        j["perturb"]["relativity"] = ec.include_relativity;
+        j["perturb"]["moon"] = ec.include_moon;
         
         // Non-Gravitational
-        f << "perturb.yarkovsky = " << (ec.include_yarkovsky ? "true" : "false") << "\n";
-        f << "perturb.yarkovsky_a2 = " << ec.yarkovsky_a2 << "\n";
+        j["perturb"]["yarkovsky"] = ec.include_yarkovsky;
+        j["perturb"]["yarkovsky_a2"] = ec.yarkovsky_a2;
         
         if (!ec.catalog_bias_file.empty()) {
-            f << "catalog.bias_file = " << ec.catalog_bias_file << "\n";
+            j["catalog"]["bias_file"] = ec.catalog_bias_file;
         }
         
-        // Carpentry
-        f << "diffcorr.outlier_max = " << ec.outlier_max_sigma << "\n";
-        f << "diffcorr.outlier_min = " << ec.outlier_min_sigma << "\n";
+        // Differential Correction
+        j["diffcorr"]["outlier_max"] = ec.outlier_max_sigma;
+        j["diffcorr"]["outlier_min"] = ec.outlier_min_sigma;
         
         // Detailed Planets
         if (ec.include_planets) {
-             f << "perturb.mercury = " << (ec.perturb_mercury ? "true" : "false") << "\n";
-             f << "perturb.venus = " << (ec.perturb_venus ? "true" : "false") << "\n";
-             f << "perturb.earth = " << (ec.perturb_earth ? "true" : "false") << "\n";
-             f << "perturb.mars = " << (ec.perturb_mars ? "true" : "false") << "\n";
-             f << "perturb.jupiter = " << (ec.perturb_jupiter ? "true" : "false") << "\n";
-             f << "perturb.saturn = " << (ec.perturb_saturn ? "true" : "false") << "\n";
-             f << "perturb.uranus = " << (ec.perturb_uranus ? "true" : "false") << "\n";
-             f << "perturb.neptune = " << (ec.perturb_neptune ? "true" : "false") << "\n";
+             j["perturb"]["mercury"] = ec.perturb_mercury;
+             j["perturb"]["venus"] = ec.perturb_venus;
+             j["perturb"]["earth"] = ec.perturb_earth;
+             j["perturb"]["mars"] = ec.perturb_mars;
+             j["perturb"]["jupiter"] = ec.perturb_jupiter;
+             j["perturb"]["saturn"] = ec.perturb_saturn;
+             j["perturb"]["uranus"] = ec.perturb_uranus;
+             j["perturb"]["neptune"] = ec.perturb_neptune;
         }
         
         // Asteroid Mode
         if (ec.asteroid_mode == "none") {
-            f << "perturb.asteroids = false\n";
+            j["perturb"]["asteroids"] = false;
         } else if (ec.asteroid_mode == "major_17") {
-            f << "perturb.asteroids = true\n";
+            j["perturb"]["asteroids"] = true;
         } else if (ec.asteroid_mode == "full_300") {
-            f << "perturb.asteroids = true\n";
+            j["perturb"]["asteroids"] = true;
         }
         
         // Integrator
-        f << "integrator.type = " << ec.integrator_type << "\n";
-        f << "integrator.step_size = " << ec.initial_step_size << "\n";
-        f << "integrator.tolerance = " << ec.tolerance << "\n";
+        j["integrator"]["type"] = ec.integrator_type;
+        j["integrator"]["step_size"] = ec.initial_step_size;
+        j["integrator"]["tolerance"] = ec.tolerance;
         
+        f << j.dump(4);
         f.close();
         return temp_path;
     }

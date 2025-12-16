@@ -14,6 +14,7 @@
 #include "astdyn/time/TimeScale.hpp"
 #include "astdyn/io/AstDynConfig.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
+#include <nlohmann/json.hpp>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -116,49 +117,114 @@ void AstDynEngine::update_propagator() {
         config_.propagator_settings);
 }
 
-void AstDynEngine::load_config(const std::string& oop_file) {
-    config::OptionFileParser parser;
-    
-    if (!parser.load(oop_file)) {
+void AstDynEngine::load_config(const std::string& config_file) {
+    if (config_.verbose) {
+        std::cout << "Loading configuration from: " << config_file << "\n";
+    }
+
+    std::ifstream f(config_file);
+    if (!f.is_open()) {
         if (config_.verbose) {
-            std::cerr << "WARNING: Could not load config file " << oop_file 
+            std::cerr << "WARNING: Could not open config file " << config_file 
                       << ", using defaults\n";
         }
         return;
     }
-    
-    // Load integrator configuration
-    config_.integrator_type = parser.getString("integrator.type", "RK4");
-    config_.initial_step_size = parser.getDouble("integrator.step_size", 0.1);
-    config_.tolerance = parser.getDouble("integrator.tolerance", 1e-12);
-    
-    // Load perturbation settings
-    config_.propagator_settings.include_planets = parser.getBool("perturb.planets", true);
-    config_.propagator_settings.include_asteroids = parser.getBool("perturb.asteroids", false);
-    config_.propagator_settings.include_relativity = parser.getBool("perturb.relativity", false);
-    config_.propagator_settings.include_moon = parser.getBool("perturb.moon", true);
-    
-    // Detailed planetary settings (only effective if perturb.planets is true)
-    config_.propagator_settings.perturb_mercury = parser.getBool("perturb.mercury", true);
-    config_.propagator_settings.perturb_venus = parser.getBool("perturb.venus", true);
-    config_.propagator_settings.perturb_earth = parser.getBool("perturb.earth", true);
-    config_.propagator_settings.perturb_mars = parser.getBool("perturb.mars", true);
-    config_.propagator_settings.perturb_jupiter = parser.getBool("perturb.jupiter", true);
-    config_.propagator_settings.perturb_saturn = parser.getBool("perturb.saturn", true);
-    config_.propagator_settings.perturb_uranus = parser.getBool("perturb.uranus", true);
-    config_.propagator_settings.perturb_neptune = parser.getBool("perturb.neptune", true);
 
-    // Non-Gravitational
-    config_.propagator_settings.include_yarkovsky = parser.getBool("perturb.yarkovsky", false);
-    config_.propagator_settings.yarkovsky_a2 = parser.getDouble("perturb.yarkovsky_a2", 0.0);
+    nlohmann::json j;
+    try {
+        f >> j;
+    } catch (const nlohmann::json::parse_error& e) {
+        if (config_.verbose) {
+            std::cerr << "WARNING: JSON parse error in " << config_file << ": " 
+                      << e.what() << ", using defaults\n";
+        }
+        return;
+    }
     
-    // Load Ephemeris settings
-    config_.ephemeris_type = parser.getString("ephemeris.type", "Analytical");
-    config_.ephemeris_file = parser.getString("ephemeris.file", "");
-    config_.asteroid_ephemeris_file = parser.getString("ephemeris.asteroid_file", "");
+    // Helper lambda for safe value retrieval
+    auto get_val = [&j](const std::string& key, auto default_val) {
+        return j.value(key, default_val);
+    };
+
+    // Load Integrator settings
+    if (j.contains("integrator")) {
+        auto& ji = j["integrator"];
+        config_.integrator_type = ji.value("type", "RK4");
+        config_.initial_step_size = ji.value("step_size", 0.1);
+        config_.tolerance = ji.value("tolerance", 1e-12);
+    } else {
+        // Flat fallback or EngineConfig structure (AsteroidFitConfig style)
+        config_.integrator_type = j.value("integrator_type", "RK4");
+        config_.initial_step_size = j.value("initial_step_size", 0.1);
+        config_.tolerance = j.value("tolerance", 1e-12);
+    }
     
-    // Load EOP settings
-    config_.eop_file = parser.getString("eop.file", "");
+    // Load Perturbation settings
+    // Support both flattened (OptionFileParser style keys converted to json?) or structured
+    // We will stick to the structure defined in AsteroidFitConfig for consistency
+    
+    // Check for "perturb" object first
+    if (j.contains("perturb")) {
+        auto& jp = j["perturb"];
+        config_.propagator_settings.include_planets = jp.value("planets", true);
+        config_.propagator_settings.include_asteroids = jp.value("asteroids", false);
+        config_.propagator_settings.include_relativity = jp.value("relativity", false);
+        config_.propagator_settings.include_moon = jp.value("moon", true);
+        
+        config_.propagator_settings.perturb_mercury = jp.value("mercury", true);
+        config_.propagator_settings.perturb_venus = jp.value("venus", true);
+        config_.propagator_settings.perturb_earth = jp.value("earth", true);
+        config_.propagator_settings.perturb_mars = jp.value("mars", true);
+        config_.propagator_settings.perturb_jupiter = jp.value("jupiter", true);
+        config_.propagator_settings.perturb_saturn = jp.value("saturn", true);
+        config_.propagator_settings.perturb_uranus = jp.value("uranus", true);
+        config_.propagator_settings.perturb_neptune = jp.value("neptune", true);
+        
+        config_.propagator_settings.include_yarkovsky = jp.value("yarkovsky", false);
+        config_.propagator_settings.yarkovsky_a2 = jp.value("yarkovsky_a2", 0.0);
+    } else {
+        // Fallback to top-level keys (matching AsteroidFitConfig::EngineConfig)
+        config_.propagator_settings.include_planets = j.value("include_planets", true);
+        config_.propagator_settings.include_relativity = j.value("include_relativity", false);
+        config_.propagator_settings.include_moon = j.value("include_moon", true);
+        
+        config_.propagator_settings.perturb_mercury = j.value("perturb_mercury", true);
+        config_.propagator_settings.perturb_venus = j.value("perturb_venus", true);
+        config_.propagator_settings.perturb_earth = j.value("perturb_earth", true);
+        config_.propagator_settings.perturb_mars = j.value("perturb_mars", true);
+        config_.propagator_settings.perturb_jupiter = j.value("perturb_jupiter", true);
+        config_.propagator_settings.perturb_saturn = j.value("perturb_saturn", true);
+        config_.propagator_settings.perturb_uranus = j.value("perturb_uranus", true);
+        config_.propagator_settings.perturb_neptune = j.value("perturb_neptune", true);
+        
+        config_.propagator_settings.include_yarkovsky = j.value("include_yarkovsky", false);
+        config_.propagator_settings.yarkovsky_a2 = j.value("yarkovsky_a2", 0.0);
+    }
+
+    // Ephemeris Settings
+    if (j.contains("ephemeris")) {
+        auto& je = j["ephemeris"];
+        config_.ephemeris_type = je.value("type", "Analytical");
+        config_.ephemeris_file = je.value("file", "");
+        config_.asteroid_ephemeris_file = je.value("asteroid_file", "");
+    } else {
+        // Top level fallback
+        // infer type from file existence or specific key
+        config_.ephemeris_file = j.value("ephemeris_file", "");
+        config_.asteroid_ephemeris_file = j.value("asteroid_ephemeris_file", "");
+        if (!config_.ephemeris_file.empty()) {
+             config_.ephemeris_type = "DE441";
+        }
+    }
+    
+    // EOP
+    if (j.contains("eop")) {
+        config_.eop_file = j["eop"].value("file", "");
+    } else {
+        config_.eop_file = j.value("eop_file", "");
+    }
+    
     if (!config_.eop_file.empty()) {
         if (config_.verbose) std::cout << "Loading EOP file: " << config_.eop_file << "...\n";
         if (time::load_dut1_data(config_.eop_file)) {
@@ -167,26 +233,48 @@ void AstDynEngine::load_config(const std::string& oop_file) {
              if (config_.verbose) std::cerr << "WARNING: Failed to load EOP file: " << config_.eop_file << "\n";
         }
     }
+
+    // Catalog Bias
+    if (j.contains("catalog")) {
+        config_.catalog_bias_file = j["catalog"].value("bias_file", "");
+    } else {
+        config_.catalog_bias_file = j.value("catalog_bias_file", "");
+    }
     
-    // Load differential correction settings
-    config_.max_iterations = parser.getInt("diffcorr.max_iter", 20);
-    config_.convergence_threshold = parser.getDouble("diffcorr.convergence", 1e-6);
-    config_.outlier_sigma = parser.getDouble("diffcorr.outlier_threshold", 3.0);
-    config_.outlier_max_sigma = parser.getDouble("diffcorr.outlier_max", 10.0);
-    config_.outlier_min_sigma = parser.getDouble("diffcorr.outlier_min", 3.0);
+    if (!config_.catalog_bias_file.empty()) {
+        load_catalog_biases(config_.catalog_bias_file);
+    }
     
-    // Load residual settings
-    config_.aberration_correction = parser.getBool("residuals.aberration", true);
-    config_.light_time_correction = parser.getBool("residuals.light_time", true);
+    // Differential Correction
+    if (j.contains("diffcorr")) {
+        auto& jd = j["diffcorr"];
+        config_.max_iterations = jd.value("max_iter", 20);
+        config_.convergence_threshold = jd.value("convergence", 1e-6);
+        config_.outlier_sigma = jd.value("outlier_threshold", 3.0);
+        config_.outlier_max_sigma = jd.value("outlier_max", 10.0);
+        config_.outlier_min_sigma = jd.value("outlier_min", 3.0);
+    } else {
+        config_.max_iterations = j.value("max_iterations", 20); // Note key difference potentially
+        // Fallback for flat structure
+        config_.outlier_max_sigma = j.value("outlier_max_sigma", 10.0);
+        config_.outlier_min_sigma = j.value("outlier_min_sigma", 3.0);
+    }
     
-    // Load output settings
-    config_.verbose = parser.getBool("verbose", true);
+    // Residuals settings
+    if (j.contains("residuals")) {
+        auto& jr = j["residuals"];
+        config_.aberration_correction = jr.value("aberration", true);
+        config_.light_time_correction = jr.value("light_time", true);
+    }
     
+    // General
+    config_.verbose = j.value("verbose", true);
+
     // Update propagator with new settings
     update_propagator();
     
     // Always print configuration details
-    std::cout << "   Configuration loaded:\n";
+    std::cout << "   Configuration loaded (JSON):\n";
     std::cout << "   • Integrator: " << config_.integrator_type << "\n";
     std::cout << "   • Step size: " << config_.initial_step_size << " days\n";
     std::cout << "   • Tolerance: " << config_.tolerance << "\n";

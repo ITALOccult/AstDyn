@@ -21,127 +21,6 @@ using namespace astdyn::propagation;
 using namespace astdyn::observations;
 
 // ============================================================================
-// OptionFileParser Implementation
-// ============================================================================
-
-bool OptionFileParser::load(const std::string& filename) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        line = trim(line);
-        
-        // Skip empty lines and comments
-        if (line.empty() || line[0] == '#' || line[0] == '!') {
-            continue;
-        }
-        
-        // Section header: [section]
-        if (line[0] == '[' && line.back() == ']') {
-            current_section_ = line.substr(1, line.length() - 2);
-            continue;
-        }
-        
-        // Parse KEY = VALUE
-        auto [key, value] = parseLine(line);
-        if (!key.empty()) {
-            std::string full_key = current_section_.empty() ? key : 
-                                   current_section_ + "." + key;
-            options_[full_key] = value;
-        }
-    }
-    
-    return true;
-}
-
-std::string OptionFileParser::getString(const std::string& key, 
-                                       const std::string& default_val) const {
-    auto it = options_.find(key);
-    return (it != options_.end()) ? it->second : default_val;
-}
-
-double OptionFileParser::getDouble(const std::string& key, double default_val) const {
-    auto it = options_.find(key);
-    if (it == options_.end()) return default_val;
-    try {
-        return std::stod(it->second);
-    } catch (...) {
-        return default_val;
-    }
-}
-
-int OptionFileParser::getInt(const std::string& key, int default_val) const {
-    auto it = options_.find(key);
-    if (it == options_.end()) return default_val;
-    try {
-        return std::stoi(it->second);
-    } catch (...) {
-        return default_val;
-    }
-}
-
-bool OptionFileParser::getBool(const std::string& key, bool default_val) const {
-    auto it = options_.find(key);
-    if (it == options_.end()) return default_val;
-    
-    std::string val = it->second;
-    std::transform(val.begin(), val.end(), val.begin(), ::tolower);
-    
-    return (val == "true" || val == "yes" || val == "1" || val == "on");
-}
-
-bool OptionFileParser::hasKey(const std::string& key) const {
-    return options_.find(key) != options_.end();
-}
-
-void OptionFileParser::set(const std::string& key, const std::string& value) {
-    options_[key] = value;
-}
-
-bool OptionFileParser::save(const std::string& filename) const {
-    std::ofstream file(filename);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& [key, value] : options_) {
-        file << key << " = " << value << "\n";
-    }
-    
-    return true;
-}
-
-std::string OptionFileParser::trim(const std::string& str) const {
-    size_t first = str.find_first_not_of(" \t\r\n");
-    if (first == std::string::npos) return "";
-    size_t last = str.find_last_not_of(" \t\r\n");
-    return str.substr(first, last - first + 1);
-}
-
-std::pair<std::string, std::string> OptionFileParser::parseLine(const std::string& line) const {
-    size_t eq_pos = line.find('=');
-    if (eq_pos == std::string::npos) {
-        return {"", ""};
-    }
-    
-    std::string key = trim(line.substr(0, eq_pos));
-    std::string value_part = line.substr(eq_pos + 1);
-    
-    // Remove comments (starting with ! or #)
-    size_t comment_pos = value_part.find_first_of("!#");
-    if (comment_pos != std::string::npos) {
-        value_part = value_part.substr(0, comment_pos);
-    }
-    
-    std::string value = trim(value_part);
-    
-    return {key, value};
-}
-
-// ============================================================================
 // OEFFileHandler Implementation
 // ============================================================================
 
@@ -415,9 +294,8 @@ bool AstDynConfigManager::loadConfiguration(const std::string& base_path,
                                             const std::string& object_name) {
     object_name_ = object_name;
     
-    // Try to load .opt file
-    std::string opt_file = base_path + "/" + object_name + ".opt";
-    options_.load(opt_file);  // OK if fails
+    // Option parsing (.opt) removed in favor of JSON
+    // Only loading elements and observations here
     
     // Load .oef file (required)
     std::string oef_file = base_path + "/" + object_name + ".oef";
@@ -461,8 +339,7 @@ std::vector<OpticalObservation> AstDynConfigManager::getValidObservations() cons
 bool AstDynConfigManager::saveConfiguration(const std::string& base_path, 
                                             const std::string& object_name) const {
     try {
-        // Save .opt
-        options_.save(base_path + "/" + object_name + ".opt");
+        // Option saving removed
         
         // Save .oef
         OEFFileHandler::write(base_path + "/" + object_name + ".oef", oef_data_);

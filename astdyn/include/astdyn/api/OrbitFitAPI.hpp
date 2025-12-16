@@ -57,14 +57,14 @@ public:
      * 
      * @param eq1_file Path to OrbFit .eq1 file (initial orbit)
      * @param rwo_file Path to OrbFit .rwo file (observations)
-     * @param oop_file Path to OrbFit .oop file (configuration), optional
+     * @param config_file Path to configuration file (.json), optional
      * @param verbose  Enable verbose output to stdout
      * @return OrbitFitResult structure containing fit statistics and final orbit
      */
     static OrbitFitResult run_fit(
         const std::string& eq1_file,
         const std::string& rwo_file,
-        const std::string& oop_file = "",
+        const std::string& config_file = "",
         bool verbose = true
     );
 

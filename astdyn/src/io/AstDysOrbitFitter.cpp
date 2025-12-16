@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <cmath>
 #include <stdexcept>
+#include <nlohmann/json.hpp>
 
 namespace astdyn {
 namespace io {
@@ -78,7 +79,7 @@ void AstDysOrbitFitter::set_elements(const propagation::KeplerianElements& eleme
 }
 
 void AstDysOrbitFitter::set_config_file(const std::string& filename) {
-    load_oop_file(filename);
+    load_json_file(filename);
     
     if (verbose_) {
         std::cout << "Loaded configuration from " << filename << "\n";
@@ -241,32 +242,32 @@ void AstDysOrbitFitter::load_oel_file(const std::string& filename) {
     load_eq1_file(filename);
 }
 
-void AstDysOrbitFitter::load_oop_file(const std::string& filename) {
-    // Parse OrbFit options file
+void AstDysOrbitFitter::load_json_file(const std::string& filename) {
+    // Parse JSON options file
     std::ifstream file(filename);
     if (!file.is_open()) {
-        throw std::runtime_error("Cannot open OOP file: " + filename);
+        throw std::runtime_error("Cannot open JSON config file: " + filename);
     }
     
-    // For now, create default config
-    // Full implementation would parse .oop and set all options
     config_ = AstDynConfig();
+    nlohmann::json j;
+    try {
+        file >> j;
+    } catch (...) {
+         throw std::runtime_error("Failed to parse JSON config: " + filename);
+    }
     
-    // Parse basic options
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '!' || line[0] == '#') continue;
-        
-        std::istringstream iss(line);
-        std::string key, equals, value;
-        
-        if (iss >> key >> equals >> value) {
-            if (key == "max_iterations") {
-                config_->max_iterations = std::stoi(value);
-            } else if (key == "convergence_threshold") {
-                config_->convergence_threshold = std::stod(value);
-            }
-        }
+    if (j.contains("diffcorr")) {
+        auto& jd = j["diffcorr"];
+        if (jd.contains("max_iter") || jd.contains("max_iterations")) 
+             config_->max_iterations = jd.value("max_iter", jd.value("max_iterations", 20));
+             
+        if (jd.contains("convergence") || jd.contains("convergence_threshold"))
+             config_->convergence_threshold = jd.value("convergence", jd.value("convergence_threshold", 1e-6));
+    } else {
+        // top level fallback
+        if (j.contains("max_iterations")) config_->max_iterations = j["max_iterations"];
+        if (j.contains("convergence_threshold")) config_->convergence_threshold = j["convergence_threshold"];
     }
 }
 
@@ -317,8 +318,8 @@ std::string AstDysOrbitFitter::detect_format(const std::string& filename) {
         return "eq1";
     } else if (filename.find(".oel") != std::string::npos) {
         return "oel";
-    } else if (filename.find(".oop") != std::string::npos) {
-        return "oop";
+    } else if (filename.find(".json") != std::string::npos) {
+        return "json";
     } else if (filename.find(".txt") != std::string::npos || 
                filename.find(".obs") != std::string::npos) {
         return "mpc";

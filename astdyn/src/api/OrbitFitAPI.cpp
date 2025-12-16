@@ -103,7 +103,7 @@ propagation::KeplerianElements OrbitFitAPI::convert_mean_equinoctial_to_osculati
 OrbitFitResult OrbitFitAPI::run_fit(
     const std::string& eq1_file,
     const std::string& rwo_file,
-    const std::string& oop_file,
+    const std::string& config_file,
     bool verbose
 ) {
     OrbitFitResult result;
@@ -156,13 +156,13 @@ OrbitFitResult OrbitFitAPI::run_fit(
         // 4. Setup Engine
         AstDynEngine engine;
         
-        if (!oop_file.empty()) {
-             std::ifstream oop_check(oop_file);
-             if (oop_check.good()) {
-                 if (verbose) std::cout << "   Loading configuration from " << oop_file << "...\n";
-                 engine.load_config(oop_file);
+        if (!config_file.empty()) {
+             std::ifstream cfg_check(config_file);
+             if (cfg_check.good()) {
+                 if (verbose) std::cout << "   Loading configuration from " << config_file << "...\n";
+                 engine.load_config(config_file);
              } else {
-                 if (verbose) std::cout << "   Warning: Config file " << oop_file << " not found. Using defaults + planetary perturbations.\n";
+                 if (verbose) std::cout << "   Warning: Config file " << config_file << " not found. Using defaults + planetary perturbations.\n";
              }
         }
         
