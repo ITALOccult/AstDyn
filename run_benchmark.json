@@ -1,0 +1,16 @@
+{
+    "eq1_file": "17030_astdys.eq1",
+    "rwo_file": "17030_astdys.rwo",
+    "output_equatorial": true,
+    "engine_config": {
+        "integrator_type": "RKF78",
+        "tolerance": 1e-12,
+        "include_planets": true,
+        "asteroid_mode": "major_17"
+    },
+    "mjd_observations": [
+        61000.0,
+        61005.0,
+        61010.0
+    ]
+}

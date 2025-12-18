@@ -73,4 +73,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/test_asteroid_fitter.dir/DependInfo.cmake"
   "CMakeFiles/test_asteroid_fitter_horizons.dir/DependInfo.cmake"
   "CMakeFiles/benchmark_79450.dir/DependInfo.cmake"
+  "CMakeFiles/benchmark_json_api.dir/DependInfo.cmake"
   )

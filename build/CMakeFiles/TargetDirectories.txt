@@ -3,6 +3,7 @@
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/test_asteroid_fitter.dir
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/test_asteroid_fitter_horizons.dir
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/benchmark_79450.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/benchmark_json_api.dir
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/test.dir
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/edit_cache.dir
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/rebuild_cache.dir

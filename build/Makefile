@@ -191,6 +191,43 @@ benchmark_79450/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_79450.dir/build.make CMakeFiles/benchmark_79450.dir/build
 .PHONY : benchmark_79450/fast
 
+#=============================================================================
+# Target rules for targets named benchmark_json_api
+
+# Build rule for target.
+benchmark_json_api: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 benchmark_json_api
+.PHONY : benchmark_json_api
+
+# fast build rule for target.
+benchmark_json_api/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/build
+.PHONY : benchmark_json_api/fast
+
+astdyn/examples/benchmark_json_api.o: astdyn/examples/benchmark_json_api.cpp.o
+.PHONY : astdyn/examples/benchmark_json_api.o
+
+# target to build an object file
+astdyn/examples/benchmark_json_api.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/astdyn/examples/benchmark_json_api.cpp.o
+.PHONY : astdyn/examples/benchmark_json_api.cpp.o
+
+astdyn/examples/benchmark_json_api.i: astdyn/examples/benchmark_json_api.cpp.i
+.PHONY : astdyn/examples/benchmark_json_api.i
+
+# target to preprocess a source file
+astdyn/examples/benchmark_json_api.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/astdyn/examples/benchmark_json_api.cpp.i
+.PHONY : astdyn/examples/benchmark_json_api.cpp.i
+
+astdyn/examples/benchmark_json_api.s: astdyn/examples/benchmark_json_api.cpp.s
+.PHONY : astdyn/examples/benchmark_json_api.s
+
+# target to generate assembly for a file
+astdyn/examples/benchmark_json_api.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/astdyn/examples/benchmark_json_api.cpp.s
+.PHONY : astdyn/examples/benchmark_json_api.cpp.s
+
 astdyn/examples/propagate_79148.o: astdyn/examples/propagate_79148.cpp.o
 .PHONY : astdyn/examples/propagate_79148.o
 
@@ -1066,9 +1103,13 @@ help:
 	@echo "... test"
 	@echo "... astdyn"
 	@echo "... benchmark_79450"
+	@echo "... benchmark_json_api"
 	@echo "... propagate_example"
 	@echo "... test_asteroid_fitter"
 	@echo "... test_asteroid_fitter_horizons"
+	@echo "... astdyn/examples/benchmark_json_api.o"
+	@echo "... astdyn/examples/benchmark_json_api.i"
+	@echo "... astdyn/examples/benchmark_json_api.s"
 	@echo "... astdyn/examples/propagate_79148.o"
 	@echo "... astdyn/examples/propagate_79148.i"
 	@echo "... astdyn/examples/propagate_79148.s"

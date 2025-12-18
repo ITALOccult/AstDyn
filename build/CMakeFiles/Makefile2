@@ -68,6 +68,7 @@ all: CMakeFiles/propagate_example.dir/all
 all: CMakeFiles/test_asteroid_fitter.dir/all
 all: CMakeFiles/test_asteroid_fitter_horizons.dir/all
 all: CMakeFiles/benchmark_79450.dir/all
+all: CMakeFiles/benchmark_json_api.dir/all
 .PHONY : all
 
 # The main recursive "codegen" target.
@@ -76,6 +77,7 @@ codegen: CMakeFiles/propagate_example.dir/codegen
 codegen: CMakeFiles/test_asteroid_fitter.dir/codegen
 codegen: CMakeFiles/test_asteroid_fitter_horizons.dir/codegen
 codegen: CMakeFiles/benchmark_79450.dir/codegen
+codegen: CMakeFiles/benchmark_json_api.dir/codegen
 .PHONY : codegen
 
 # The main recursive "preinstall" target.
@@ -88,6 +90,7 @@ clean: CMakeFiles/propagate_example.dir/clean
 clean: CMakeFiles/test_asteroid_fitter.dir/clean
 clean: CMakeFiles/test_asteroid_fitter_horizons.dir/clean
 clean: CMakeFiles/benchmark_79450.dir/clean
+clean: CMakeFiles/benchmark_json_api.dir/clean
 .PHONY : clean
 
 #=============================================================================
@@ -129,7 +132,7 @@ CMakeFiles/astdyn.dir/clean:
 CMakeFiles/propagate_example.dir/all: CMakeFiles/astdyn.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/propagate_example.dir/build.make CMakeFiles/propagate_example.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/propagate_example.dir/build.make CMakeFiles/propagate_example.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=36,37 "Built target propagate_example"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=38,39 "Built target propagate_example"
 .PHONY : CMakeFiles/propagate_example.dir/all
 
 # Build rule for subdir invocation for target.
@@ -146,7 +149,7 @@ propagate_example: CMakeFiles/propagate_example.dir/rule
 # codegen rule for target.
 CMakeFiles/propagate_example.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/propagate_example.dir/build.make CMakeFiles/propagate_example.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=36,37 "Finished codegen for target propagate_example"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=38,39 "Finished codegen for target propagate_example"
 .PHONY : CMakeFiles/propagate_example.dir/codegen
 
 # clean rule for target.
@@ -161,7 +164,7 @@ CMakeFiles/propagate_example.dir/clean:
 CMakeFiles/test_asteroid_fitter.dir/all: CMakeFiles/astdyn.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter.dir/build.make CMakeFiles/test_asteroid_fitter.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter.dir/build.make CMakeFiles/test_asteroid_fitter.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=38,39 "Built target test_asteroid_fitter"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=40,41 "Built target test_asteroid_fitter"
 .PHONY : CMakeFiles/test_asteroid_fitter.dir/all
 
 # Build rule for subdir invocation for target.
@@ -178,7 +181,7 @@ test_asteroid_fitter: CMakeFiles/test_asteroid_fitter.dir/rule
 # codegen rule for target.
 CMakeFiles/test_asteroid_fitter.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter.dir/build.make CMakeFiles/test_asteroid_fitter.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=38,39 "Finished codegen for target test_asteroid_fitter"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=40,41 "Finished codegen for target test_asteroid_fitter"
 .PHONY : CMakeFiles/test_asteroid_fitter.dir/codegen
 
 # clean rule for target.
@@ -193,7 +196,7 @@ CMakeFiles/test_asteroid_fitter.dir/clean:
 CMakeFiles/test_asteroid_fitter_horizons.dir/all: CMakeFiles/astdyn.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter_horizons.dir/build.make CMakeFiles/test_asteroid_fitter_horizons.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter_horizons.dir/build.make CMakeFiles/test_asteroid_fitter_horizons.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=40,41 "Built target test_asteroid_fitter_horizons"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=42,43 "Built target test_asteroid_fitter_horizons"
 .PHONY : CMakeFiles/test_asteroid_fitter_horizons.dir/all
 
 # Build rule for subdir invocation for target.
@@ -210,7 +213,7 @@ test_asteroid_fitter_horizons: CMakeFiles/test_asteroid_fitter_horizons.dir/rule
 # codegen rule for target.
 CMakeFiles/test_asteroid_fitter_horizons.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter_horizons.dir/build.make CMakeFiles/test_asteroid_fitter_horizons.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=40,41 "Finished codegen for target test_asteroid_fitter_horizons"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=42,43 "Finished codegen for target test_asteroid_fitter_horizons"
 .PHONY : CMakeFiles/test_asteroid_fitter_horizons.dir/codegen
 
 # clean rule for target.
@@ -249,6 +252,38 @@ CMakeFiles/benchmark_79450.dir/codegen:
 CMakeFiles/benchmark_79450.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_79450.dir/build.make CMakeFiles/benchmark_79450.dir/clean
 .PHONY : CMakeFiles/benchmark_79450.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/benchmark_json_api.dir
+
+# All Build rule for target.
+CMakeFiles/benchmark_json_api.dir/all: CMakeFiles/astdyn.dir/all
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=36,37 "Built target benchmark_json_api"
+.PHONY : CMakeFiles/benchmark_json_api.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/benchmark_json_api.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles 35
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/benchmark_json_api.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles 0
+.PHONY : CMakeFiles/benchmark_json_api.dir/rule
+
+# Convenience name for target.
+benchmark_json_api: CMakeFiles/benchmark_json_api.dir/rule
+.PHONY : benchmark_json_api
+
+# codegen rule for target.
+CMakeFiles/benchmark_json_api.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles --progress-num=36,37 "Finished codegen for target benchmark_json_api"
+.PHONY : CMakeFiles/benchmark_json_api.dir/codegen
+
+# clean rule for target.
+CMakeFiles/benchmark_json_api.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/clean
+.PHONY : CMakeFiles/benchmark_json_api.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

@@ -23,7 +23,7 @@ list(FILTER ASTDYN_SOURCES EXCLUDE REGEX ".*astdyn_main\\.cpp$")
 list(FILTER ASTDYN_SOURCES EXCLUDE REGEX ".*astdyn_convert\\.cpp$")
 add_library(astdyn STATIC ${ASTDYN_SOURCES})
 
-target_link_libraries(astdyn Eigen3::Eigen)
+target_link_libraries(astdyn Eigen3::Eigen nlohmann_json::nlohmann_json)
 
 # Example executable (propagation demo)
 add_executable(propagate_example astdyn/examples/propagate_79148.cpp)
@@ -46,5 +46,9 @@ add_test(NAME AsteroidFitterHorizonsTest COMMAND test_asteroid_fitter_horizons)
 # Benchmark 79450
 add_executable(benchmark_79450 astdyn/tests/benchmark_79450.cpp)
 target_link_libraries(benchmark_79450 astdyn Eigen3::Eigen nlohmann_json::nlohmann_json)
+
+# New High-Level JSON API Benchmark
+add_executable(benchmark_json_api astdyn/examples/benchmark_json_api.cpp)
+target_link_libraries(benchmark_json_api astdyn Eigen3::Eigen nlohmann_json::nlohmann_json)
 
 target_link_libraries(propagate_example astdyn Eigen3::Eigen)
