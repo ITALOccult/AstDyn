@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     generate_17030_geocentric_debug
-relocations:     []
-...
