@@ -58,6 +58,16 @@ public:
 
     /**
      * @brief Initialize propagator with configuration
+     * 
+     * @example
+     * HighPrecisionPropagator::Config config;
+     * config.de441_path = "path/to/de441.bsp";
+     * config.perturbations_planets = true;
+     * 
+     * HighPrecisionPropagator propagator(config);
+     * auto result = propagator.calculateGeocentricObservation(elements, target_jd);
+     * 
+     * @param config Configuration settings for the propagator
      */
     explicit HighPrecisionPropagator(const Config& config = Config());
     ~HighPrecisionPropagator();

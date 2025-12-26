@@ -99,9 +99,11 @@ HighPrecisionPropagator::calculateGeocentricObservation(
     CartesianElements state_ast = propagator->propagate_cartesian(cart_icrf, target_mjd);
 
     // 3. Earth Position at Target Time
-    // PlanetaryEphemeris returns Ecliptic J2000 (even if DE441 wrapped)
-    Eigen::Vector3d r_earth_ecl = PlanetaryEphemeris::getPosition(CelestialBody::EARTH, target_jd_tdb);
-    Eigen::Vector3d r_earth_eq = ecl_to_eq(r_earth_ecl);
+    // PlanetaryEphemeris::getPosition returns SSB-relative if DE441 is used.
+    // Propagator is Heliocentric, so we need Earth wrt Sun.
+    Eigen::Vector3d r_sun_ssb = PlanetaryEphemeris::getPosition(CelestialBody::SUN, target_jd_tdb);
+    Eigen::Vector3d r_earth_ssb = PlanetaryEphemeris::getPosition(CelestialBody::EARTH, target_jd_tdb);
+    Eigen::Vector3d r_earth_eq = r_earth_ssb - r_sun_ssb;
 
     // 4. Light Time Correction Loop
     double t_emit_mjd = target_mjd;

@@ -36,6 +36,29 @@ curl -sG "https://ssd.jpl.nasa.gov/api/horizons.api" \
 
 Use the output \texttt{X, Y, Z, VX, VY, VZ} directly in your C++ code to initialize the \texttt{CartesianElements} structure.
 
+\section{High-Level API: HighPrecisionPropagator}
+\label{sec:high_precision_api}
+
+To simplify the rigorous propagation workflow, AstDyn provides the \texttt{HighPrecisionPropagator} class. This high-level API encapsulates N-body settings, light-time correction, and geocentric reduction in a single call.
+
+\begin{lstlisting}[style=cpp, caption={Using HighPrecisionPropagator}]
+using namespace astdyn::propagation;
+
+// 1. Configure for maximum precision
+HighPrecisionPropagator::Config config;
+config.de441_path = "/path/to/de441.bsp";
+config.perturbations_planets = true;
+config.relativity = true;
+
+HighPrecisionPropagator propagator(config);
+
+// 2. Calculate geocentric RA/Dec with light-time correction
+auto result = propagator.calculateGeocentricObservation(elements, target_jd);
+
+std::cout << "RA: " << result.ra_deg << " deg" << std::endl;
+std::cout << "Dec: " << result.dec_deg << " deg" << std::endl;
+\end{lstlisting}
+
 \section{Reference Frame Consistency}
 \label{sec:frame_consistency}
 
@@ -45,42 +68,13 @@ A common source of systematic error is the confusion between \textbf{Heliocentri
     \item \textbf{JPL DE441}: Provides positions relative to the \textit{Solar System Barycenter} (SSB).
 \end{itemize}
 
-The offset between the Sun and the SSB can be up to $\sim 0.01$ AU (approx. 1.5 million km), primarily due to Jupiter. Neglecting this offset introduces a systematic error of $\sim 30$ arcseconds in geocentric observations.
+The offset between the Sun and the SSB can be up to $\sim 0.01$ AU, primarily due to Jupiter. Neglecting this offset introduces a systematic error of several arcminutes.
 
 \subsection{Frame Correction Logic}
-The AstDyn library handles this internally for perturbations, but you must manually handle it when reducing observations if you are rigorously calculating residuals.
+The \texttt{HighPrecisionPropagator} handles these transformations internally. If you are implementing a custom reduction, ensure the Earth's position is converted to the Heliocentric frame by subtracting the Sun's SSB-relative position:
 
-\textbf{Perturbations}: The Propagator subtracts the Sun's Barycentric position from the planet's Barycentric position:
-\begin{equation}
-    \mathbf{r}_{planet}^{helio} = \mathbf{r}_{planet}^{bary}(SSB) - \mathbf{r}_{sun}^{bary}(SSB)
-\end{equation}
-
-\textbf{Geocentric Reduction}: When calculating the range vector $\boldsymbol{\rho}$ for Astrometry, you must ensure the Earth's position is also Heliocentric:
 \begin{equation}
     \mathbf{r}_{earth}^{helio} = \mathbf{r}_{earth}^{bary}(SSB) - \mathbf{r}_{sun}^{bary}(SSB)
 \end{equation}
-\begin{equation}
-    \boldsymbol{\rho} = \mathbf{r}_{ast}^{helio} - \mathbf{r}_{earth}^{helio}
-\end{equation}
 
-\section{Implementation Check}
-The following C++ snippet demonstrates the correct logic for computing the astrometric position:
-
-\begin{lstlisting}[style=cpp, caption={Correct Geocentric Reduction}]
-// 1. Get Sun Position (Relative to SSB)
-auto sun_state = ephemeris::PlanetaryEphemeris::getState(
-    ephemeris::CelestialBody::SUN, target_jd);
-
-// 2. Get Earth Position (Relative to SSB)
-auto earth_bary = ephemeris::PlanetaryEphemeris::getState(
-    ephemeris::CelestialBody::EARTH, target_jd);
-
-// 3. Convert Earth to Heliocentric Frame
-Vector3d earth_helio = earth_bary.position() - sun_state.position();
-
-// 4. Calculate Range Vector
-// (Asteroid state from propagator is already Heliocentric)
-Vector3d rho = asteroid_helio_state.position - earth_helio;
-
-// 5. Proceed with Light Time and Aberration corrections...
-\end{lstlisting}
+This ensures that both the asteroid (propagated heliocentrically) and the observer (Earth) are defined in the same coordinate system.

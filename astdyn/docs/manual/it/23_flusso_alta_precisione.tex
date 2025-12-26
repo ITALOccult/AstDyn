@@ -50,10 +50,45 @@ Il modulo \texttt{TimeScale} offre funzioni collaudate per le conversioni:
     \item \texttt{utc\_to\_ut1(mjd\_utc)}: Usato internamente per il calcolo del Tempo Siderale (GMST/LAST).
 \end{itemize}
 
-\section{Best Practices per l'Analisi}
+\section{API di Alto Livello: HighPrecisionPropagator}
+\label{sec:high_precision_api}
 
-\begin{enumerate}
-    \item \textbf{Inizializzazione}: Se possibile, inizializzare l'orbita con un vettore di stato Cartesiano (Posizione/Velocità) non singolare, idealmente ottenuto da JPL Horizons, per evitare le approssimazioni intrinseche degli elementi osculatori Kepleriani in epoche lontane.
-    \item \textbf{Effemeridi}: Utilizzare sempre file SPK binari (es. \texttt{de441.bsp}) per la posizione dei pianeti. Le formule analitiche approssimate non sono sufficienti per l'astrometria di precisione moderna.
-    \item \textbf{Verifica}: Controllare sempre che l'RMS post-fit sia compatibile con l'errore del catalogo stellare utilizzato (tipicamente $< 0.5$ arcsec per Gaia DR3).
-\end{enumerate}
+Per semplificare il flusso di lavoro rigoroso, AstDyn fornisce la classe \texttt{HighPrecisionPropagator}. Questa API di alto livello incapsula le impostazioni N-body, la correzione del tempo di luce e la riduzione geocentrica in un'unica chiamata.
+
+\begin{lstlisting}[style=cpp, caption={Utilizzo di HighPrecisionPropagator}]
+using namespace astdyn::propagation;
+
+// 1. Configurazione per la massima precisione
+HighPrecisionPropagator::Config config;
+config.de441_path = "/percorso/per/de441.bsp";
+config.perturbations_planets = true;
+config.relativity = true;
+
+HighPrecisionPropagator propagator(config);
+
+// 2. Calcolo della posizione geocentrica (RA/Dec) con correzione tempo di luce
+auto result = propagator.calculateGeocentricObservation(elements, target_jd);
+
+std::cout << "RA: " << result.ra_deg << " deg" << std::endl;
+std::cout << "Dec: " << result.dec_deg << " deg" << std::endl;
+\end{lstlisting}
+
+\section{Coerenza del Sistema di Riferimento}
+\label{sec:frame_consistency}
+
+Una fonte comune di errore sistematico è la confusione tra sistemi \textbf{Eliocentrici} e \textbf{Baricentrici}.
+\begin{itemize}
+    \item \textbf{Propagatore AstDyn}: Integra le equazioni del moto in un sistema \textit{Eliocentrico} (origine nel centro del Sole).
+    \item \textbf{JPL DE441}: Fornisce posizioni relative al \textit{Baricentro del Sistema Solare} (SSB).
+\end{itemize}
+
+L'offset tra il Sole e l'SSB può arrivare a $\sim 0.01$ AU, principalmente a causa di Giove. Trascurare questo offset introduce un errore sistematico di diversi arcominuti.
+
+\subsection{Logica di Correzione del Frame}
+La classe \texttt{HighPrecisionPropagator} gestisce queste trasformazioni internamente. Se si implementa una riduzione personalizzata, assicurarsi che la posizione della Terra venga convertita nel sistema Eliocentrico sottraendo la posizione del Sole rispetto all'SSB:
+
+\begin{equation}
+    \mathbf{r}_{earth}^{helio} = \mathbf{r}_{earth}^{bary}(SSB) - \mathbf{r}_{sun}^{bary}(SSB)
+\end{equation}
+
+Questo garantisce che sia l'asteroide (propagato eliocentricamente) che l'osservatore (Terra) siano definiti nello stesso sistema di coordinate.

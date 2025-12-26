@@ -237,6 +237,44 @@ public:
 };
 \end{lstlisting}
 
+\subsection{astdyn::propagation::HighPrecisionPropagator}
+
+\begin{lstlisting}[language=C++]
+class HighPrecisionPropagator {
+public:
+    struct Config {
+        std::string de441_path;
+        double step_size = 0.5;
+        double tolerance = 1e-13;
+        bool perturbations_planets = true;
+        bool relativity = true;
+    };
+
+    struct ObservationResult {
+        double ra_deg;
+        double dec_deg;
+        double distance_au;
+        double light_time_sec;
+    };
+
+    explicit HighPrecisionPropagator(const Config& config = Config());
+    
+    ObservationResult calculateGeocentricObservation(
+        const KeplerianElements& initial_elements, 
+        double target_jd_tdb
+    );
+};
+\end{lstlisting}
+
+\textbf{Scopo}: API semplificata per la propagazione rigorosa di asteroidi e riduzione geocentrica compatibile con la precisione JPL.
+
+\textbf{Caratteristiche Principali}:
+\begin{itemize}
+    \item Gestione automatica dei frame Eliocentrici vs Baricentrici.
+    \item Correzione iterativa del tempo di luce.
+    \item Supporto nativo per effemeridi DE441 (tramite \texttt{Config}).
+\end{itemize}
+
 \section{Osservazioni}
 
 \subsection{astdyn::observations::Observation}

@@ -170,6 +170,37 @@ Compile and link:
 g++ -std=c++17 example.cpp -lastdyn -I/usr/local/include -L/usr/local/lib
 ```
 
+### High-Precision Propagation
+
+```cpp
+#include <astdyn/AstDyn.hpp>
+#include <iostream>
+
+int main() {
+    astdyn::initialize();
+
+    // 1. Configure for JPL precision
+    astdyn::propagation::HighPrecisionPropagator::Config config;
+    config.de441_path = "de441.bsp";
+    
+    astdyn::propagation::HighPrecisionPropagator propagator(config);
+
+    // 2. Initial elements (Epoch 2458315.5)
+    astdyn::propagation::KeplerianElements elements;
+    // ... set elements ...
+
+    // 3. Propagate and calculate Geocentric RA/Dec
+    double target_jd = 2461050.580949; // 2026-Jan-10
+    auto result = propagator.calculateGeocentricObservation(elements, target_jd);
+
+    std::cout << "RA J2000: " << result.ra_deg << " deg\n";
+    std::cout << "Dec J2000: " << result.dec_deg << " deg\n";
+
+    astdyn::shutdown();
+    return 0;
+}
+```
+
 ## 🧪 Testing
 
 Run all unit tests:
