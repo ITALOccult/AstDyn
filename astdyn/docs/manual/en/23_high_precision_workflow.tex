@@ -59,6 +59,26 @@ std::cout << "RA: " << result.ra_deg << " deg" << std::endl;
 std::cout << "Dec: " << result.dec_deg << " deg" << std::endl;
 \end{lstlisting}
 
+\section{Simplified Integration: ITALOccultLibrary}
+\label{sec:italoccultlib_integration}
+
+To facilitate the use of these features in larger projects like \texttt{IOccultCalc}, the \texttt{ITALOccultLibrary} was developed as a simplified wrapper.
+
+\subsection{Automatic Mean-to-Osculating Conversion}
+A common pitfall is using mean orbital elements from AstDyS (\texttt{.eq1} files) directly in an N-Body numerical propagator. This typically results in a systematic error of $\sim 360$ arcseconds. The \texttt{AstDynWrapper} automatically handles this by applying the rigorous conversion at load-time:
+
+\begin{lstlisting}[style=cpp, caption={AstDynWrapper for High-Precision}]
+#include <italoccultlib/astdyn_wrapper.h>
+
+ioccultcalc::AstDynWrapper wrapper;
+// Automatically parses and converts Mean (Ecliptic) -> Osculating (Equatorial)
+wrapper.loadFromEQ1File("34713.eq1");
+
+// Compute geocentric observation with full DE441 part-2 perturbations
+auto obs = wrapper.calculateObservation(61050.0);
+std::cout << "RA: " << obs.ra_deg << " deg" << std::endl;
+\end{lstlisting}
+
 \section{Reference Frame Consistency}
 \label{sec:frame_consistency}
 

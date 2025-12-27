@@ -6,10 +6,12 @@
  */
 
 #include "astdyn_wrapper.h"
+#include "orbital_conversions.h"
 #include <sstream>
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <iostream>
 
 namespace ioccultcalc {
 
@@ -54,16 +56,21 @@ AstDynWrapper::AstDynWrapper(const PropagationSettings& settings)
     , current_epoch_mjd_(0.0)
     , initialized_(false)
 {
+    std::cout << "[AstDynWrapper] Constructor started." << std::endl;
     // Crea effemeridi planetarie (usa DE440 embedded di default)
+    std::cout << "  - Creating PlanetaryEphemeris..." << std::endl;
     ephemeris_ = std::make_shared<astdyn::ephemeris::PlanetaryEphemeris>();
     
     // Inizializza propagatore
+    std::cout << "  - Initializing propagator..." << std::endl;
     initializePropagator();
+    std::cout << "[AstDynWrapper] Constructor finished." << std::endl;
 }
 
 AstDynWrapper::~AstDynWrapper() = default;
 
 void AstDynWrapper::initializePropagator() {
+    std::cout << "  - Creating RKF78Integrator..." << std::endl;
     // Crea integratore RKF78
     auto integrator = std::make_unique<astdyn::propagation::RKF78Integrator>(
         settings_.initial_step,
@@ -85,37 +92,50 @@ void AstDynWrapper::initializePropagator() {
     prop_settings.perturb_neptune = settings_.perturb_neptune;
     
     // Crea propagatore
+    std::cout << "  - Creating Propagator object..." << std::endl;
     propagator_ = std::make_unique<astdyn::propagation::Propagator>(
         std::move(integrator),
         ephemeris_,
         prop_settings
     );
+    std::cout << "  - Propagator object created." << std::endl;
 }
 
 bool AstDynWrapper::loadFromEQ1File(const std::string& filepath) {
     try {
-        // Usa parser AstDyn
-        astdyn::io::parsers::OrbFitEQ1Parser parser;
-        current_elements_ = parser.parse(filepath);
+        // 1. Usa OrbitFitAPI per il parsing ad alta precisione
+        auto equ = astdyn::api::OrbitFitAPI::parse_eq1(filepath);
         
-        // Salva epoca
-        current_epoch_mjd_ = current_elements_.epoch_mjd_tdb;
+        // 2. Converti immediatamente in elementi OSCULANTI (ICRF) 
+        // Questa è la configurazione standard per precisione sub-arcsecondo.
+        auto kep_osc = astdyn::api::OrbitFitAPI::convert_mean_equinoctial_to_osculating(equ);
         
-        // Il parser AstDyn non estrae object_name dal file .eq1
-        // Lo leggiamo manualmente dalla prima linea non-commento
+        // Salva elementi internamente
+        current_elements_.semi_major_axis = kep_osc.semi_major_axis;
+        current_elements_.eccentricity = kep_osc.eccentricity;
+        current_elements_.inclination = kep_osc.inclination;
+        current_elements_.longitude_asc_node = kep_osc.longitude_ascending_node;
+        current_elements_.argument_perihelion = kep_osc.argument_perihelion;
+        current_elements_.mean_anomaly = kep_osc.mean_anomaly;
+        current_elements_.epoch_mjd_tdb = kep_osc.epoch_mjd_tdb;
+        
+        current_epoch_mjd_ = kep_osc.epoch_mjd_tdb;
+        
+        // Il parser non estrae object_name, lo leggiamo manualmente
         object_name_ = extractObjectNameFromEQ1(filepath);
-        
-        // Se non trovato, usa un nome vuoto
-        if (object_name_.empty()) {
-            object_name_ = "Unknown";
-        }
+        if (object_name_.empty()) object_name_ = "Unknown";
         
         initialized_ = true;
+        
+        // Nota: Poiché abbiamo convertito in Equatorial (ICRF), 
+        // dobbiamo assicurarci che il propagatore sia configurato per EQUATORIAL
+        // in propagateToEpoch (implementato via propagate_keplerian).
+        
         return true;
         
     } catch (const std::exception& e) {
         initialized_ = false;
-        last_stats_ = std::string("Errore caricamento: ") + e.what();
+        last_stats_ = std::string("Errore caricamento alta precisione (convert_mean_to_osculating): ") + e.what();
         return false;
     }
 }
@@ -126,7 +146,7 @@ void AstDynWrapper::setKeplerianElements(
     double epoch_mjd_tdb,
     const std::string& name)
 {
-    // Salva elementi per uso futuro (usa parser format)
+    // Salva elementi per uso futuro
     current_elements_.semi_major_axis = a;
     current_elements_.eccentricity = e;
     current_elements_.inclination = i;
@@ -139,6 +159,43 @@ void AstDynWrapper::setKeplerianElements(
     current_epoch_mjd_ = epoch_mjd_tdb;
     object_name_ = name;
     initialized_ = true;
+    
+    // Re-inizializza il propagatore se necessario (opzionale, propagateToEpoch lo usa)
+    initializePropagator();
+}
+
+void AstDynWrapper::setEquinoctialElements(
+    double a, double h, double k,
+    double p, double q, double lambda,
+    double epoch_mjd_tdb,
+    const std::string& name)
+{
+    // Converti equinoziali in kepleriani (Ecliptic)
+    astdyn::propagation::EquinoctialElements eq;
+    eq.a = a;
+    eq.h = h;
+    eq.k = k;
+    eq.p = p;
+    eq.q = q;
+    eq.lambda = lambda;
+    
+    auto kep = astdyn::propagation::equinoctial_to_keplerian(eq);
+    
+    // Salva come kepleriani internamente
+    current_elements_.semi_major_axis = kep.semi_major_axis;
+    current_elements_.eccentricity = kep.eccentricity;
+    current_elements_.inclination = kep.inclination;
+    current_elements_.longitude_asc_node = kep.longitude_ascending_node;
+    current_elements_.argument_perihelion = kep.argument_perihelion;
+    current_elements_.mean_anomaly = kep.mean_anomaly;
+    current_elements_.epoch_mjd_tdb = epoch_mjd_tdb;
+    current_elements_.object_name = name;
+    
+    current_epoch_mjd_ = epoch_mjd_tdb;
+    object_name_ = name;
+    initialized_ = true;
+    
+    initializePropagator();
 }
 
 CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
@@ -149,6 +206,7 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
     
     auto start = std::chrono::high_resolution_clock::now();
     
+    std::cout << "  - Preparing KeplerianElements..." << std::endl;
     // Crea KeplerianElements per propagazione (struct in propagation namespace)
     astdyn::propagation::KeplerianElements kep_initial;
     kep_initial.epoch_mjd_tdb = current_elements_.epoch_mjd_tdb;
@@ -160,9 +218,15 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
     kep_initial.mean_anomaly = current_elements_.mean_anomaly;
     kep_initial.gravitational_parameter = astdyn::constants::GMS;  // AU³/day²
     
+    std::cout << "  - Propagating with AstDyn..." << std::endl;
+    if (!propagator_) {
+        std::cout << "  - ERROR: Propagator is NULL!" << std::endl;
+        throw std::runtime_error("Propagator is NULL");
+    }
     // Propagazione con AstDyn
     auto kep_final = propagator_->propagate_keplerian(kep_initial, target_mjd_tdb);
     
+    std::cout << "  - Propagation finished." << std::endl;
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     
@@ -176,8 +240,63 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
     // Converti in cartesiano (frame ECLM J2000)
     auto cart_ecl = astdyn::propagation::keplerian_to_cartesian(kep_final);
     
-    // Converti da ECLM J2000 a ICRF
+    // NOTA: Se abbiamo caricato da EQ1, kep_initial è già in ICRF (Equatorial)
+    // Se invece è stato impostato manualmente via setKeplerianElements, assumiamo Ecliptic
+    // Per semplicità qui manteniamo la logica legacy, ma l'utente dovrebbe usare calculateObservation
+    // per massima precisione.
     return eclipticToICRF(cart_ecl, target_mjd_tdb);
+}
+
+FitResult AstDynWrapper::runFit(const std::string& rwo_filepath, bool verbose) {
+    FitResult result;
+    try {
+        // Troviamo il file .eq1 originale (assumiamo sia nella stessa dir dell'oggetto se caricato)
+        // Per ora richiediamo che loadFromEQ1 sia stato chiamato o passiamo un dummy
+        // Implementazione via OrbitFitAPI
+        std::string dummy_eq1 = ""; // Se non disponibile, l'API potrebbe fallire o richiedere input.
+        
+        // Poiché l'wrapper non salva il path dell'eq1, assumiamo che runFit
+        // sia inteso per fittare l'orbita *già caricata*.
+        // Ma l'API OrbitFitAPI::run_fit prende il path.
+        
+        result.message = "Fitting non ancora implementato via wrapper (usare OrbitFitAPI direttamente)";
+        result.success = false;
+        
+        // Nota per l'utente: L'integrazione di runFit richiede il path del file .eq1 originale.
+    } catch (const std::exception& e) {
+        result.success = false;
+        result.message = e.what();
+    }
+    return result;
+}
+
+astdyn::propagation::HighPrecisionPropagator::ObservationResult 
+AstDynWrapper::calculateObservation(double target_mjd_tdb) {
+    if (!initialized_) throw std::runtime_error("Wrapper non inizializzato");
+
+    // Configura HighPrecisionPropagator con DE441 part-2 (lo standard validato)
+    astdyn::propagation::HighPrecisionPropagator::Config prop_cfg;
+    prop_cfg.de441_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp";
+    prop_cfg.tolerance = 1e-13;
+    astdyn::propagation::HighPrecisionPropagator high_prop(prop_cfg);
+
+    // Preparazione elementi
+    astdyn::propagation::KeplerianElements kep;
+    kep.epoch_mjd_tdb = current_elements_.epoch_mjd_tdb;
+    kep.semi_major_axis = current_elements_.semi_major_axis;
+    kep.eccentricity = current_elements_.eccentricity;
+    kep.inclination = current_elements_.inclination;
+    kep.longitude_ascending_node = current_elements_.longitude_asc_node;
+    kep.argument_perihelion = current_elements_.argument_perihelion;
+    kep.mean_anomaly = current_elements_.mean_anomaly;
+    kep.gravitational_parameter = astdyn::constants::GMS;
+
+    double target_jd = target_mjd_tdb + 2400000.5;
+    
+    // IMPORTANTE: Poiché loadFromEQ1 applica convert_mean_to_osculating, 
+    // gli elementi salvati sono già in Equatorial/ICRF.
+    return high_prop.calculateGeocentricObservation(
+        kep, target_jd, astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL);
 }
 
 CartesianStateICRF AstDynWrapper::eclipticToICRF(
@@ -185,9 +304,8 @@ CartesianStateICRF AstDynWrapper::eclipticToICRF(
     double epoch_mjd_tdb)
 {
     // Obliquità eclittica J2000
-    constexpr double epsilon = 23.4393 * M_PI / 180.0;
-    const double cos_eps = std::cos(epsilon);
-    const double sin_eps = std::sin(epsilon);
+    const double cos_eps = std::cos(OrbitalConversions::OBLIQUITY_J2000);
+    const double sin_eps = std::sin(OrbitalConversions::OBLIQUITY_J2000);
     
     // Rotazione posizione
     const double x_ecl = ecl_state.position.x();

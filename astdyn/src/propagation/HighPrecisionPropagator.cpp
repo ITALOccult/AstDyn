@@ -9,6 +9,7 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 #include <iostream>
 #include <cmath>
 
@@ -69,28 +70,33 @@ std::unique_ptr<Propagator> HighPrecisionPropagator::createPropagator() const {
 
 // Helper: Ecliptic to Equatorial (J2000)
 static Eigen::Vector3d ecl_to_eq(const Eigen::Vector3d& ecl) {
-    double eps = 23.4392911 * M_PI / 180.0;
-    double c = cos(eps);
-    double s = sin(eps);
-    return Eigen::Vector3d(ecl.x(), c*ecl.y() - s*ecl.z(), s*ecl.y() + c*ecl.z());
+    return coordinates::ReferenceFrame::ecliptic_to_j2000() * ecl;
 }
 
 HighPrecisionPropagator::ObservationResult 
 HighPrecisionPropagator::calculateGeocentricObservation(
     const KeplerianElements& initial_elements, 
-    double target_jd_tdb
+    double target_jd_tdb,
+    InputFrame frame
 ) {
     auto propagator = createPropagator();
 
     // 1. Initial State Setup
-    // Convert input Keplerian (assumed Ecliptic J2000) to Cartesian ICRF (Equatorial)
-    CartesianElements cart_ecl = keplerian_to_cartesian(initial_elements);
+    CartesianElements cart_start = keplerian_to_cartesian(initial_elements);
     
     CartesianElements cart_icrf;
     cart_icrf.epoch_mjd_tdb = initial_elements.epoch_mjd_tdb;
     cart_icrf.gravitational_parameter = initial_elements.gravitational_parameter;
-    cart_icrf.position = ecl_to_eq(cart_ecl.position);
-    cart_icrf.velocity = ecl_to_eq(cart_ecl.velocity);
+    
+    if (frame == InputFrame::ECLIPTIC) {
+        // Convert input Keplerian (Ecliptic J2000) to Cartesian ICRF (Equatorial)
+        cart_icrf.position = ecl_to_eq(cart_start.position);
+        cart_icrf.velocity = ecl_to_eq(cart_start.velocity);
+    } else {
+        // Already Equatorial
+        cart_icrf.position = cart_start.position;
+        cart_icrf.velocity = cart_start.velocity;
+    }
 
     double target_mjd = target_jd_tdb - 2400000.5;
 
@@ -151,6 +157,31 @@ HighPrecisionPropagator::calculateGeocentricObservation(
 
 std::shared_ptr<EphemerisProvider> HighPrecisionPropagator::getEphemerisProvider() const {
     return custom_provider_;
+}
+
+CartesianElements HighPrecisionPropagator::propagate_cartesian(
+    const KeplerianElements& initial_elements,
+    double target_mjd_tdb,
+    InputFrame frame
+) {
+    auto propagator = createPropagator();
+
+    // 1. Initial State Setup
+    CartesianElements cart_start = keplerian_to_cartesian(initial_elements);
+    
+    CartesianElements cart_icrf;
+    cart_icrf.epoch_mjd_tdb = initial_elements.epoch_mjd_tdb;
+    cart_icrf.gravitational_parameter = initial_elements.gravitational_parameter;
+    
+    if (frame == InputFrame::ECLIPTIC) {
+        cart_icrf.position = ecl_to_eq(cart_start.position);
+        cart_icrf.velocity = ecl_to_eq(cart_start.velocity);
+    } else {
+        cart_icrf.position = cart_start.position;
+        cart_icrf.velocity = cart_start.velocity;
+    }
+
+    return propagator->propagate_cartesian(cart_icrf, target_mjd_tdb);
 }
 
 } // namespace astdyn::propagation

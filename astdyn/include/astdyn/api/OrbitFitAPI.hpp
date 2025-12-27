@@ -65,7 +65,8 @@ public:
         const std::string& eq1_file,
         const std::string& rwo_file,
         const std::string& config_file = "",
-        bool verbose = true
+        bool verbose = true,
+        const std::string& de441_path = ""
     );
 
     /**

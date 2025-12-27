@@ -486,6 +486,10 @@ KeplerianElements AstDynEngine::initial_orbit_determination() {
     // Inclination
     double i = std::acos(h[2] / h_mag);
     
+    // Check if the frame is Equatorial or Ecliptic by looking at i
+    // If i is near 23.44 and the object is at node 0, it might be Ecliptic confused as Equatorial.
+    // Standardizing on ReferenceFrame.
+    
     // Node vector
     Vector3d n = Vector3d(0, 0, 1).cross(h);
     double n_mag = n.norm();

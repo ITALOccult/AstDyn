@@ -12,33 +12,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(AstDyn REQUIRED)
 
-# Include directories
-set(TEMPLATES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../templates_ioccultcalc")
-
-include_directories(
-    ${TEMPLATES_DIR}/include
-)
-
-# Source files
-set(INTEGRATION_SOURCES
-    ${TEMPLATES_DIR}/src/eq1_parser.cpp
-    ${TEMPLATES_DIR}/src/orbital_conversions.cpp
-    ${TEMPLATES_DIR}/src/astdyn_wrapper.cpp
-)
-
-# Create library from integration modules
-add_library(astdyn_integration STATIC ${INTEGRATION_SOURCES})
-
-target_include_directories(astdyn_integration
-    PUBLIC
-        ${TEMPLATES_DIR}/include
-)
-
-target_link_libraries(astdyn_integration
-    PUBLIC
-        AstDyn::AstDyn
-        Eigen3::Eigen
-)
+# Add main library as subdirectory
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../italoccultlibrary ${CMAKE_CURRENT_BINARY_DIR}/italoccultlib_build)
 
 # Executable: test standalone
 add_executable(test_astdyn_integration
@@ -47,7 +22,9 @@ add_executable(test_astdyn_integration
 
 target_link_libraries(test_astdyn_integration
     PRIVATE
-        astdyn_integration
+        italoccultlib
+        AstDyn::astdyn
+        Eigen3::Eigen
 )
 
 # Compiler flags

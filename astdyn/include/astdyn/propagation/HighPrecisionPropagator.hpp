@@ -32,6 +32,11 @@ class Propagator;
  */
 class HighPrecisionPropagator {
 public:
+    enum class InputFrame {
+        ECLIPTIC,   ///< Mean Ecliptic J2000 (standard for AstDys/MPC)
+        EQUATORIAL  ///< J2000 Equatorial / ICRF
+    };
+
     struct Config {
         std::string de441_path = "";     ///< Path to de44xx.bsp. If empty, uses analytical ephemeris.
         std::string asteroid_ephemeris_file = ""; ///< Path to asteroid SPK kernel
@@ -87,7 +92,8 @@ public:
      */
     ObservationResult calculateGeocentricObservation(
         const KeplerianElements& initial_elements, 
-        double target_jd_tdb
+        double target_jd_tdb,
+        InputFrame frame = InputFrame::ECLIPTIC
     );
 
     /**
@@ -95,15 +101,32 @@ public:
      */
     std::shared_ptr<astdyn::ephemeris::EphemerisProvider> getEphemerisProvider() const;
 
+    /**
+     * @brief Create a fresh configured Propagator instance
+     */
+    std::unique_ptr<Propagator> createPropagator() const;
+
+    /**
+     * @brief High-precision propagation to target epoch
+     * 
+     * @param initial_elements Initial orbit
+     * @param target_mjd_tdb Target epoch
+     * @param frame Input frame
+     * @return Cartesian state at target epoch (ICRF Equatorial)
+     */
+    CartesianElements propagate_cartesian(
+        const KeplerianElements& initial_elements,
+        double target_mjd_tdb,
+        InputFrame frame = InputFrame::ECLIPTIC
+    );
+
+private:
 private:
     Config config_;
     
     // Shared resources
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> planetary_ephemeris_;
     std::shared_ptr<astdyn::ephemeris::EphemerisProvider> custom_provider_;
-    
-    // Helper to create a fresh configured propagator
-    std::unique_ptr<Propagator> createPropagator() const;
 };
 
 } // namespace astdyn::propagation

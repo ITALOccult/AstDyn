@@ -73,6 +73,26 @@ std::cout << "RA: " << result.ra_deg << " deg" << std::endl;
 std::cout << "Dec: " << result.dec_deg << " deg" << std::endl;
 \end{lstlisting}
 
+\section{Integrazione Semplificata: ITALOccultLibrary}
+\label{sec:italoccultlib_integration}
+
+Per rendere accessibili queste funzionalità nel progetto \texttt{IOccultCalc}, è stata creata la libreria \texttt{ITALOccultLibrary}. Questa agisce come un wrapper che automatizza i passaggi critici.
+
+\subsection{Conversione Automatica Mean $\to$ Osculating}
+Uno degli errori più comuni è l'utilizzo diretto degli elementi medi di AstDyS (\texttt{.eq1}) in un propagatore numerico N-Body. Questo introduce un errore sistematico di circa $360$ arcsec. Il wrapper \texttt{AstDynWrapper} risolve questo problema applicando automaticamente la conversione:
+
+\begin{lstlisting}[style=cpp, caption={AstDynWrapper per Alta Precisione}]
+#include <italoccultlib/astdyn_wrapper.h>
+
+ioccultcalc::AstDynWrapper wrapper;
+// Carica e converte automaticamente Mean (Ecl) -> Osculating (Equatorial)
+wrapper.loadFromEQ1File("34713.eq1");
+
+// Calcola osservazione geocentrica con DE441 part-2
+auto obs = wrapper.calculateObservation(61050.0);
+std::cout << "RA: " << obs.ra_deg << " deg" << std::endl;
+\end{lstlisting}
+
 \section{Coerenza del Sistema di Riferimento}
 \label{sec:frame_consistency}
 

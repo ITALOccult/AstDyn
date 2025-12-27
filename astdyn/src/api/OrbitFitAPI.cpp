@@ -100,11 +100,16 @@ propagation::KeplerianElements OrbitFitAPI::convert_mean_equinoctial_to_osculati
     return propagation::cartesian_to_keplerian(cart_equatorial);
 }
 
+static Eigen::Vector3d ecl_to_eq_std(const Eigen::Vector3d& ecl) {
+    return coordinates::ReferenceFrame::ecliptic_to_j2000() * ecl;
+}
+
 OrbitFitResult OrbitFitAPI::run_fit(
     const std::string& eq1_file,
     const std::string& rwo_file,
     const std::string& config_file,
-    bool verbose
+    bool verbose,
+    const std::string& de441_path
 ) {
     OrbitFitResult result;
     result.success = false;
@@ -117,30 +122,31 @@ OrbitFitResult OrbitFitAPI::run_fit(
         auto orbfit_orbit_ecliptic = propagation::equinoctial_to_keplerian(equ);
 
         // 2. Transform Frame: Ecliptic J2000 -> Equatorial J2000
-        // This is crucial as AstDyn operates in Equatorial frame
         auto cart_ecliptic_elem = propagation::keplerian_to_cartesian(orbfit_orbit_ecliptic);
-        
-        coordinates::CartesianState state_ecliptic(
-            cart_ecliptic_elem.position,
-            cart_ecliptic_elem.velocity,
-            cart_ecliptic_elem.gravitational_parameter
-        );
-        
-        auto state_equatorial = coordinates::ReferenceFrame::transform_state(
-            state_ecliptic,
-            coordinates::FrameType::ECLIPTIC,
-            coordinates::FrameType::J2000
-        );
-        
+
+        OrbitContext ctx_in;
+        ctx_in.frame = ReferenceFrame::ECLIPTIC_J2000;
+        ctx_in.center = OriginCenter::SUN;
+        ctx_in.model = OrbitModel::MEAN;
+        ctx_in.format = ElementFormat::KEPLERIAN;
+
         propagation::CartesianElements cart_equatorial_elem;
         cart_equatorial_elem.epoch_mjd_tdb = cart_ecliptic_elem.epoch_mjd_tdb;
-        cart_equatorial_elem.position = state_equatorial.position();
-        cart_equatorial_elem.velocity = state_equatorial.velocity();
-        cart_equatorial_elem.gravitational_parameter = state_equatorial.mu();
+        cart_equatorial_elem.position = coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.position;
+        cart_equatorial_elem.velocity = coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.velocity;
+        cart_equatorial_elem.gravitational_parameter = cart_ecliptic_elem.gravitational_parameter;
         
         auto initial_orbit_equatorial = propagation::cartesian_to_keplerian(cart_equatorial_elem);
         
+        OrbitContext ctx_fit;
+        ctx_fit.frame = ReferenceFrame::EQUATORIAL_J2000;
+        ctx_fit.center = OriginCenter::SUN;
+        ctx_fit.model = OrbitModel::OSCULATING;
+        ctx_fit.format = ElementFormat::KEPLERIAN;
+
         if (verbose) {
+            std::cout << "   Initial Context: " << ctx_in.toString() << "\n";
+            std::cout << "   Target Context:  " << ctx_fit.toString() << "\n";
             std::cout << "   Initial Orbit (Ecliptic): a=" << orbfit_orbit_ecliptic.semi_major_axis 
                       << " e=" << orbfit_orbit_ecliptic.eccentricity 
                       << " i=" << orbfit_orbit_ecliptic.inclination * constants::RAD_TO_DEG << "deg\n";
@@ -164,6 +170,14 @@ OrbitFitResult OrbitFitAPI::run_fit(
              } else {
                  if (verbose) std::cout << "   Warning: Config file " << config_file << " not found. Using defaults + planetary perturbations.\n";
              }
+        }
+        
+        if (!de441_path.empty()) {
+            if (verbose) std::cout << "   Overriding DE441 path: " << de441_path << "\n";
+            AstDynConfig cfg = engine.config();
+            cfg.ephemeris_type = "DE441";
+            cfg.ephemeris_file = de441_path;
+            engine.set_config(cfg);
         }
         
         // Ensure robust configuration if loaded one is minimal/missing

@@ -159,7 +159,32 @@ Confronto posizione su 1 anno:
 \end{tabular}
 \end{table}
 
-\textbf{Conclusione}: AstDyn concorda con JPL Horizons entro $\sim$5 km su 1 anno.
+\textbf{Conclusione}: AstDyn concorda con JPL Horizons entro $\sim$5 km su 1 anno per la posizione cartesiana.
+
+\section{Validazione Geocentrica ad Alta Precisione (34713 Ilse)}
+
+Per validare il workflow di occultazione, è stata eseguita una prova rigorosa sull'asteroide (34713) Ilse all'epoca MJD 61050.0 (10 Gennaio 2026), confrontando i risultati geocentrici (RA/Dec) con il sistema JPL Horizons.
+
+\begin{table}[H]
+\centering
+\caption{Validazione Astrometrica (34713 Ilse) @ MJD 61050.0}
+\begin{tabular}{lccc}
+\hline
+\textbf{Metodo} & \textbf{Sorgente Elementi} & \textbf{Errore RA} & \textbf{Errore Dec} \\
+\hline
+AstDyn (Nominale) & AstDyS .eq1 (Mean $\to$ Osc) & \textbf{0.627''} & \textbf{0.151''} \\
+AstDyn (JPL-Ref) & JPL Horizons (Osculating) & \textbf{0.634''} & \textbf{0.147''} \\
+\hline
+\end{tabular}
+\end{table}
+
+I risultati mostrano una precisione \textbf{sub-arcsecondo} ($\sim 0.6$ arcsec), confermando la corretta integrazione di:
+\begin{itemize}
+    \item Effemeridi planetarie JPL DE441 (part-2).
+    \item Correzione iterativa del tempo di luce.
+    \item Trasformazione accurata tra elementi medi (AstDyS) e osculanti (N-Body).
+    \item Conversione rigorosa tra frame Eclittico J2000 e Equatoriale ICRF.
+\end{itemize}
 
 \section{Stress Testing}
 
@@ -232,11 +257,11 @@ GitHub Actions workflow eseguito ad ogni commit:
 \section{Limitazioni Note}
 
 \begin{enumerate}
-    \item \textbf{Effetti relativistici}: Non ancora implementati
-    \item \textbf{Forze non gravitazionali}: Nessun modello outgassing comete
-    \item \textbf{Incontri ravvicinati}: Nessuna gestione speciale approcci $< 0.1$ AU
-    \item \textbf{Forma asteroide}: Solo approssimazione massa puntiforme
-    \item \textbf{Correzione light-time}: Approssimazione primo ordine
+    \item \textbf{Effetti relativistici}: Implementati nel modello 1PN (Einstein-Infeld-Hoffmann).
+    \item \textbf{Forze non gravitazionali}: Nessun modello outgassing comete o pressione di radiazione Yarkovsky (in sviluppo).
+    \item \textbf{Incontri ravvicinati}: Gestione standard via riduzione step-size (no regolarizzazione di Kustaanheimo-Stiefel).
+    \item \textbf{Forma asteroide}: Solo approssimazione massa puntiforme (nessun contributo $J_2$ per l'asteroide).
+    \item \textbf{Correzione light-time}: Implementata in modo iterativo completo.
 \end{enumerate}
 
 \section{Sommario}
