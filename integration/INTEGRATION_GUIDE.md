@@ -64,6 +64,44 @@ void propagateAsteroid(const std::string& eq1_path, double target_mjd) {
 }
 ```
 
+### 3. Database Integration (Allnum.cat / SQLite)
+
+If your application loads elements from a database (e.g., `allnum.cat` or an SQLite DB), you often have **Mean Equinoctial Elements** (AstDyS standard) but no `.eq1` file. Use `setMeanEquinoctialElements` to handle this programmatically.
+
+The library will automatically convert these Mean elements to Osculating ICRF before propagation.
+
+```cpp
+#include <italoccultlib/astdyn_wrapper.h>
+
+// Example: Function called after fetching a row from SQLite
+void processAsteroidFromDB(const DBRow& row, double epoch_mjd, double target_mjd) {
+    // 1. Initialize Wrapper
+    ioccultcalc::AstDynWrapper wrapper(ioccultcalc::PropagationSettings::highAccuracy());
+    
+    // 2. Pass Raw Mean Elements from DB (AstDyS format)
+    //    Note: Check if angles are Deg or Rad in your DB. Wrapper expects RADIANS.
+    //    Allnum.cat usually has Mean Anomaly/Longitude in Degrees.
+    wrapper.setMeanEquinoctialElements(
+        row.a,          // Semi-major axis [AU]
+        row.h,          // e * sin(w + Omega)
+        row.k,          // e * cos(w + Omega)
+        row.p,          // tan(i/2) * sin(Omega)
+        row.q,          // tan(i/2) * cos(Omega)
+        row.lambda_rad, // Mean Longitude [rad] (convert from deg if needed!)
+        epoch_mjd,      // Epoch of elements [MJD TDB]
+        row.name        // Asteroid Name/ID
+    );
+    
+    // 3. Calculate Observation (High Precision)
+    auto result = wrapper.calculateObservation(target_mjd);
+    
+    std::cout << "Asteroid: " << row.name << std::endl;
+    std::cout << "  RA: " << result.ra_deg << " deg" << std::endl;
+    std::cout << "  Dec: " << result.dec_deg << " deg" << std::endl;
+    std::cout << "  Mag: " << result.visual_magnitude << std::endl;
+}
+```
+
 ### 4. Advanced High-Precision & Fitting
 
 For high-precision work, it is critical to distinguish between **Mean** and **Osculating** elements. `AstDyn` uses `OrbitContext` to track this metadata.
