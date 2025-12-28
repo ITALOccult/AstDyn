@@ -18,15 +18,28 @@ def get_horizons_obs(obj_id, epoch_mjd):
     response = requests.get(url, params=params)
     try:
         data = response.json()
+        if 'result' in data:
+            lines = data['result'].split('\n')
+            for line in lines:
+                if "2026-Jan" in line:
+                    print(f"[{epoch}] found: {line.strip()}")
+        else:
+            print(f"Error: {data}")
     except Exception as e:
-        print(f"Error parsing JSON: {e}")
-        print(f"Raw response: {response.text}")
-        return
-    
-    if 'result' in data:
-        print(data['result'])
-    else:
-        print(f"Error in API response: {data}")
+        print(f"Error: {e}")
 
 # Asteroid 34713
-get_horizons_obs('34713', 61050.0)
+# Asteroid 249 (Ilse)
+# Epochs: 2026-Jan-09, 10, 11 -> MJD 61049.0, 61050.0, 61051.0
+epochs = [61049.0, 61050.0, 61051.0]
+
+results = []
+
+print("Fetching data...")
+for epoch in epochs:
+    print(f"--- Fecthing for Epoch {epoch} ---")
+    get_horizons_obs('249', epoch)
+    # Note: The function prints the result but doesn't return parsed RA/Dec efficiently for the table without major refactoring.
+    # I will rely on the printed output which should now be short enough if I didn't truncate it, or I can parse it here.
+    # Actually, simpler: just let it run. The truncation was due to long previous output. 
+    # I will modify the function to print the RAW LINE with "R.A." only.

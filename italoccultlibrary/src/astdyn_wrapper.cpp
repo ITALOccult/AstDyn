@@ -55,6 +55,7 @@ AstDynWrapper::AstDynWrapper(const PropagationSettings& settings)
     : settings_(settings)
     , current_epoch_mjd_(0.0)
     , initialized_(false)
+    , current_frame_(astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC)
 {
     std::cout << "[AstDynWrapper] Constructor started." << std::endl;
     // Crea effemeridi planetarie (usa DE440 embedded di default)
@@ -120,6 +121,7 @@ bool AstDynWrapper::loadFromEQ1File(const std::string& filepath) {
         current_elements_.epoch_mjd_tdb = kep_osc.epoch_mjd_tdb;
         
         current_epoch_mjd_ = kep_osc.epoch_mjd_tdb;
+        current_frame_ = astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL;
         
         // Il parser non estrae object_name, lo leggiamo manualmente
         object_name_ = extractObjectNameFromEQ1(filepath);
@@ -144,7 +146,8 @@ void AstDynWrapper::setKeplerianElements(
     double a, double e, double i,
     double Omega, double omega, double M,
     double epoch_mjd_tdb,
-    const std::string& name)
+    const std::string& name,
+    astdyn::propagation::HighPrecisionPropagator::InputFrame frame)
 {
     // Salva elementi per uso futuro
     current_elements_.semi_major_axis = a;
@@ -157,6 +160,7 @@ void AstDynWrapper::setKeplerianElements(
     current_elements_.object_name = name;
     
     current_epoch_mjd_ = epoch_mjd_tdb;
+    current_frame_ = frame;
     object_name_ = name;
     initialized_ = true;
     
@@ -168,9 +172,10 @@ void AstDynWrapper::setEquinoctialElements(
     double a, double h, double k,
     double p, double q, double lambda,
     double epoch_mjd_tdb,
-    const std::string& name)
+    const std::string& name,
+    astdyn::propagation::HighPrecisionPropagator::InputFrame frame)
 {
-    // Converti equinoziali in kepleriani (Ecliptic)
+    // Converti equinoziali in kepleriani (mantiene il frame logico, conversione matematica pura)
     astdyn::propagation::EquinoctialElements eq;
     eq.a = a;
     eq.h = h;
@@ -192,6 +197,48 @@ void AstDynWrapper::setEquinoctialElements(
     current_elements_.object_name = name;
     
     current_epoch_mjd_ = epoch_mjd_tdb;
+    current_frame_ = frame;
+    object_name_ = name;
+    initialized_ = true;
+    
+    initializePropagator();
+}
+
+void AstDynWrapper::setMeanEquinoctialElements(
+    double a, double h, double k,
+    double p, double q, double lambda,
+    double epoch_mjd_tdb,
+    const std::string& name)
+{
+    // 1. Costruisci struttura EquinoctialElements per API (namespace propagation)
+    astdyn::propagation::EquinoctialElements mean_elements;
+    mean_elements.a = a;
+    mean_elements.h = h;
+    mean_elements.k = k;
+    mean_elements.p = p;
+    mean_elements.q = q;
+    mean_elements.lambda = lambda;
+    mean_elements.epoch_mjd_tdb = epoch_mjd_tdb;
+    mean_elements.gravitational_parameter = astdyn::constants::GMS;
+    
+    // 2. Converti in Osculanti (ICRF) usando OrbitFitAPI
+    auto kep_osc = astdyn::api::OrbitFitAPI::convert_mean_equinoctial_to_osculating(mean_elements);
+    
+    // 3. Salva elementi osculanti
+    current_elements_.semi_major_axis = kep_osc.semi_major_axis;
+    current_elements_.eccentricity = kep_osc.eccentricity;
+    current_elements_.inclination = kep_osc.inclination;
+    current_elements_.longitude_asc_node = kep_osc.longitude_ascending_node;
+    current_elements_.argument_perihelion = kep_osc.argument_perihelion;
+    current_elements_.mean_anomaly = kep_osc.mean_anomaly;
+    current_elements_.epoch_mjd_tdb = kep_osc.epoch_mjd_tdb;
+    current_elements_.object_name = name;
+    
+    current_epoch_mjd_ = kep_osc.epoch_mjd_tdb;
+    
+    // IMPORTANTE: Poiché convert_mean_equinoctial_to_osculating restituisce ICRF Equatoriali
+    current_frame_ = astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL;
+    
     object_name_ = name;
     initialized_ = true;
     
@@ -294,9 +341,10 @@ AstDynWrapper::calculateObservation(double target_mjd_tdb) {
     double target_jd = target_mjd_tdb + 2400000.5;
     
     // IMPORTANTE: Poiché loadFromEQ1 applica convert_mean_to_osculating, 
-    // gli elementi salvati sono già in Equatorial/ICRF.
+    // gli elementi salvati sono in Equatorial/ICRF. Se usiamo setKeplerianElements,
+    // usiamo il frame specificato.
     return high_prop.calculateGeocentricObservation(
-        kep, target_jd, astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL);
+        kep, target_jd, current_frame_);
 }
 
 CartesianStateICRF AstDynWrapper::eclipticToICRF(

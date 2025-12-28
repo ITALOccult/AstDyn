@@ -23,5 +23,5 @@ def get_horizons_elements(obj_id, epoch_mjd):
     else:
         print("Error fetching data")
 
-# Asteroid 34713
-get_horizons_elements('34713', 61050.0)
+# Asteroid 249 (Ilse)
+get_horizons_elements('249', 61050.5)

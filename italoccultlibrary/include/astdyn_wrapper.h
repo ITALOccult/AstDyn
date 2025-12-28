@@ -133,13 +133,50 @@ public:
      */
     bool loadFromEQ1File(const std::string& filepath);
     
+    /**
+     * @brief Imposta elementi kepleriani manualmente
+     * @param a Semiasse maggiore [AU]
+     * @param e Eccentricità
+     * @param i Inclinazione [rad]
+     * @param Omega Longitudine nodo ascendente [rad]
+     * @param omega Argomento perielio [rad]
+     * @param M Anomalia media [rad]
+     * @param epoch_mjd_tdb Epoca [MJD TDB]
+     * @param name Nome oggetto (opzionale)
+     * @param frame Frame di riferimento degli elementi (default: ECLIPTIC)
+     */
     void setKeplerianElements(double a, double e, double i, 
                               double Omega, double omega, double M,
                               double epoch_mjd_tdb,
-                              const std::string& name = "");
+                              const std::string& name = "",
+                              astdyn::propagation::HighPrecisionPropagator::InputFrame frame = 
+                                  astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
     
     /**
-     * @brief Imposta elementi orbitali equinoziali manualmente
+     * @brief Imposta elementi orbitali equinoziali (OSCULANTI)
+     * @param a Semiasse maggiore [AU]
+     * @param h e*sin(omega+Omega)
+     * @param k e*cos(omega+Omega)
+     * @param p tan(i/2)*sin(Omega)
+     * @param q tan(i/2)*cos(Omega)
+     * @param lambda Longitudine media [rad]
+     * @param epoch_mjd_tdb Epoca [MJD TDB]
+     * @param name Nome oggetto (opzionale)
+     * @param frame Frame di riferimento (default: ECLIPTIC, assumendo input osculanti)
+     */
+    void setEquinoctialElements(double a, double h, double k,
+                                double p, double q, double lambda,
+                                double epoch_mjd_tdb,
+                                const std::string& name = "",
+                                astdyn::propagation::HighPrecisionPropagator::InputFrame frame = 
+                                    astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+
+    /**
+     * @brief Imposta elementi equinoziali MEDI (es. da allnum.cat / AstDyS)
+     * 
+     * Esegue automaticamente la conversione Mean -> Osculating (ICRF)
+     * richiesta per l'alta precisione.
+     * 
      * @param a Semiasse maggiore [AU]
      * @param h e*sin(omega+Omega)
      * @param k e*cos(omega+Omega)
@@ -149,10 +186,10 @@ public:
      * @param epoch_mjd_tdb Epoca [MJD TDB]
      * @param name Nome oggetto (opzionale)
      */
-    void setEquinoctialElements(double a, double h, double k,
-                                double p, double q, double lambda,
-                                double epoch_mjd_tdb,
-                                const std::string& name = "");
+    void setMeanEquinoctialElements(double a, double h, double k,
+                                    double p, double q, double lambda,
+                                    double epoch_mjd_tdb,
+                                    const std::string& name = "");
     
     /**
      * @brief Propaga orbita a epoca target
@@ -208,6 +245,7 @@ private:
     std::unique_ptr<astdyn::propagation::Propagator> propagator_;
     
     astdyn::io::IOrbitParser::OrbitalElements current_elements_;
+    astdyn::propagation::HighPrecisionPropagator::InputFrame current_frame_;
     double current_epoch_mjd_;
     std::string object_name_;
     bool initialized_;

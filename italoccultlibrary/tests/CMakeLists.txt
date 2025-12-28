@@ -37,5 +37,23 @@ target_link_libraries(test_34713_precision PRIVATE
 )
 add_test(NAME test_34713_precision COMMAND test_34713_precision)
 
+# Test Asteroid 249 Precision
+add_executable(test_asteroid_249_precision test_asteroid_249_precision.cpp)
+target_link_libraries(test_asteroid_249_precision PRIVATE 
+    italoccultlib 
+    ${PROJECT_SOURCE_DIR}/../astdyn/build/src/libastdyn.a
+    ${Boost_LIBRARIES}
+)
+add_test(NAME test_asteroid_249_precision COMMAND test_asteroid_249_precision)
+
+# Test Allnum Cat DB Simulation (Mean Elements API check)
+add_executable(test_allnum_cat_simulation test_allnum_cat_simulation.cpp)
+target_link_libraries(test_allnum_cat_simulation PRIVATE 
+    italoccultlib 
+    ${PROJECT_SOURCE_DIR}/../astdyn/build/src/libastdyn.a
+    ${Boost_LIBRARIES}
+)
+add_test(NAME test_allnum_cat_simulation COMMAND test_allnum_cat_simulation)
+
 add_test(NAME ChebyshevTest COMMAND test_chebyshev)
 add_test(NAME AstDynWrapperTest COMMAND test_astdyn_wrapper)
