@@ -80,17 +80,33 @@ HighPrecisionPropagator::calculateGeocentricObservation(
     const KeplerianElements& initial_elements, 
     double target_jd_tdb
 ) {
+    return calculateGeocentricObservation(initial_elements, target_jd_tdb, InputFrame::ECLIPTIC);
+}
+
+HighPrecisionPropagator::ObservationResult 
+HighPrecisionPropagator::calculateGeocentricObservation(
+    const KeplerianElements& initial_elements, 
+    double target_jd_tdb,
+    InputFrame frame
+) {
     auto propagator = createPropagator();
 
     // 1. Initial State Setup
-    // Convert input Keplerian (assumed Ecliptic J2000) to Cartesian ICRF (Equatorial)
-    CartesianElements cart_ecl = keplerian_to_cartesian(initial_elements);
-    
     CartesianElements cart_icrf;
     cart_icrf.epoch_mjd_tdb = initial_elements.epoch_mjd_tdb;
     cart_icrf.gravitational_parameter = initial_elements.gravitational_parameter;
-    cart_icrf.position = ecl_to_eq(cart_ecl.position);
-    cart_icrf.velocity = ecl_to_eq(cart_ecl.velocity);
+
+    if (frame == InputFrame::ECLIPTIC) {
+        // Convert input Keplerian (Ecliptic J2000) to Cartesian ICRF (Equatorial)
+        CartesianElements cart_ecl = keplerian_to_cartesian(initial_elements);
+        cart_icrf.position = ecl_to_eq(cart_ecl.position);
+        cart_icrf.velocity = ecl_to_eq(cart_ecl.velocity);
+    } else {
+        // Assume already EQUATORIAL
+        CartesianElements cart_eq = keplerian_to_cartesian(initial_elements);
+        cart_icrf.position = cart_eq.position;
+        cart_icrf.velocity = cart_eq.velocity;
+    }
 
     double target_mjd = target_jd_tdb - 2400000.5;
 

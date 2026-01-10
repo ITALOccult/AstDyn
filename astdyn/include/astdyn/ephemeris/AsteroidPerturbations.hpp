@@ -92,7 +92,7 @@ public:
      * @param sun_pos_bary Position of Sun relative to SSB [AU]
      * @return Acceleration vector [AU/d^2]
      */
-    Eigen::Vector3d computePerturbation(const Eigen::Vector3d& position, double mjd_tdb, const Eigen::Vector3d& sun_pos_bary) const;
+    Eigen::Vector3d computePerturbation(const Eigen::Vector3d& position, double mjd_tdb, const Eigen::Vector3d& sun_pos_bary = Eigen::Vector3d::Zero()) const;
     
     /**
      * @brief Compute perturbation from single asteroid

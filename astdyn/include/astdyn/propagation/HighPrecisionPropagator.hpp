@@ -32,6 +32,11 @@ class Propagator;
  */
 class HighPrecisionPropagator {
 public:
+    enum class InputFrame {
+        ECLIPTIC,
+        EQUATORIAL
+    };
+
     struct Config {
         std::string de441_path = "";     ///< Path to de44xx.bsp. If empty, uses analytical ephemeris.
         std::string asteroid_ephemeris_file = ""; ///< Path to asteroid SPK kernel
@@ -78,6 +83,15 @@ public:
     ObservationResult calculateGeocentricObservation(
         const KeplerianElements& initial_elements, 
         double target_jd_tdb
+    );
+
+    /**
+     * @brief Calculate geocentric astrometric position with explicit input frame
+     */
+    ObservationResult calculateGeocentricObservation(
+        const KeplerianElements& initial_elements, 
+        double target_jd_tdb,
+        InputFrame frame
     );
 
     /**
