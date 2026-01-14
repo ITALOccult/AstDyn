@@ -1,10 +1,7 @@
 {
 	"InstallScripts" : 
 	[
-		"/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/cmake_install.cmake",
-		"/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/src/cmake_install.cmake",
-		"/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/cmake_install.cmake",
-		"/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/examples/cmake_install.cmake"
+		"/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

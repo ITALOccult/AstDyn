@@ -480,6 +480,44 @@ std::vector<CartesianState> generate_ephemeris(
 
 \textbf{Returns}: Vector of states
 
+\subsection{astdyn::propagation::HighPrecisionPropagator}
+
+\begin{lstlisting}[language=C++]
+class HighPrecisionPropagator {
+public:
+    struct Config {
+        std::string de441_path;
+        double step_size = 0.5;
+        double tolerance = 1e-13;
+        bool perturbations_planets = true;
+        bool relativity = true;
+    };
+
+    struct ObservationResult {
+        double ra_deg;
+        double dec_deg;
+        double distance_au;
+        double light_time_sec;
+    };
+
+    explicit HighPrecisionPropagator(const Config& config = Config());
+    
+    ObservationResult calculateGeocentricObservation(
+        const KeplerianElements& initial_elements, 
+        double target_jd_tdb
+    );
+};
+\end{lstlisting}
+
+\textbf{Purpose}: Simplified API for rigorous asteroid propagation and geocentric reduction matching JPL precision.
+
+\textbf{Key Features}:
+\begin{itemize}
+    \item Automatic handling of Heliocentric vs Baricentric frames.
+    \item Iterative light-time correction.
+    \item Native DE441 ephemeris support (via \texttt{Config}).
+\end{itemize}
+
 \section{Observations}
 
 \subsection{astdyn::observations::Observation}

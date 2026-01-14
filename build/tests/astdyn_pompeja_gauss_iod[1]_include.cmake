@@ -1,5 +1,0 @@
-if(EXISTS "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/astdyn_pompeja_gauss_iod[1]_tests.cmake")
-  include("/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/astdyn_pompeja_gauss_iod[1]_tests.cmake")
-else()
-  add_test(astdyn_pompeja_gauss_iod_NOT_BUILT astdyn_pompeja_gauss_iod_NOT_BUILT)
-endif()

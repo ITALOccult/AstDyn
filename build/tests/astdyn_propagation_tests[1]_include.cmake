@@ -1,5 +1,0 @@
-if(EXISTS "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/astdyn_propagation_tests[1]_tests.cmake")
-  include("/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/tests/astdyn_propagation_tests[1]_tests.cmake")
-else()
-  add_test(astdyn_propagation_tests_NOT_BUILT astdyn_propagation_tests_NOT_BUILT)
-endif()

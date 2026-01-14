@@ -152,7 +152,7 @@ private:
     void load_mpc_file(const std::string& filename);
     void load_eq1_file(const std::string& filename);
     void load_oel_file(const std::string& filename);
-    void load_oop_file(const std::string& filename);
+    void load_json_file(const std::string& filename);
     
     propagation::KeplerianElements equinoctial_to_keplerian(
         double a, double h, double k, double p, double q, double lambda, double mjd);

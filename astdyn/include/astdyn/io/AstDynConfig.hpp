@@ -94,63 +94,8 @@ struct RWOObservation {
           outlier(false), selection_flag('S') {}
 };
 
-/**
- * @brief OPT file parser (option file)
- * 
- * Format: KEY = VALUE
- * Supports sections: [section]
- */
-class OptionFileParser {
-public:
-    OptionFileParser() = default;
-    
-    /**
-     * @brief Load options from .opt file
-     */
-    bool load(const std::string& filename);
-    
-    /**
-     * @brief Get string option
-     */
-    std::string getString(const std::string& key, const std::string& default_val = "") const;
-    
-    /**
-     * @brief Get double option
-     */
-    double getDouble(const std::string& key, double default_val = 0.0) const;
-    
-    /**
-     * @brief Get integer option
-     */
-    int getInt(const std::string& key, int default_val = 0) const;
-    
-    /**
-     * @brief Get boolean option
-     */
-    bool getBool(const std::string& key, bool default_val = false) const;
-    
-    /**
-     * @brief Check if key exists
-     */
-    bool hasKey(const std::string& key) const;
-    
-    /**
-     * @brief Set option
-     */
-    void set(const std::string& key, const std::string& value);
-    
-    /**
-     * @brief Save to file
-     */
-    bool save(const std::string& filename) const;
-    
-private:
-    std::map<std::string, std::string> options_;
-    std::string current_section_;
-    
-    std::string trim(const std::string& str) const;
-    std::pair<std::string, std::string> parseLine(const std::string& line) const;
-};
+// OptionFileParser removed - usage replaced by JSON
+
 
 /**
  * @brief OEF file reader/writer
@@ -266,24 +211,18 @@ public:
     std::vector<observations::OpticalObservation> getValidObservations() const;
     
     /**
-     * @brief Get option value
-     */
-    template<typename T>
-    T getOption(const std::string& key, const T& default_val) const;
-    
-    /**
      * @brief Save current configuration
      */
     bool saveConfiguration(const std::string& base_path, const std::string& object_name) const;
-    
+
     /**
-     * @brief Export to legacy Fortran format for compatibility
+     * @brief Get option value
      */
     bool exportForLegacyFortran(const std::string& output_dir, 
                                 const std::string& object_name) const;
     
 private:
-    OptionFileParser options_;
+    // OptionFileParser options_; // Removed
     OrbitalElementFile oef_data_;
     std::vector<RWOObservation> observations_;
     std::string object_name_;

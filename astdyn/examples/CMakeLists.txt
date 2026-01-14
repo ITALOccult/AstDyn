@@ -40,6 +40,16 @@ target_link_libraries(example_configurable_parsers PRIVATE astdyn)
 add_executable(propagate_79148 propagate_79148.cpp)
 target_link_libraries(propagate_79148 PRIVATE astdyn)
 
+# Example: Generic propagation example for specific test case
+add_executable(propagation_example propagation_example.cpp)
+target_link_libraries(propagation_example PRIVATE astdyn)
+
+add_executable(fitting_comparison_34713 fitting_comparison_34713.cpp)
+target_link_libraries(fitting_comparison_34713 PRIVATE astdyn)
+
+add_executable(check_de441_positions check_de441_positions.cpp)
+target_link_libraries(check_de441_positions PRIVATE astdyn)
+
 # Install examples (optional)
 install(TARGETS example_basic example_coordinates example_ephemeris propagation_benchmark example_astdys_fitter example_configurable_parsers
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples

@@ -16,9 +16,13 @@
 #include <astdyn/propagation/OrbitalElements.hpp>
 #include <astdyn/ephemeris/PlanetaryEphemeris.hpp>
 #include <astdyn/io/parsers/OrbFitEQ1Parser.hpp>
+#include <astdyn/api/OrbitFitAPI.hpp>
+#include <astdyn/propagation/HighPrecisionPropagator.hpp>
+#include <astdyn/core/Types.hpp>
 #include <Eigen/Dense>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace ioccultcalc {
 
@@ -78,6 +82,20 @@ struct CartesianStateICRF {
 };
 
 /**
+ * @struct FitResult
+ * @brief Risultato del fitting orbitale (Orbit Determination)
+ */
+struct FitResult {
+    bool success = false;
+    std::string message;
+    double rms_ra = 0.0;     ///< [arcsec]
+    double rms_dec = 0.0;    ///< [arcsec]
+    int iterations = 0;
+    int num_observations = 0;
+    bool converged = false;
+};
+
+/**
  * @class AstDynWrapper
  * @brief Wrapper semplificato per propagazione con AstDyn
  * 
@@ -116,7 +134,7 @@ public:
     bool loadFromEQ1File(const std::string& filepath);
     
     /**
-     * @brief Imposta elementi orbitali kepleriani manualmente
+     * @brief Imposta elementi kepleriani manualmente
      * @param a Semiasse maggiore [AU]
      * @param e Eccentricità
      * @param i Inclinazione [rad]
@@ -125,11 +143,53 @@ public:
      * @param M Anomalia media [rad]
      * @param epoch_mjd_tdb Epoca [MJD TDB]
      * @param name Nome oggetto (opzionale)
+     * @param frame Frame di riferimento degli elementi (default: ECLIPTIC)
      */
     void setKeplerianElements(double a, double e, double i, 
                               double Omega, double omega, double M,
                               double epoch_mjd_tdb,
-                              const std::string& name = "");
+                              const std::string& name = "",
+                              astdyn::propagation::HighPrecisionPropagator::InputFrame frame = 
+                                  astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+    
+    /**
+     * @brief Imposta elementi orbitali equinoziali (OSCULANTI)
+     * @param a Semiasse maggiore [AU]
+     * @param h e*sin(omega+Omega)
+     * @param k e*cos(omega+Omega)
+     * @param p tan(i/2)*sin(Omega)
+     * @param q tan(i/2)*cos(Omega)
+     * @param lambda Longitudine media [rad]
+     * @param epoch_mjd_tdb Epoca [MJD TDB]
+     * @param name Nome oggetto (opzionale)
+     * @param frame Frame di riferimento (default: ECLIPTIC, assumendo input osculanti)
+     */
+    void setEquinoctialElements(double a, double h, double k,
+                                double p, double q, double lambda,
+                                double epoch_mjd_tdb,
+                                const std::string& name = "",
+                                astdyn::propagation::HighPrecisionPropagator::InputFrame frame = 
+                                    astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+
+    /**
+     * @brief Imposta elementi equinoziali MEDI (es. da allnum.cat / AstDyS)
+     * 
+     * Esegue automaticamente la conversione Mean -> Osculating (ICRF)
+     * richiesta per l'alta precisione.
+     * 
+     * @param a Semiasse maggiore [AU]
+     * @param h e*sin(omega+Omega)
+     * @param k e*cos(omega+Omega)
+     * @param p tan(i/2)*sin(Omega)
+     * @param q tan(i/2)*cos(Omega)
+     * @param lambda Longitudine media [rad]
+     * @param epoch_mjd_tdb Epoca [MJD TDB]
+     * @param name Nome oggetto (opzionale)
+     */
+    void setMeanEquinoctialElements(double a, double h, double k,
+                                    double p, double q, double lambda,
+                                    double epoch_mjd_tdb,
+                                    const std::string& name = "");
     
     /**
      * @brief Propaga orbita a epoca target
@@ -138,6 +198,22 @@ public:
      * @throws std::runtime_error Se elementi non inizializzati
      */
     CartesianStateICRF propagateToEpoch(double target_mjd_tdb);
+
+    /**
+     * @brief Esegue un fitting orbitale (Least Squares)
+     * @param rwo_filepath Percorso file osservazioni (.rwo)
+     * @param verbose Abilita output dettagliato
+     * @return Risultato del fit
+     */
+    FitResult runFit(const std::string& rwo_filepath, bool verbose = true);
+
+    /**
+     * @brief Calcola osservazione geocentrica (RA/Dec) ad alta precisione
+     * @param target_mjd_tdb Epoca target [MJD TDB]
+     * @return Risultato osservazione (gradi, AU, ecc.)
+     */
+    astdyn::propagation::HighPrecisionPropagator::ObservationResult 
+    calculateObservation(double target_mjd_tdb);
     
     /**
      * @brief Ottiene epoca corrente elementi orbitali
@@ -169,6 +245,7 @@ private:
     std::unique_ptr<astdyn::propagation::Propagator> propagator_;
     
     astdyn::io::IOrbitParser::OrbitalElements current_elements_;
+    astdyn::propagation::HighPrecisionPropagator::InputFrame current_frame_;
     double current_epoch_mjd_;
     std::string object_name_;
     bool initialized_;

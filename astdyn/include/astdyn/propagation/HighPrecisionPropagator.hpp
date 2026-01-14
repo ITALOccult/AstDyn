@@ -33,8 +33,8 @@ class Propagator;
 class HighPrecisionPropagator {
 public:
     enum class InputFrame {
-        ECLIPTIC,
-        EQUATORIAL
+        ECLIPTIC,   ///< Mean Ecliptic J2000 (standard for AstDys/MPC)
+        EQUATORIAL  ///< J2000 Equatorial / ICRF
     };
 
     struct Config {
@@ -63,6 +63,16 @@ public:
 
     /**
      * @brief Initialize propagator with configuration
+     * 
+     * @example
+     * HighPrecisionPropagator::Config config;
+     * config.de441_path = "path/to/de441.bsp";
+     * config.perturbations_planets = true;
+     * 
+     * HighPrecisionPropagator propagator(config);
+     * auto result = propagator.calculateGeocentricObservation(elements, target_jd);
+     * 
+     * @param config Configuration settings for the propagator
      */
     explicit HighPrecisionPropagator(const Config& config = Config());
     ~HighPrecisionPropagator();
@@ -82,16 +92,8 @@ public:
      */
     ObservationResult calculateGeocentricObservation(
         const KeplerianElements& initial_elements, 
-        double target_jd_tdb
-    );
-
-    /**
-     * @brief Calculate geocentric astrometric position with explicit input frame
-     */
-    ObservationResult calculateGeocentricObservation(
-        const KeplerianElements& initial_elements, 
         double target_jd_tdb,
-        InputFrame frame
+        InputFrame frame = InputFrame::ECLIPTIC
     );
 
     /**
@@ -99,15 +101,32 @@ public:
      */
     std::shared_ptr<astdyn::ephemeris::EphemerisProvider> getEphemerisProvider() const;
 
+    /**
+     * @brief Create a fresh configured Propagator instance
+     */
+    std::unique_ptr<Propagator> createPropagator() const;
+
+    /**
+     * @brief High-precision propagation to target epoch
+     * 
+     * @param initial_elements Initial orbit
+     * @param target_mjd_tdb Target epoch
+     * @param frame Input frame
+     * @return Cartesian state at target epoch (ICRF Equatorial)
+     */
+    CartesianElements propagate_cartesian(
+        const KeplerianElements& initial_elements,
+        double target_mjd_tdb,
+        InputFrame frame = InputFrame::ECLIPTIC
+    );
+
+private:
 private:
     Config config_;
     
     // Shared resources
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> planetary_ephemeris_;
     std::shared_ptr<astdyn::ephemeris::EphemerisProvider> custom_provider_;
-    
-    // Helper to create a fresh configured propagator
-    std::unique_ptr<Propagator> createPropagator() const;
 };
 
 } // namespace astdyn::propagation

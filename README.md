@@ -11,7 +11,8 @@
 *   **Precision Integrators**: Implements adaptive Runge-Kutta-Fehlberg 7(8), RK4, and Symplectic Gauss-Legendre methods.
 *   **Perturbation Modeling**: Full N-body solar system gravity (JPL DE440/441), Relativistic effects (1PN), and Solar Radiation Pressure.
 *   **Orbit Determination**: Robust differential correction (least squares) with analytic State Transition Matrix (STM) computation.
-*   **Validated Accuracy**: Validated against NASA/JPL Horizons Ephemeris System with residuals $< 2.5 \mu\text{m}$ ($10^{-9}$ AU) over 10-year propagation arcs.
+*   **High-Precision Wrapper**: Simplified interface (`ITALOccultLibrary`) for rapid integration with high-level workflows.
+*   **Validated Accuracy**: Validated against NASA/JPL Horizons Ephemeris System with residuals $< 2.5 \mu\text{m}$ ($10^{-9}$ AU) and sub-arcsecond geocentric precision ($< 0.7$ arcsec).
 *   **Performance**: Optimized C++17 architecture, ~8x faster than numerical STM approaches.
 
 ## Documentation
@@ -39,31 +40,31 @@ make
 sudo make install
 ```
 
-### Example Usage
+#### Simplified High-Precision API (ITALOccultLibrary)
+
+For most users, `ITALOccultLibrary` provides a more convenient way to work with AstDyS elements and high-precision observations:
 
 ```cpp
-#include <astdyn/propagation/Propagator.hpp>
-#include <iostream>
+#include <italoccultlib/astdyn_wrapper.h>
 
-int main() {
-    using namespace astdyn;
-
-    // 1. Setup Force Model (Sun + Planets)
-    ForceModel forces;
-    forces.enable_planets({"Earth", "Jupiter", "Mars"});
-
-    // 2. Initial State (Position/Velocity in AU, AU/day)
-    Vector6d y0; 
-    y0 << 2.5, 0.0, 0.0, 0.0, 0.01, 0.0; 
+void example() {
+    ioccultcalc::AstDynWrapper wrapper;
+    wrapper.loadFromEQ1File("34713.eq1"); // Automatically handles mean-to-osculating conversion
     
-    // 3. Propagate for 30 days
-    Propagator prop(forces);
-    auto result = prop.propagate(y0, 0.0, 30.0);
-
-    std::cout << "Final State: " << result.state.transpose() << std::endl;
-    return 0;
+    // High-precision geocentric RA/Dec with DE441 light-time correction
+    auto obs = wrapper.calculateObservation(61050.0);
+    std::cout << "RA: " << obs.ra_deg << " deg" << std::endl;
 }
 ```
+
+## Validation Reference (34713 Ilse)
+
+| Method | Source | RA Error [arcsec] | Dec Error [arcsec] |
+| :--- | :--- | :--- | :--- |
+| **AstDyn (Nominal)** | AstDyS .eq1 | **0.627** | **0.151** |
+| **AstDyn (JPL-Ref)** | JPL Horizons | **0.634** | **0.147** |
+
+*Validation epoch: 2026-Jan-10 00:00:00 UTC (MJD 61050.0)*
 
 ## Citation
 

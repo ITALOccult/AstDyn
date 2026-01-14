@@ -76,3 +76,6 @@ validation_plots/
 *.bsp
 *.eq1
 *.rwo
+
+# Local archive for non-distribution files
+archive_non_distrib/

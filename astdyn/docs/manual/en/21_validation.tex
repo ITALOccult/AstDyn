@@ -68,6 +68,31 @@ On a standard workstation (Intel i7, Single Thread), AstDyn achieves:
 \end{itemize}
 This allows for rapid Monte Carlo simulations and differential corrections required for robust orbit determination.
 
+\section{High-Precision Geocentric Validation (34713 Ilse)}
+
+To validate the occultation workflow, a rigorous test was performed on Asteroid (34713) Ilse at epoch MJD 61050.0 (January 10, 2026), comparing geocentric results (RA/Dec) with the JPL Horizons system.
+
+\begin{table}[H]
+\centering
+\caption{Astrometric Validation (34713 Ilse) @ MJD 61050.0}
+\begin{tabular}{lccc}
+\hline
+\textbf{Method} & \textbf{Element Source} & \textbf{RA Error} & \textbf{Dec Error} \\
+\hline
+AstDyn (Nominal) & AstDyS .eq1 (Mean $\to$ Osc) & \textbf{0.627''} & \textbf{0.151''} \\
+AstDyn (JPL-Ref) & JPL Horizons (Osculating) & \textbf{0.634''} & \textbf{0.147''} \\
+\hline
+\end{tabular}
+\end{table}
+
+The results demonstrate \textbf{sub-arcsecond} precision ($\sim 0.6$ arcsec), validating the correct integration of:
+\begin{itemize}
+    \item JPL DE441 (part-2) planetary ephemerides.
+    \item Iterative light-time correction.
+    \item Accurate transformation between mean (AstDyS) and osculating (N-Body) elements.
+    \item Rigorous conversion between Ecliptic J2000 and Equatorial ICRF frames.
+\end{itemize}
+
 \section{Summary}
 The validation confirms that AstDyn is a \textbf{high-fidelity} tool suitable for:
 \begin{enumerate}

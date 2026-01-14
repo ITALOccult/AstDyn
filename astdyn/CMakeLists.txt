@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(OrbFit 
-    VERSION 1.0.0
-    DESCRIPTION "C++ port of OrbFit - Orbit determination and propagation software"
-    LANGUAGES CXX
+project(OrbFit
+    VERSION 1.0
+    DESCRIPTION "High-precision Asteroid Dynamics Library"
+    HOMEPAGE_URL "https://github.com/ITALOccult/AstDyn"
+    LANGUAGES CXX C
 )
 
 # ============================================================================
@@ -13,7 +14,7 @@ project(OrbFit
 option(ASTDYN_BUILD_TESTS "Build unit tests" ON)
 option(ASTDYN_BUILD_EXAMPLES "Build examples" ON)
 option(ASTDYN_BUILD_DOCS "Build documentation" OFF)
-option(ASTDYN_USE_SPICE "Use SPICE toolkit for ephemerides" ON)
+option(ASTDYN_USE_SPICE "Use SPICE toolkit for ephemerides" OFF)
 option(ASTDYN_ENABLE_PROFILING "Enable profiling support" OFF)
 option(ASTDYN_BUILD_SHARED "Build shared library in addition to static" ON)
 

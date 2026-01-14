@@ -78,24 +78,61 @@ using KM_Per_Second = double;
 // ============================================================================
 
 /**
- * @brief Coordinate system types
+ * @brief Reference frame types (Inertial)
  */
-enum class CoordinateSystem {
-    ECLIPTIC_J2000,     ///< Ecliptic coordinates, J2000.0
-    EQUATORIAL_J2000,   ///< Equatorial coordinates, J2000.0
-    BARYCENTRIC,        ///< Solar system barycentric
-    HELIOCENTRIC        ///< Heliocentric
+enum class ReferenceFrame {
+    ECLIPTIC_J2000,     ///< Mean ecliptic and equinox at J2000.0
+    EQUATORIAL_J2000,   ///< Mean equator and equinox at J2000.0 (ICRF)
+    ICRS = EQUATORIAL_J2000
+};
+
+/**
+ * @brief Origin types for coordinates
+ */
+enum class OriginCenter {
+    SSB,                ///< Solar System Barycenter
+    SUN,                ///< Heliocentric
+    EARTH,              ///< Geocentric
+    EMB                 ///< Earth-Moon Barycenter
+};
+
+/**
+ * @brief Physics type of the elements
+ */
+enum class OrbitModel {
+    MEAN,               ///< Mean elements (averaged perturbations)
+    OSCULATING          ///< Osculating elements (instantaneous conic)
 };
 
 /**
  * @brief Orbital element representation types
  */
-enum class ElementType {
+enum class ElementFormat {
     KEPLERIAN,          ///< Classical Keplerian elements (a,e,i,Ω,ω,M)
     CARTESIAN,          ///< Cartesian state vector (x,y,z,vx,vy,vz)
     COMETARY,           ///< Cometary elements (q,e,i,Ω,ω,T)
     EQUINOCTIAL,        ///< Equinoctial elements (for small e, i)
     DELAUNAY            ///< Delaunay canonical elements
+};
+
+/**
+ * @brief Context of an orbital state (METADATA)
+ */
+struct OrbitContext {
+    ReferenceFrame frame = ReferenceFrame::ECLIPTIC_J2000;
+    OriginCenter center = OriginCenter::SUN;
+    OrbitModel model = OrbitModel::OSCULATING;
+    ElementFormat format = ElementFormat::KEPLERIAN;
+
+    std::string toString() const {
+        std::string s;
+        s += (frame == ReferenceFrame::ECLIPTIC_J2000 ? "ECLIPTIC" : "EQUATORIAL");
+        s += "/";
+        s += (center == OriginCenter::SSB ? "SSB" : (center == OriginCenter::SUN ? "SUN" : "EARTH"));
+        s += "/";
+        s += (model == OrbitModel::MEAN ? "MEAN" : "OSCULATING");
+        return s;
+    }
 };
 
 /**

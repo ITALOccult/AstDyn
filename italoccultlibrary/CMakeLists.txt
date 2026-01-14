@@ -22,7 +22,10 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 set(Boost_NO_WARN_NEW_VERSIONS ON)
 find_package(Boost 1.70 REQUIRED)
 
-find_package(AstDyn REQUIRED)
+# find_package(AstDyn REQUIRED) # Disabled to use local build
+set(ASTDYN_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/../astdyn/include)
+set(ASTDYN_LIB ${PROJECT_SOURCE_DIR}/../astdyn/build/src/libastdyn.a)
+set(ASTDYN_FOUND TRUE)
 
 # Include directories
 include_directories(
@@ -63,7 +66,8 @@ target_include_directories(italoccultlib PUBLIC
 
 target_link_libraries(italoccultlib PUBLIC
     Eigen3::Eigen
-    AstDyn::astdyn
+    ${ASTDYN_LIB}
+    ${Boost_LIBRARIES}
 )
 
 # Compiler flags
@@ -124,11 +128,6 @@ install(FILES
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
-endif()
-
-# Build examples
-if(BUILD_EXAMPLES)
-    add_subdirectory(examples)
 endif()
 
 # Messaggi info

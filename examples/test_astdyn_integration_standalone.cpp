@@ -28,10 +28,9 @@
 #include <string>
 #include <chrono>
 
-// Include moduli FASE 1
-#include "eq1_parser.h"
-#include "orbital_conversions.h"
-#include "astdyn_wrapper.h"
+# include <italoccultlib/eq1_parser.h>
+# include <italoccultlib/orbital_conversions.h>
+# include <italoccultlib/astdyn_wrapper.h>
 
 using namespace ioccultcalc;
 
@@ -82,6 +81,27 @@ void printCartesianState(const CartesianState& state,
 }
 
 /**
+ * @brief Print stato cartesiano ICRF formattato
+ */
+void printCartesianStateICRF(const CartesianStateICRF& state, 
+                             const std::string& label) {
+    std::cout << "=== " << label << " ===" << std::endl;
+    std::cout << std::fixed << std::setprecision(12);
+    std::cout << "Epoch MJD: " << state.epoch_mjd_tdb << std::endl;
+    std::cout << "Position (AU):" << std::endl;
+    std::cout << "  x = " << state.position(0) << std::endl;
+    std::cout << "  y = " << state.position(1) << std::endl;
+    std::cout << "  z = " << state.position(2) << std::endl;
+    std::cout << "  |r| = " << state.position.norm() << std::endl;
+    std::cout << "Velocity (AU/day):" << std::endl;
+    std::cout << "  vx = " << state.velocity(0) << std::endl;
+    std::cout << "  vy = " << state.velocity(1) << std::endl;
+    std::cout << "  vz = " << state.velocity(2) << std::endl;
+    std::cout << "  |v| = " << state.velocity.norm() << std::endl;
+    std::cout << std::endl;
+}
+
+/**
  * @brief Print elementi kepleriani formattati
  */
 void printKeplerianElements(const KeplerianElements& kep) {
@@ -111,6 +131,7 @@ int main(int argc, char* argv[]) {
     
     std::string eq1_file = argv[1];
     double target_jd = std::stod(argv[2]);
+    double target_mjd = target_jd - 2400000.5;
     
     std::cout << "======================================" << std::endl;
     std::cout << "  AstDyn Integration Test Standalone" << std::endl;
@@ -128,7 +149,7 @@ int main(int argc, char* argv[]) {
         std::cout << "  Asteroid: " << eq_elements.name << std::endl;
         std::cout << "  Epoch MJD: " << eq_elements.epoch_mjd << std::endl;
         std::cout << "  a = " << eq_elements.a << " AU" << std::endl;
-        std::cout << "  e = " << eq_elements.getEccentricity() << std::endl;
+        std::cout << "  e = " << std::sqrt(eq_elements.h*eq_elements.h + eq_elements.k*eq_elements.k) << std::endl;
         std::cout << "  H = " << eq_elements.H << std::endl;
         std::cout << "  G = " << eq_elements.G << std::endl;
         std::cout << "  Valid: " << (eq_elements.isValid() ? "YES" : "NO") << std::endl;
@@ -163,10 +184,10 @@ int main(int argc, char* argv[]) {
         // ================================================================
         std::cout << "[4/5] Rotating Ecliptic → ICRF" << std::endl;
         
-        auto cart_icrf = OrbitalConversions::eclipticToICRF(cart_ecliptic);
-        printCartesianState(cart_icrf, "ICRF State (Initial)");
+        auto cart_icrf_conv = OrbitalConversions::eclipticToICRF(cart_ecliptic);
+        printCartesianState(cart_icrf_conv, "ICRF State (Initial)");
         
-        if (!OrbitalConversions::validateICRF(cart_icrf)) {
+        if (!OrbitalConversions::validateICRF(cart_icrf_conv)) {
             throw std::runtime_error("Invalid ICRF state");
         }
         
@@ -174,32 +195,25 @@ int main(int argc, char* argv[]) {
         // STEP 5: Propagate with AstDyn
         // ================================================================
         std::cout << "[5/5] Propagating with AstDyn" << std::endl;
-        std::cout << "  Initial epoch: " << cart_icrf.epoch_jd << " JD" << std::endl;
-        std::cout << "  Target epoch:  " << target_jd << " JD" << std::endl;
-        std::cout << "  Δt = " << (target_jd - cart_icrf.epoch_jd) << " days" << std::endl;
+        std::cout << "  Initial epoch: " << eq_elements.epoch_mjd << " MJD" << std::endl;
+        std::cout << "  Target epoch:  " << target_mjd << " MJD" << std::endl;
+        std::cout << "  Δt = " << (target_mjd - eq_elements.epoch_mjd) << " days" << std::endl;
         std::cout << std::endl;
         
         // Create wrapper with JPL-compliant configuration
-        auto wrapper = AstDynWrapperFactory::forOccultations();
+        AstDynWrapper wrapper(PropagationSettings::highAccuracy());
         
         // Propagate
         auto start = std::chrono::high_resolution_clock::now();
         
-        auto result = wrapper->propagate(
-            cart_icrf.position,
-            cart_icrf.velocity,
-            cart_icrf.epoch_jd,
-            target_jd
-        );
+        if (!wrapper.loadFromEQ1File(eq1_file)) {
+             throw std::runtime_error("Failed to load .eq1 file in wrapper");
+        }
+        
+        auto state_final = wrapper.propagateToEpoch(target_mjd);
         
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        
-        // Check result
-        if (!result.success) {
-            std::cerr << "ERROR: " << result.error_message << std::endl;
-            return 1;
-        }
         
         // ================================================================
         // RESULTS
@@ -209,31 +223,11 @@ int main(int argc, char* argv[]) {
         std::cout << "======================================" << std::endl;
         std::cout << std::endl;
         
-        std::cout << std::fixed << std::setprecision(12);
-        std::cout << "Final Position (ICRF, AU):" << std::endl;
-        std::cout << "  x = " << result.position(0) << std::endl;
-        std::cout << "  y = " << result.position(1) << std::endl;
-        std::cout << "  z = " << result.position(2) << std::endl;
-        std::cout << "  |r| = " << result.position.norm() << std::endl;
-        std::cout << std::endl;
-        
-        std::cout << "Final Velocity (ICRF, AU/day):" << std::endl;
-        std::cout << "  vx = " << result.velocity(0) << std::endl;
-        std::cout << "  vy = " << result.velocity(1) << std::endl;
-        std::cout << "  vz = " << result.velocity(2) << std::endl;
-        std::cout << "  |v| = " << result.velocity.norm() << std::endl;
-        std::cout << std::endl;
+        printCartesianStateICRF(state_final, "Final ICRF State");
         
         std::cout << "Performance:" << std::endl;
-        std::cout << "  Steps: " << result.num_steps << std::endl;
-        std::cout << "  Computation time: " << result.computation_time_ms << " ms" << std::endl;
+        std::cout << "  " << wrapper.getLastPropagationStats() << std::endl;
         std::cout << "  Wall time: " << duration.count() << " ms" << std::endl;
-        
-        if (result.num_steps > 0) {
-            double avg_step = std::abs(target_jd - cart_icrf.epoch_jd) / 
-                             static_cast<double>(result.num_steps);
-            std::cout << "  Avg step size: " << avg_step << " days" << std::endl;
-        }
         std::cout << std::endl;
         
         // ================================================================
@@ -243,9 +237,6 @@ int main(int argc, char* argv[]) {
         std::cout << "  VALIDATION" << std::endl;
         std::cout << "======================================" << std::endl;
         std::cout << std::endl;
-        
-        // TODO: Insert JPL Horizons reference position here
-        // For asteroid 17030 at JD 2460643.77083 (2025-11-26 06:30 UTC)
         
         std::cout << "To validate against JPL Horizons:" << std::endl;
         std::cout << "1. Go to https://ssd.jpl.nasa.gov/horizons.cgi" << std::endl;
@@ -261,10 +252,6 @@ int main(int argc, char* argv[]) {
         std::cout << "======================================" << std::endl;
         
         return 0;
-        
-    } catch (const EQ1ParseException& e) {
-        std::cerr << "EQ1 Parse Error: " << e.what() << std::endl;
-        return 1;
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
