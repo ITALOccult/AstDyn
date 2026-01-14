@@ -73,7 +73,8 @@ public:
      */
     std::array<double, 6> calculateCorrections(
         const KeplerianElements& elements,
-        double mjd) const;
+        double mjd,
+        bool verbose = false) const;
 
 private:
     // Ported routines from OrbFit

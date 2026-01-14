@@ -230,9 +230,11 @@ void PlanetaryPeriodicPerturbations::levco(int i, const std::vector<double>& b,
 
 std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
     const KeplerianElements& elements,
-    double mjd) const {
+    double mjd,
+    bool verbose) const {
     
     std::array<double, 6> corrections = {0,0,0,0,0,0};
+
     double e_ast = std::max(1e-8, elements.eccentricity);
     double i_ast = elements.inclination;
     double si = std::sin(i_ast);
@@ -245,14 +247,84 @@ std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
     double dt = (mjd + 2400000.5) - T0_LONGSTOP;
     double dd5 = 0;
 
-    // TODO: Implement full Laplace/Leverrier coefficient calculation.
-    // The current loop is missing the 'lapco' and 'levco' calls which are essential for correct amplitude.
-    // Returning 0 correction for now to allow build and basic tests to pass.
+    const double MASS_PLANET[9] = {0, MERCURY_MASS_RATIO, VENUS_MASS_RATIO, EARTH_MOON_MASS_RATIO, MARS_MASS_RATIO, JUPITER_MASS_RATIO, SATURN_MASS_RATIO, URANUS_MASS_RATIO, NEPTUNE_MASS_RATIO};
+
+    // Vectors for Laplace coefficients (size sufficiently large for max harmonic)
+    const int np_max = 50;
+    const double excrit = 1e-10;
+    std::vector<double> b, b1, b2, b3, b4, b5, c, c1, c2, c3, e, e1;
+    std::vector<double> cl; 
+
+    // Loop over perturbing planets (Jupiter=5, Saturn=6, Uranus=7, Neptune=8)
+    for (int iplan = 5; iplan <= 8; ++iplan) {
+        double a_p = A_PLANET[iplan];
+        
+        // Skip if not an outer planet (for main belt asteroids)
+        if (elements.semi_major_axis >= a_p) continue;
+
+        double alpha = elements.semi_major_axis / a_p;
+        // Use GMS for AU/day units consistency
+        double n_p = std::sqrt(constants::GMS / (a_p * a_p * a_p));
+        // Potential scaling factor GM/a' (energy per unit mass)
+        double energy_scale = constants::GMS / a_p;
+        
+        // Compute Laplace coefficients for this alpha
+        lapco(alpha, np_max, excrit, b, b1, b2, b3, b4, b5, c, c1, c2, c3, e, e1);
+
+        double l_p = normalize(FAG_PLANET[iplan] + G_PLANET[iplan] * dt);
+        double e_p = E_PLANET[iplan];
+        double si_p = std::sin(I_PLANET[iplan]);
+
+        int last_i_lev = -1;
+
+        for (const auto& term : directSeries) {
+            // Update Leverrier coefficients if harmonic index changes
+            if (term.i_lev != last_i_lev) {
+                levco(term.i_lev, b, b1, b2, b3, b4, c, c1, c2, e, alpha, PI, cl);
+                last_i_lev = term.i_lev;
+            }
+
+            double div_val = term.k_p * n_p + term.k_a * n_ast;
+            // Avoid resonance singularities (small divisors)
+            // For analytical non-resonant theory, we must skip resonant terms
+            if (std::abs(div_val) < 1e-4) continue; 
+
+             // Calculate term amplitude factor
+            double efac = (term.e_pow == 0) ? 1.0 : std::pow(e_ast, term.e_pow);
+            double epfac = (term.ep_pow == 0) ? 1.0 : std::pow(e_p, term.ep_pow);
+            double sifac = (term.s_pow == 0) ? 1.0 : std::pow(si, term.s_pow);
+            double sipfac = (term.sp_pow == 0) ? 1.0 : std::pow(si_p, term.sp_pow);
+            
+            // Factor from term integer coeff and divisor
+            // Note: mul/div is an integer factor.
+            // cl[1] is the Leverrier coefficient.
+            // MASS_PLANET[iplan] scales by perturbing mass ratio.
+            // energy_scale provides physical units (L^2/T^2).
+            double term_amp = (term.mul / (double)term.div) * efac * epfac * sifac * sipfac * cl[1] * MASS_PLANET[iplan] * energy_scale;
+            
+            // Argument of the term
+            double arg = term.k_p * l_p + term.k_a * L_ast + 
+                         term.m1 * elements.mean_anomaly + 
+                         term.m2 * g_ast + 
+                         term.m3 * h_ast;
+
+            // Semi-major axis correction: Delta a = (2 * k_a / n_a) * R_term / (freq) * cos(arg)
+            if (term.k_a != 0) {
+                if (verbose && std::abs((2.0 * term.k_a / n_ast) * (term_amp / div_val)) > 1e-3) {
+                     double contrib = (2.0 * term.k_a / n_ast) * (term_amp / div_val) * std::cos(arg);
+                     std::cout << "[DEBUG] Planet " << iplan << " / Term i_lev=" << term.i_lev 
+                               << " kp=" << term.k_p << " ka=" << term.k_a 
+                               << " Amp=" << term_amp << " Div=" << div_val 
+                               << " Contrib=" << contrib << std::endl;
+                }
+                 dd5 += (2.0 * term.k_a / n_ast) * (term_amp / div_val) * std::cos(arg);
+            }
+        }
+    }
     
-    // Stub implementation:
-    (void)e_ast; (void)i_ast; (void)si; (void)n_ast; (void)L_ast; (void)g_ast; (void)h_ast; (void)dt; (void)dd5;
-    
-    return corrections; // All zeros
+    // Assign to delta_a
+    corrections[0] = dd5;
+    return corrections;
 }
 
 } // namespace astdyn::propagation

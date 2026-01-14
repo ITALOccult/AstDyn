@@ -37,7 +37,7 @@ struct KeplerianElements {
     double argument_perihelion;      ///< Argument of perihelion (ω) [rad]
     double mean_anomaly;             ///< Mean anomaly (M) [rad]
     
-    double gravitational_parameter;  ///< GM of central body [AU³/day²]
+    double gravitational_parameter = constants::GMS;  ///< GM of central body [AU³/day²]
     
     // Optional uncertainties (covariance matrix diagonal)
     std::optional<Eigen::Matrix<double, 6, 6>> covariance;

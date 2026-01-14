@@ -369,10 +369,8 @@ KeplerianElements mean_to_osculating(
 {
     KeplerianElements osc = mean_elements;
     
-    // If J2 is zero or negligible, mean ≈ osculating
-    if (std::abs(j2) < 1e-12) {
-        return osc;
-    }
+    // If J2 is zero, we still check for planetary perturbations
+    // if (std::abs(j2) < 1e-12) return osc;  <-- REMOVED
     
     // Extract orbital parameters
     double a = mean_elements.semi_major_axis;
@@ -429,6 +427,7 @@ KeplerianElements mean_to_osculating(
     
     // 2. Apply Milani-Knezevic planetary periodic perturbations
     // Only applied for main belt asteroids (1.8 AU < a < 4.0 AU) to avoid validation errors for Earth/Mars
+    
     if (mean_elements.semi_major_axis > 1.8 && mean_elements.semi_major_axis < 4.0) {
         PlanetaryPeriodicPerturbations mk_theory;
         auto corrections = mk_theory.calculateCorrections(mean_elements, mean_elements.epoch_mjd_tdb);
