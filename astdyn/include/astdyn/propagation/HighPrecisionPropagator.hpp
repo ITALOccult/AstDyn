@@ -102,6 +102,11 @@ public:
     std::shared_ptr<astdyn::ephemeris::EphemerisProvider> getEphemerisProvider() const;
 
     /**
+     * @brief Set planetary ephemeris provider manually
+     */
+    void setPlanetaryEphemeris(std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephemeris);
+
+    /**
      * @brief Create a fresh configured Propagator instance
      */
     std::unique_ptr<Propagator> createPropagator() const;
@@ -127,6 +132,7 @@ private:
     // Shared resources
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> planetary_ephemeris_;
     std::shared_ptr<astdyn::ephemeris::EphemerisProvider> custom_provider_;
+    mutable std::unique_ptr<Propagator> cached_propagator_;
 };
 
 } // namespace astdyn::propagation

@@ -79,7 +79,10 @@ HighPrecisionPropagator::calculateGeocentricObservation(
     double target_jd_tdb,
     InputFrame frame
 ) {
-    auto propagator = createPropagator();
+    if (!cached_propagator_) {
+        cached_propagator_ = createPropagator();
+    }
+    auto& propagator = cached_propagator_;
 
     // 1. Initial State Setup
     CartesianElements cart_start = keplerian_to_cartesian(initial_elements);
@@ -159,13 +162,20 @@ std::shared_ptr<EphemerisProvider> HighPrecisionPropagator::getEphemerisProvider
     return custom_provider_;
 }
 
+void HighPrecisionPropagator::setPlanetaryEphemeris(std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephemeris) {
+    planetary_ephemeris_ = ephemeris;
+    cached_propagator_.reset(); // Invalidate cache as ephemeris changed
+}
+
 CartesianElements HighPrecisionPropagator::propagate_cartesian(
     const KeplerianElements& initial_elements,
     double target_mjd_tdb,
     InputFrame frame
 ) {
-    auto propagator = createPropagator();
-
+    if (!cached_propagator_) {
+        cached_propagator_ = createPropagator();
+    }
+    
     // 1. Initial State Setup
     CartesianElements cart_start = keplerian_to_cartesian(initial_elements);
     
@@ -181,7 +191,7 @@ CartesianElements HighPrecisionPropagator::propagate_cartesian(
         cart_icrf.velocity = cart_start.velocity;
     }
 
-    return propagator->propagate_cartesian(cart_icrf, target_mjd_tdb);
+    return cached_propagator_->propagate_cartesian(cart_icrf, target_mjd_tdb);
 }
 
 } // namespace astdyn::propagation

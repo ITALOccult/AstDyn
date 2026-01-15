@@ -19,8 +19,8 @@ namespace ephemeris {
 using namespace constants;
 
 AsteroidPerturbations::AsteroidPerturbations() {
-    loadDefaultAsteroids();
-    enabled_flags_.resize(asteroids_.size(), true);
+    // Note: loadDefaultAsteroids is now called on demand by computePerturbation if vector is empty
+    // to avoid potential hangs during object construction or shared_ptr allocation.
 }
 
 AsteroidPerturbations::~AsteroidPerturbations() = default;

@@ -22,16 +22,19 @@ Propagator::Propagator(std::unique_ptr<Integrator> integrator,
       ephemeris_(std::move(ephemeris)),
       settings_(settings) {
     
+    std::cout << "    [Propagator] Constructor entry (include_asteroids=" << settings_.include_asteroids << ")." << std::endl;
     // Initialize asteroid perturbations if enabled
     if (settings_.include_asteroids) {
+        std::cout << "    [Propagator] Creating AsteroidPerturbations..." << std::endl;
         asteroids_ = std::make_shared<ephemeris::AsteroidPerturbations>();
-        asteroids_->loadDefaultAsteroids();
         
         // Load SPK if provided
         if (!settings_.asteroid_ephemeris_file.empty()) {
+            std::cout << "    [Propagator] Loading Asteroid SPK: " << settings_.asteroid_ephemeris_file << std::endl;
             asteroids_->loadSPK(settings_.asteroid_ephemeris_file);
         }
     }
+    std::cout << "    [Propagator] Constructor exit." << std::endl;
 }
 
 Eigen::VectorXd Propagator::compute_derivatives(double t, const Eigen::VectorXd& state) {

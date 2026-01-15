@@ -18,6 +18,7 @@
 #include <astdyn/io/parsers/OrbFitEQ1Parser.hpp>
 #include <astdyn/api/OrbitFitAPI.hpp>
 #include <astdyn/propagation/HighPrecisionPropagator.hpp>
+#include "ioccultcalc/orbital_elements.h"
 #include <astdyn/core/Types.hpp>
 #include <Eigen/Dense>
 #include <memory>
@@ -134,6 +135,31 @@ public:
     bool loadFromEQ1File(const std::string& filepath);
     
     /**
+     * @brief Inietta manualmente elementi orbitali (JPL Injector)
+     * 
+     * @param a Semiasse maggiore [AU]
+     * @param e Eccentricità
+     * @param i Inclinazione [rad]
+     * @param Omega Longitudine nodo ascendente [rad]
+     * @param omega Argomento perielio [rad]
+     * @param M Anomalia media [rad]
+     * @param epoch Epoca [MJD TDB]
+     * @param name Nome oggetto
+     */
+    void injectElements(double a, double e, double i, double Omega, double omega, double M, double epoch, const std::string& name = "INJECTED") {
+        setKeplerianElements(a, e, i, Omega, omega, M, epoch, name);
+    }
+
+    /**
+     * @brief Carica elementi orbitali osculanti da JPL Horizons
+     * 
+     * @param designation Nome o numero asteroide (es. "13477")
+     * @param epoch_mjd_tdb Epoca richiesta [MJD TDB]
+     * @return true se operazione riuscita (richiede connessione internet)
+     */
+    bool loadFromHorizons(const std::string& designation, double epoch_mjd_tdb);
+
+    /**
      * @brief Imposta elementi kepleriani manualmente
      * @param a Semiasse maggiore [AU]
      * @param e Eccentricità
@@ -151,6 +177,12 @@ public:
                               const std::string& name = "",
                               astdyn::propagation::HighPrecisionPropagator::InputFrame frame = 
                                   astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+
+    /**
+     * @brief Imposta gli elementi orbitali da struct ioccultcalc.
+     * Applica le conversioni necessarie (Mean -> Osculating) se il tipo è MEAN_ASTDYS.
+     */
+    void setAsteroidElements(const AstDynEquinoctialElements& elements);
     
     /**
      * @brief Imposta elementi orbitali equinoziali (OSCULANTI)
@@ -221,11 +253,7 @@ public:
      */
     double getCurrentEpoch() const { return current_epoch_mjd_; }
     
-    /**
-     * @brief Ottiene nome oggetto corrente
-     * @return Nome oggetto
-     */
-    std::string getObjectName() const { return object_name_; }
+    std::string getObjectName() const;
     
     /**
      * @brief Verifica se elementi sono stati caricati
@@ -239,10 +267,38 @@ public:
      */
     std::string getLastPropagationStats() const { return last_stats_; }
 
+    /**
+     * @struct ApparentState
+     * @brief Stato apparente geocentrico per compatibilità Phase2
+     */
+    struct ApparentState {
+        double ra_deg;
+        double dec_deg;
+        double distance_au;
+        Eigen::Vector3d position;
+    };
+
+    /**
+     * @brief Ottiene stato apparente geocentrico (RA/Dec) a epoca MJD
+     * @param mjd_tdb Epoca [MJD TDB]
+     * @return Stato apparente
+     */
+    ApparentState getApparentStateGeocentric(double mjd_tdb);
+
+    /**
+     * @brief Ottiene elementi kepleriani correnti (incluso Mag)
+     * @return Elementi kepleriani (IOrbitParser format)
+     */
+    astdyn::io::IOrbitParser::OrbitalElements getKeplerianElements() const;
+
+    // Compatibilità legacy
+    void setSPKReader(std::shared_ptr<void> reader);
+
 private:
     PropagationSettings settings_;
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephemeris_;
     std::unique_ptr<astdyn::propagation::Propagator> propagator_;
+    std::unique_ptr<astdyn::propagation::HighPrecisionPropagator> high_prop_;
     
     astdyn::io::IOrbitParser::OrbitalElements current_elements_;
     astdyn::propagation::HighPrecisionPropagator::InputFrame current_frame_;
@@ -254,6 +310,8 @@ private:
     /// Inizializza propagatore con settings correnti
     void initializePropagator();
     
+    static std::string extractObjectNameFromEQ1(const std::string& filepath);
+
     /// Conversione frame ECLM J2000 → ICRF
     static CartesianStateICRF eclipticToICRF(const astdyn::propagation::CartesianElements& ecl_state,
                                              double epoch_mjd_tdb);

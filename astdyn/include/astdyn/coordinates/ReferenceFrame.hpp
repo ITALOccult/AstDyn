@@ -169,8 +169,8 @@ public:
      * @return 3x3 rotation matrix
      */
     static Matrix3d j2000_to_ecliptic() {
-        // Mean obliquity at J2000.0 (IAU 2000)
-        constexpr double epsilon0 = 23.439291 * constants::DEG_TO_RAD;
+        // Mean obliquity at J2000.0 (IAU 2000 high-precision: 23° 26' 21".406)
+        constexpr double epsilon0 = 0.4090926227129525;
         return rotation_x(epsilon0);
     }
     
@@ -182,7 +182,7 @@ public:
      * @return 3x3 rotation matrix
      */
     static Matrix3d ecliptic_to_j2000() {
-        constexpr double epsilon0 = 23.439291 * constants::DEG_TO_RAD;
+        constexpr double epsilon0 = 0.4090926227129525;
         return rotation_x(-epsilon0);
     }
     

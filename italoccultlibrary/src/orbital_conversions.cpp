@@ -9,6 +9,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <sstream>
+#include "astdyn/propagation/OrbitalElements.hpp"
 
 namespace ioccultcalc {
 
@@ -59,6 +60,42 @@ KeplerianElements OrbitalConversions::equinoctialToKeplerian(
 // ============================================================================
 // Conversione Kepleriano → Cartesiano (Eclittico)
 // ============================================================================
+
+
+KeplerianElements OrbitalConversions::meanToOsculating(
+    const KeplerianElements& mean) {
+    
+    // 1. Mappa ioccultcalc::KeplerianElements -> astdyn::propagation::KeplerianElements
+    astdyn::propagation::KeplerianElements astdyn_mean;
+    astdyn_mean.epoch_mjd_tdb = mean.epoch_jd - 2400000.5; // JD -> MJD
+    astdyn_mean.semi_major_axis = mean.a;
+    astdyn_mean.eccentricity = mean.e;
+    astdyn_mean.inclination = mean.i;      // Già in radianti in struct
+    astdyn_mean.longitude_ascending_node = mean.Omega;
+    astdyn_mean.argument_perihelion = mean.omega;
+    astdyn_mean.mean_anomaly = mean.M;
+    astdyn_mean.gravitational_parameter = 0.0002959122082855911; // GMS
+    
+    // 2. Chiama astdyn per la conversione (include perturbazioni planetarie)
+    // Usa J2=0 per default (eliocentrico), la funzione interna applica Milani-Knezevic
+    auto astdyn_osc = astdyn::propagation::mean_to_osculating(astdyn_mean);
+    
+    // 3. Mappa back -> ioccultcalc::KeplerianElements
+    KeplerianElements osc = mean; // Copia metadati (nome, epoca)
+    osc.a = astdyn_osc.semi_major_axis;
+    osc.e = astdyn_osc.eccentricity;
+    osc.i = astdyn_osc.inclination;
+    osc.Omega = astdyn_osc.longitude_ascending_node;
+    osc.omega = astdyn_osc.argument_perihelion;
+    osc.M = astdyn_osc.mean_anomaly;
+    
+    // Assicura che gli angoli siano normalizzati
+    osc.Omega = normalizeAngle(osc.Omega);
+    osc.omega = normalizeAngle(osc.omega);
+    osc.M = normalizeAngle(osc.M);
+    
+    return osc;
+}
 
 CartesianState OrbitalConversions::keplerianToCartesian(
     const KeplerianElements& kep) {

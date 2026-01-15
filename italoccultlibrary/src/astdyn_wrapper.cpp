@@ -7,6 +7,7 @@
 
 #include "astdyn_wrapper.h"
 #include "orbital_conversions.h"
+#include "ioccultcalc/jpl_horizons_client.h"
 #include <sstream>
 #include <chrono>
 #include <cmath>
@@ -104,14 +105,17 @@ void AstDynWrapper::initializePropagator() {
 
 bool AstDynWrapper::loadFromEQ1File(const std::string& filepath) {
     try {
-        // 1. Usa OrbitFitAPI per il parsing ad alta precisione
+        // 1. Usa OrbitFitAPI per il solo parsing degli elementi equinoziali (Medi, Eclittici)
         auto equ = astdyn::api::OrbitFitAPI::parse_eq1(filepath);
         
-        // 2. Converti immediatamente in elementi OSCULANTI (ICRF) 
-        // Questa è la configurazione standard per precisione sub-arcsecondo.
-        auto kep_osc = astdyn::api::OrbitFitAPI::convert_mean_equinoctial_to_osculating(equ);
+        // 2. Converti Equinoziali -> Kepleriani (sempre Medi, Eclittici)
+        auto kep_mean = astdyn::propagation::equinoctial_to_keplerian(equ);
         
-        // Salva elementi internamente
+        // 3. Converti Medi -> Osculanti (Milani-Knezevic)
+        // Nota: mean_to_osculating applica le correzioni MK se a è nel range main belt
+        auto kep_osc = astdyn::propagation::mean_to_osculating(kep_mean);
+        
+        // Salva elementi internamente (Osculanti, Eclittici)
         current_elements_.semi_major_axis = kep_osc.semi_major_axis;
         current_elements_.eccentricity = kep_osc.eccentricity;
         current_elements_.inclination = kep_osc.inclination;
@@ -121,13 +125,20 @@ bool AstDynWrapper::loadFromEQ1File(const std::string& filepath) {
         current_elements_.epoch_mjd_tdb = kep_osc.epoch_mjd_tdb;
         
         current_epoch_mjd_ = kep_osc.epoch_mjd_tdb;
-        current_frame_ = astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL;
+        
+        // IMPORTANTE: Utilizziamo ECLIPTIC per coerenza con Phase 1 
+        // e per evitare bug di rotazione in OrbitFitAPI.
+        // HighPrecisionPropagator ruoterà internamente in Equatorial (ICRF).
+        current_frame_ = astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC;
         
         // Il parser non estrae object_name, lo leggiamo manualmente
         object_name_ = extractObjectNameFromEQ1(filepath);
         if (object_name_.empty()) object_name_ = "Unknown";
         
+        std::cout << "[AstDynWrapper:" << this << "] loadFromEQ1File: asteroid=" << object_name_ 
+                  << " (Frame: ECLIPTIC, Mean->Osc: YES) setting initialized_ = true" << std::endl;
         initialized_ = true;
+        // DEFERRED: initializePropagator(); // Avoid slow initialization here
         
         // Nota: Poiché abbiamo convertito in Equatorial (ICRF), 
         // dobbiamo assicurarci che il propagatore sia configurato per EQUATORIAL
@@ -136,8 +147,34 @@ bool AstDynWrapper::loadFromEQ1File(const std::string& filepath) {
         return true;
         
     } catch (const std::exception& e) {
+        std::cout << "[AstDynWrapper:" << this << "] loadFromEQ1File: FAILED, setting initialized_ = false" << std::endl;
         initialized_ = false;
         last_stats_ = std::string("Errore caricamento alta precisione (convert_mean_to_osculating): ") + e.what();
+        return false;
+    }
+}
+
+bool AstDynWrapper::loadFromHorizons(const std::string& designation, double epoch_mjd_tdb) {
+    try {
+        JPLHorizonsClient client;
+        JulianDate epoch;
+        epoch.jd = epoch_mjd_tdb + 2400000.5;
+        
+        std::cout << "[AstDynWrapper] Fetching elements from JPL Horizons for " << designation << " at MJD " << epoch_mjd_tdb << std::endl;
+        
+        auto elem = client.getOsculatingElements(designation, epoch);
+        
+        // Imposta gli elementi (Horizons restituisce elementi OSCULANTI in frame ECLIPTIC J2000 per default se non specificato altrimenti)
+        // La nostra JPLHorizonsClient::getOsculatingElements imposta REF_PLANE='ECLIPTIC'
+        setKeplerianElements(elem.a, elem.e, elem.i, elem.Omega, elem.omega, elem.M, 
+                             elem.epoch.jd - 2400000.5, designation, 
+                             astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+        
+        std::cout << "[AstDynWrapper] loadFromHorizons: SUCCESS" << std::endl;
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[AstDynWrapper] loadFromHorizons failed: " << e.what() << std::endl;
         return false;
     }
 }
@@ -162,10 +199,36 @@ void AstDynWrapper::setKeplerianElements(
     current_epoch_mjd_ = epoch_mjd_tdb;
     current_frame_ = frame;
     object_name_ = name;
+    std::cout << "[AstDynWrapper:" << this << "] setKeplerianElements: asteroid=" << name << " state set to INITIALIZED." << std::endl;
     initialized_ = true;
     
     // Re-inizializza il propagatore se necessario (opzionale, propagateToEpoch lo usa)
     initializePropagator();
+}
+
+void AstDynWrapper::setAsteroidElements(const AstDynEquinoctialElements& elements) {
+    if (elements.type == ElementType::MEAN_ASTDYS) {
+        // Applica correzione MILANI-KNEZEVIC via OrbitalConversions
+        auto osc = elements.toOsculatingKeplerian();
+        
+        // Carica elementi osculanti risultanti
+        setKeplerianElements(osc.a, osc.e, osc.i, osc.Omega, osc.omega, osc.M, 
+                            osc.epoch.jd - 2400000.5, elements.name, 
+                            (elements.frame == FrameType::EQUATORIAL_ICRF) ? 
+                             astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL : 
+                             astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+        
+        // Importante: toOsculatingKeplerian restituisce ElementType::OSCULATING
+        // ma noi ricordiamo il frame originale se possibile.
+    } else {
+        // Già osculanti o ignoti, carica direttamente
+        auto kep = elements.toKeplerian();
+        setKeplerianElements(kep.a, kep.e, kep.i, kep.Omega, kep.omega, kep.M, 
+                            kep.epoch.jd - 2400000.5, elements.name,
+                            (elements.frame == FrameType::EQUATORIAL_ICRF) ? 
+                             astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL : 
+                             astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+    }
 }
 
 void AstDynWrapper::setEquinoctialElements(
@@ -240,6 +303,7 @@ void AstDynWrapper::setMeanEquinoctialElements(
     current_frame_ = astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL;
     
     object_name_ = name;
+    std::cout << "[AstDynWrapper] setMeanEquinoctialElements: asteroid=" << name << " state set to INITIALIZED." << std::endl;
     initialized_ = true;
     
     initializePropagator();
@@ -284,14 +348,30 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
         << "Tempo: " << duration.count() << " ms";
     last_stats_ = oss.str();
     
-    // Converti in cartesiano (frame ECLM J2000)
-    auto cart_ecl = astdyn::propagation::keplerian_to_cartesian(kep_final);
+    // Aggiorna elementi correnti per chiamate successive (es. getKeplerianElements)
+    current_elements_.semi_major_axis = kep_final.semi_major_axis;
+    current_elements_.eccentricity = kep_final.eccentricity;
+    current_elements_.inclination = kep_final.inclination;
+    current_elements_.longitude_asc_node = kep_final.longitude_ascending_node;
+    current_elements_.argument_perihelion = kep_final.argument_perihelion;
+    current_elements_.mean_anomaly = kep_final.mean_anomaly;
+    current_elements_.epoch_mjd_tdb = kep_final.epoch_mjd_tdb;
+    current_epoch_mjd_ = kep_final.epoch_mjd_tdb;
+
+    // Converti in cartesiano
+    auto cart_final = astdyn::propagation::keplerian_to_cartesian(kep_final);
     
-    // NOTA: Se abbiamo caricato da EQ1, kep_initial è già in ICRF (Equatorial)
-    // Se invece è stato impostato manualmente via setKeplerianElements, assumiamo Ecliptic
-    // Per semplicità qui manteniamo la logica legacy, ma l'utente dovrebbe usare calculateObservation
-    // per massima precisione.
-    return eclipticToICRF(cart_ecl, target_mjd_tdb);
+    // CORREZIONE BUG: Il frame di cart_final è lo stesso degli elementi correnti (current_frame_)
+    if (current_frame_ == astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC) {
+        return eclipticToICRF(cart_final, target_mjd_tdb);
+    } else {
+        // Già in ICRF/Equatoriale (es. caricato da EQ1 o Horizons)
+        CartesianStateICRF result;
+        result.position = cart_final.position;
+        result.velocity = cart_final.velocity;
+        result.epoch_mjd_tdb = target_mjd_tdb;
+        return result;
+    }
 }
 
 FitResult AstDynWrapper::runFit(const std::string& rwo_filepath, bool verbose) {
@@ -319,13 +399,19 @@ FitResult AstDynWrapper::runFit(const std::string& rwo_filepath, bool verbose) {
 
 astdyn::propagation::HighPrecisionPropagator::ObservationResult 
 AstDynWrapper::calculateObservation(double target_mjd_tdb) {
-    if (!initialized_) throw std::runtime_error("Wrapper non inizializzato");
+    if (!initialized_) {
+        std::cerr << "[AstDynWrapper:" << this << "] calculateObservation: ERROR - initialized_ is " << (initialized_ ? "TRUE" : "FALSE") << "!" << std::endl;
+        throw std::runtime_error("Wrapper non inizializzato");
+    }
 
     // Configura HighPrecisionPropagator con DE441 part-2 (lo standard validato)
-    astdyn::propagation::HighPrecisionPropagator::Config prop_cfg;
-    prop_cfg.de441_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp";
-    prop_cfg.tolerance = 1e-13;
-    astdyn::propagation::HighPrecisionPropagator high_prop(prop_cfg);
+    if (!high_prop_) {
+        astdyn::propagation::HighPrecisionPropagator::Config prop_cfg;
+        prop_cfg.de441_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp";
+        prop_cfg.tolerance = 1e-13;
+        high_prop_ = std::make_unique<astdyn::propagation::HighPrecisionPropagator>(prop_cfg);
+        high_prop_->setPlanetaryEphemeris(ephemeris_);
+    }
 
     // Preparazione elementi
     astdyn::propagation::KeplerianElements kep;
@@ -343,7 +429,7 @@ AstDynWrapper::calculateObservation(double target_mjd_tdb) {
     // IMPORTANTE: Poiché loadFromEQ1 applica convert_mean_to_osculating, 
     // gli elementi salvati sono in Equatorial/ICRF. Se usiamo setKeplerianElements,
     // usiamo il frame specificato.
-    return high_prop.calculateGeocentricObservation(
+    return high_prop_->calculateGeocentricObservation(
         kep, target_jd, current_frame_);
 }
 
@@ -382,6 +468,55 @@ CartesianStateICRF AstDynWrapper::eclipticToICRF(
     result.epoch_mjd_tdb = epoch_mjd_tdb;
     
     return result;
+}
+
+void AstDynWrapper::setSPKReader(std::shared_ptr<void> reader) {
+    // No-op: AstDyn uses internal ephemeris
+}
+
+AstDynWrapper::ApparentState AstDynWrapper::getApparentStateGeocentric(double mjd_tdb) {
+    auto obs = calculateObservation(mjd_tdb);
+    ApparentState st;
+    st.ra_deg = obs.ra_deg;
+    st.dec_deg = obs.dec_deg;
+    st.distance_au = obs.distance_au;
+    st.position = obs.geocentric_position;
+    return st;
+}
+
+astdyn::io::IOrbitParser::OrbitalElements AstDynWrapper::getKeplerianElements() const {
+    return current_elements_;
+}
+
+std::string AstDynWrapper::getObjectName() const {
+    return object_name_;
+}
+
+std::string AstDynWrapper::extractObjectNameFromEQ1(const std::string& filepath) {
+    // 1. Prova a leggere dal file
+    std::ifstream f(filepath);
+    if (f.is_open()) {
+        std::string line;
+        while (std::getline(f, line)) {
+            if (line.find("NAME") != std::string::npos && line.find("=") != std::string::npos) {
+                 auto pos = line.find("=");
+                 std::string name = line.substr(pos + 1);
+                 // Trim
+                 name.erase(0, name.find_first_not_of(" \t\r\n'\""));
+                 name.erase(name.find_last_not_of(" \t\r\n'\"") + 1);
+                 if (!name.empty()) return name;
+            }
+        }
+    }
+    
+    // 2. Fallback: estrai dal nome del file (basename senza estensione)
+    size_t last_slash = filepath.find_last_of("/\\");
+    std::string filename = (last_slash == std::string::npos) ? filepath : filepath.substr(last_slash + 1);
+    size_t last_dot = filename.find_last_of(".");
+    if (last_dot != std::string::npos) {
+        return filename.substr(0, last_dot);
+    }
+    return filename;
 }
 
 } // namespace ioccultcalc

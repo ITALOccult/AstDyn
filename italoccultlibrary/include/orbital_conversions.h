@@ -136,11 +136,11 @@ public:
     static constexpr double DEG_TO_RAD = PI / 180.0;
     static constexpr double RAD_TO_DEG = 180.0 / PI;
     
-    /// Parametro gravitazionale Sole [AU³/day²]
+    /// Parametro gravitazionale Sole [AU³/day²] (OrbFit high precision)
     static constexpr double GM_SUN = 0.0002959122082855911;
     
-    /// Obliquità eclittica J2000 [rad]
-    static constexpr double OBLIQUITY_J2000 = 23.439291 * DEG_TO_RAD;
+    /// Obliquità eclittica J2000 [rad] (23° 26' 21".406)
+    static constexpr double OBLIQUITY_J2000 = 0.4090926227129525;
     
     // ========================================================================
     // Conversioni principali
@@ -161,6 +161,18 @@ public:
      */
     static KeplerianElements equinoctialToKeplerian(
         const EquinoctialElements& eq);
+
+    /**
+     * @brief Converte elementi medi (AstDyS) in osculatori
+     * @param mean Elementi medi kepleriani
+     * @return Elementi osculatori kepleriani
+     * 
+     * Include:
+     * - Perturbazioni periodiche planetarie (Milani-Knezevic)
+     * - Correzioni a breve periodo (J2)
+     */
+    static KeplerianElements meanToOsculating(
+        const KeplerianElements& mean);
     
     /**
      * @brief Converte elementi kepleriani in stato cartesiano (eclittico)

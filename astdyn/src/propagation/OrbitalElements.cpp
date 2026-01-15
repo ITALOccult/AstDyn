@@ -308,9 +308,14 @@ KeplerianElements equinoctial_to_keplerian(const EquinoctialElements& eq) {
     kep.longitude_ascending_node = Omega;
     
     double omega_plus_Omega = std::atan2(eq.h, eq.k);
-    kep.argument_perihelion = omega_plus_Omega - Omega;
+    kep.argument_perihelion = std::fmod(omega_plus_Omega - Omega, constants::TWO_PI);
+    if (kep.argument_perihelion < 0) kep.argument_perihelion += constants::TWO_PI;
     
-    kep.mean_anomaly = eq.lambda - omega_plus_Omega;
+    kep.mean_anomaly = std::fmod(eq.lambda - omega_plus_Omega, constants::TWO_PI);
+    if (kep.mean_anomaly < 0) kep.mean_anomaly += constants::TWO_PI;
+    
+    kep.longitude_ascending_node = std::fmod(kep.longitude_ascending_node, constants::TWO_PI);
+    if (kep.longitude_ascending_node < 0) kep.longitude_ascending_node += constants::TWO_PI;
     
     return kep;
 }
@@ -430,12 +435,18 @@ KeplerianElements mean_to_osculating(
     
     if (mean_elements.semi_major_axis > 1.8 && mean_elements.semi_major_axis < 4.0) {
         PlanetaryPeriodicPerturbations mk_theory;
-        auto corrections = mk_theory.calculateCorrections(mean_elements, mean_elements.epoch_mjd_tdb);
+        if (mean_elements.gravitational_parameter < 1e-10) {
+             const_cast<KeplerianElements&>(mean_elements).gravitational_parameter = constants::GMS;
+        }
+        auto corrections = mk_theory.calculateCorrections(mean_elements, mean_elements.epoch_mjd_tdb, false);
 
-        // Apply corrections (corrections[0] = delta_a is typically index 0 in a vector, but 5 in array?)
-        // TODO: Verify index mapping. Assuming [0]=da, [1]=de, [2]=di, ...
-        // For now, we use a safer accumulation to avoid breaking the build if corrections are large
+        // Apply semi-major axis correction Delta a (index 0)
         osc.semi_major_axis += corrections[0]; 
+        
+        // Note: The other element corrections (e, i, Omega, omega, M) are currently 
+        // placeholders in calculateCorrections and return 0. 
+        // If we implement them in PlanetaryPeriodicPerturbations.cpp, 
+        // we should apply them here.
     }
     
     return osc;
