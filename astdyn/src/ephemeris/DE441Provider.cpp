@@ -9,6 +9,7 @@
 #include "astdyn/io/SPKReader.hpp"
 #include <cmath>
 #include <iostream>
+#include "astdyn/core/Constants.hpp"
 
 namespace astdyn::ephemeris {
 
@@ -32,8 +33,9 @@ int DE441Provider::bodyToNAIFId(CelestialBody body) const {
 }
 
 double DE441Provider::jdToET(double jd_tdb) const {
-    constexpr double J2000_JD = 2451545.0;
-    constexpr double SECONDS_PER_DAY = 86400.0;
+    using namespace astdyn::constants;
+    constexpr double J2000_JD = JD2000;
+    // SECONDS_PER_DAY is already in constants
     
     // Heuristic: If jd is small (e.g. < 2M), assume Modified Julian Day (MJD)
     // and convert to Full JD. AstDyn Propagator typically uses MJD.
@@ -46,7 +48,8 @@ double DE441Provider::jdToET(double jd_tdb) const {
 }
 
 Eigen::Vector3d DE441Provider::equatorialToEcliptic(const Eigen::Vector3d& vec) const {
-    constexpr double epsilon = 23.4392911 * M_PI / 180.0;
+    using namespace astdyn::constants;
+    constexpr double epsilon = 23.4392911 * DEG_TO_RAD;
     const double c = std::cos(epsilon);
     const double s = std::sin(epsilon);
     Eigen::Vector3d result;
@@ -148,7 +151,8 @@ Eigen::Vector3d DE441Provider::getPosition(CelestialBody body, double jd_tdb) {
     }
     
     // Convert km to AU
-    constexpr double KM_PER_AU = 149597870.691;
+    using namespace astdyn::constants;
+    constexpr double KM_PER_AU = AU;
     Eigen::Vector3d pos_eq(state[0] / KM_PER_AU,
                            state[1] / KM_PER_AU,
                            state[2] / KM_PER_AU);
@@ -188,9 +192,8 @@ Eigen::Vector3d DE441Provider::getVelocity(CelestialBody body, double jd_tdb) {
          state = reader_->getState(seg_id, et);
     }
 
-    constexpr double KM_PER_AU = 149597870.691;
-    constexpr double SECONDS_PER_DAY = 86400.0;
-    const double conversion = SECONDS_PER_DAY / KM_PER_AU;
+    using namespace astdyn::constants;
+    const double conversion = SECONDS_PER_DAY / AU;
     
     Eigen::Vector3d vel_eq(state[3] * conversion,
                            state[4] * conversion,

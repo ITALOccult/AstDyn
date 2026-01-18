@@ -11,6 +11,7 @@
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include <cmath>
+#include <iomanip>
 #include <algorithm>
 #include <numeric>
 #include <iostream>
@@ -62,7 +63,7 @@ static double utc_to_tdb_internal(double mjd_utc) {
     
     // Mean anomaly of Sun [degrees]
     double g = 357.53 + 0.9856003 * (jd_tt - 2451545.0);
-    g = std::fmod(g, 360.0) * (M_PI / 180.0); // Convert to radians
+    g = std::fmod(g, 360.0) * astdyn::constants::DEG_TO_RAD; // Convert to radians
     
     // TDB correction [seconds]
     double tdb_correction = 0.001658 * std::sin(g) 
@@ -235,8 +236,8 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     double d_ra = obs.ra - computed_ra_rad;
     
     // Normalize angular difference to [-PI, PI]
-    while (d_ra > M_PI) d_ra -= TWO_PI;
-    while (d_ra < -M_PI) d_ra += TWO_PI;
+    while (d_ra > astdyn::constants::PI) d_ra -= astdyn::constants::TWO_PI;
+    while (d_ra < -astdyn::constants::PI) d_ra += astdyn::constants::TWO_PI;
     
     result.residual_ra = d_ra;
     result.residual_dec = obs.dec - computed_dec_rad;
@@ -244,6 +245,13 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     // Normalize RA residual by cos(dec) for spherical geometry
     result.residual_ra *= std::cos(obs.dec);
     
+    // DEBUG: Output RA/Dec comparison
+    std::cout << "[Residuals Debug] MJD=" << std::fixed << std::setprecision(5) << obs.mjd_utc
+              << " Obs RA=" << (obs.ra * constants::RAD_TO_DEG) << " Dec=" << (obs.dec * constants::RAD_TO_DEG)
+              << " Comp RA=" << (computed_ra_rad * constants::RAD_TO_DEG) << " Dec=" << (computed_dec_rad * constants::RAD_TO_DEG)
+              << " ResRA=" << (result.residual_ra * constants::RAD_TO_ARCSEC) << " ResDec=" << (result.residual_dec * constants::RAD_TO_ARCSEC)
+              << std::endl;
+
     // Normalized residuals
     result.normalized_ra = result.residual_ra / obs.sigma_ra;
     result.normalized_dec = result.residual_dec / obs.sigma_dec;

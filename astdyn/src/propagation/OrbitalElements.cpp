@@ -437,6 +437,7 @@ KeplerianElements mean_to_osculating(
         PlanetaryPeriodicPerturbations mk_theory;
         if (mean_elements.gravitational_parameter < 1e-10) {
              const_cast<KeplerianElements&>(mean_elements).gravitational_parameter = constants::GMS;
+             osc.gravitational_parameter = constants::GMS;
         }
         auto corrections = mk_theory.calculateCorrections(mean_elements, mean_elements.epoch_mjd_tdb, false);
 

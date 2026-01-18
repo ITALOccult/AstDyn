@@ -20,6 +20,7 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include "astdyn/core/Constants.hpp"
 
 namespace astdyn {
 namespace io {
@@ -66,68 +67,55 @@ public:
                 if (line.length() < 90) continue; // Minimum length for Coordinates
 
                 try {
+                    // Extract substrings carefully
+                    std::string obj_name = extract_field(0, 10);
+                    std::string date_part = extract_field(17, 21); // YYYY MM DD.ddddd
+                    std::string ra_part = extract_field(50, 12);   // HH MM SS.sss
+                    std::string dec_part = extract_field(103, 13); // sDD MM SS.ss
+                    
+                    if (obj_name.empty() || date_part.empty() || ra_part.empty() || dec_part.empty()) continue;
+
                     OpticalObservation obs;
-                    
-                    // 1. Object Name: 0-10
-                    obs.object_name = extract_field(0, 10);
-                    
-                    // 2. Date: YYYY (17,4) MM (22,2) DD (25,9)
-                    std::string y_str = extract_field(17, 4);
-                    std::string m_str = extract_field(22, 2);
-                    std::string d_str = extract_field(25, 9);
-                    
-                    // Robust conversion
-                    if (y_str.empty() || m_str.empty() || d_str.empty()) continue;
-                    int year = std::stoi(y_str);
-                    int month = std::stoi(m_str);
-                    double day = std::stod(d_str);
+                    obs.object_name = obj_name;
+
+                    // Parse Date
+                    std::stringstream ss_date(date_part);
+                    int year, month; double day;
+                    if (!(ss_date >> year >> month >> day)) continue;
                     obs.mjd_utc = date_to_mjd(year, month, day);
 
-                    // 3. RA: H (47,3) M (50,3) S (53,8)
-                    // Tolerant offsets
-                    int ra_h = std::stoi(extract_field(47, 3));
-                    int ra_m = std::stoi(extract_field(50, 3));
-                    double ra_s = std::stod(extract_field(53, 8));
-                    obs.ra = (ra_h + ra_m / 60.0 + ra_s / 3600.0) * 15.0 * M_PI / 180.0;
+                    // Parse RA
+                    std::stringstream ss_ra(ra_part);
+                    int rh, rm; double rs;
+                    if (!(ss_ra >> rh >> rm >> rs)) continue;
+                    obs.ra = (rh + rm / 60.0 + rs / 3600.0) * 15.0 * M_PI / 180.0;
 
-                    // 4. Dec: sDD(102-105) MM(106-107) SS(109-115)
-                    // " +31" or "-13" -> Start 102
-                    std::string dec_d_str = extract_field(102, 3);
-                    
-                    int dec_d = std::abs(std::stoi(dec_d_str));
-                    int dec_m = std::stoi(extract_field(106, 2));
-                    double dec_s = std::stod(extract_field(109, 8));
-                    
-                    double dec_deg = dec_d + dec_m / 60.0 + dec_s / 3600.0;
-                    if (dec_d_str.find('-') != std::string::npos) dec_deg = -dec_deg;
-                    obs.dec = dec_deg * M_PI / 180.0;
+                    // Parse Dec
+                    std::stringstream ss_dec(dec_part);
+                    int dd, dm; double ds;
+                    if (!(ss_dec >> dd >> dm >> ds)) continue;
+                    double dec_val = std::abs(dd) + dm / 60.0 + ds / 3600.0;
+                    if (dec_part.find('-') != std::string::npos) dec_val = -dec_val;
+                    obs.dec = dec_val * M_PI / 180.0;
 
-                    // 5. Magnitude: Unknown offset, skip or guess
+                    // Obs Code (at the end of line)
+                    if (line.length() > 140) {
+                        obs.obs_code = extract_field(143, 3);
+                        if (obs.obs_code.empty() || !isdigit(obs.obs_code[0])) {
+                             obs.obs_code = extract_field(137, 3);
+                        }
+                    }
+                    if (obs.obs_code.empty() || !isdigit(obs.obs_code[0])) obs.obs_code = "500";
+
+                    obs.sigma_ra = 0.5 * astdyn::constants::ARCSEC_TO_RAD;
+                    obs.sigma_dec = 0.5 * astdyn::constants::ARCSEC_TO_RAD;
                     obs.mag = 0.0;
 
-                    // 6. Obs Code: Try end of line logic
-                    size_t p_pos = line.rfind("p "); 
-                    std::string code = "";
-                    if (line.length() > 20) {
-                        std::string c1 = extract_field(143, 3);
-                        if (!c1.empty() && isdigit(c1[0])) code = c1;
-                    }
-                    if (code.empty()) code = extract_field(137, 3); 
-
-                    if (code.empty() || !isdigit(code[0])) code = "500";
-                    obs.obs_code = code;
-
-
-                    // Defaults
-                    obs.sigma_ra = 1.0; 
-                    obs.sigma_dec = 1.0;
-
                     observations.push_back(obs);
-                    
-                     if (max_count > 0 && ++count >= max_count) break;
+                    if (max_count > 0 && ++count >= max_count) break;
 
-                } catch (const std::exception& e) {
-                    continue; // Skip lines with bad numbers
+                } catch (...) {
+                    continue;
                 }
         }
 
@@ -153,8 +141,8 @@ private:
         int y = year + 4800 - a;
         int m = month + 12 * a - 3;
         
-        int jdn = day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045;
-        return jdn - 2400000.5;
+        int jdn = (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045;
+        return (double)jdn + day - 0.5 - 2400000.5;
     }
 };
 

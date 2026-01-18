@@ -322,7 +322,7 @@ public:
     }
 
 private:
-    double a_;      ///< Semi-major axis [km]
+    double a_;      ///< Semi-major axis [AU]
     double e_;      ///< Eccentricity
     double i_;      ///< Inclination [rad]
     double Omega_;  ///< RAAN [rad]

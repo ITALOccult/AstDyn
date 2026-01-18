@@ -29,9 +29,12 @@ public:
         double argument_perihelion;    ///< radians (ω)
         double mean_anomaly;           ///< radians (M)
         
+        double gravitational_parameter; ///< AU³/day²
+        
         // Optional
         double magnitude = 0.0;
-        double mag_slope = 0.0;
+        double mag_slope = 0.15;
+        double diameter = 0.0; // km
     };
 
     virtual ~IOrbitParser() = default;

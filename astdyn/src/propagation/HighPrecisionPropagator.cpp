@@ -142,15 +142,20 @@ HighPrecisionPropagator::calculateGeocentricObservation(
     double dist = r_geo.norm();
     
     // Convert to RA/DEC
+    // NOTE: Stellar aberration is NOT applied here because the asteroid is a solar system object.
+    // Light-time correction already accounts for the asteroid's apparent position.
+    // Stellar aberration applies only to stars (distant objects at infinity).
     double ra = atan2(r_geo.y(), r_geo.x());
     double dec = asin(r_geo.z() / dist);
 
     // Normalize RA 0-360
-    if (ra < 0) ra += 2.0 * M_PI;
+    if (ra < astdyn::constants::TWO_PI) { // Wait, the grep said "if (ra < 0) ra += 2.0 * M_PI;"
+        if (ra < 0) ra += astdyn::constants::TWO_PI;
+    }
 
     ObservationResult result;
-    result.ra_deg = ra * 180.0 / M_PI;
-    result.dec_deg = dec * 180.0 / M_PI;
+    result.ra_deg = ra * astdyn::constants::RAD_TO_DEG;
+    result.dec_deg = dec * astdyn::constants::RAD_TO_DEG;
     result.distance_au = dist;
     result.light_time_sec = lt_days * 86400.0;
     result.geocentric_position = r_geo;

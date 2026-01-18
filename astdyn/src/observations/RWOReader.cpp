@@ -32,43 +32,44 @@ std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath)
     }
     
     std::string line;
+    int line_num = 0;
     while (std::getline(file, line)) {
+        line_num++;
         if (line.empty() || line[0] == '#' || line[0] == '!') continue;
         
         auto obs = parseLine(line);
         if (obs) {
             observations.push_back(*obs);
+        } else {
+             std::cerr << "RWOReader Debug: Line " << line_num << " parseLine failed.\n";
         }
     }
+    std::cerr << "RWOReader Debug: Total lines " << line_num << ". Total obs " << observations.size() << "\n";
     
     return observations;
 }
 
 std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) {
-    // Skip header lines and ensure line is long enough
-    if (line.length() < 150 || line[0] == '!' || line.find("END_OF_HEADER") != std::string::npos) {
-        return std::nullopt;
+    if (line.length() < 150) {
+       std::cerr << "RWOReader Debug: Line too short (" << line.length() << " < 150)\n";
+       return std::nullopt;
     }
-    
+    if (line[0] == '!' || line.find("END_OF_HEADER") != std::string::npos) return std::nullopt;
+
     try {
         OpticalObservation obs;
         
-        // Fortran FORMAT 110: (1X,A9,1X,A1,1X,A1,1X,A1)
-        // Object designation: column 2-10 (1-indexed) = index 1-9 (0-indexed)
+        // Fortran FORMAT 110
         obs.object_designation = trim(line.substr(1, 9));
         
-        // Observation type: column 12 (1-indexed) = index 11 (0-indexed)
         if (line.length() < 12 || line[11] != 'O') {
-            return std::nullopt;  // Not an optical observation
+             std::cerr << "RWOReader Debug: Not Optical ('O' at 11): '" << line[11] << "'\n";
+             return std::nullopt;
         }
         
-        // Fortran FORMAT 120: (I4,1X,I2,1X,F13.10,1X,E10.3)
-        // Date starts at column 18 (1-indexed) = index 17 (0-indexed) in Fortran READ(record(18:),120)
-        // But since record starts at column 1, READ(record(18:)) means skip first 17 chars
-        // So in our 0-indexed string, date is at position 17
-        // Format is: "YYYY MM DD.dddddddddd" (4 + 1 + 2 + 1 + 13 = 21 chars)
         std::string date_str = line.substr(17, 21);
         obs.mjd_utc = parseDate(date_str);
+        // ... (rest of function)
         
         // Fortran FORMAT 521 starts at READ(record(51:),521)
         // In Fortran, record(51:) means from character 51 onwards (1-indexed)
@@ -85,8 +86,7 @@ std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) 
         // Dec sign is after: 1X,E10.3,1X,A8,1X,L1,1X,F8.3,A9,1X
         // That's about 40 chars after RA start
         // Dec: 1X,A1,I2,1X,I2,1X,F5.2
-        size_t dec_start = ra_start + 12 + 1 + 10 + 1 + 8 + 1 + 1 + 1 + 8 + 9 + 1;
-        // dec_start ≈ 50 + 54 = 104
+        size_t dec_start = 103; 
         if (line.length() < dec_start + 13) return std::nullopt;
         
         std::string dec_str = line.substr(dec_start, 13);

@@ -124,17 +124,41 @@ OrbitFitResult OrbitFitAPI::run_fit(
         // 2. Transform Frame: Ecliptic J2000 -> Equatorial J2000
         auto cart_ecliptic_elem = propagation::keplerian_to_cartesian(orbfit_orbit_ecliptic);
 
+        // Detect Reference Frame from EQ1 file
+        bool is_equatorial = false;
+        {
+            std::ifstream f(eq1_file);
+            std::string l;
+            while(std::getline(f, l)) {
+                if (l.find("refsys") != std::string::npos) {
+                    if (l.find("EQU") != std::string::npos || l.find("ICRS") != std::string::npos || l.find("ICRF") != std::string::npos) {
+                        is_equatorial = true;
+                    }
+                    break;
+                }
+                if (l.find("END_OF_HEADER") != std::string::npos) break;
+            }
+        }
+
         OrbitContext ctx_in;
-        ctx_in.frame = ReferenceFrame::ECLIPTIC_J2000;
+        ctx_in.frame = is_equatorial ? ReferenceFrame::EQUATORIAL_J2000 : ReferenceFrame::ECLIPTIC_J2000;
         ctx_in.center = OriginCenter::SUN;
         ctx_in.model = OrbitModel::MEAN;
         ctx_in.format = ElementFormat::KEPLERIAN;
 
         propagation::CartesianElements cart_equatorial_elem;
         cart_equatorial_elem.epoch_mjd_tdb = cart_ecliptic_elem.epoch_mjd_tdb;
-        cart_equatorial_elem.position = coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.position;
-        cart_equatorial_elem.velocity = coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.velocity;
         cart_equatorial_elem.gravitational_parameter = cart_ecliptic_elem.gravitational_parameter;
+
+        if (is_equatorial) {
+            if (verbose) std::cout << "   Detecting EQUATORIAL frame in .eq1, skipping rotation.\n";
+            cart_equatorial_elem.position = cart_ecliptic_elem.position;
+            cart_equatorial_elem.velocity = cart_ecliptic_elem.velocity;
+        } else {
+            if (verbose) std::cout << "   Detecting ECLIPTIC frame in .eq1, applying rotation to Equatorial J2000.\n";
+            cart_equatorial_elem.position = coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.position;
+            cart_equatorial_elem.velocity = coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.velocity;
+        }
         
         auto initial_orbit_equatorial = propagation::cartesian_to_keplerian(cart_equatorial_elem);
         

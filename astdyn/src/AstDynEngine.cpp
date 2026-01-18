@@ -569,12 +569,12 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
     orbit_determination::DifferentialCorrectorSettings dc_settings;
     dc_settings.max_iterations = config_.max_iterations;
     dc_settings.convergence_tolerance = config_.convergence_threshold;
-    // Relax outlier threshold to avoid rejecting all data initially
-    // Standard OrbFit practice: Initial large sigma, then tighten.
-    // Ideally DC handles this strategy. For now, set to 10.0 if default 3.0 is likely too tight for initial guess.
+    
+    // Outlier strategy: if initial guess is poor, use a very large threshold for the first step
     dc_settings.outlier_sigma = config_.outlier_sigma;
-    dc_settings.outlier_max_sigma = config_.outlier_max_sigma;
-    dc_settings.outlier_min_sigma = config_.outlier_min_sigma;
+    dc_settings.outlier_max_sigma = std::max(100.0, config_.outlier_sigma * 10.0); 
+    dc_settings.outlier_min_sigma = config_.outlier_sigma;
+    dc_settings.reject_outliers = true;
     
     dc_settings.verbose = config_.verbose;
     
@@ -745,7 +745,7 @@ void AstDynEngine::print_orbit_summary(std::ostream& os) const {
     os << "Ω:        " << (current_orbit_.longitude_ascending_node * constants::RAD_TO_DEG) << " deg\n";
     os << "ω:        " << (current_orbit_.argument_perihelion * constants::RAD_TO_DEG) << " deg\n";
     os << "M:        " << (current_orbit_.mean_anomaly * constants::RAD_TO_DEG) << " deg\n";
-    os << "Period:   " << std::setprecision(3) << (current_orbit_.period() / constants::DAY) << " days\n";
+    os << "Period:   " << std::setprecision(3) << current_orbit_.period() << " days\n";
     os << "q:        " << std::setprecision(6) << current_orbit_.perihelion_distance() << " AU\n";
     os << "Q:        " << current_orbit_.aphelion_distance() << " AU\n";
 }

@@ -102,41 +102,24 @@ DifferentialCorrectorResult DifferentialCorrector::fit(
         
         // Check convergence
         if (check_convergence(correction, settings.convergence_tolerance)) {
-            
-            // CARPENTRY Check
-            // If we converged with a loose sigma, tighten it and continue iterating
-            if (settings.reject_outliers && current_sigma > settings.outlier_min_sigma + 0.1) {
-                double old_sigma = current_sigma;
-                // Tighten schema: Reduce by half, but not below min
-                current_sigma = std::max(settings.outlier_min_sigma, current_sigma * 0.5);
-                
-                if (settings.verbose) {
-                    std::cout << ">> Carpentry: Tightening sigma " 
-                              << old_sigma << " -> " << current_sigma << ". Continuing...\n";
-                }
-                
-                // Force re-identification of outliers with new sigma immediately? 
-                // Wait, identify_outliers is called at start of next iteration (if iter > 0).
-                // Actually, residuals are already computed. If I change sigma now and continue, 
-                // the next iteration will call identify_outliers(..., current_sigma). 
-                // Correct.
-                continue; 
-            }
-            
-            result.converged = true;
-            result.final_state = current_state;
-            result.residuals = residuals;
-            result.statistics = stats;
-            
-            if (settings.verbose) {
-                std::cout << "\n✓ CONVERGED after " << iter + 1 << " iterations\n";
-            }
-            break;
+             // ... (convergence logic)
+             result.converged = true;
+             result.final_state = current_state;
+             result.residuals = residuals;
+             result.statistics = stats; // Set stats on success
+             break;
         }
+        
+        // Update result with latest state even if not converged yet
+        result.final_state = current_state;
+        result.residuals = residuals;
+        result.statistics = stats;
     }
     
-    if (!result.converged && settings.verbose) {
-        std::cout << "\n✗ NOT CONVERGED after " << result.iterations << " iterations\n";
+    if (settings.verbose) {
+         std::cout << "DC Debug: Loop finished. Converged=" << result.converged 
+                   << " Iter=" << result.iterations << "\n";
+         if (!result.converged) std::cout << "✗ NOT CONVERGED\n";
     }
     
     // Compute final covariance if requested

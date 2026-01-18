@@ -18,12 +18,14 @@
 #include <astdyn/io/parsers/OrbFitEQ1Parser.hpp>
 #include <astdyn/api/OrbitFitAPI.hpp>
 #include <astdyn/propagation/HighPrecisionPropagator.hpp>
+#include <astdyn/propagation/STMPropagator.hpp>
 #include "ioccultcalc/orbital_elements.h"
 #include <astdyn/core/Types.hpp>
 #include <Eigen/Dense>
 #include <memory>
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace ioccultcalc {
 
@@ -75,6 +77,7 @@ struct CartesianStateICRF {
     Eigen::Vector3d position;  ///< Posizione [AU]
     Eigen::Vector3d velocity;  ///< Velocità [AU/day]
     double epoch_mjd_tdb;      ///< Epoca [MJD TDB]
+    std::optional<Eigen::Matrix<double, 6, 6>> covariance; ///< Covarianza [6x6]
     
     CartesianStateICRF() : epoch_mjd_tdb(0.0) {
         position = Eigen::Vector3d::Zero();
@@ -146,8 +149,10 @@ public:
      * @param epoch Epoca [MJD TDB]
      * @param name Nome oggetto
      */
-    void injectElements(double a, double e, double i, double Omega, double omega, double M, double epoch, const std::string& name = "INJECTED") {
-        setKeplerianElements(a, e, i, Omega, omega, M, epoch, name);
+    void injectElements(double a, double e, double i, double Omega, double omega, double M, double epoch, const std::string& name = "INJECTED", double H=0, double G=0.15, double dia=0) {
+        setKeplerianElements(a, e, i, Omega, omega, M, epoch, name, 
+                             astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC,
+                             H, G, dia);
     }
 
     /**
@@ -176,7 +181,22 @@ public:
                               double epoch_mjd_tdb,
                               const std::string& name = "",
                               astdyn::propagation::HighPrecisionPropagator::InputFrame frame = 
-                                  astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+                                  astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC,
+                              double H = 0.0, double G = 0.15, double dia = 0.0,
+                              const std::optional<Eigen::Matrix<double, 6, 6>>& covariance = std::nullopt);
+    
+    /**
+     * @brief Imposta elementi cartesiani manualmente
+     * @param pos Posizione [AU]
+     * @param vel Velocità [AU/day]
+     * @param epoch_mjd_tdb Epoca [MJD TDB]
+     * @param name Nome oggetto
+     * @param frame Frame di riferimento (default: EQUATORIAL/ICRF)
+     */
+    void setCartesianElements(const Eigen::Vector3d& pos, const Eigen::Vector3d& vel,
+                             double epoch_mjd_tdb, const std::string& name = "",
+                             astdyn::propagation::HighPrecisionPropagator::InputFrame frame = 
+                                 astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL);
 
     /**
      * @brief Imposta gli elementi orbitali da struct ioccultcalc.
@@ -201,7 +221,8 @@ public:
                                 double epoch_mjd_tdb,
                                 const std::string& name = "",
                                 astdyn::propagation::HighPrecisionPropagator::InputFrame frame = 
-                                    astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+                                    astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC,
+                                const std::optional<Eigen::Matrix<double, 6, 6>>& covariance = std::nullopt);
 
     /**
      * @brief Imposta elementi equinoziali MEDI (es. da allnum.cat / AstDyS)
@@ -293,6 +314,8 @@ public:
 
     // Compatibilità legacy
     void setSPKReader(std::shared_ptr<void> reader);
+    
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> getPlanetaryEphemeris() const { return ephemeris_; }
 
 private:
     PropagationSettings settings_;
@@ -302,6 +325,7 @@ private:
     
     astdyn::io::IOrbitParser::OrbitalElements current_elements_;
     astdyn::propagation::HighPrecisionPropagator::InputFrame current_frame_;
+    std::optional<Eigen::Matrix<double, 6, 6>> current_covariance_;
     double current_epoch_mjd_;
     std::string object_name_;
     bool initialized_;

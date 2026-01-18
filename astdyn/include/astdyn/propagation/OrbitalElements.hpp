@@ -95,7 +95,7 @@ struct CartesianElements {
     Eigen::Vector3d position;          ///< Position [AU]
     Eigen::Vector3d velocity;          ///< Velocity [AU/day]
     
-    double gravitational_parameter;    ///< GM of central body [AU³/day²]
+    double gravitational_parameter = constants::GMS;    ///< GM of central body [AU³/day²]
     
     // Optional covariance (6x6: position, velocity)
     std::optional<Eigen::Matrix<double, 6, 6>> covariance;
@@ -142,7 +142,7 @@ struct EquinoctialElements {
     double q;                 ///< q = tan(i/2) cos(Ω)
     double lambda;            ///< Mean longitude λ = M + ω + Ω [rad]
     
-    double gravitational_parameter;
+    double gravitational_parameter = constants::GMS;
     
     std::optional<Eigen::Matrix<double, 6, 6>> covariance;
     
@@ -164,7 +164,7 @@ struct CometaryElements {
     double argument_perihelion;        ///< ω [rad]
     double time_perihelion_mjd_tdb;    ///< Tp [MJD TDB]
     
-    double gravitational_parameter;    ///< GM [AU³/day²]
+    double gravitational_parameter = constants::GMS;    ///< GM [AU³/day²]
     
     std::optional<Eigen::Matrix<double, 6, 6>> covariance;
     

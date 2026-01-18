@@ -115,6 +115,10 @@ bool AstDynWrapper::loadFromEQ1File(const std::string& filepath) {
         // Nota: mean_to_osculating applica le correzioni MK se a è nel range main belt
         auto kep_osc = astdyn::propagation::mean_to_osculating(kep_mean);
         
+        std::cout << "[AstDynWrapper] Computed Osculating Elements (Epoch " << kep_osc.epoch_mjd_tdb << "):\n"
+                  << "  a=" << kep_osc.semi_major_axis << " e=" << kep_osc.eccentricity << " i=" << kep_osc.inclination << "\n"
+                  << "  Omega=" << kep_osc.longitude_ascending_node << " omega=" << kep_osc.argument_perihelion << " M=" << kep_osc.mean_anomaly << "\n";
+        
         // Salva elementi internamente (Osculanti, Eclittici)
         current_elements_.semi_major_axis = kep_osc.semi_major_axis;
         current_elements_.eccentricity = kep_osc.eccentricity;
@@ -123,6 +127,7 @@ bool AstDynWrapper::loadFromEQ1File(const std::string& filepath) {
         current_elements_.argument_perihelion = kep_osc.argument_perihelion;
         current_elements_.mean_anomaly = kep_osc.mean_anomaly;
         current_elements_.epoch_mjd_tdb = kep_osc.epoch_mjd_tdb;
+        current_elements_.gravitational_parameter = kep_osc.gravitational_parameter;
         
         current_epoch_mjd_ = kep_osc.epoch_mjd_tdb;
         
@@ -184,7 +189,9 @@ void AstDynWrapper::setKeplerianElements(
     double Omega, double omega, double M,
     double epoch_mjd_tdb,
     const std::string& name,
-    astdyn::propagation::HighPrecisionPropagator::InputFrame frame)
+    astdyn::propagation::HighPrecisionPropagator::InputFrame frame,
+    double H, double G, double dia,
+    const std::optional<Eigen::Matrix<double, 6, 6>>& covariance)
 {
     // Salva elementi per uso futuro
     current_elements_.semi_major_axis = a;
@@ -195,11 +202,17 @@ void AstDynWrapper::setKeplerianElements(
     current_elements_.mean_anomaly = M;
     current_elements_.epoch_mjd_tdb = epoch_mjd_tdb;
     current_elements_.object_name = name;
+    current_elements_.magnitude = H;
+    current_elements_.mag_slope = G;
+    current_elements_.diameter = dia;
+    current_elements_.gravitational_parameter = astdyn::constants::GMS; // Default if not provided
     
     current_epoch_mjd_ = epoch_mjd_tdb;
     current_frame_ = frame;
     object_name_ = name;
-    std::cout << "[AstDynWrapper:" << this << "] setKeplerianElements: asteroid=" << name << " state set to INITIALIZED." << std::endl;
+    current_covariance_ = covariance;
+    std::cout << "[AstDynWrapper:" << this << "] setKeplerianElements: asteroid=" << name << " state set to INITIALIZED (Covariance: " << (covariance.has_value()?"YES":"NO") << ")." << std::endl;
+    std::cout << "[AstDynWrapper]   Processing Frame: " << (frame == astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC ? "ECLIPTIC" : "EQUATORIAL") << "\n";
     initialized_ = true;
     
     // Re-inizializza il propagatore se necessario (opzionale, propagateToEpoch lo usa)
@@ -211,24 +224,94 @@ void AstDynWrapper::setAsteroidElements(const AstDynEquinoctialElements& element
         // Applica correzione MILANI-KNEZEVIC via OrbitalConversions
         auto osc = elements.toOsculatingKeplerian();
         
-        // Carica elementi osculanti risultanti
+        // Assumiamo che se abbiamo covarianza sia già nel frame target (ECLIPTIC di solito per MEAN)
+        std::optional<Eigen::Matrix<double, 6, 6>> cov_opt;
+        if (elements.hasCovariance && elements.covariance.size() == 21) {
+            Eigen::Matrix<double, 6, 6> cov = Eigen::Matrix<double, 6, 6>::Zero();
+            int idx = 0;
+            for (int i = 0; i < 6; ++i) {
+                for (int j = i; j < 6; ++j) {
+                    cov(i, j) = elements.covariance[idx++];
+                    cov(j, i) = cov(i, j);
+                }
+            }
+            cov_opt = cov;
+        }
+
         setKeplerianElements(osc.a, osc.e, osc.i, osc.Omega, osc.omega, osc.M, 
                             osc.epoch.jd - 2400000.5, elements.name, 
                             (elements.frame == FrameType::EQUATORIAL_ICRF) ? 
                              astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL : 
-                             astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+                             astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC,
+                             elements.H, elements.G, elements.diameter,
+                             cov_opt);
         
         // Importante: toOsculatingKeplerian restituisce ElementType::OSCULATING
         // ma noi ricordiamo il frame originale se possibile.
     } else {
         // Già osculanti o ignoti, carica direttamente
         auto kep = elements.toKeplerian();
+        auto target_frame = (elements.frame == FrameType::EQUATORIAL_ICRF) ? 
+                              astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL : 
+                              astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC;
+
+        std::cout << "[AstDynWrapper] setAsteroidElements DEBUG: "
+                  << "Name=" << elements.name 
+                  << " FrameType=" << (int)elements.frame
+                  << " -> InputFrame=" << (int)target_frame
+                  << " omega=" << kep.omega << " Omega=" << kep.Omega << " M=" << kep.M << "\n";
+
+        std::optional<Eigen::Matrix<double, 6, 6>> cov_opt;
+        if (elements.hasCovariance && elements.covariance.size() == 21) {
+            Eigen::Matrix<double, 6, 6> cov = Eigen::Matrix<double, 6, 6>::Zero();
+            int idx = 0;
+            for (int i = 0; i < 6; ++i) {
+                for (int j = i; j < 6; ++j) {
+                    cov(i, j) = elements.covariance[idx++];
+                    cov(j, i) = cov(i, j);
+                }
+            }
+            cov_opt = cov;
+        }
+
         setKeplerianElements(kep.a, kep.e, kep.i, kep.Omega, kep.omega, kep.M, 
                             kep.epoch.jd - 2400000.5, elements.name,
-                            (elements.frame == FrameType::EQUATORIAL_ICRF) ? 
-                             astdyn::propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL : 
-                             astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
+                            target_frame,
+                             elements.H, elements.G, elements.diameter,
+                             cov_opt);
     }
+}
+
+void AstDynWrapper::setCartesianElements(const Eigen::Vector3d& pos, const Eigen::Vector3d& vel,
+                                         double epoch_mjd_tdb, const std::string& name,
+                                         astdyn::propagation::HighPrecisionPropagator::InputFrame frame)
+{
+    initialized_ = true;
+    object_name_ = name;
+    current_epoch_mjd_ = epoch_mjd_tdb;
+    current_frame_ = frame;
+
+    // Converti in elementi Kepleriani per consistenza con current_elements_
+    astdyn::propagation::CartesianElements cart;
+    cart.position = pos;
+    cart.velocity = vel;
+    cart.epoch_mjd_tdb = epoch_mjd_tdb;
+    cart.gravitational_parameter = astdyn::constants::GMS;
+
+    auto kep = astdyn::propagation::cartesian_to_keplerian(cart);
+    
+    current_elements_.object_name = name;
+    current_elements_.epoch_mjd_tdb = epoch_mjd_tdb;
+    current_elements_.semi_major_axis = kep.semi_major_axis;
+    current_elements_.eccentricity = kep.eccentricity;
+    current_elements_.inclination = kep.inclination;
+    current_elements_.longitude_asc_node = kep.longitude_ascending_node;
+    current_elements_.argument_perihelion = kep.argument_perihelion;
+    current_elements_.mean_anomaly = kep.mean_anomaly;
+    current_elements_.gravitational_parameter = astdyn::constants::GMS;
+
+    std::cout << "[AstDynWrapper:" << this << "] setCartesianElements: asteroid=" << name 
+              << " epoch=" << epoch_mjd_tdb << " frame=" << (int)frame << " state set to INITIALIZED.\n";
 }
 
 void AstDynWrapper::setEquinoctialElements(
@@ -236,7 +319,8 @@ void AstDynWrapper::setEquinoctialElements(
     double p, double q, double lambda,
     double epoch_mjd_tdb,
     const std::string& name,
-    astdyn::propagation::HighPrecisionPropagator::InputFrame frame)
+    astdyn::propagation::HighPrecisionPropagator::InputFrame frame,
+    const std::optional<Eigen::Matrix<double, 6, 6>>& covariance)
 {
     // Converti equinoziali in kepleriani (mantiene il frame logico, conversione matematica pura)
     astdyn::propagation::EquinoctialElements eq;
@@ -262,6 +346,7 @@ void AstDynWrapper::setEquinoctialElements(
     current_epoch_mjd_ = epoch_mjd_tdb;
     current_frame_ = frame;
     object_name_ = name;
+    current_covariance_ = covariance;
     initialized_ = true;
     
     initializePropagator();
@@ -334,8 +419,44 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
         std::cout << "  - ERROR: Propagator is NULL!" << std::endl;
         throw std::runtime_error("Propagator is NULL");
     }
-    // Propagazione con AstDyn
-    auto kep_final = propagator_->propagate_keplerian(kep_initial, target_mjd_tdb);
+
+    Eigen::Vector3d pos_final, vel_final;
+    std::optional<Eigen::Matrix<double, 6, 6>> cov_final;
+
+    if (current_covariance_.has_value()) {
+        std::cout << "  - Covariance detected. Using STMPropagator for rigorous propagation.\n";
+        
+        // Setup initial cartesian state in InputFrame
+        auto cart_initial = astdyn::propagation::keplerian_to_cartesian(kep_initial);
+        Eigen::Vector<double, 6> x0;
+        x0.head<3>() = cart_initial.position;
+        x0.tail<3>() = cart_initial.velocity;
+
+        // Setup STM Propagator
+        auto integrator = std::make_unique<astdyn::propagation::RKF78Integrator>(
+            settings_.initial_step, settings_.tolerance);
+        
+        // Force function from underlying propagator
+        astdyn::propagation::STMPropagator stm_prop(
+            std::move(integrator),
+            [this](double t, const Eigen::Vector<double, 6>& x) {
+                return propagator_->compute_derivatives(t, x);
+            }
+        );
+
+        auto res = stm_prop.propagate(x0, kep_initial.epoch_mjd_tdb, target_mjd_tdb);
+        pos_final = res.state.template head<3>();
+        vel_final = res.state.template tail<3>();
+
+        // Propagate Covariance: P(t) = Phi * P(t0) * Phi^T
+        cov_final = res.stm * (*current_covariance_) * res.stm.transpose();
+    } else {
+        // Propagazione standard senza STM
+        auto kep_final = propagator_->propagate_keplerian(kep_initial, target_mjd_tdb);
+        auto cart_final = astdyn::propagation::keplerian_to_cartesian(kep_final);
+        pos_final = cart_final.position;
+        vel_final = cart_final.velocity;
+    }
     
     std::cout << "  - Propagation finished." << std::endl;
     auto end = std::chrono::high_resolution_clock::now();
@@ -346,30 +467,56 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
     oss << "Propagazione: " << current_epoch_mjd_ << " → " << target_mjd_tdb 
         << " MJD (" << (target_mjd_tdb - current_epoch_mjd_) << " giorni)\n"
         << "Tempo: " << duration.count() << " ms";
+    if (cov_final) oss << " (STM Covariance propagated)";
     last_stats_ = oss.str();
     
-    // Aggiorna elementi correnti per chiamate successive (es. getKeplerianElements)
-    current_elements_.semi_major_axis = kep_final.semi_major_axis;
-    current_elements_.eccentricity = kep_final.eccentricity;
-    current_elements_.inclination = kep_final.inclination;
-    current_elements_.longitude_asc_node = kep_final.longitude_ascending_node;
-    current_elements_.argument_perihelion = kep_final.argument_perihelion;
-    current_elements_.mean_anomaly = kep_final.mean_anomaly;
-    current_elements_.epoch_mjd_tdb = kep_final.epoch_mjd_tdb;
-    current_epoch_mjd_ = kep_final.epoch_mjd_tdb;
+    // Aggiorna elementi correnti per chiamate successive (getKeplerianElements)
+    // Nota: se abbiamo usato STM, dovremmo riconvertire pos/vel in Kepleriani
+    astdyn::propagation::CartesianElements cart_final_elem;
+    cart_final_elem.position = pos_final;
+    cart_final_elem.velocity = vel_final;
+    cart_final_elem.epoch_mjd_tdb = target_mjd_tdb;
+    cart_final_elem.gravitational_parameter = astdyn::constants::GMS;
 
-    // Converti in cartesiano
-    auto cart_final = astdyn::propagation::keplerian_to_cartesian(kep_final);
-    
-    // CORREZIONE BUG: Il frame di cart_final è lo stesso degli elementi correnti (current_frame_)
+    auto kep_final_updated = astdyn::propagation::cartesian_to_keplerian(cart_final_elem);
+    current_elements_.semi_major_axis = kep_final_updated.semi_major_axis;
+    current_elements_.eccentricity = kep_final_updated.eccentricity;
+    current_elements_.inclination = kep_final_updated.inclination;
+    current_elements_.longitude_asc_node = kep_final_updated.longitude_ascending_node;
+    current_elements_.argument_perihelion = kep_final_updated.argument_perihelion;
+    current_elements_.mean_anomaly = kep_final_updated.mean_anomaly;
+    current_elements_.epoch_mjd_tdb = target_mjd_tdb;
+    current_epoch_mjd_ = target_mjd_tdb;
+
+    // Converti in ICRF se necessario
     if (current_frame_ == astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC) {
-        return eclipticToICRF(cart_final, target_mjd_tdb);
+        auto result = eclipticToICRF(cart_final_elem, target_mjd_tdb);
+        // Ruota anche la covarianza se presente
+        if (cov_final) {
+            // Matrice di rotazione Eclittica -> ICRF (3x3)
+            const double cos_eps = std::cos(OrbitalConversions::OBLIQUITY_J2000);
+            const double sin_eps = std::sin(OrbitalConversions::OBLIQUITY_J2000);
+            Eigen::Matrix3d R;
+            R << 1, 0, 0,
+                 0, cos_eps, -sin_eps,
+                 0, sin_eps, cos_eps;
+            
+            // Matrice di rotazione 6x6 (blocco diagonale)
+            Eigen::Matrix<double, 6, 6> R6;
+            R6.setZero();
+            R6.template block<3, 3>(0, 0) = R;
+            R6.template block<3, 3>(3, 3) = R;
+
+            result.covariance = R6 * (*cov_final) * R6.transpose();
+        }
+        return result;
     } else {
-        // Già in ICRF/Equatoriale (es. caricato da EQ1 o Horizons)
+        // Già in ICRF
         CartesianStateICRF result;
-        result.position = cart_final.position;
-        result.velocity = cart_final.velocity;
+        result.position = pos_final;
+        result.velocity = vel_final;
         result.epoch_mjd_tdb = target_mjd_tdb;
+        result.covariance = cov_final;
         return result;
     }
 }
@@ -413,7 +560,7 @@ AstDynWrapper::calculateObservation(double target_mjd_tdb) {
         high_prop_->setPlanetaryEphemeris(ephemeris_);
     }
 
-    // Preparazione elementi
+    // 1. Prepare elements
     astdyn::propagation::KeplerianElements kep;
     kep.epoch_mjd_tdb = current_elements_.epoch_mjd_tdb;
     kep.semi_major_axis = current_elements_.semi_major_axis;
@@ -422,7 +569,13 @@ AstDynWrapper::calculateObservation(double target_mjd_tdb) {
     kep.longitude_ascending_node = current_elements_.longitude_asc_node;
     kep.argument_perihelion = current_elements_.argument_perihelion;
     kep.mean_anomaly = current_elements_.mean_anomaly;
-    kep.gravitational_parameter = astdyn::constants::GMS;
+    
+    // Ensure gravitational parameter is set
+    if (std::abs(current_elements_.gravitational_parameter) < 1e-18) {
+        kep.gravitational_parameter = astdyn::constants::GMS;
+    } else {
+        kep.gravitational_parameter = current_elements_.gravitational_parameter;
+    }
 
     double target_jd = target_mjd_tdb + 2400000.5;
     

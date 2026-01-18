@@ -271,7 +271,7 @@ public:
     }
 
 private:
-    double a_;       ///< Semi-major axis [km]
+    double a_;       ///< Semi-major axis [AU]
     double h_;       ///< e·sin(ω + Ω)
     double k_;       ///< e·cos(ω + Ω)
     double p_;       ///< tan(i/2)·sin(Ω)

@@ -4,6 +4,9 @@
 #define ASTDYN_VERSION_MAJOR 1
 #define ASTDYN_VERSION_MINOR 0
 #define ASTDYN_VERSION_PATCH 0
+#ifndef ASTDYN_VERSION_PATCH
+#define ASTDYN_VERSION_PATCH 0
+#endif
 #define ASTDYN_VERSION_STRING "1.0.0"
 
 namespace astdyn {
