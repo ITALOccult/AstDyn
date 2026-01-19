@@ -285,6 +285,7 @@ CartesianElements Propagator::propagate_cartesian(const CartesianElements& initi
     final.gravitational_parameter = initial.gravitational_parameter;
     final.position = yf.head<3>();
     final.velocity = yf.tail<3>();
+    final.covariance = initial.covariance;
     
     return final;
 }
@@ -293,12 +294,16 @@ KeplerianElements Propagator::propagate_keplerian(const KeplerianElements& initi
                                                   double target_mjd_tdb) {
     // Convert to Cartesian
     CartesianElements cart = keplerian_to_cartesian(initial);
+    cart.covariance = initial.covariance;
     
     // Propagate
     CartesianElements cart_final = propagate_cartesian(cart, target_mjd_tdb);
     
     // Convert back to Keplerian
-    return cartesian_to_keplerian(cart_final);
+    KeplerianElements final = cartesian_to_keplerian(cart_final);
+    final.covariance = initial.covariance; // Keep the same (Cartesian frame) for now
+    
+    return final;
 }
 
 std::vector<CartesianElements> Propagator::propagate_ephemeris(

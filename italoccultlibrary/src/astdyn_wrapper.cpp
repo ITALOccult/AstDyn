@@ -421,22 +421,67 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
     }
 
     Eigen::Vector3d pos_final, vel_final;
+    Eigen::Vector3d helio_pos, helio_vel;
     std::optional<Eigen::Matrix<double, 6, 6>> cov_final;
 
     if (current_covariance_.has_value()) {
         std::cout << "  - Covariance detected. Using STMPropagator for rigorous propagation.\n";
         
-        // Setup initial cartesian state in InputFrame
+        std::cout << "[DEBUG] Keplerian elements before conversion:\n"
+                  << "  a=" << kep_initial.semi_major_axis 
+                  << " e=" << kep_initial.eccentricity
+                  << " i=" << kep_initial.inclination * 180.0 / M_PI
+                  << " Omega=" << kep_initial.longitude_ascending_node * 180.0 / M_PI
+                  << " omega=" << kep_initial.argument_perihelion * 180.0 / M_PI
+                  << " M=" << kep_initial.mean_anomaly * 180.0 / M_PI
+                  << " epoch=" << kep_initial.epoch_mjd_tdb << std::endl;
+        
+        // Validate elements
+        if (kep_initial.eccentricity < 0 || kep_initial.eccentricity >= 1.0) {
+            throw std::runtime_error("Invalid eccentricity: " + std::to_string(kep_initial.eccentricity));
+        }
+        if (kep_initial.semi_major_axis <= 0) {
+            throw std::runtime_error("Invalid semi-major axis: " + std::to_string(kep_initial.semi_major_axis));
+        }
+        if (!std::isfinite(kep_initial.mean_anomaly)) {
+            throw std::runtime_error("Invalid mean anomaly: " + std::to_string(kep_initial.mean_anomaly));
+        }
+        
         auto cart_initial = astdyn::propagation::keplerian_to_cartesian(kep_initial);
         Eigen::Vector<double, 6> x0;
         x0.head<3>() = cart_initial.position;
         x0.tail<3>() = cart_initial.velocity;
+        
+        // SE il frame è Eclittico, dobbiamo ruotare TUTTO in ICRF (Equatoriale)
+        // prima della propagazione, perché le derivate (pianeti) sono in ICRF.
+        if (current_frame_ == astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC) {
+            astdyn::propagation::CartesianElements ecl_init;
+            ecl_init.position = cart_initial.position;
+            ecl_init.velocity = cart_initial.velocity;
+            auto icrf_init = eclipticToICRF(ecl_init, kep_initial.epoch_mjd_tdb);
+            x0.head<3>() = icrf_init.position;
+            x0.tail<3>() = icrf_init.velocity;
+
+            // Ruota anche la matrice di covarianza 6x6
+            const double cos_eps = std::cos(OrbitalConversions::OBLIQUITY_J2000);
+            const double sin_eps = std::sin(OrbitalConversions::OBLIQUITY_J2000);
+            Eigen::Matrix3d Rot;
+            Rot << 1, 0, 0,
+                   0, cos_eps, -sin_eps,
+                   0, sin_eps, cos_eps;
+            
+            Eigen::Matrix<double, 6, 6> R6;
+            R6.setZero();
+            R6.block<3,3>(0,0) = Rot;
+            R6.block<3,3>(3,3) = Rot;
+            
+            *current_covariance_ = R6 * (*current_covariance_) * R6.transpose();
+        }
 
         // Setup STM Propagator
         auto integrator = std::make_unique<astdyn::propagation::RKF78Integrator>(
             settings_.initial_step, settings_.tolerance);
         
-        // Force function from underlying propagator
         astdyn::propagation::STMPropagator stm_prop(
             std::move(integrator),
             [this](double t, const Eigen::Vector<double, 6>& x) {
@@ -448,14 +493,74 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
         pos_final = res.state.template head<3>();
         vel_final = res.state.template tail<3>();
 
+        // Store heliocentric state for element update
+        helio_pos = pos_final;
+        helio_vel = vel_final;
+
         // Propagate Covariance: P(t) = Phi * P(t0) * Phi^T
         cov_final = res.stm * (*current_covariance_) * res.stm.transpose();
+
+        // --- CONVERSIONE IN GEOCENTRICO ---
+        // Recuperiamo la posizione della Terra rispetto al Sole (ICRF)
+        double jd_tdb = target_mjd_tdb + 2400000.5;
+        auto earth_state = astdyn::ephemeris::PlanetaryEphemeris::getState(astdyn::ephemeris::CelestialBody::EARTH, jd_tdb);
+        auto sun_state = astdyn::ephemeris::PlanetaryEphemeris::getState(astdyn::ephemeris::CelestialBody::SUN, jd_tdb);
+        Eigen::Vector3d r_earth_sun = earth_state.position() - sun_state.position();
+        
+        pos_final -= r_earth_sun;
+        vel_final -= (earth_state.velocity() - sun_state.velocity());
     } else {
-        // Propagazione standard senza STM
-        auto kep_final = propagator_->propagate_keplerian(kep_initial, target_mjd_tdb);
-        auto cart_final = astdyn::propagation::keplerian_to_cartesian(kep_final);
-        pos_final = cart_final.position;
-        vel_final = cart_final.velocity;
+        // Usa HighPrecisionPropagator per coerenza perfetta
+        if (!high_prop_) {
+            astdyn::propagation::HighPrecisionPropagator::Config prop_cfg;
+            prop_cfg.de441_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp";
+            prop_cfg.tolerance = 1e-13;
+            high_prop_ = std::make_unique<astdyn::propagation::HighPrecisionPropagator>(prop_cfg);
+            high_prop_->setPlanetaryEphemeris(ephemeris_);
+        }
+        
+        // calculateGeocentricObservation gestisce già:
+        // 1. Frame conversion (ECL -> ICRF)
+        // 2. Light-time compensation
+        // 3. Geocentric origin shift (Sun -> Earth)
+        double target_jd = target_mjd_tdb + 2400000.5;
+        
+        std::cout << "[DEBUG-HPP] Keplerian elements before calculateGeocentricObservation:\n"
+                  << "  a=" << kep_initial.semi_major_axis 
+                  << " e=" << kep_initial.eccentricity
+                  << " i=" << kep_initial.inclination * 180.0 / M_PI
+                  << " Omega=" << kep_initial.longitude_ascending_node * 180.0 / M_PI
+                  << " omega=" << kep_initial.argument_perihelion * 180.0 / M_PI
+                  << " M=" << kep_initial.mean_anomaly * 180.0 / M_PI
+                  << " epoch=" << kep_initial.epoch_mjd_tdb 
+                  << " target=" << target_mjd_tdb
+                  << " dt=" << (target_mjd_tdb - kep_initial.epoch_mjd_tdb) << " days"
+                  << " frame=" << (int)current_frame_ << std::endl;
+        
+        // Validate elements
+        if (kep_initial.eccentricity < 0 || kep_initial.eccentricity >= 1.0) {
+            throw std::runtime_error("Invalid eccentricity: " + std::to_string(kep_initial.eccentricity));
+        }
+        if (kep_initial.semi_major_axis <= 0) {
+            throw std::runtime_error("Invalid semi-major axis: " + std::to_string(kep_initial.semi_major_axis));
+        }
+        if (!std::isfinite(kep_initial.mean_anomaly)) {
+            throw std::runtime_error("Invalid mean anomaly: " + std::to_string(kep_initial.mean_anomaly));
+        }
+        
+        auto obs = high_prop_->calculateGeocentricObservation(kep_initial, target_jd, current_frame_);
+        
+        pos_final = obs.geocentric_position;
+        // La velocità non è restituita da calculateGeocentricObservation,
+        // la recuperiamo tramite una propagazione helio e poi sottraiamo.
+        auto helio_state = high_prop_->propagate_cartesian(kep_initial, target_mjd_tdb, current_frame_);
+        
+        helio_pos = helio_state.position;
+        helio_vel = helio_state.velocity;
+
+        auto earth_state = astdyn::ephemeris::PlanetaryEphemeris::getState(astdyn::ephemeris::CelestialBody::EARTH, target_jd);
+        auto sun_state = astdyn::ephemeris::PlanetaryEphemeris::getState(astdyn::ephemeris::CelestialBody::SUN, target_jd);
+        vel_final = helio_vel - (earth_state.velocity() - sun_state.velocity());
     }
     
     std::cout << "  - Propagation finished." << std::endl;
@@ -471,14 +576,15 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
     last_stats_ = oss.str();
     
     // Aggiorna elementi correnti per chiamate successive (getKeplerianElements)
-    // Nota: se abbiamo usato STM, dovremmo riconvertire pos/vel in Kepleriani
-    astdyn::propagation::CartesianElements cart_final_elem;
-    cart_final_elem.position = pos_final;
-    cart_final_elem.velocity = vel_final;
-    cart_final_elem.epoch_mjd_tdb = target_mjd_tdb;
-    cart_final_elem.gravitational_parameter = astdyn::constants::GMS;
+    // IMPORTANT: Use HELIOCENTRIC coordinates to update the internal state, 
+    // otherwise subsequent propagations will be corrupted by geocentric shifts.
+    astdyn::propagation::CartesianElements cart_helio_elem;
+    cart_helio_elem.position = helio_pos;
+    cart_helio_elem.velocity = helio_vel;
+    cart_helio_elem.epoch_mjd_tdb = target_mjd_tdb;
+    cart_helio_elem.gravitational_parameter = astdyn::constants::GMS;
 
-    auto kep_final_updated = astdyn::propagation::cartesian_to_keplerian(cart_final_elem);
+    auto kep_final_updated = astdyn::propagation::cartesian_to_keplerian(cart_helio_elem);
     current_elements_.semi_major_axis = kep_final_updated.semi_major_axis;
     current_elements_.eccentricity = kep_final_updated.eccentricity;
     current_elements_.inclination = kep_final_updated.inclination;
@@ -488,37 +594,14 @@ CartesianStateICRF AstDynWrapper::propagateToEpoch(double target_mjd_tdb) {
     current_elements_.epoch_mjd_tdb = target_mjd_tdb;
     current_epoch_mjd_ = target_mjd_tdb;
 
-    // Converti in ICRF se necessario
-    if (current_frame_ == astdyn::propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC) {
-        auto result = eclipticToICRF(cart_final_elem, target_mjd_tdb);
-        // Ruota anche la covarianza se presente
-        if (cov_final) {
-            // Matrice di rotazione Eclittica -> ICRF (3x3)
-            const double cos_eps = std::cos(OrbitalConversions::OBLIQUITY_J2000);
-            const double sin_eps = std::sin(OrbitalConversions::OBLIQUITY_J2000);
-            Eigen::Matrix3d R;
-            R << 1, 0, 0,
-                 0, cos_eps, -sin_eps,
-                 0, sin_eps, cos_eps;
-            
-            // Matrice di rotazione 6x6 (blocco diagonale)
-            Eigen::Matrix<double, 6, 6> R6;
-            R6.setZero();
-            R6.template block<3, 3>(0, 0) = R;
-            R6.template block<3, 3>(3, 3) = R;
-
-            result.covariance = R6 * (*cov_final) * R6.transpose();
-        }
-        return result;
-    } else {
-        // Già in ICRF
-        CartesianStateICRF result;
-        result.position = pos_final;
-        result.velocity = vel_final;
-        result.epoch_mjd_tdb = target_mjd_tdb;
-        result.covariance = cov_final;
-        return result;
-    }
+    // Restituisce lo stato in ICRF (già calcolato/ruotato nelle sezioni precedenti)
+    CartesianStateICRF result;
+    result.position = pos_final;
+    result.velocity = vel_final;
+    result.epoch_mjd_tdb = target_mjd_tdb;
+    result.covariance = cov_final;
+    
+    return result;
 }
 
 FitResult AstDynWrapper::runFit(const std::string& rwo_filepath, bool verbose) {

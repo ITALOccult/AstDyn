@@ -93,13 +93,17 @@ HighPrecisionPropagator::calculateGeocentricObservation(
     
     if (frame == InputFrame::ECLIPTIC) {
         // Convert input Keplerian (Ecliptic J2000) to Cartesian ICRF (Equatorial)
+        std::cout << "[HPP-DEBUG] Input frame is ECLIPTIC. Performing rotation." << std::endl;
         cart_icrf.position = ecl_to_eq(cart_start.position);
         cart_icrf.velocity = ecl_to_eq(cart_start.velocity);
     } else {
         // Already Equatorial
+        std::cout << "[HPP-DEBUG] Input frame is EQUATORIAL. Skipping rotation." << std::endl;
         cart_icrf.position = cart_start.position;
         cart_icrf.velocity = cart_start.velocity;
     }
+    
+    std::cout << "[HPP-DEBUG] Initial Pos: " << cart_icrf.position.transpose() << std::endl;
 
     double target_mjd = target_jd_tdb - 2400000.5;
 
@@ -159,6 +163,8 @@ HighPrecisionPropagator::calculateGeocentricObservation(
     result.distance_au = dist;
     result.light_time_sec = lt_days * 86400.0;
     result.geocentric_position = r_geo;
+
+    std::cout << "[HPP-DEBUG] Final Pos (Geocentric): " << r_geo.x() << " " << r_geo.y() << " " << r_geo.z() << " (Dist: " << dist << " AU)" << std::endl;
 
     return result;
 }

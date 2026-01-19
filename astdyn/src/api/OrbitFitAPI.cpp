@@ -260,6 +260,11 @@ OrbitFitResult OrbitFitAPI::run_fit(
         result.num_observations = engine_result.num_observations;
         result.num_outliers = engine_result.num_rejected;
         
+        // Populate covariance in the KeplerianElements object
+        if (engine_result.covariance.rows() == 6 && engine_result.covariance.cols() == 6) {
+            result.fitted_orbit.covariance = engine_result.covariance.block<6, 6>(0, 0);
+        }
+        
         // Comparison (Propagate initial orbit to result epoch)
         engine.set_initial_orbit(initial_orbit_equatorial);
         auto initial_at_result_epoch = engine.propagate_to(result.fitted_orbit.epoch_mjd_tdb);

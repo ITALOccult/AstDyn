@@ -37,11 +37,19 @@ std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath)
         line_num++;
         if (line.empty() || line[0] == '#' || line[0] == '!') continue;
         
+        // Skip header lines without noise
+        if (line.find(":") != std::string::npos || line.find("END_OF_HEADER") != std::string::npos) {
+            continue;
+        }
+
         auto obs = parseLine(line);
         if (obs) {
             observations.push_back(*obs);
         } else {
-             std::cerr << "RWOReader Debug: Line " << line_num << " parseLine failed.\n";
+             // Only report failure for lines that look like observations (have 'O' or 'R' in the right place)
+             if (line.length() > 12 && (line[11] == 'O' || line[11] == 'R')) {
+                 std::cerr << "RWOReader Debug: Line " << line_num << " parseLine failed.\n";
+             }
         }
     }
     std::cerr << "RWOReader Debug: Total lines " << line_num << ". Total obs " << observations.size() << "\n";
@@ -50,11 +58,14 @@ std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath)
 }
 
 std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) {
-    if (line.length() < 150) {
-       std::cerr << "RWOReader Debug: Line too short (" << line.length() << " < 150)\n";
-       return std::nullopt;
+    if (line.empty() || line[0] == '!' || line.length() < 150) {
+        return std::nullopt;
     }
-    if (line[0] == '!' || line.find("END_OF_HEADER") != std::string::npos) return std::nullopt;
+
+    // Official RWO observation lines have 'O' at index 11 (optical) or 'R' (radar)
+    if (line[11] != 'O' && line[11] != 'R') {
+        return std::nullopt;
+    }
 
     try {
         OpticalObservation obs;
