@@ -176,7 +176,6 @@ class RKF78Integrator : public Integrator {
 public:
     /**
      * @brief Construct RKF78 integrator
-    /**
      * @param initial_step Initial step size guess
      * @param tolerance Relative error tolerance (default 1e-12)
      * @param min_step Minimum allowed step size (default 1e-6 days, ~0.1 seconds)
