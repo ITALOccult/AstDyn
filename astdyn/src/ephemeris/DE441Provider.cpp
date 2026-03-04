@@ -150,14 +150,20 @@ Eigen::Vector3d DE441Provider::getPosition(CelestialBody body, double jd_tdb) {
         throw std::runtime_error("Native SPK Error: " + std::string(e.what()));
     }
     
-    // Convert km to AU
+    // jpl_pleph / reader restituisce coordinate ECLITTICHE J2000; converti in equatoriali
     using namespace astdyn::constants;
     constexpr double KM_PER_AU = AU;
-    Eigen::Vector3d pos_eq(state[0] / KM_PER_AU,
-                           state[1] / KM_PER_AU,
-                           state[2] / KM_PER_AU);
-                           
-    return pos_eq; // Return Equatorial J2000 directly
+    Eigen::Vector3d pos_ecl(state[0] / KM_PER_AU,
+                            state[1] / KM_PER_AU,
+                            state[2] / KM_PER_AU);
+    // Converti ECLITTICHE -> EQUATORIALI (J2000): rotazione attorno all'asse X di -eps
+    const double eps = 23.439291111 * PI / 180.0;
+    Eigen::Matrix3d R;
+    R << 1.0, 0.0,        0.0,
+         0.0, std::cos(eps), -std::sin(eps),
+         0.0, std::sin(eps),  std::cos(eps);
+    Eigen::Vector3d pos_eq = R * pos_ecl;
+    return pos_eq;
 }
 
 Eigen::Vector3d DE441Provider::getVelocity(CelestialBody body, double jd_tdb) {
@@ -194,12 +200,17 @@ Eigen::Vector3d DE441Provider::getVelocity(CelestialBody body, double jd_tdb) {
 
     using namespace astdyn::constants;
     const double conversion = SECONDS_PER_DAY / AU;
-    
-    Eigen::Vector3d vel_eq(state[3] * conversion,
-                           state[4] * conversion,
-                           state[5] * conversion);
-                           
-    return vel_eq; // Return Equatorial J2000 directly
+    Eigen::Vector3d vel_ecl(state[3] * conversion,
+                            state[4] * conversion,
+                            state[5] * conversion);
+    // Stessa rotazione eclittica -> equatoriale per la velocità
+    const double eps = 23.439291111 * PI / 180.0;
+    Eigen::Matrix3d R;
+    R << 1.0, 0.0,        0.0,
+         0.0, std::cos(eps), -std::sin(eps),
+         0.0, std::sin(eps),  std::cos(eps);
+    Eigen::Vector3d vel_eq = R * vel_ecl;
+    return vel_eq;
 }
 
 } // namespace astdyn::ephemeris
