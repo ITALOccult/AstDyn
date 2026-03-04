@@ -148,11 +148,6 @@ void PlanetaryPeriodicPerturbations::lapco(double a, int np, double excrit,
     c.assign(np + 1, 0.0); c1.assign(np + 1, 0.0); c2.assign(np + 1, 0.0); c3.assign(np + 1, 0.0);
     e.assign(np + 1, 0.0); e1.assign(np + 1, 0.0);
 
-    // Initial coefficients (k=0)
-    std::cout << "[DEBUG-PERT] lapco entry (alpha=" << a << ")" << std::endl;
-
-    // Initial coefficients (k=0)
-    std::cout << "[DEBUG-PERT] lapco entry (alpha=" << a << ")" << std::endl;
     for (int i = 1; i <= 3; ++i) {
         double s = 0.5 + (i - 1);
         double val = 2.0;
@@ -162,13 +157,12 @@ void PlanetaryPeriodicPerturbations::lapco(double a, int np, double excrit,
             double f = (s + cj) / (cj + 1.0);
             aku *= a * a * f * f;
             val += 2.0 * aku;
-            if (2.0 * aku < excrit || ++cj > 1000) break;
+            if (2.0 * aku < excrit || ++cj > 500) break;
         }
         if (i == 1) b[0] = val;
         else if (i == 2) c[0] = val;
         else if (i == 3) e[0] = val;
     }
-    std::cout << "[DEBUG-PERT] Initial Laplace coefficients computed." << std::endl;
 
     auto lap = [&](double s, int j, double alpha, double& v) {
         v = 0; double z_val = 1.0;
@@ -223,12 +217,8 @@ void PlanetaryPeriodicPerturbations::levco(int i, const std::vector<double>& b,
                                            const std::vector<double>& c2, const std::vector<double>& e, 
                                            double a, double pai, std::vector<double>& cl) const {
     cl.assign(381, 0.0);
-    int j = i / 10; // Decoding OrbFit index: j = int(i/10)
-    int type_idx = i % 10; // Optional: 1=b, 2=b1, etc. (Simplified here)
-    if (j < 0) j = std::abs(j); 
-    
-    int j1 = std::abs(j - 1), j2 = std::abs(j + 1);
-    double di = (double)j;
+    int j = std::abs(i), j1 = std::abs(i - 1), j2 = std::abs(i + 1);
+    double di = (double)i;
 
     cl[1] = pai * b[j] / 2.0; cl[2] = pai * (-2.0 * di * di * b[j] + b1[j] + b2[j] / 2.0); cl[3] = cl[2];
     cl[4] = pai * ((-9.0 * di * di + 16.0 * std::pow(di, 4)) * b[j] / 8.0 - di * di * (b1[j] + b2[j]) + b3[j] / 2.0 + b4[j] / 8.0);
@@ -242,15 +232,13 @@ std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
     const KeplerianElements& elements,
     double mjd,
     bool verbose) const {
-    
+
     std::array<double, 6> corrections = {0,0,0,0,0,0};
 
     double e_ast = std::max(1e-8, elements.eccentricity);
     double i_ast = elements.inclination;
     double si = std::sin(i_ast);
     double n_ast = elements.mean_motion();
-    double a_ast = elements.semi_major_axis;
-    if (verbose) std::cout << "[DEBUG-PERT] n_ast=" << n_ast << " a_ast=" << a_ast << " mu=" << elements.gravitational_parameter << std::endl;
 
     double L_ast = normalize(elements.mean_anomaly + elements.argument_perihelion + elements.longitude_ascending_node);
     double g_ast = elements.argument_perihelion;
@@ -265,12 +253,12 @@ std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
     const int np_max = 400;
     const double excrit = 1e-10;
     std::vector<double> b, b1, b2, b3, b4, b5, c, c1, c2, c3, e, e1;
-    std::vector<double> cl; 
+    std::vector<double> cl;
 
     // Loop over perturbing planets (Jupiter=5, Saturn=6, Uranus=7, Neptune=8)
     for (int iplan = 5; iplan <= 8; ++iplan) {
         double a_p = A_PLANET[iplan];
-        
+
         // Skip if not an outer planet (for main belt asteroids)
         if (elements.semi_major_axis >= a_p) continue;
 
@@ -279,7 +267,7 @@ std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
         double n_p = std::sqrt(constants::GMS / (a_p * a_p * a_p));
         // Potential scaling factor GM/a' (energy per unit mass)
         double energy_scale = constants::GMS / a_p;
-        
+
         // Compute Laplace coefficients for this alpha
         lapco(alpha, np_max, excrit, b, b1, b2, b3, b4, b5, c, c1, c2, c3, e, e1);
 
@@ -299,14 +287,14 @@ std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
             double div_val = term.k_p * n_p + term.k_a * n_ast;
             // Avoid resonance singularities (small divisors)
             // For analytical non-resonant theory, we must skip resonant terms
-            if (std::abs(div_val) < 1e-4) continue; 
+            if (std::abs(div_val) < 1e-4) continue;
 
              // Calculate term amplitude factor
             double efac = (term.e_pow == 0) ? 1.0 : std::pow(e_ast, term.e_pow);
             double epfac = (term.ep_pow == 0) ? 1.0 : std::pow(e_p, term.ep_pow);
             double sifac = (term.s_pow == 0) ? 1.0 : std::pow(si, term.s_pow);
             double sipfac = (term.sp_pow == 0) ? 1.0 : std::pow(si_p, term.sp_pow);
-            
+
             // Factor from term integer coeff and divisor
             // Note: mul is the INDEX into cl array. div is the DIVISOR.
             // cl[term.mul] is the Leverrier coefficient.
@@ -314,17 +302,18 @@ std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
             // energy_scale provides physical units (L^2/T^2).
             double coeff_val = cl[term.mul];
             double term_amp = (1.0 / (double)term.div) * efac * epfac * sifac * sipfac * coeff_val * MASS_PLANET[iplan] * energy_scale;
-            
+
             // Argument of the term
-            double arg = term.k_p * l_p + term.k_a * L_ast + 
-                         term.m1 * elements.mean_anomaly + 
-                         term.m2 * g_ast + 
+            double arg = term.k_p * l_p + term.k_a * L_ast +
+                         term.m1 * elements.mean_anomaly +
+                         term.m2 * g_ast +
                          term.m3 * h_ast;
 
             // Semi-major axis correction: Delta a = (2 * k_a / (n_a^2 * a_a)) * R_term / (freq) * cos(arg)
-            // Note: R_term already contains factor GM/a_p. 
-            // In Delaunay vars: da/dt = 2/na * dR/dM. 
+            // Note: R_term already contains factor GM/a_p.
+            // In Delaunay vars: da/dt = 2/na * dR/dM.
             // Delta a = 2/(n*a) * sum (ka * R_k / div_val * cos(arg))
+            double a_ast = elements.semi_major_axis;
             if (term.k_a != 0) {
                  if (std::abs(n_ast * a_ast) < 1e-12) continue;
                  double pre_factor = (2.0 / (n_ast * a_ast));
@@ -336,10 +325,9 @@ std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
             }
         }
     }
-    
+
     // Assign to delta_a
     corrections[0] = dd5;
     return corrections;
-}
 
 } // namespace astdyn::propagation

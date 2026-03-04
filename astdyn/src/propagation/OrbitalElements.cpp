@@ -432,7 +432,6 @@ KeplerianElements mean_to_osculating(
     
     // 2. Apply Milani-Knezevic planetary periodic perturbations
     // Only applied for main belt asteroids (1.8 AU < a < 4.0 AU) to avoid validation errors for Earth/Mars
-    
     if (mean_elements.semi_major_axis > 1.8 && mean_elements.semi_major_axis < 4.0) {
         PlanetaryPeriodicPerturbations mk_theory;
         if (mean_elements.gravitational_parameter < 1e-10) {
@@ -442,11 +441,11 @@ KeplerianElements mean_to_osculating(
         auto corrections = mk_theory.calculateCorrections(mean_elements, mean_elements.epoch_mjd_tdb, false);
 
         // Apply semi-major axis correction Delta a (index 0)
-        osc.semi_major_axis += corrections[0]; 
-        
-        // Note: The other element corrections (e, i, Omega, omega, M) are currently 
-        // placeholders in calculateCorrections and return 0. 
-        // If we implement them in PlanetaryPeriodicPerturbations.cpp, 
+        osc.semi_major_axis += corrections[0];
+
+        // Note: The other element corrections (e, i, Omega, omega, M) are currently
+        // placeholders in calculateCorrections and return 0.
+        // If we implement them in PlanetaryPeriodicPerturbations.cpp,
         // we should apply them here.
     }
     

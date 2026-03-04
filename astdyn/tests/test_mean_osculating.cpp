@@ -96,17 +96,16 @@ TEST_F(MeanOsculatingTest, PlanetaryPeriodicPerturbations) {
     
     // Check that delta_a is non-zero and reasonable
     double delta_a = std::abs(osc.semi_major_axis - sierks.semi_major_axis);
-    
+
     // Milani-Knezevic theory should return a small but significant correction
-    EXPECT_GT(delta_a, 1e-12); 
+    EXPECT_GT(delta_a, 1e-12);
     // Calibrated magnitude should be around 1e-4 AU
-    EXPECT_LT(delta_a, 2e-4); 
-    
+    EXPECT_LT(delta_a, 2e-4);
+
     // Round trip should work with the iterative inverse conversion
     auto mean_recovered = osculating_to_mean(osc, 0.0);
     // Expect reasonable recovery precision (limited by first-order inversion approx)
-    EXPECT_NEAR(mean_recovered.semi_major_axis, sierks.semi_major_axis, 2e-4); 
-}
+    EXPECT_NEAR(mean_recovered.semi_major_axis, sierks.semi_major_axis, 2e-4);
 
 TEST_F(MeanOsculatingTest, MarsOrbitConversion) {
     // Test with Mars orbit
