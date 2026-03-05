@@ -35,6 +35,14 @@ struct Degree {
     explicit constexpr Degree(const double v) : value(v) {}
 };
 
+/**
+ * @brief Strong type for MilliArcSecond.
+ */
+struct MilliArcSecond {
+    const double value;
+    explicit constexpr MilliArcSecond(const double v) : value(v) {}
+};
+
 } // namespace astdyn::core
 
 #endif // ASTDYN_CORE_UNITS_HPP

@@ -13,6 +13,7 @@ file(GLOB_RECURSE ASTDYN_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/orbit_determination/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/close_approach/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/api/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/astrometry/*.cpp
 )
 
 # Add AstDynEngine to the library
