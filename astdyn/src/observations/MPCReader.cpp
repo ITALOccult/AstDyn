@@ -18,16 +18,10 @@ namespace observations {
 
 using namespace astdyn::utils;
 
-std::vector<OpticalObservation> MPCReader::readFile(const std::string& filepath) {
+std::vector<OpticalObservation> MPCReader::readStream(std::istream& stream) {
     std::vector<OpticalObservation> observations;
-    std::ifstream file(filepath);
-    
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file: " + filepath);
-    }
-    
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         if (line.empty() || line[0] == '#') continue;
         
         auto obs = parseLine(line);
@@ -37,6 +31,16 @@ std::vector<OpticalObservation> MPCReader::readFile(const std::string& filepath)
     }
     
     return observations;
+}
+
+std::vector<OpticalObservation> MPCReader::readFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file: " + filepath);
+    }
+    
+    return readStream(file);
 }
 
 std::optional<OpticalObservation> MPCReader::parseLine(const std::string& line) {

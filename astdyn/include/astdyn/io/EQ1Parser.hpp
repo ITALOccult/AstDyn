@@ -33,27 +33,20 @@ public:
     };
 
     /**
-     * @brief Parse .eq1 file
+     * @brief Parse equinoctial elements from an input stream
      * 
-     * Supports OEF2.0 format from AstDyS/OrbFit.
-     * 
-     * @param filepath Path to .eq1 file
+     * @param stream Input stream containing .eq1 content
      * @return Equinoctial elements
-     * @throws std::runtime_error if file cannot be parsed
+     * @throws std::runtime_error if parsing fails
      */
-    static EquinoctialElements parse(const std::string& filepath) {
-        std::ifstream file(filepath);
-        if (!file.is_open()) {
-            throw std::runtime_error("Cannot open file: " + filepath);
-        }
-
+    static EquinoctialElements parse_stream(std::istream& stream) {
         EquinoctialElements elem;
         std::string line;
         bool found_object = false;
         bool found_equ = false;
         bool found_mjd = false;
 
-        while (std::getline(file, line)) {
+        while (std::getline(stream, line)) {
             // Skip empty lines and comments
             if (line.empty() || line[0] == '!') continue;
 
@@ -112,16 +105,33 @@ public:
 
         // Validate
         if (!found_object) {
-            throw std::runtime_error("No object name found in .eq1 file");
+            throw std::runtime_error("No object name found in stream");
         }
         if (!found_equ) {
-            throw std::runtime_error("No EQU line found in .eq1 file");
+            throw std::runtime_error("No EQU line found in stream");
         }
         if (!found_mjd) {
-            throw std::runtime_error("No MJD line found in .eq1 file");
+            throw std::runtime_error("No MJD line found in stream");
         }
 
         return elem;
+    }
+
+    /**
+     * @brief Parse .eq1 file
+     * 
+     * Supports OEF2.0 format from AstDyS/OrbFit.
+     * 
+     * @param filepath Path to .eq1 file
+     * @return Equinoctial elements
+     * @throws std::runtime_error if file cannot be parsed
+     */
+    static EquinoctialElements parse(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file: " + filepath);
+        }
+        return parse_stream(file);
     }
 
     /**

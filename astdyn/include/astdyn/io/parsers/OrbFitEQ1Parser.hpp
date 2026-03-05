@@ -19,18 +19,13 @@ namespace parsers {
  */
 class OrbFitEQ1Parser : public IOrbitParser {
 public:
-    OrbitalElements parse(const std::string& filepath) override {
-        std::ifstream file(filepath);
-        if (!file.is_open()) {
-            throw std::runtime_error("Cannot open file: " + filepath);
-        }
-
+    OrbitalElements parse_stream(std::istream& stream) override {
         EquinoctialElements eq_elem;
         bool found_equ = false;
         bool found_mjd = false;
 
         std::string line;
-        while (std::getline(file, line)) {
+        while (std::getline(stream, line)) {
             // Handle leading spaces in OEF2.0 format
             if (line.find("EQU") == 0 || line.find(" EQU") == 0) {
                 size_t start = line.find("EQU") + 3;
@@ -64,11 +59,19 @@ public:
         }
 
         if (!found_equ || !found_mjd) {
-            throw std::runtime_error("Invalid .eq1 file: missing EQU or MJD data");
+            throw std::runtime_error("Invalid stream data: missing EQU or MJD data");
         }
 
         // Convert equinoctial to Keplerian
         return equinoctial_to_keplerian(eq_elem);
+    }
+
+    OrbitalElements parse(const std::string& filepath) override {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file: " + filepath);
+        }
+        return parse_stream(file);
     }
 
     std::string name() const override {

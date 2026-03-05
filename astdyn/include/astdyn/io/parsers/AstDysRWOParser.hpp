@@ -28,17 +28,12 @@ namespace parsers {
 
 class AstDysRWOParser : public IObservationParser {
 public:
-    std::vector<OpticalObservation> parse(const std::string& filepath, size_t max_count = 0) override {
-        std::ifstream file(filepath);
-        if (!file.is_open()) {
-            throw std::runtime_error("Cannot open file: " + filepath);
-        }
-
+    std::vector<OpticalObservation> parse_stream(std::istream& stream, size_t max_count = 0) override {
         std::vector<OpticalObservation> observations;
         std::string line;
         size_t count = 0;
 
-        while (std::getline(file, line)) {
+        while (std::getline(stream, line)) {
             // Skip header
             if (line.empty() || line[0] == '!' || line[0] == '#' || 
                 line.find("END_OF_HEADER") != std::string::npos ||
@@ -120,10 +115,18 @@ public:
         }
 
         if (observations.empty()) {
-            throw std::runtime_error("No observations found in file: " + filepath);
+            throw std::runtime_error("No observations found in stream");
         }
 
         return observations;
+    }
+
+    std::vector<OpticalObservation> parse(const std::string& filepath, size_t max_count = 0) override {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file: " + filepath);
+        }
+        return parse_stream(file, max_count);
     }
 
     std::string name() const override {

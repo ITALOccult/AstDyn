@@ -20,20 +20,11 @@ namespace observations {
 
 using namespace utils;
 
-std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath) {
-    // RWO format is OrbFit's proprietary format, NOT standard MPC!
-    // We must parse it directly using the format specification from OrbFit
-    
+std::vector<OpticalObservation> RWOReader::readStream(std::istream& stream) {
     std::vector<OpticalObservation> observations;
-    std::ifstream file(filepath);
-    
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file: " + filepath);
-    }
-    
     std::string line;
     int line_num = 0;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         line_num++;
         if (line.empty() || line[0] == '#' || line[0] == '!') continue;
         
@@ -55,6 +46,19 @@ std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath)
     std::cerr << "RWOReader Debug: Total lines " << line_num << ". Total obs " << observations.size() << "\n";
     
     return observations;
+}
+
+std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath) {
+    // RWO format is OrbFit's proprietary format, NOT standard MPC!
+    // We must parse it directly using the format specification from OrbFit
+    
+    std::ifstream file(filepath);
+    
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file: " + filepath);
+    }
+    
+    return readStream(file);
 }
 
 std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) {

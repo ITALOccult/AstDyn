@@ -43,6 +43,13 @@ public:
     static std::vector<OpticalObservation> readFile(const std::string& filepath);
     
     /**
+     * @brief Read observations from a generic stream
+     * @param stream Input stream
+     * @return Vector of optical observations
+     */
+    static std::vector<OpticalObservation> readStream(std::istream& stream);
+    
+    /**
      * @brief Parse single line from .rwo file
      * @param line Line text
      * @return Observation if successfully parsed

@@ -51,6 +51,13 @@ public:
     static std::vector<OpticalObservation> readFile(const std::string& filepath);
     
     /**
+     * @brief Read observations from a generic stream in MPC format
+     * @param stream Input stream
+     * @return Vector of observations
+     */
+    static std::vector<OpticalObservation> readStream(std::istream& stream);
+    
+    /**
      * @brief Parse a single MPC observation line
      * @param line 80-column MPC observation line
      * @return OpticalObservation, or nullopt if parsing fails

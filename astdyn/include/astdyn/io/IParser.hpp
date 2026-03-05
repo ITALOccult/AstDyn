@@ -49,6 +49,15 @@ public:
     virtual OrbitalElements parse(const std::string& filepath) = 0;
 
     /**
+     * @brief Parse orbital elements from a generic stream
+     * 
+     * @param stream Input stream
+     * @return Parsed orbital elements
+     * @throws std::runtime_error if parsing fails
+     */
+    virtual OrbitalElements parse_stream(std::istream& stream) = 0;
+
+    /**
      * @brief Get parser name/description
      */
     virtual std::string name() const = 0;
@@ -92,6 +101,18 @@ public:
      */
     virtual std::vector<OpticalObservation> parse(
         const std::string& filepath, 
+        size_t max_count = 0) = 0;
+
+    /**
+     * @brief Parse observations from stream
+     * 
+     * @param stream Input stream
+     * @param max_count Maximum observations to read (0 = all)
+     * @return Vector of observations
+     * @throws std::runtime_error if parsing fails
+     */
+    virtual std::vector<OpticalObservation> parse_stream(
+        std::istream& stream, 
         size_t max_count = 0) = 0;
 
     /**
