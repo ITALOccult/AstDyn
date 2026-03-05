@@ -477,7 +477,7 @@ gtest_discover_tests(astdyn_propagation_tests)
 # )# ============================================================================
 # Rigorous Validation Tests (Strong Types & Transformations)
 # ============================================================================
-
+# Rigorous validation suite for Phase 6 elements
 add_executable(astdyn_rigorous_validation
     test_rigorous_validation.cpp
 )
@@ -491,3 +491,12 @@ target_link_libraries(astdyn_rigorous_validation
 
 gtest_discover_tests(astdyn_rigorous_validation)
 
+# Benchmark 79450 tool
+add_executable(benchmark_79450
+    benchmark_79450.cpp
+)
+
+target_link_libraries(benchmark_79450
+    PRIVATE
+        astdyn
+)

@@ -10,6 +10,9 @@
 
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
+#include "src/types/orbital_state.hpp"
 #include <string>
 #include <optional>
 
@@ -20,24 +23,25 @@ namespace api {
  * @brief Result structure for OrbitFitAPI
  */
 struct OrbitFitResult {
-    bool success;
+    bool success = false;
     std::string message;
     
-    // Fitted Orbit (Equatorial J2000)
-    propagation::KeplerianElements fitted_orbit;
+    // Fitted Orbit (GCRF / Equatorial J2000)
+    std::optional<types::OrbitalState<core::GCRF, types::KeplerianTag>> fitted_state;
     
     // Statistics
-    double rms_ra;        // [arcsec]
-    double rms_dec;       // [arcsec]
-    int iterations;
-    int num_observations;
-    int num_outliers;
-    bool converged;
+    core::MilliArcSecond rms_ra = core::MilliArcSecond(0.0);
+    core::MilliArcSecond rms_dec = core::MilliArcSecond(0.0);
+    int iterations = 0;
+    int num_observations = 0;
+    int num_outliers = 0;
+    bool converged = false;
     
-    // Comparison with initial orbit (if provided)
-    double delta_a_km;    // [km]
-    double delta_e;       // dimensionless
-    double delta_i_arcsec;// [arcsec]
+    // Comparison metrics
+    double delta_a_km = 0.0;
+    double delta_e = 0.0;
+
+    OrbitFitResult() = default;
 };
 
 /**
@@ -78,16 +82,9 @@ public:
     
     /**
      * @brief Convert Mean Equinoctial elements (Ecliptic) to Osculating Keplerian (Equatorial)
-     * 
-     * Applies the necessary frame transformations (Ecliptic -> Equatorial J2000)
-     * to prepare elements for numerical propagation.
-     * 
-     * @param mean_equ Input elements (from .eq1)
-     * @return Osculating Keplerian Elements (Equatorial J2000)
      */
-    static propagation::KeplerianElements convert_mean_equinoctial_to_osculating(
-        const propagation::EquinoctialElements& mean_equ
-    );
+    static types::OrbitalState<core::GCRF, types::KeplerianTag> 
+    prepare_initial_state(const propagation::EquinoctialElements& mean_equ);
 
 private:
      // Helper to trim strings

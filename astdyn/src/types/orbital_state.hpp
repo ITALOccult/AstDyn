@@ -59,7 +59,7 @@ public:
     [[nodiscard]] constexpr const StateData& raw_values() const noexcept { return values_; }
 
 private:
-    const StateData values_;
+    StateData values_;
 };
 
 } // namespace astdyn::types

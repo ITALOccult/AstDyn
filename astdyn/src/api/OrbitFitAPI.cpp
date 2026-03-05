@@ -10,6 +10,9 @@
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/types/orbital_state.hpp"
+#include "src/coordinates/state_conversions.hpp"
 #include <fstream>
 #include <sstream>
 #include <cmath>
@@ -69,42 +72,38 @@ propagation::EquinoctialElements OrbitFitAPI::parse_eq1(const std::string& filep
     return equ;
 }
 
-propagation::KeplerianElements OrbitFitAPI::convert_mean_equinoctial_to_osculating(
-    const propagation::EquinoctialElements& mean_equ
-) {
-    // 1. Convert Equinoctial to Keplerian (Ecliptic)
-    // Note: Assuming input is "mean" in the sense of averaged elements, but we treat them
-    // geometrically for frame transformation.
-    auto keplerian_ecliptic = propagation::equinoctial_to_keplerian(mean_equ);
+types::OrbitalState<core::GCRF, types::KeplerianTag> 
+OrbitFitAPI::prepare_initial_state(const propagation::EquinoctialElements& mean_equ) {
+    // 1. Convert Equinoctial (Mean, Ecliptic) to Keplerian (Mean, Ecliptic)
+    auto kep_ecl = propagation::equinoctial_to_keplerian(mean_equ);
     
-    // 2. To Cartesian (Ecliptic J2000)
-    auto cart_ecliptic = propagation::keplerian_to_cartesian(keplerian_ecliptic);
+    // 2. Convert to Cartesian (Ecliptic) for rotation
+    auto cart_ecl = propagation::keplerian_to_cartesian(kep_ecl);
     
-    // 3. Transform Frame: Ecliptic J2000 -> Equatorial J2000 (ICRF)
-    coordinates::CartesianState state_ecliptic(
-        cart_ecliptic.position.to_eigen(),
-        cart_ecliptic.velocity.to_eigen(),
-        cart_ecliptic.gravitational_parameter
-    );
+    // 3. Rotate Cartesian: Ecliptic -> Equatorial (GCRF)
+    auto mat = coordinates::ReferenceFrame::ecliptic_to_j2000();
+    auto final_pos = mat * cart_ecl.position.to_eigen();
+    auto final_vel = mat * cart_ecl.velocity.to_eigen();
     
-    auto state_equatorial = coordinates::ReferenceFrame::transform_state(
-        state_ecliptic,
-        coordinates::FrameType::ECLIPTIC,
-        coordinates::FrameType::J2000
-    );
+    // 4. Create a legacy Cartesian state in Equatorial frame to use existing conversion logic
+    propagation::CartesianElements cart_eq;
+    cart_eq.epoch = mean_equ.epoch;
+    cart_eq.position = types::Vector3<core::GCRF, core::Meter>(final_pos);
+    cart_eq.velocity = types::Vector3<core::GCRF, core::Meter>(final_vel);
+    cart_eq.gravitational_parameter = kep_ecl.gravitational_parameter;
     
-    // 4. Convert back to Keplerian (Equatorial / Osculating)
-    propagation::CartesianElements cart_equatorial;
-    cart_equatorial.epoch = cart_ecliptic.epoch;
-    cart_equatorial.position = types::Vector3<core::GCRF, core::Meter>(state_equatorial.position());
-    cart_equatorial.velocity = types::Vector3<core::GCRF, core::Meter>(state_equatorial.velocity());
-    cart_equatorial.gravitational_parameter = state_equatorial.mu();
+    // 5. Convert back to Keplerian (Equatorial / GCRF)
+    auto kep_eq = propagation::cartesian_to_keplerian(cart_eq);
     
-    return propagation::cartesian_to_keplerian(cart_equatorial);
-}
-
-static Eigen::Vector3d ecl_to_eq_std(const Eigen::Vector3d& ecl) {
-    return coordinates::ReferenceFrame::ecliptic_to_j2000() * ecl;
+    // 6. Return typed GCRF OrbitalState
+    return types::OrbitalState<core::GCRF, types::KeplerianTag>(std::array<double, 6>{
+        kep_eq.semi_major_axis,
+        kep_eq.eccentricity,
+        kep_eq.inclination,
+        kep_eq.longitude_ascending_node,
+        kep_eq.argument_perihelion,
+        kep_eq.mean_anomaly
+    });
 }
 
 OrbitFitResult OrbitFitAPI::run_fit(
@@ -118,157 +117,69 @@ OrbitFitResult OrbitFitAPI::run_fit(
     result.success = false;
 
     try {
-        if (verbose) std::cout << "[OrbitFitAPI] Loading OrbFit elements from " << eq1_file << "...\n";
-        
-        // 1. Parse Initial Orbit
+        if (verbose) std::cout << "[OrbitFitAPI] Loading elements from " << eq1_file << "...\n";
         auto equ = parse_eq1(eq1_file);
-        auto orbfit_orbit_ecliptic = propagation::equinoctial_to_keplerian(equ);
+        auto initial_state = OrbitFitAPI::prepare_initial_state(equ);
 
-        // 2. Transform Frame: Ecliptic J2000 -> Equatorial J2000
-        auto cart_ecliptic_elem = propagation::keplerian_to_cartesian(orbfit_orbit_ecliptic);
-
-        // Detect Reference Frame from EQ1 file
-        bool is_equatorial = false;
-        {
-            std::ifstream f(eq1_file);
-            std::string l;
-            while(std::getline(f, l)) {
-                if (l.find("refsys") != std::string::npos) {
-                    if (l.find("EQU") != std::string::npos || l.find("ICRS") != std::string::npos || l.find("ICRF") != std::string::npos) {
-                        is_equatorial = true;
-                    }
-                    break;
-                }
-                if (l.find("END_OF_HEADER") != std::string::npos) break;
-            }
-        }
-
-
-
-        propagation::CartesianElements cart_equatorial_elem;
-        cart_equatorial_elem.epoch = cart_ecliptic_elem.epoch;
-        cart_equatorial_elem.gravitational_parameter = cart_ecliptic_elem.gravitational_parameter;
-
-        if (is_equatorial) {
-            if (verbose) std::cout << "   Detecting EQUATORIAL frame in .eq1, skipping rotation.\n";
-            cart_equatorial_elem.position = cart_ecliptic_elem.position;
-            cart_equatorial_elem.velocity = cart_ecliptic_elem.velocity;
-        } else {
-            if (verbose) std::cout << "   Detecting ECLIPTIC frame in .eq1, applying rotation to Equatorial J2000.\n";
-            cart_equatorial_elem.position = types::Vector3<core::GCRF, core::Meter>(coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.position.to_eigen());
-            cart_equatorial_elem.velocity = types::Vector3<core::GCRF, core::Meter>(coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.velocity.to_eigen());
-        }
-        
-        auto initial_orbit_equatorial = propagation::cartesian_to_keplerian(cart_equatorial_elem);
-        
-        if (verbose) {
-            std::cout << "   Initial Orbit (Ecliptic): a=" << orbfit_orbit_ecliptic.semi_major_axis 
-                      << " e=" << orbfit_orbit_ecliptic.eccentricity 
-                      << " i=" << orbfit_orbit_ecliptic.inclination * constants::RAD_TO_DEG << "deg\n";
-            std::cout << "   Initial Orbit (Transformed Equatorial): i=" 
-                      << initial_orbit_equatorial.inclination * constants::RAD_TO_DEG << "deg\n";
-        }
-
-        // 3. Load Observations
-        if (verbose) std::cout << "[OrbitFitAPI] Loading observations from " << rwo_file << "...\n";
         auto obs_list = observations::RWOReader::readFile(rwo_file);
         if (verbose) std::cout << "   Loaded " << obs_list.size() << " observations\n";
 
-        // 4. Setup Engine
         AstDynEngine engine;
-        
-        if (!config_file.empty()) {
-             std::ifstream cfg_check(config_file);
-             if (cfg_check.good()) {
-                 if (verbose) std::cout << "   Loading configuration from " << config_file << "...\n";
-                 engine.load_config(config_file);
-             } else {
-                 if (verbose) std::cout << "   Warning: Config file " << config_file << " not found. Using defaults + planetary perturbations.\n";
-             }
-        }
-        
         if (!de441_path.empty()) {
-            if (verbose) std::cout << "   Overriding DE441 path: " << de441_path << "\n";
             AstDynConfig cfg = engine.config();
             cfg.ephemeris_type = "DE441";
             cfg.ephemeris_file = de441_path;
             engine.set_config(cfg);
         }
         
-        // Ensure robust configuration if loaded one is minimal/missing
-        AstDynConfig config = engine.config();
-        
-        // Force Planetary Perturbations (Sun+Planets)
+        // CTFYH: Ensure planetary perturbations are enabled by default for precision
+        auto config = engine.config();
         config.propagator_settings.include_planets = true;
-        config.propagator_settings.perturb_mercury = true;
-        config.propagator_settings.perturb_venus = true;
-        config.propagator_settings.perturb_earth = true;
-        config.propagator_settings.perturb_mars = true;
-        config.propagator_settings.perturb_jupiter = true;
-        config.propagator_settings.perturb_saturn = true;
-        config.propagator_settings.perturb_uranus = true;
-        config.propagator_settings.perturb_neptune = true;
-        
-        // Force Asteroid Perturbations (AST17 model) - DISABLED for stability defaults
-        // This is critical for high precision over long arcs
-        // config.propagator_settings.include_asteroids = true;
-        
-        // Force RKF78 for speed/accuracy balance
         config.integrator_type = "RKF78";
-        config.initial_step_size = 0.5; // days
-        config.tolerance = 1e-12;
-        
         config.verbose = verbose;
         engine.set_config(config);
+
+        for (const auto& obs : obs_list) engine.add_observation(obs);
+
+        // Convert OrbitalState to legacy KeplerianElements for current engine compatibility
+        propagation::KeplerianElements legacy_init;
+        legacy_init.semi_major_axis = initial_state.a();
+        legacy_init.eccentricity = initial_state.e();
+        legacy_init.inclination = initial_state.i();
+        legacy_init.longitude_ascending_node = initial_state.raan();
+        legacy_init.argument_perihelion = initial_state.arg_peri();
+        legacy_init.mean_anomaly = initial_state.m_anomaly();
+        legacy_init.epoch = equ.epoch;
         
-        engine.clear_observations();
-        for (const auto& obs : obs_list) {
-            engine.add_observation(obs);
-        }
-        
-        // 5. Propagate to Meaningful Epoch (Mean observation time)
-        // Helps convergence if the initial epoch is far from observations
-        double sum_mjd = 0.0;
-        for (const auto& obs : obs_list) sum_mjd += obs.time.mjd.value;
-        double mean_epoch = obs_list.empty() ? initial_orbit_equatorial.epoch.mjd.value : (sum_mjd / obs_list.size());
-        
-        engine.set_initial_orbit(initial_orbit_equatorial);
-        auto start_orbit = engine.propagate_to(mean_epoch);
-        engine.set_initial_orbit(start_orbit);
-        
-        // 6. Run Fit
-        if (verbose) std::cout << "[OrbitFitAPI] Running differential correction...\n";
+        engine.set_initial_orbit(legacy_init);
         auto engine_result = engine.fit_orbit();
         
-        // 7. Populate Result
         result.success = true;
-        result.message = "Fit completed";
         result.converged = engine_result.converged;
-        result.fitted_orbit = engine_result.orbit;
-        result.rms_ra = engine_result.rms_ra;
-        result.rms_dec = engine_result.rms_dec;
-        result.iterations = engine_result.num_iterations;
+        
+        // Pack into OrbitalState Result
+        result.fitted_state = types::OrbitalState<core::GCRF, types::KeplerianTag>(std::array<double, 6>{
+            engine_result.orbit.semi_major_axis,
+            engine_result.orbit.eccentricity,
+            engine_result.orbit.inclination,
+            engine_result.orbit.longitude_ascending_node,
+            engine_result.orbit.argument_perihelion,
+            engine_result.orbit.mean_anomaly
+        });
+        
+        result.rms_ra = core::MilliArcSecond(engine_result.rms_ra * 1000.0);
+        result.rms_dec = core::MilliArcSecond(engine_result.rms_dec * 1000.0);
         result.num_observations = engine_result.num_observations;
-        result.num_outliers = engine_result.num_rejected;
-        
-        // Populate covariance in the KeplerianElements object
-        if (engine_result.covariance.rows() == 6 && engine_result.covariance.cols() == 6) {
-            result.fitted_orbit.covariance = engine_result.covariance.block<6, 6>(0, 0);
-        }
-        
-        // Comparison (Propagate initial orbit to result epoch)
-        engine.set_initial_orbit(initial_orbit_equatorial);
-        auto initial_at_result_epoch = engine.propagate_to(result.fitted_orbit.epoch.mjd.value);
-        
-        result.delta_a_km = (result.fitted_orbit.semi_major_axis - initial_at_result_epoch.semi_major_axis) * constants::AU;
-        result.delta_e = result.fitted_orbit.eccentricity - initial_at_result_epoch.eccentricity;
-        result.delta_i_arcsec = (result.fitted_orbit.inclination - initial_at_result_epoch.inclination) * constants::RAD_TO_ARCSEC;
+        result.iterations = engine_result.num_iterations;
+
+        // Comparison against initial guess
+        result.delta_a_km = std::abs(engine_result.orbit.semi_major_axis - initial_state.a()) * constants::AU;
+        result.delta_e = std::abs(engine_result.orbit.eccentricity - initial_state.e());
 
     } catch (const std::exception& e) {
         result.success = false;
         result.message = e.what();
     }
-
     return result;
 }
 

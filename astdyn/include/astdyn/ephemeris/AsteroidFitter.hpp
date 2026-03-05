@@ -118,8 +118,8 @@ public:
         result.fitted_orbit.mean_anomaly = orbit.M;
         result.rms_ra = 0.0;
         result.rms_dec = 0.0;
-        result.num_observations = static_cast<int>(mjd_observations.size());
-        result.fitted_positions.reserve(mjd_observations.size());
+        result.num_observations = static_cast<int>(t_observations.size());
+        result.fitted_positions.reserve(t_observations.size());
         // Build PositionCalculator element struct
         KeplerianElements calc_elem;
         calc_elem.a = orbit.a;
@@ -128,7 +128,7 @@ public:
         calc_elem.Omega = orbit.Omega;
         calc_elem.omega = orbit.omega;
         calc_elem.M = orbit.M;
-        calc_elem.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(orbit.epoch_mjd_tdb));
+        calc_elem.epoch = orbit.epoch;
         
         for (const auto& t : t_observations) {
             auto pos = PositionCalculator::computePosition(
@@ -292,10 +292,8 @@ public:
                 engine.set_initial_orbit(result.fitted_orbit); 
                 
                 for (const auto& target_t : cfg.t_observations) {
-                     // Propagate to target time
-                     auto state_at_target = engine.propagate_to(target_t);
-                     
-                     // Convert to PositionCalculator format
+                     auto state_at_target = engine.propagate_to(target_t.mjd.value);
+                     Eigen::Vector3d target_pos;                    // Convert to PositionCalculator format
                      KeplerianElements calc_elem;
                      calc_elem.a = state_at_target.semi_major_axis;
                      calc_elem.e = state_at_target.eccentricity;
@@ -381,7 +379,7 @@ public:
              kep_ecl.longitude_ascending_node = cfg.orbit.Omega;
              kep_ecl.argument_perihelion = cfg.orbit.omega;
              kep_ecl.mean_anomaly = cfg.orbit.M;
-             kep_ecl.epoch_mjd_tdb = cfg.orbit.epoch_mjd_tdb;
+             kep_ecl.epoch = cfg.orbit.epoch;
              kep_ecl.gravitational_parameter = constants::GMS;
              
              // 2. Transform to Equatorial J2000
@@ -401,7 +399,7 @@ public:
              
              // 3. Propagate
              for (const auto& target_t : cfg.t_observations) {
-                 auto state_at_target = engine.propagate_to(target_t);
+                 auto state_at_target = engine.propagate_to(target_t.mjd.value);
                  
                  KeplerianElements calc_elem;
                  calc_elem.a = state_at_target.semi_major_axis;

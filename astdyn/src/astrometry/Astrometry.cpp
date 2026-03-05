@@ -50,34 +50,23 @@ Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     const utils::Instant& t_obs,
     const Eigen::Vector3d& earth_pos,
     const AstDynConfig& cfg) {
-    
-    AstDynEngine engine;
-    engine.set_config(cfg);
-    auto kep = state_to_kep(initial, t_obs);
-    engine.set_initial_orbit(kep);
-    double tau_days = 0.0;
-    Eigen::Vector3d ast_p;
+    AstDynEngine engine(cfg);
+    engine.set_initial_orbit(state_to_kep(initial, t_obs));
+    double tau_days = 0.0; Eigen::Vector3d ast_p;
     for (int i = 0; i < 3; ++i) {
-        auto elements = engine.propagate_to(t_obs.mjd.value - tau_days);
-        auto cart = propagation::keplerian_to_cartesian(elements);
-        ast_p = cart.position.to_eigen(); // Meter, GCRF
+        auto el = engine.propagate_to(t_obs.mjd.value - tau_days);
+        ast_p = propagation::keplerian_to_cartesian(el).position.to_eigen(); 
         tau_days = (ast_p - earth_pos).norm() / (C_LIGHT * 1000.0 * 86400.0);
     }
     return ast_p;
 }
 
 Eigen::Vector3d AstrometryReducer::apply_stellar_aberration(
-    const Eigen::Vector3d& rho,
-    const Eigen::Vector3d& earth_vel) {
-    
+    const Eigen::Vector3d& rho, const Eigen::Vector3d& earth_vel) {
     double r = rho.norm();
-    Eigen::Vector3d u = rho / r;
-    Eigen::Vector3d v_c = earth_vel / (C_LIGHT * 1000.0);
-    // Lorenz-invariant aberration (High-precision reduction)
-    double dot_uv = u.dot(v_c);
-    double beta = std::sqrt(1.0 - v_c.squaredNorm());
-    Eigen::Vector3d result = (beta * u + (1.0 + dot_uv / (1.0 + beta)) * v_c) / (1.0 + dot_uv);
-    return result * r;
+    Eigen::Vector3d u = rho / r, v_c = earth_vel / (C_LIGHT * 1000.0);
+    double d_uv = u.dot(v_c), b = std::sqrt(1.0 - v_c.squaredNorm());
+    return ((b * u + (1.0 + d_uv / (1.0 + b)) * v_c) / (1.0 + d_uv)) * r;
 }
 
 Eigen::Vector3d AstrometryReducer::convert_frame_if_needed(

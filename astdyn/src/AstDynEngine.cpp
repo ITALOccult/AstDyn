@@ -11,9 +11,11 @@
 #include "astdyn/observations/MPCReader.hpp"
 #include "astdyn/coordinates/KeplerianElements.hpp"
 #include "astdyn/time/TimeScale.hpp"
-#include "astdyn/time/TimeScale.hpp"
 #include "astdyn/io/AstDynConfig.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
+#include "astdyn/propagation/GaussIntegrator.hpp"
+#include "astdyn/propagation/RadauIntegrator.hpp"
+#include "astdyn/propagation/saba4_integrator.hpp"
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <iomanip>
@@ -63,6 +65,20 @@ void AstDynEngine::update_propagator() {
     } else if (config_.integrator_type == "RK4") {
         integrator = std::make_unique<RK4Integrator>(
             config_.initial_step_size);
+    } else if (config_.integrator_type == "SABA4") {
+        // Force minimum step to 0.5 for SABA4 to ensure symplectic speed-up (prevent 7s stall on 0.2s steps)
+        double saba_step = std::max(0.5, config_.initial_step_size);
+        integrator = std::make_unique<SABA4Integrator>(
+            saba_step,
+            config_.tolerance);
+    } else if (config_.integrator_type == "GAUSS") {
+        integrator = std::make_unique<GaussIntegrator>(
+            config_.initial_step_size,
+            config_.tolerance);
+    } else if (config_.integrator_type == "RADAU") {
+        integrator = std::make_unique<RadauIntegrator>(
+            config_.initial_step_size,
+            config_.tolerance);
     } else {
         // Default to RK4
         if (config_.verbose) {
