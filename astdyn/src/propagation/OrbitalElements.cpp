@@ -121,16 +121,19 @@ CartesianElements keplerian_to_cartesian(const KeplerianElements& kep) {
     });
 
     // 2. Call new AstDyn Coordinates Kernel
-    const auto state_cart = astdyn::coordinates::keplerian_to_cartesian(state_kep);
+    const auto state_cart = astdyn::coordinates::keplerian_to_cartesian(state_kep, kep.gravitational_parameter);
 
-    // 3. Re-convert to legacy structure
+    // 3. Scale to SI (Meters/Seconds) if mu is in AU units
+    double scale_p = (kep.gravitational_parameter < 1.0) ? (AU * 1000.0) : 1.0;
+    double scale_v = (kep.gravitational_parameter < 1.0) ? (AU * 1000.0 / 86400.0) : 1.0;
+
     CartesianElements cart;
     cart.epoch = kep.epoch;
     cart.gravitational_parameter = kep.gravitational_parameter;
-    
+
     const auto& raw = state_cart.raw_values();
-    cart.position = types::Vector3<core::GCRF, core::Meter>(raw[0], raw[1], raw[2]);
-    cart.velocity = types::Vector3<core::GCRF, core::Meter>(raw[3], raw[4], raw[5]);
+    cart.position = types::Vector3<core::GCRF, core::Meter>(raw[0] * scale_p, raw[1] * scale_p, raw[2] * scale_p);
+    cart.velocity = types::Vector3<core::GCRF, core::Meter>(raw[3] * scale_v, raw[4] * scale_v, raw[5] * scale_v);
     
     return cart;
 }
@@ -140,9 +143,14 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     kep.epoch = cart.epoch;
     kep.gravitational_parameter = cart.gravitational_parameter;
     
-    Eigen::Vector3d r(cart.position.x, cart.position.y, cart.position.z);
-    Eigen::Vector3d v(cart.velocity.x, cart.velocity.y, cart.velocity.z);
     double mu = cart.gravitational_parameter;
+    
+    // Scale SI to AU if mu is in AU units
+    double scale_p = (mu < 1.0) ? 1.0 / (AU * 1000.0) : 1.0;
+    double scale_v = (mu < 1.0) ? 86400.0 / (AU * 1000.0) : 1.0;
+
+    Eigen::Vector3d r(cart.position.x * scale_p, cart.position.y * scale_p, cart.position.z * scale_p);
+    Eigen::Vector3d v(cart.velocity.x * scale_v, cart.velocity.y * scale_v, cart.velocity.z * scale_v);
     
     double r_mag = r.norm();
     double v_mag = v.norm();

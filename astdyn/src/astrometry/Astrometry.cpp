@@ -3,6 +3,8 @@
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/astrometry/AstrometricTypes.hpp"
 #include <cmath>
 
 namespace astdyn::astrometry {
@@ -28,15 +30,19 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     // 1. Get Earth state at observation time (Native DE441)
     if (e_cfg.ephemeris_file.empty()) return std::unexpected(AstrometryError::EphemerisUnavailable);
     ephemeris::DE441Provider de441(e_cfg.ephemeris_file);
-    auto earth_pos = de441.getPosition(ephemeris::CelestialBody::EARTH, t_obs).to_eigen(); 
-    auto earth_vel = de441.getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen();
+    auto earth_p_ssb = de441.getPosition(ephemeris::CelestialBody::EARTH, t_obs).to_eigen(); 
+    auto earth_v_ssb = de441.getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen();
 
-    // 2. Light-time Iteration (Step 1)
+    // 2. SUN position (to convert Earth to HELIOCENTRIC)
+    auto sun_p_ssb = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t_obs).to_eigen();
+    Eigen::Vector3d earth_pos = earth_p_ssb - sun_p_ssb;
+
+    // 3. Light-time Iteration (Step 1)
     auto ast_pos = compute_light_time_corrected_pos(initial, t_obs, earth_pos, e_cfg);
     auto raw_rho = ast_pos - earth_pos;
 
-    // 3. Aberration (Step 2)
-    auto aberr_rho = a_cfg.stellar_aberration ? apply_stellar_aberration(raw_rho, earth_vel) : raw_rho;
+    // 4. Aberration (Step 2)
+    auto aberr_rho = a_cfg.stellar_aberration ? apply_stellar_aberration(raw_rho, earth_v_ssb) : raw_rho;
 
     // 4. Frame Reduction (Step 3)
     auto final_rho = convert_frame_if_needed(aberr_rho, a_cfg);
@@ -50,12 +56,24 @@ Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     const utils::Instant& t_obs,
     const Eigen::Vector3d& earth_pos,
     const AstDynConfig& cfg) {
+    // 1. Transform initial Ecliptic -> Equatorial GCRF for engine
+    auto kep_ecl = state_to_kep(initial, t_obs);
+    auto cart_ecl = propagation::keplerian_to_cartesian(kep_ecl);
+    auto mat = coordinates::ReferenceFrame::ecliptic_to_j2000();
+    propagation::CartesianElements cart_eq;
+    cart_eq.epoch = t_obs;
+    cart_eq.position = types::Vector3<core::GCRF, core::Meter>(mat * cart_ecl.position.to_eigen());
+    cart_eq.velocity = types::Vector3<core::GCRF, core::Meter>(mat * cart_ecl.velocity.to_eigen());
+    cart_eq.gravitational_parameter = GMS;
+    
     AstDynEngine engine(cfg);
-    engine.set_initial_orbit(state_to_kep(initial, t_obs));
+    engine.set_initial_orbit(propagation::cartesian_to_keplerian(cart_eq));
+
     double tau_days = 0.0; Eigen::Vector3d ast_p;
     for (int i = 0; i < 3; ++i) {
         auto el = engine.propagate_to(t_obs.mjd.value - tau_days);
-        ast_p = propagation::keplerian_to_cartesian(el).position.to_eigen(); 
+        // Position is now correctly returned in Meters by the updated OrbitalElements.cpp
+        ast_p = propagation::keplerian_to_cartesian(el).position.to_eigen();
         tau_days = (ast_p - earth_pos).norm() / (C_LIGHT * 1000.0 * 86400.0);
     }
     return ast_p;
@@ -80,13 +98,8 @@ Eigen::Vector3d AstrometryReducer::convert_frame_if_needed(
 
 AstrometricObservation AstrometryReducer::finalize_observation(
     const Eigen::Vector3d& rho) {
-    
-    double r = rho.norm();
-    double ra = std::atan2(rho.y(), rho.x());
-    double dec = std::asin(rho.z() / r);
-    if (ra < 0) ra += 2.0 * PI;
-    
-    return { core::Radian(ra), core::Radian(dec), core::Meter(r) };
+    double r = rho.norm(), ra = std::atan2(rho.y(), rho.x()); if (ra < 0) ra += TWO_PI;
+    return { core::Radian(ra), core::Radian(std::asin(rho.z() / r)), core::Meter(r) };
 }
 
 } // namespace astdyn::astrometry

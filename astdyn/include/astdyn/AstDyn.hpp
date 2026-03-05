@@ -39,6 +39,10 @@
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/propagation/HighPrecisionPropagator.hpp"
 
+// Top-level APIs
+#include "astdyn/api/OrbitFitAPI.hpp"
+#include "astdyn/astrometry/Astrometry.hpp"
+
 namespace astdyn {
 
 /**

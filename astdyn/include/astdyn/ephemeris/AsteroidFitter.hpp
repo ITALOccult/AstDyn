@@ -67,13 +67,24 @@ public:
         AsteroidFitResult result;
         result.success = api_result.success;
         result.message = api_result.message;
-        result.fitted_orbit = api_result.fitted_orbit;
-        result.rms_ra = api_result.rms_ra;
-        result.rms_dec = api_result.rms_dec;
-        result.num_observations = api_result.num_observations;
-        if (!api_result.success) {
+        
+        if (!api_result.success || !api_result.fitted_state) {
             return result;
         }
+
+        // Convert OrbitalState back to legacy KeplerianElements for AsteroidFitResult
+        const auto& state = *api_result.fitted_state;
+        result.fitted_orbit.semi_major_axis = state.a();
+        result.fitted_orbit.eccentricity = state.e();
+        result.fitted_orbit.inclination = state.i();
+        result.fitted_orbit.longitude_ascending_node = state.raan();
+        result.fitted_orbit.argument_perihelion = state.arg_peri();
+        result.fitted_orbit.mean_anomaly = state.m_anomaly();
+        // Note: Epoch should be preserved from parse_eq1 if needed, but OrbitFitAPI currently sets it internal to run_fit
+        
+        result.rms_ra = api_result.rms_ra.value / 1000.0; // mas -> arcsec
+        result.rms_dec = api_result.rms_dec.value / 1000.0;
+        result.num_observations = api_result.num_observations;
         // Load observation epochs (optical observations)
         std::vector<astdyn::observations::OpticalObservation> records =
             astdyn::observations::RWOReader::readFile(rwo_file);
