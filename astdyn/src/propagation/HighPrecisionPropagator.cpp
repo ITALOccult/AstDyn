@@ -5,11 +5,11 @@
 
 #include "astdyn/propagation/HighPrecisionPropagator.hpp"
 #include "astdyn/propagation/Propagator.hpp"
-#include "astdyn/propagation/Integrator.hpp"
-#include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
-#include "astdyn/ephemeris/DE441Provider.hpp"
-#include "astdyn/core/Constants.hpp"
+#include "src/core/units.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/orbital_state.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
+#include "astdyn/ephemeris/DE441Provider.hpp"
 #include <iostream>
 #include <cmath>
 
@@ -21,46 +21,34 @@ using namespace astdyn::constants;
 HighPrecisionPropagator::HighPrecisionPropagator(const Config& config) 
     : config_(config) 
 {
-    // Initialize PlanetaryEphemeris wrapper
     planetary_ephemeris_ = std::make_shared<PlanetaryEphemeris>();
-
-    // Load custom provider (DE441) if requested
     if (!config_.de441_path.empty()) {
         try {
             custom_provider_ = std::make_shared<DE441Provider>(config_.de441_path);
             PlanetaryEphemeris::setProvider(custom_provider_);
-            // std::cout << "[HighPrecisionPropagator] Native DE441 loaded from: " << config_.de441_path << "\n";
         } catch (const std::exception& e) {
-            std::cerr << "[HighPrecisionPropagator] Warning: Failed to load DE441 (" << e.what() 
-                      << "). Using analytical fallback.\n";
+            std::cerr << "[HighPrecisionPropagator] Warning: Failed to load DE441 (" << e.what() << ").\n";
         }
     }
 }
 
-HighPrecisionPropagator::~HighPrecisionPropagator() {
-    // Reset global provider to avoid side effects if singleton employed (?)
-    // PlanetaryEphemeris::setProvider(nullptr); 
-    // Careful: PlanetaryEphemeris::setProvider is static global. 
-    // If this class is used in multi-threaded env or multiple instances, this is tricky.
-    // For now assuming single context usage or global config.
-}
+HighPrecisionPropagator::~HighPrecisionPropagator() {}
 
 std::unique_ptr<Propagator> HighPrecisionPropagator::createPropagator() const {
     auto integrator = std::make_unique<RKF78Integrator>(config_.step_size, config_.tolerance);
-    
     PropagatorSettings settings;
     settings.include_planets = config_.perturbations_planets;
     settings.include_relativity = config_.relativity;
     settings.include_asteroids = config_.perturbations_asteroids;
     settings.asteroid_ephemeris_file = config_.asteroid_ephemeris_file;
-    // Enable all major perturbers if planets enabled
+    
     if (settings.include_planets) {
         settings.perturb_jupiter = true;
         settings.perturb_saturn = true;
         settings.perturb_mars = true;
         settings.perturb_earth = true;
         settings.perturb_venus = true; 
-        settings.perturb_mercury = false; // Usually negligible for main belt?
+        settings.perturb_mercury = true;
         settings.perturb_uranus = true;
         settings.perturb_neptune = true;
     }
@@ -68,103 +56,47 @@ std::unique_ptr<Propagator> HighPrecisionPropagator::createPropagator() const {
     return std::make_unique<Propagator>(std::move(integrator), planetary_ephemeris_, settings);
 }
 
-// Helper: Ecliptic to Equatorial (J2000)
-static Eigen::Vector3d ecl_to_eq(const Eigen::Vector3d& ecl) {
-    return coordinates::ReferenceFrame::ecliptic_to_j2000() * ecl;
-}
-
 HighPrecisionPropagator::ObservationResult 
 HighPrecisionPropagator::calculateGeocentricObservation(
     const KeplerianElements& initial_elements, 
-    double target_jd_tdb,
+    utils::Instant target_time,
     InputFrame frame
 ) {
-    if (!cached_propagator_) {
-        cached_propagator_ = createPropagator();
-    }
-    auto& propagator = cached_propagator_;
-
-    // 1. Initial State Setup
-    CartesianElements cart_start = keplerian_to_cartesian(initial_elements);
+    if (!cached_propagator_) cached_propagator_ = createPropagator();
     
-    CartesianElements cart_icrf;
-    cart_icrf.epoch_mjd_tdb = initial_elements.epoch_mjd_tdb;
-    cart_icrf.gravitational_parameter = initial_elements.gravitational_parameter;
+    CartesianElements cart_icrf = propagate_cartesian(initial_elements, target_time, frame);
     
-    if (frame == InputFrame::ECLIPTIC) {
-        // Convert input Keplerian (Ecliptic J2000) to Cartesian ICRF (Equatorial)
-        std::cout << "[HPP-DEBUG] Input frame is ECLIPTIC. Performing rotation." << std::endl;
-        cart_icrf.position = ecl_to_eq(cart_start.position);
-        cart_icrf.velocity = ecl_to_eq(cart_start.velocity);
-    } else {
-        // Already Equatorial
-        std::cout << "[HPP-DEBUG] Input frame is EQUATORIAL. Skipping rotation." << std::endl;
-        cart_icrf.position = cart_start.position;
-        cart_icrf.velocity = cart_start.velocity;
-    }
+    // Earth position at target time
+    auto r_sun_ssb = PlanetaryEphemeris::getSunBarycentricPosition(target_time);
+    auto r_earth_ssb = PlanetaryEphemeris::getPosition(CelestialBody::EARTH, target_time);
+    auto r_earth_helio = r_earth_ssb - r_sun_ssb;
+
+    double lt_sec = 0.0;
+    CartesianElements state_at_emit = cart_icrf;
     
-    std::cout << "[HPP-DEBUG] Initial Pos: " << cart_icrf.position.transpose() << std::endl;
-
-    double target_mjd = target_jd_tdb - 2400000.5;
-
-    // 2. Propagate to Target Approximation (Heliocentric)
-    // Propagate asteroid center to target time
-    CartesianElements state_ast = propagator->propagate_cartesian(cart_icrf, target_mjd);
-
-    // 3. Earth Position at Target Time
-    // PlanetaryEphemeris::getPosition returns SSB-relative if DE441 is used.
-    // Propagator is Heliocentric, so we need Earth wrt Sun.
-    Eigen::Vector3d r_sun_ssb = PlanetaryEphemeris::getPosition(CelestialBody::SUN, target_jd_tdb);
-    Eigen::Vector3d r_earth_ssb = PlanetaryEphemeris::getPosition(CelestialBody::EARTH, target_jd_tdb);
-    Eigen::Vector3d r_earth_eq = r_earth_ssb - r_sun_ssb;
-
-    // 4. Light Time Correction Loop
-    double t_emit_mjd = target_mjd;
-    double lt_days = 0.0;
-    Eigen::Vector3d r_ast_emit = state_ast.position; // Initial guess
-
+    // Light-time correction loop
     for (int i = 0; i < 3; ++i) {
-        // Propagate asteroid to emission time (small step from target or full propagation)
-        // Since Propagator might be stateful at the end, let's just re-call propagate
-        // Efficiency note: Ideally we step back from state_ast, but Propagator interface is absolute.
-        // If the propagator step allows, this will be fast. 
-        // For MAX precision, we propagate from initial epoch (or closest checkpoint) to t_emit.
-        // Assuming Propagator is robust:
-        CartesianElements state_emit = propagator->propagate_cartesian(cart_icrf, t_emit_mjd);
-        r_ast_emit = state_emit.position;
-
-        // Geometric distance Earth(t_obs) to Asteroid(t_emit)
-        double dist_au = (r_ast_emit - r_earth_eq).norm();
-        lt_days = dist_au / SPEED_OF_LIGHT_AU_PER_DAY;
+        auto t_emit = utils::Instant::from_tt(utils::ModifiedJulianDate(target_time.mjd.value - lt_sec / 86400.0));
+        state_at_emit = cached_propagator_->propagate_cartesian(cart_icrf, t_emit);
         
-        // Update emission time
-        t_emit_mjd = target_mjd - lt_days;
+        double dist = (state_at_emit.position - r_earth_helio).norm();
+        lt_sec = dist / (constants::C_LIGHT * 1000.0);
     }
 
-    // 5. Final Geocentric Vector
-    Eigen::Vector3d r_geo = r_ast_emit - r_earth_eq;
+    auto r_geo = state_at_emit.position - r_earth_helio;
     double dist = r_geo.norm();
     
-    // Convert to RA/DEC
-    // NOTE: Stellar aberration is NOT applied here because the asteroid is a solar system object.
-    // Light-time correction already accounts for the asteroid's apparent position.
-    // Stellar aberration applies only to stars (distant objects at infinity).
-    double ra = atan2(r_geo.y(), r_geo.x());
-    double dec = asin(r_geo.z() / dist);
+    double ra = atan2(r_geo.y, r_geo.x);
+    double dec = asin(r_geo.z / dist);
 
-    // Normalize RA 0-360
-    if (ra < astdyn::constants::TWO_PI) { // Wait, the grep said "if (ra < 0) ra += 2.0 * M_PI;"
-        if (ra < 0) ra += astdyn::constants::TWO_PI;
-    }
+    if (ra < 0) ra += astdyn::constants::TWO_PI;
 
     ObservationResult result;
     result.ra_deg = ra * astdyn::constants::RAD_TO_DEG;
     result.dec_deg = dec * astdyn::constants::RAD_TO_DEG;
-    result.distance_au = dist;
-    result.light_time_sec = lt_days * 86400.0;
+    result.distance_au = dist / (constants::AU * 1000.0);
+    result.light_time_sec = lt_sec;
     result.geocentric_position = r_geo;
-
-    std::cout << "[HPP-DEBUG] Final Pos (Geocentric): " << r_geo.x() << " " << r_geo.y() << " " << r_geo.z() << " (Dist: " << dist << " AU)" << std::endl;
 
     return result;
 }
@@ -175,34 +107,32 @@ std::shared_ptr<EphemerisProvider> HighPrecisionPropagator::getEphemerisProvider
 
 void HighPrecisionPropagator::setPlanetaryEphemeris(std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephemeris) {
     planetary_ephemeris_ = ephemeris;
-    cached_propagator_.reset(); // Invalidate cache as ephemeris changed
+    cached_propagator_.reset();
 }
 
 CartesianElements HighPrecisionPropagator::propagate_cartesian(
     const KeplerianElements& initial_elements,
-    double target_mjd_tdb,
+    utils::Instant target_time,
     InputFrame frame
 ) {
-    if (!cached_propagator_) {
-        cached_propagator_ = createPropagator();
-    }
+    if (!cached_propagator_) cached_propagator_ = createPropagator();
     
-    // 1. Initial State Setup
     CartesianElements cart_start = keplerian_to_cartesian(initial_elements);
     
-    CartesianElements cart_icrf;
-    cart_icrf.epoch_mjd_tdb = initial_elements.epoch_mjd_tdb;
-    cart_icrf.gravitational_parameter = initial_elements.gravitational_parameter;
-    
     if (frame == InputFrame::ECLIPTIC) {
-        cart_icrf.position = ecl_to_eq(cart_start.position);
-        cart_icrf.velocity = ecl_to_eq(cart_start.velocity);
-    } else {
-        cart_icrf.position = cart_start.position;
-        cart_icrf.velocity = cart_start.velocity;
+        // VSOP87 elements are usually in ecliptic frame. 
+        // Need to ensure they are rotated to GCRF (Equatorial J2000) if requested.
+        // For now assume keplerian_to_cartesian handles the requested frame or we convert here.
+        // Actually, reference_frame.hpp transform_position handles this.
+        auto pos_ecl = cart_start.position.to_eigen();
+        auto vel_ecl = cart_start.velocity.to_eigen();
+        auto pos_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl;
+        auto vel_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl;
+        cart_start.position = types::Vector3<core::GCRF, core::Meter>(pos_eq);
+        cart_start.velocity = types::Vector3<core::GCRF, core::Meter>(vel_eq);
     }
 
-    return cached_propagator_->propagate_cartesian(cart_icrf, target_mjd_tdb);
+    return cached_propagator_->propagate_cartesian(cart_start, target_time);
 }
 
 } // namespace astdyn::propagation

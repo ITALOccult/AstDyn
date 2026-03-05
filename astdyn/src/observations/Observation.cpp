@@ -15,18 +15,18 @@ namespace observations {
 void ObservationSet::sortByTime() {
     std::sort(observations.begin(), observations.end(),
         [](const Observation& a, const Observation& b) {
-            return a.getMJD() < b.getMJD();
+            return a.getInstant().mjd.value < b.getInstant().mjd.value;
         });
 }
 
 double ObservationSet::getTimeSpan() const {
     if (observations.empty()) return 0.0;
     
-    double min_mjd = observations.front().getMJD();
-    double max_mjd = observations.front().getMJD();
+    double min_mjd = observations.front().getInstant().mjd.value;
+    double max_mjd = observations.front().getInstant().mjd.value;
     
     for (const auto& obs : observations) {
-        double mjd = obs.getMJD();
+        double mjd = obs.getInstant().mjd.value;
         if (mjd < min_mjd) min_mjd = mjd;
         if (mjd > max_mjd) max_mjd = mjd;
     }

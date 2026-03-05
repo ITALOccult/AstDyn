@@ -22,6 +22,7 @@
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
+#include "src/utils/time_types.hpp"
 #include <cmath>
 #include <string>
 
@@ -203,7 +204,8 @@ public:
      * @param mjd_ut1 Modified Julian Date in UT1 time scale
      * @return 3x3 rotation matrix
      */
-    static Matrix3d j2000_to_itrf_simple(double mjd_ut1) {
+    static Matrix3d j2000_to_itrf_simple(utils::Instant t_ut1) {
+        double mjd_ut1 = t_ut1.mjd.value;
         // Earth rotation angle (ERA)
         // ERA = 2π(0.7790572732640 + 1.00273781191135448 × (MJD_UT1 - 51544.5))
         
@@ -223,8 +225,8 @@ public:
      * @param mjd_ut1 Modified Julian Date in UT1 time scale
      * @return 3x3 rotation matrix
      */
-    static Matrix3d itrf_to_j2000_simple(double mjd_ut1) {
-        return j2000_to_itrf_simple(mjd_ut1).transpose();
+    static Matrix3d itrf_to_j2000_simple(utils::Instant t_ut1) {
+        return j2000_to_itrf_simple(t_ut1).transpose();
     }
     
     // ========================================================================
@@ -239,7 +241,7 @@ public:
      * @return 3x3 rotation matrix
      */
     static Matrix3d get_transformation(FrameType from, FrameType to, 
-                                       double mjd_ut1 = constants::MJD2000) {
+                                       utils::Instant t_ut1 = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
         // Same frame, return identity
         if (from == to) {
             return Matrix3d::Identity();
@@ -259,10 +261,10 @@ public:
             return ecliptic_to_j2000();
         }
         if (from == FrameType::J2000 && to == FrameType::ITRF) {
-            return j2000_to_itrf_simple(mjd_ut1);
+            return j2000_to_itrf_simple(t_ut1);
         }
         if (from == FrameType::ITRF && to == FrameType::J2000) {
-            return itrf_to_j2000_simple(mjd_ut1);
+            return itrf_to_j2000_simple(t_ut1);
         }
         
         // Chain transformations through J2000
@@ -274,16 +276,16 @@ public:
             return j2000_to_icrs() * ecliptic_to_j2000();
         }
         if (from == FrameType::ICRS && to == FrameType::ITRF) {
-            return j2000_to_itrf_simple(mjd_ut1) * icrs_to_j2000();
+            return j2000_to_itrf_simple(t_ut1) * icrs_to_j2000();
         }
         if (from == FrameType::ITRF && to == FrameType::ICRS) {
-            return j2000_to_icrs() * itrf_to_j2000_simple(mjd_ut1);
+            return j2000_to_icrs() * itrf_to_j2000_simple(t_ut1);
         }
         if (from == FrameType::ECLIPTIC && to == FrameType::ITRF) {
-            return j2000_to_itrf_simple(mjd_ut1) * ecliptic_to_j2000();
+            return j2000_to_itrf_simple(t_ut1) * ecliptic_to_j2000();
         }
         if (from == FrameType::ITRF && to == FrameType::ECLIPTIC) {
-            return j2000_to_ecliptic() * itrf_to_j2000_simple(mjd_ut1);
+            return j2000_to_ecliptic() * itrf_to_j2000_simple(t_ut1);
         }
         
         // Default: return identity (should not reach here)
@@ -304,8 +306,8 @@ public:
      */
     static Vector3d transform_position(const Vector3d& pos, 
                                       FrameType from, FrameType to,
-                                      double mjd_ut1 = constants::MJD2000) {
-        Matrix3d R = get_transformation(from, to, mjd_ut1);
+                                      utils::Instant t_ut1 = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
+        Matrix3d R = get_transformation(from, to, t_ut1);
         return R * pos;
     }
     
@@ -324,8 +326,8 @@ public:
      */
     static Vector3d transform_velocity(const Vector3d& pos, const Vector3d& vel,
                                       FrameType from, FrameType to,
-                                      double mjd_ut1 = constants::MJD2000) {
-        Matrix3d R = get_transformation(from, to, mjd_ut1);
+                                      utils::Instant t_ut1 = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
+        Matrix3d R = get_transformation(from, to, t_ut1);
         Vector3d vel_rotated = R * vel;
         
         // Add Coriolis term for rotating frame transformations
@@ -361,10 +363,10 @@ public:
      */
     static CartesianState transform_state(const CartesianState& state,
                                          FrameType from, FrameType to,
-                                         double mjd_ut1 = constants::MJD2000) {
-        Vector3d pos_new = transform_position(state.position(), from, to, mjd_ut1);
+                                         utils::Instant t_ut1 = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
+        Vector3d pos_new = transform_position(state.position(), from, to, t_ut1);
         Vector3d vel_new = transform_velocity(state.position(), state.velocity(),
-                                              from, to, mjd_ut1);
+                                              from, to, t_ut1);
         
         return CartesianState(pos_new, vel_new, state.mu());
     }
@@ -392,7 +394,8 @@ public:
      * @param mjd_ut1 Modified Julian Date in UT1
      * @return GMST [rad]
      */
-    static double gmst(double mjd_ut1) {
+    static double gmst(utils::Instant t_ut1) {
+        double mjd_ut1 = t_ut1.mjd.value;
         double T = (mjd_ut1 - constants::MJD2000) / 36525.0;
         
         // GMST at 0h UT1 (IAU 2000)

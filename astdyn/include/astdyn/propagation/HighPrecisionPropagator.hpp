@@ -8,6 +8,10 @@
 #define ASTDYN_HIGH_PRECISION_PROPAGATOR_HPP
 
 #include "astdyn/propagation/OrbitalElements.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <string>
 #include <memory>
 #include <Eigen/Dense>
@@ -58,7 +62,7 @@ public:
         double dec_deg;             ///< Declination J2000 [deg]
         double distance_au;         ///< Geometric distance [AU]
         double light_time_sec;      ///< Light travel time [s]
-        Eigen::Vector3d geocentric_position; ///< Vector Earth->Body (J2000 Equatorial) [AU]
+        types::Vector3<core::GCRF, core::Meter> geocentric_position; ///< Vector Earth->Body (ICRF)
     };
 
     /**
@@ -92,7 +96,7 @@ public:
      */
     ObservationResult calculateGeocentricObservation(
         const KeplerianElements& initial_elements, 
-        double target_jd_tdb,
+        utils::Instant target_time,
         InputFrame frame = InputFrame::ECLIPTIC
     );
 
@@ -121,7 +125,7 @@ public:
      */
     CartesianElements propagate_cartesian(
         const KeplerianElements& initial_elements,
-        double target_mjd_tdb,
+        utils::Instant target_time,
         InputFrame frame = InputFrame::ECLIPTIC
     );
 

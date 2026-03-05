@@ -25,6 +25,10 @@
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <vector>
 #include <memory>
 #include <optional>
@@ -53,9 +57,9 @@ enum class BodyType {
  * target body's distance. Coordinates (ξ, ζ) define the miss distance.
  */
 struct BPlaneCoordinates {
-    double xi;                          ///< ξ coordinate [AU]
-    double zeta;                        ///< ζ coordinate [AU]
-    double b_magnitude;                 ///< Miss distance |b| = √(ξ²+ζ²) [AU]
+    double xi;                          ///< ξ coordinate [m]
+    double zeta;                        ///< ζ coordinate [m]
+    double b_magnitude;                 ///< Miss distance |b| = √(ξ²+ζ²) [m]
     double theta;                       ///< Angle arctan2(ζ,ξ) [rad]
     
     /**
@@ -70,20 +74,20 @@ struct BPlaneCoordinates {
  * @brief Single close approach event
  */
 struct CloseApproach {
-    double mjd_tdb;                     ///< Time of closest approach [MJD TDB]
+    utils::Instant time;                ///< Time of closest approach
     BodyType body;                      ///< Target body
     
     // Geometric quantities at closest approach
-    double distance;                    ///< Distance from body center [AU]
-    double relative_velocity;           ///< |v_rel| [AU/day]
-    astdyn::Vector3d position_object;   ///< Object heliocentric position [AU]
-    astdyn::Vector3d velocity_object;   ///< Object heliocentric velocity [AU/day]
-    astdyn::Vector3d position_body;     ///< Body heliocentric position [AU]
-    astdyn::Vector3d velocity_body;     ///< Body heliocentric velocity [AU/day]
+    double distance;                    ///< Distance from body center [m]
+    double relative_velocity_mag;       ///< |v_rel| [m/s]
+    types::Vector3<core::GCRF, core::Meter> position_object;   ///< Object heliocentric position [m]
+    types::Vector3<core::GCRF, core::Meter> velocity_object;   ///< Object heliocentric velocity [m/s]
+    types::Vector3<core::GCRF, core::Meter> position_body;     ///< Body heliocentric position [m]
+    types::Vector3<core::GCRF, core::Meter> velocity_body;     ///< Body heliocentric velocity [m/s]
     
     // Relative coordinates
-    astdyn::Vector3d rel_position;      ///< Object position relative to body [AU]
-    astdyn::Vector3d rel_velocity;      ///< Object velocity relative to body [AU/day]
+    types::Vector3<core::GCRF, core::Meter> rel_position;      ///< Object position relative to body [m]
+    types::Vector3<core::GCRF, core::Meter> rel_velocity;      ///< Object velocity relative to body [m/s]
     
     // B-plane analysis
     std::optional<BPlaneCoordinates> b_plane; ///< Target plane coordinates
@@ -91,15 +95,15 @@ struct CloseApproach {
     /**
      * @brief Check if approach is within specified threshold
      */
-    bool is_close(double threshold_au) const {
-        return distance < threshold_au;
+    bool is_close(double threshold_meters) const {
+        return distance < threshold_meters;
     }
     
     /**
      * @brief Get distance in planetary radii
      */
-    double distance_in_radii(double planet_radius_au) const {
-        return distance / planet_radius_au;
+    double distance_in_radii(double planet_radius_meters) const {
+        return distance / planet_radius_meters;
     }
 };
 
@@ -107,8 +111,8 @@ struct CloseApproach {
  * @brief Settings for close approach detection
  */
 struct CloseApproachSettings {
-    double detection_distance = 0.05;   ///< Detection threshold [AU] (default ~7.5 million km)
-    double min_distance = 1e-6;         ///< Minimum distance for numerical stability [AU]
+    double detection_distance = 0.05 * constants::AU;   ///< Detection threshold [m] (default ~0.05 AU)
+    double min_distance = 1e-6 * constants::AU;         ///< Minimum distance for numerical stability [m]
     bool compute_b_plane = true;        ///< Compute b-plane coordinates
     bool refine_time = true;            ///< Refine time of closest approach
     double time_tolerance = 1e-6;       ///< Time refinement tolerance [days]
@@ -157,16 +161,16 @@ public:
      */
     std::vector<CloseApproach> find_approaches(
         const propagation::CartesianElements& initial_state,
-        double t_start,
-        double t_end);
+        utils::Instant t_start,
+        utils::Instant t_end);
     
     /**
      * @brief Find close approaches (Keplerian initial state)
      */
     std::vector<CloseApproach> find_approaches(
         const propagation::KeplerianElements& initial_orbit,
-        double t_start,
-        double t_end);
+        utils::Instant t_start,
+        utils::Instant t_end);
     
     /**
      * @brief Compute b-plane coordinates for a close approach
@@ -199,7 +203,7 @@ private:
      * @return Distance to body [AU]
      */
     double compute_distance(
-        double t,
+        utils::Instant t,
         const propagation::CartesianElements& state,
         BodyType body) const;
     
@@ -216,11 +220,11 @@ private:
      * @param body Target body
      * @return Time of closest approach [MJD TDB]
      */
-    double refine_approach_time(
+    utils::Instant refine_approach_time(
         const propagation::CartesianElements& state_t1,
         const propagation::CartesianElements& state_t2,
-        double t1,
-        double t2,
+        utils::Instant t1,
+        utils::Instant t2,
         BodyType body) const;
     
     /**
@@ -232,7 +236,7 @@ private:
      * @return Complete CloseApproach structure
      */
     CloseApproach build_approach(
-        double t,
+        utils::Instant t,
         const propagation::CartesianElements& state,
         BodyType body) const;
     
@@ -263,7 +267,7 @@ public:
      * 
      * @param object_orbit Small body orbit
      * @param planet Planet identifier
-     * @return MOID [AU]
+     * @return MOID [m]
      */
     static double compute_moid(
         const propagation::KeplerianElements& object_orbit,
@@ -274,7 +278,7 @@ public:
      * 
      * @param orbit1 First orbit
      * @param orbit2 Second orbit
-     * @return MOID [AU]
+     * @return MOID [m]
      */
     static double compute_moid(
         const propagation::KeplerianElements& orbit1,
@@ -291,7 +295,7 @@ private:
      * @param f2 True anomaly on orbit 2 [rad]
      * @param orbit1 First orbit
      * @param orbit2 Second orbit
-     * @return Distance² [AU²]
+     * @return Distance² [m²]
      */
     static double distance_squared(
         double f1, double f2,

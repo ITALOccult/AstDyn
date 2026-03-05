@@ -12,9 +12,13 @@
 #ifndef ASTDYN_EPHEMERIS_PROVIDER_HPP
 #define ASTDYN_EPHEMERIS_PROVIDER_HPP
 
+#include "astdyn/ephemeris/CelestialBody.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <Eigen/Dense>
 #include <string>
-#include "astdyn/ephemeris/CelestialBody.hpp"
 
 namespace astdyn::ephemeris {
 
@@ -29,19 +33,19 @@ public:
      * @brief Get position of celestial body
      * 
      * @param body Celestial body
-     * @param jd_tdb Julian Date (TDB time scale)
-     * @return Position vector [AU] in J2000 ecliptic frame
+     * @param t Time
+     * @return Position vector [m] in J2000 equatorial frame (ICRF)
      */
-    virtual Eigen::Vector3d getPosition(CelestialBody body, double jd_tdb) = 0;
+    virtual types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, utils::Instant t) = 0;
     
     /**
      * @brief Get velocity of celestial body
      * 
      * @param body Celestial body
-     * @param jd_tdb Julian Date (TDB time scale)
-     * @return Velocity vector [AU/day] in J2000 ecliptic frame
+     * @param t Time
+     * @return Velocity vector [m/s] in J2000 equatorial frame (ICRF)
      */
-    virtual Eigen::Vector3d getVelocity(CelestialBody body, double jd_tdb) = 0;
+    virtual types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, utils::Instant t) = 0;
     
     /**
      * @brief Get full state (position + velocity)
@@ -50,10 +54,11 @@ public:
      * @param jd_tdb Julian Date (TDB time scale)
      * @return State vector [pos (AU), vel (AU/day)] in J2000 ecliptic frame
      */
-    virtual Eigen::Matrix<double, 6, 1> getState(CelestialBody body, double jd_tdb) {
+    virtual Eigen::Matrix<double, 6, 1> getState(CelestialBody body, utils::Instant t) {
         Eigen::Matrix<double, 6, 1> state;
-        state.head<3>() = getPosition(body, jd_tdb);
-        state.tail<3>() = getVelocity(body, jd_tdb);
+        const auto pos = getPosition(body, t);
+        const auto vel = getVelocity(body, t);
+        state << pos.x, pos.y, pos.z, vel.x, vel.y, vel.z;
         return state;
     }
     

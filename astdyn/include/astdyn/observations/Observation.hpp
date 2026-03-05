@@ -15,8 +15,8 @@
 #ifndef ASTDYN_OBSERVATIONS_OBSERVATION_HPP
 #define ASTDYN_OBSERVATIONS_OBSERVATION_HPP
 
-#include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "src/utils/time_types.hpp"
 #include <string>
 #include <vector>
 #include <optional>
@@ -75,7 +75,7 @@ struct OpticalObservation {
     std::string observatory_code;    ///< MPC observatory code (e.g., "568" = Mauna Kea)
     
     // Time
-    double mjd_utc;                  ///< Modified Julian Date in UTC
+    utils::Instant time;             ///< Time of observation (UTC)
     
     // Astrometry
     double ra;                       ///< Right Ascension [radians]
@@ -100,7 +100,7 @@ struct OpticalObservation {
      * @brief Default constructor
      */
     OpticalObservation()
-        : mjd_utc(0.0), ra(0.0), dec(0.0), 
+        : time(utils::Instant::from_utc(utils::ModifiedJulianDate(0.0))), ra(0.0), dec(0.0), 
           sigma_ra(1e-5), sigma_dec(1e-5),
           catalog(CatalogCode::UNKNOWN),
           is_discovery(false), is_offset(false) {}
@@ -118,22 +118,22 @@ struct RadarObservation {
     std::string receiver_code;       ///< Receiving station (can differ from TX)
     
     // Time
-    double mjd_utc;                  ///< Time of observation (bounce time for range)
+    utils::Instant time;             ///< Time of observation
     
     // Measurement type
     ObservationType type;            ///< RADAR_RANGE, RADAR_DOPPLER, or RADAR_RANGE_RATE
     
     // Range measurement
-    std::optional<double> range;     ///< Range [km] (round-trip time / 2c)
-    std::optional<double> sigma_range; ///< Range uncertainty [km]
+    std::optional<double> range;     ///< Range [m] (round-trip time / 2c)
+    std::optional<double> sigma_range; ///< Range uncertainty [m]
     
     // Doppler measurement  
     std::optional<double> doppler;   ///< Doppler shift [Hz]
     std::optional<double> sigma_doppler; ///< Doppler uncertainty [Hz]
     
     // Range-rate measurement
-    std::optional<double> range_rate; ///< Range rate [km/s]
-    std::optional<double> sigma_range_rate; ///< Range rate uncertainty [km/s]
+    std::optional<double> range_rate; ///< Range rate [m/s]
+    std::optional<double> sigma_range_rate; ///< Range rate uncertainty [m/s]
     
     // Frequency
     double frequency_mhz;            ///< Radar frequency [MHz]
@@ -142,7 +142,7 @@ struct RadarObservation {
      * @brief Default constructor
      */
     RadarObservation()
-        : mjd_utc(0.0), type(ObservationType::RADAR_RANGE),
+        : time(utils::Instant::from_utc(utils::ModifiedJulianDate(0.0))), type(ObservationType::RADAR_RANGE),
           frequency_mhz(0.0) {}
 };
 
@@ -157,7 +157,7 @@ struct PhotometricObservation {
     std::string observatory_code;
     
     // Time
-    double mjd_utc;
+    utils::Instant time;             ///< Time of observation
     
     // Photometry
     double magnitude;                ///< Apparent magnitude
@@ -166,14 +166,14 @@ struct PhotometricObservation {
     
     // Phase information (for lightcurve analysis)
     std::optional<double> phase_angle; ///< Phase angle [degrees]
-    std::optional<double> heliocentric_distance; ///< r [AU]
-    std::optional<double> geocentric_distance;   ///< Δ [AU]
+    std::optional<double> heliocentric_distance; ///< r [m]
+    std::optional<double> geocentric_distance;   ///< Δ [m]
     
     /**
      * @brief Default constructor
      */
     PhotometricObservation()
-        : mjd_utc(0.0), magnitude(0.0), sigma_magnitude(0.1), band('V') {}
+        : time(utils::Instant::from_utc(utils::ModifiedJulianDate(0.0))), magnitude(0.0), sigma_magnitude(0.1), band('V') {}
 };
 
 /**
@@ -192,8 +192,8 @@ struct OccultationObservation {
     double altitude;                 ///< Observer altitude [m]
     
     // Timing
-    double mjd_utc_start;            ///< Immersion time
-    double mjd_utc_end;              ///< Emersion time
+    utils::Instant time_start;       ///< Immersion time
+    utils::Instant time_end;         ///< Emersion time
     double sigma_time;               ///< Timing uncertainty [seconds]
     
     // Star information
@@ -206,7 +206,9 @@ struct OccultationObservation {
      */
     OccultationObservation()
         : longitude(0.0), latitude(0.0), altitude(0.0),
-          mjd_utc_start(0.0), mjd_utc_end(0.0), sigma_time(0.001),
+          time_start(utils::Instant::from_utc(utils::ModifiedJulianDate(0.0))), 
+          time_end(utils::Instant::from_utc(utils::ModifiedJulianDate(0.0))), 
+          sigma_time(0.001),
           star_ra(0.0), star_dec(0.0) {}
 };
 
@@ -246,12 +248,12 @@ struct Observation {
     /**
      * @brief Get time of observation (works for all types)
      */
-    double getMJD() const {
-        if (optical) return optical->mjd_utc;
-        if (radar) return radar->mjd_utc;
-        if (photometric) return photometric->mjd_utc;
-        if (occultation) return occultation->mjd_utc_start;
-        return 0.0;
+    utils::Instant getInstant() const {
+        if (optical) return optical->time;
+        if (radar) return radar->time;
+        if (photometric) return photometric->time;
+        if (occultation) return occultation->time_start;
+        return utils::Instant::from_utc(utils::ModifiedJulianDate(0.0));
     }
     
     /**

@@ -19,6 +19,9 @@ namespace ephemeris {
 using Eigen::Vector3d;
 using coordinates::CartesianState;
 
+// Convert constants context
+using namespace astdyn::core;
+
 // Convert GM from km³/s² to AU³/day²
 static constexpr double GM_SUN_AU_DAY2 = 1.32712440018e11 / (1.49597870700e8 * 1.49597870700e8 * 1.49597870700e8) * (86400.0 * 86400.0);
 
@@ -32,56 +35,52 @@ void PlanetaryEphemeris::setProvider(std::shared_ptr<EphemerisProvider> provider
     global_provider_ = provider;
 }
 
-Vector3d PlanetaryEphemeris::getPosition(CelestialBody body, double jd_tdb) {
+types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getPosition(CelestialBody body, utils::Instant t) {
     if (global_provider_ && global_provider_->isAvailable()) {
-        return global_provider_->getPosition(body, jd_tdb);
+        return global_provider_->getPosition(body, t);
     }
 
-    if (body == CelestialBody::SUN) {
-        return Vector3d::Zero();
-    }
+    if (body == CelestialBody::SUN) return types::Vector3<core::GCRF, core::Meter>(0.0, 0.0, 0.0);
     
-    double T = julianCenturies(jd_tdb);
+    double T = julianCenturies(t.mjd.value + 2400000.5);
     double elements[6];
     computeOrbitalElements(body, T, elements);
     
     Vector3d pos = elementsToPosition(elements);
     Vector3d pert = computePerturbations(body, T);
     
-    return pos + pert;
+    Vector3d final_pos = (pos + pert) * constants::AU * 1000.0;
+    return types::Vector3<core::GCRF, core::Meter>(final_pos.x(), final_pos.y(), final_pos.z());
 }
 
-Vector3d PlanetaryEphemeris::getVelocity(CelestialBody body, double jd_tdb) {
+types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getVelocity(CelestialBody body, utils::Instant t) {
     if (global_provider_ && global_provider_->isAvailable()) {
-        return global_provider_->getVelocity(body, jd_tdb);
+        return global_provider_->getVelocity(body, t);
     }
 
-    if (body == CelestialBody::SUN) {
-        return Vector3d::Zero();
-    }
+    if (body == CelestialBody::SUN) return types::Vector3<core::GCRF, core::Meter>(0.0, 0.0, 0.0);
     
-    double T = julianCenturies(jd_tdb);
+    double T = julianCenturies(t.mjd.value + 2400000.5);
     double elements[6];
     computeOrbitalElements(body, T, elements);
     
-    return elementsToVelocity(elements, GM_SUN_AU_DAY2);
+    // elementsToVelocity returns [AU/day]. Convert to [m/s].
+    Vector3d vel = elementsToVelocity(elements, GM_SUN_AU_DAY2);
+    Vector3d vel_ms = vel * (constants::AU * 1000.0 / 86400.0);
+    return types::Vector3<core::GCRF, core::Meter>(vel_ms.x(), vel_ms.y(), vel_ms.z());
 }
 
-CartesianState PlanetaryEphemeris::getState(CelestialBody body, double jd_tdb) {
-    // If provider is available, use it (optimized if getState() exists in interface, but getPos/getVel work too)
-    // EphemerisProvider interface typically has getPosition/getVelocity separately.
+CartesianState PlanetaryEphemeris::getState(CelestialBody body, utils::Instant t) {
     if (global_provider_ && global_provider_->isAvailable()) {
-        Vector3d pos = global_provider_->getPosition(body, jd_tdb);
-        Vector3d vel = global_provider_->getVelocity(body, jd_tdb);
-        return CartesianState(pos, vel);
+        return CartesianState(global_provider_->getPosition(body, t), global_provider_->getVelocity(body, t));
     }
 
-    Vector3d pos = getPosition(body, jd_tdb);
-    Vector3d vel = getVelocity(body, jd_tdb);
+    auto pos = getPosition(body, t);
+    auto vel = getVelocity(body, t);
     return CartesianState(pos, vel);
 }
 
-Vector3d PlanetaryEphemeris::getSunBarycentricPosition(double jd_tdb) {
+types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getSunBarycentricPosition(utils::Instant t) {
     // Simplified: Sun offset from barycenter due to planets
     // Dominated by Jupiter (~5e-4 AU) and Saturn (~3e-4 AU)
     
@@ -90,38 +89,36 @@ Vector3d PlanetaryEphemeris::getSunBarycentricPosition(double jd_tdb) {
     // Major contributors
     double total_mass = PlanetaryData::MASS_SUN;
     
-    // Jupiter
-    Vector3d r_jup = getPosition(CelestialBody::JUPITER, jd_tdb);
-    r_sun -= r_jup * (PlanetaryData::MASS_JUPITER / total_mass);
+    auto add_contrib = [&](CelestialBody body, double mass) {
+        auto p = getPosition(body, t);
+        r_sun.x() -= p.x * (mass / total_mass);
+        r_sun.y() -= p.y * (mass / total_mass);
+        r_sun.z() -= p.z * (mass / total_mass);
+    };
+
+    add_contrib(CelestialBody::JUPITER, PlanetaryData::MASS_JUPITER);
+    add_contrib(CelestialBody::SATURN,  PlanetaryData::MASS_SATURN);
+    add_contrib(CelestialBody::URANUS,  PlanetaryData::MASS_URANUS);
+    add_contrib(CelestialBody::NEPTUNE, PlanetaryData::MASS_NEPTUNE);
     
-    // Saturn
-    Vector3d r_sat = getPosition(CelestialBody::SATURN, jd_tdb);
-    r_sun -= r_sat * (PlanetaryData::MASS_SATURN / total_mass);
-    
-    // Uranus
-    Vector3d r_ura = getPosition(CelestialBody::URANUS, jd_tdb);
-    r_sun -= r_ura * (PlanetaryData::MASS_URANUS / total_mass);
-    
-    // Neptune
-    Vector3d r_nep = getPosition(CelestialBody::NEPTUNE, jd_tdb);
-    r_sun -= r_nep * (PlanetaryData::MASS_NEPTUNE / total_mass);
-    
-    return r_sun;
+    return types::Vector3<core::GCRF, core::Meter>(r_sun.x(), r_sun.y(), r_sun.z());
 }
 
 CartesianState PlanetaryEphemeris::heliocentricToBarycentric(
     const CartesianState& heliocentric_state, 
-    double jd_tdb) 
+    utils::Instant t) 
 {
-    Vector3d r_sun = getSunBarycentricPosition(jd_tdb);
+    auto r_sun = getSunBarycentricPosition(t);
     
     // Barycentric position = heliocentric position - Sun position
-    Vector3d r_bary = heliocentric_state.position() - r_sun;
+    Vector3d r_bary(heliocentric_state.position().x() - r_sun.x,
+                    heliocentric_state.position().y() - r_sun.y,
+                    heliocentric_state.position().z() - r_sun.z);
     
     // Approximate velocity (ignore Sun's velocity for now)
-    Vector3d v_bary = heliocentric_state.velocity();
+    auto v_bary = heliocentric_state.velocity_strong<core::GCRF, core::Meter>();
     
-    return CartesianState(r_bary, v_bary);
+    return CartesianState(types::Vector3<core::GCRF, core::Meter>(r_bary), v_bary);
 }
 
 // ============================================================================

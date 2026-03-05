@@ -21,6 +21,8 @@ TEST(ReferenceFrameTest, RotationMatrices) {
     Matrix3d Ry = ReferenceFrame::rotation_y(angle);
     Matrix3d Rz = ReferenceFrame::rotation_z(angle);
     
+
+    
     // Check orthogonality: R * R^T = I
     EXPECT_TRUE((Rx * Rx.transpose()).isApprox(Matrix3d::Identity(), 1e-10));
     EXPECT_TRUE((Ry * Ry.transpose()).isApprox(Matrix3d::Identity(), 1e-10));
@@ -146,9 +148,8 @@ TEST(ReferenceFrameTest, EclipticRoundTrip) {
 
 TEST(ReferenceFrameTest, J2000ToITRFSimple) {
     // At J2000.0 epoch
-    double mjd = MJD2000;
     
-    Matrix3d R = ReferenceFrame::j2000_to_itrf_simple(mjd);
+    Matrix3d R = ReferenceFrame::j2000_to_itrf_simple(utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000)));
     
     // Should be orthogonal
     EXPECT_TRUE((R * R.transpose()).isApprox(Matrix3d::Identity(), 1e-10));
@@ -158,10 +159,10 @@ TEST(ReferenceFrameTest, J2000ToITRFSimple) {
 }
 
 TEST(ReferenceFrameTest, ITRFToJ2000Inverse) {
-    double mjd = MJD2000 + 1.0; // One day after J2000
+    utils::Instant mjd_instant = utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000 + 1.0)); // One day after J2000
     
-    Matrix3d to_itrf = ReferenceFrame::j2000_to_itrf_simple(mjd);
-    Matrix3d from_itrf = ReferenceFrame::itrf_to_j2000_simple(mjd);
+    Matrix3d to_itrf = ReferenceFrame::j2000_to_itrf_simple(mjd_instant);
+    Matrix3d from_itrf = ReferenceFrame::itrf_to_j2000_simple(mjd_instant);
     
     // Should be inverses
     EXPECT_TRUE((to_itrf * from_itrf).isApprox(Matrix3d::Identity(), 1e-10));
@@ -171,13 +172,13 @@ TEST(ReferenceFrameTest, ITRFRotation) {
     // Position at different times should show Earth rotation
     Vector3d pos_j2000(7000.0, 0.0, 0.0);
     
-    double mjd1 = MJD2000;
-    double mjd2 = MJD2000 + 0.25; // 6 hours later
+    utils::Instant mjd1_instant = utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000));
+    utils::Instant mjd2_instant = utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000 + 0.25)); // 6 hours later
     
     Vector3d pos_itrf1 = ReferenceFrame::transform_position(
-        pos_j2000, FrameType::J2000, FrameType::ITRF, mjd1);
+        pos_j2000, FrameType::J2000, FrameType::ITRF, mjd1_instant);
     Vector3d pos_itrf2 = ReferenceFrame::transform_position(
-        pos_j2000, FrameType::J2000, FrameType::ITRF, mjd2);
+        pos_j2000, FrameType::J2000, FrameType::ITRF, mjd2_instant);
     
     // Positions should be different (Earth has rotated)
     EXPECT_GT((pos_itrf2 - pos_itrf1).norm(), 1000.0);
@@ -267,11 +268,11 @@ TEST(ReferenceFrameTest, ITRFVelocityTransformation) {
     Vector3d vel(0.0, 7.5, 0.0);
     CartesianState state_j2000(pos, vel, GM_EARTH);
     
-    double mjd = MJD2000;
+    utils::Instant mjd_instant = utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000));
     
     // Transform to ITRF
     CartesianState state_itrf = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ITRF, mjd);
+        state_j2000, FrameType::J2000, FrameType::ITRF, mjd_instant);
     
     // Velocity magnitude should be different (Coriolis effect)
     EXPECT_NE(state_itrf.speed(), state_j2000.speed());
@@ -295,15 +296,15 @@ TEST(ReferenceFrameTest, IsRotating) {
 
 TEST(ReferenceFrameTest, GMSTCalculation) {
     // GMST at J2000.0 should be approximately 6h 41m 50.5s = 100.4606° = 1.753368 rad
-    double gmst_j2000 = ReferenceFrame::gmst(MJD2000);
+    double gmst0 = ReferenceFrame::gmst(utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000)));
     
     // Check it's in valid range [0, 2π)
-    EXPECT_GE(gmst_j2000, 0.0);
-    EXPECT_LT(gmst_j2000, 2.0 * PI);
+    EXPECT_GE(gmst0, 0.0);
+    EXPECT_LT(gmst0, 2.0 * PI);
     
     // GMST should increase with time
-    double gmst_later = ReferenceFrame::gmst(MJD2000 + 1.0);
-    EXPECT_NE(gmst_j2000, gmst_later);
+    double gmst_later = ReferenceFrame::gmst(utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000 + 1.0)));
+    EXPECT_NE(gmst0, gmst_later);
 }
 
 TEST(ReferenceFrameTest, FrameTypeToString) {

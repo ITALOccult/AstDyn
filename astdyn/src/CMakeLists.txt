@@ -57,6 +57,7 @@ endif()
 target_include_directories(astdyn
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
@@ -78,6 +79,7 @@ if(ASTDYN_BUILD_SHARED)
     target_include_directories(astdyn_shared
         PUBLIC
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
             $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
             $<INSTALL_INTERFACE:include>
     )

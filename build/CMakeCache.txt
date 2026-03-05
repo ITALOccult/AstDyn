@@ -82,7 +82,7 @@ CMAKE_FIND_PACKAGE_REDIRECTS_DIR:STATIC=/Users/michelebigi/Documents/Develop/AST
 CMAKE_INSTALL_NAME_TOOL:FILEPATH=/usr/bin/install_name_tool
 
 //Install path prefix, prepended onto install directories.
-CMAKE_INSTALL_PREFIX:PATH=/usr/local
+CMAKE_INSTALL_PREFIX:PATH=/Users/michelebigi/.local
 
 //Path to a program.
 CMAKE_LINKER:FILEPATH=/usr/bin/ld

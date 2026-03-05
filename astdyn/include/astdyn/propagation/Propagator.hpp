@@ -19,6 +19,7 @@
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/AsteroidPerturbations.hpp"
+#include "src/utils/time_types.hpp"
 #include <memory>
 
 namespace astdyn::propagation {
@@ -98,7 +99,7 @@ public:
      * @return Keplerian elements at target epoch
      */
     KeplerianElements propagate_keplerian(const KeplerianElements& initial,
-                                         double target_mjd_tdb);
+                                         utils::Instant target_time);
     
     /**
      * @brief Propagate Cartesian state to target epoch
@@ -108,7 +109,7 @@ public:
      * @return Cartesian state at target epoch
      */
     CartesianElements propagate_cartesian(const CartesianElements& initial,
-                                         double target_mjd_tdb);
+                                         utils::Instant target_time);
     
     /**
      * @brief Propagate and generate ephemeris at multiple epochs
@@ -119,7 +120,7 @@ public:
      */
     std::vector<CartesianElements> propagate_ephemeris(
         const CartesianElements& initial,
-        const std::vector<double>& epochs_mjd_tdb);
+        const std::vector<utils::Instant>& target_times);
     
     /**
      * @brief Get integrator statistics from last propagation
@@ -148,7 +149,7 @@ public:
      * @param state State vector [x, y, z, vx, vy, vz] in AU, AU/day
      * @return Derivative [vx, vy, vz, ax, ay, az]
      */
-    Eigen::VectorXd compute_derivatives(double t, const Eigen::VectorXd& state);
+    Eigen::VectorXd compute_derivatives(utils::Instant t, const Eigen::VectorXd& state);
     
 private:
     
@@ -164,14 +165,14 @@ private:
      * @brief Compute planetary perturbations (Heliocentric frame corrected)
      */
     Eigen::Vector3d planetary_perturbations(const Eigen::Vector3d& position, 
-                                          double mjd_tdb,
+                                          utils::Instant t,
                                           const Eigen::Vector3d& sun_pos_bary);
                                           
     /**
      * @brief Compute asteroid perturbations (Heliocentric frame corrected)
      */
     Eigen::Vector3d asteroid_perturbations(const Eigen::Vector3d& position, 
-                                         double mjd_tdb,
+                                         utils::Instant t,
                                          const Eigen::Vector3d& sun_pos_bary);
                                          
     // Relativistic correction (PPN)
@@ -200,7 +201,7 @@ public:
      * @return Keplerian elements at target (only M changes)
      */
     static KeplerianElements propagate(const KeplerianElements& initial,
-                                       double target_mjd_tdb);
+                                       utils::Instant target_time);
     
     /**
      * @brief Compute mean anomaly at epoch from initial state
@@ -210,7 +211,7 @@ public:
      * @return Mean anomaly at target epoch [rad]
      */
     static double mean_anomaly_at_epoch(const KeplerianElements& initial,
-                                        double target_mjd_tdb);
+                                        utils::Instant target_time);
 };
 
 } // namespace astdyn::propagation

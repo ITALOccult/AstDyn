@@ -61,7 +61,7 @@ std::optional<OpticalObservation> MPCReader::parseLine(const std::string& line) 
         
         // Parse date (columns 16-32)
         std::string date_str = line.substr(15, 17);
-        obs.mjd_utc = parseDate(date_str);
+        obs.time = parseDate(date_str);
         
         // Parse RA (columns 33-44)
         std::string ra_str = line.substr(32, 12);
@@ -149,7 +149,7 @@ std::string MPCReader::parseDesignation(const std::string& packed) {
     return trim(packed);
 }
 
-double MPCReader::parseDate(const std::string& date_str) {
+utils::Instant MPCReader::parseDate(const std::string& date_str) {
     // Format: "YYYY MM DD.ddddd"
     std::istringstream iss(date_str);
     int year, month;
@@ -160,7 +160,8 @@ double MPCReader::parseDate(const std::string& date_str) {
     // Convert to MJD
     int day_int = static_cast<int>(day);
     double fraction = day - day_int;
-    return time::calendar_to_mjd(year, month, day_int, fraction);
+    double mjd = time::calendar_to_mjd(year, month, day_int, fraction);
+    return utils::Instant::from_utc(utils::ModifiedJulianDate(mjd));
 }
 
 double MPCReader::parseRA(const std::string& ra_str) {

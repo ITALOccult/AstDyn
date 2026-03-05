@@ -21,7 +21,7 @@ using namespace astdyn::propagation;
 TEST(OrbitalElementsTest, KeplerianToCartesianCircular) {
     // Circular orbit at 1 AU
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = constants::MJD2000;
+    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
     kep.semi_major_axis = 1.0; // AU
     kep.eccentricity = 0.0;
     kep.inclination = 0.0;
@@ -33,21 +33,21 @@ TEST(OrbitalElementsTest, KeplerianToCartesianCircular) {
     CartesianElements cart = keplerian_to_cartesian(kep);
     
     // At M=0, true anomaly=0, so object is at perihelion along x-axis
-    EXPECT_NEAR(cart.position(0), 1.0, 1e-10);
-    EXPECT_NEAR(cart.position(1), 0.0, 1e-10);
-    EXPECT_NEAR(cart.position(2), 0.0, 1e-10);
+    EXPECT_NEAR(cart.position.x, 1.0, 1e-10);
+    EXPECT_NEAR(cart.position.y, 0.0, 1e-10);
+    EXPECT_NEAR(cart.position.z, 0.0, 1e-10);
     
     // Velocity should be along y-axis for circular orbit
     double v_circular = std::sqrt(constants::GMS / 1.0);
-    EXPECT_NEAR(cart.velocity(0), 0.0, 1e-10);
-    EXPECT_NEAR(cart.velocity(1), v_circular, 1e-10);
-    EXPECT_NEAR(cart.velocity(2), 0.0, 1e-10);
+    EXPECT_NEAR(cart.velocity.x, 0.0, 1e-10);
+    EXPECT_NEAR(cart.velocity.y, v_circular, 1e-10);
+    EXPECT_NEAR(cart.velocity.z, 0.0, 1e-10);
 }
 
 TEST(OrbitalElementsTest, CartesianToKeplerianRoundTrip) {
     // Create Keplerian elements for Earth-like orbit
     KeplerianElements kep1;
-    kep1.epoch_mjd_tdb = constants::MJD2000;
+    kep1.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
     kep1.semi_major_axis = 1.0;
     kep1.eccentricity = 0.0167;
     kep1.inclination = 0.0;
@@ -93,7 +93,7 @@ TEST(OrbitalElementsTest, KeplerEquationSolver) {
 
 TEST(OrbitalElementsTest, EquinoctialConversion) {
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = constants::MJD2000;
+    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
     kep.semi_major_axis = 2.5;
     kep.eccentricity = 0.2;
     kep.inclination = 15.0 * constants::DEG_TO_RAD;
@@ -201,7 +201,7 @@ TEST(IntegratorTest, RK4vsRKF78Accuracy) {
 TEST(TwoBodyPropagatorTest, CircularOrbitPeriod) {
     // Circular orbit should return to same position after one period
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = constants::MJD2000;
+    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
     kep.semi_major_axis = 1.0;
     kep.eccentricity = 0.0;
     kep.inclination = 0.0;
@@ -211,9 +211,9 @@ TEST(TwoBodyPropagatorTest, CircularOrbitPeriod) {
     kep.gravitational_parameter = constants::GMS;
     
     double period = kep.period();
-    double target_mjd = kep.epoch_mjd_tdb + period;
+    double target_mjd = kep.epoch.mjd.value + period;
     
-    KeplerianElements final = TwoBodyPropagator::propagate(kep, target_mjd);
+    KeplerianElements final = TwoBodyPropagator::propagate(kep, utils::Instant::from_tt(utils::ModifiedJulianDate(target_mjd)));
     
     // Mean anomaly should be ~0 or ~2π after one period
     double M_normalized = std::fmod(final.mean_anomaly, constants::TWO_PI);
@@ -228,7 +228,7 @@ TEST(TwoBodyPropagatorTest, CircularOrbitPeriod) {
 
 TEST(TwoBodyPropagatorTest, MeanAnomalyProgression) {
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = constants::MJD2000;
+    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
     kep.semi_major_axis = 2.5;
     kep.eccentricity = 0.2;
     kep.inclination = 0.0;
@@ -240,7 +240,7 @@ TEST(TwoBodyPropagatorTest, MeanAnomalyProgression) {
     double n = kep.mean_motion();
     double dt = 100.0; // days
     
-    KeplerianElements final = TwoBodyPropagator::propagate(kep, kep.epoch_mjd_tdb + dt);
+    KeplerianElements final = TwoBodyPropagator::propagate(kep, utils::Instant::from_tt(utils::ModifiedJulianDate(kep.epoch.mjd.value + dt)));
     
     double expected_M = n * dt;
     EXPECT_NEAR(final.mean_anomaly, expected_M, 1e-10);
@@ -253,7 +253,7 @@ TEST(TwoBodyPropagatorTest, MeanAnomalyProgression) {
 TEST(PropagationTest, EnergyConservationTwoBody) {
     // Create Keplerian orbit
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = constants::MJD2000;
+    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
     kep.semi_major_axis = 2.0;
     kep.eccentricity = 0.3;
     kep.inclination = 10.0 * constants::DEG_TO_RAD;
@@ -277,7 +277,7 @@ TEST(PropagationTest, EnergyConservationTwoBody) {
     Propagator prop(std::move(integrator), ephemeris, settings);
     
     double dt = 10.0; // 10 days (shorter to reduce numerical error)
-    CartesianElements cart_final = prop.propagate_cartesian(cart0, cart0.epoch_mjd_tdb + dt);
+    CartesianElements cart_final = prop.propagate_cartesian(cart0, utils::Instant::from_tt(utils::ModifiedJulianDate(cart0.epoch.mjd.value + dt)));
     double energy_final = cart_final.energy();
     
     // Energy should be conserved reasonably well in two-body problem

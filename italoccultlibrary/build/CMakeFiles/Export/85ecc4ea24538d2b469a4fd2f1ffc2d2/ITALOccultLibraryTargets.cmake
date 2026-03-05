@@ -61,7 +61,7 @@ add_library(ITALOccultLibrary::italoccultlib STATIC IMPORTED)
 set_target_properties(ITALOccultLibrary::italoccultlib PROPERTIES
   INTERFACE_COMPILE_DEFINITIONS "ITALOCCULTLIB_VERSION_MAJOR=1;ITALOCCULTLIB_VERSION_MINOR=0;ITALOCCULTLIB_VERSION_PATCH=0"
   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/include"
-  INTERFACE_LINK_LIBRARIES "Eigen3::Eigen;AstDyn::astdyn"
+  INTERFACE_LINK_LIBRARIES "Eigen3::Eigen;/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/../astdyn/build/src/libastdyn.a"
 )
 
 # Load information for each installed configuration.

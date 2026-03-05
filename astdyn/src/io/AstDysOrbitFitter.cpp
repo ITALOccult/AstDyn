@@ -107,7 +107,7 @@ AstDysFitResult AstDysOrbitFitter::fit() {
     if (verbose_) {
         std::cout << "\n=== Starting Orbit Fit ===\n";
         std::cout << "Observations: " << observations_.size() << "\n";
-        std::cout << "Initial epoch: MJD " << initial_elements_->epoch_mjd_tdb << "\n";
+        std::cout << "Initial epoch: MJD " << initial_elements_->epoch.mjd.value << "\n";
         std::cout << "Initial a: " << initial_elements_->semi_major_axis << " AU\n\n";
     }
     
@@ -304,7 +304,7 @@ propagation::KeplerianElements AstDysOrbitFitter::equinoctial_to_keplerian(
     while (M >= 2.0*constants::PI) M -= 2.0 * constants::PI;
     kep.mean_anomaly = M;
     
-    kep.epoch_mjd_tdb = mjd;
+    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(mjd));
     kep.gravitational_parameter = constants::GMS;
     
     return kep;

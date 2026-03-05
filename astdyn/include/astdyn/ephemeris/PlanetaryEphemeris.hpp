@@ -21,14 +21,16 @@
 #ifndef ASTDYN_EPHEMERIS_PLANETARYEPHEMERIS_HPP
 #define ASTDYN_EPHEMERIS_PLANETARYEPHEMERIS_HPP
 
-#include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
 #include "astdyn/ephemeris/PlanetaryData.hpp"
 #include "astdyn/ephemeris/EphemerisProvider.hpp"
-#include <Eigen/Dense>
 #include <vector>
-#include <memory> // for std::shared_ptr
+#include <memory>
 
 namespace astdyn {
 namespace ephemeris {
@@ -55,51 +57,45 @@ public:
     /**
      * @brief Construct ephemeris calculator
      */
-    PlanetaryEphemeris() = default;
-    
     /**
-     * @brief Get heliocentric position of a planet
-     * @param body Celestial body (planet or Moon)
-     * @param jd_tdb Julian Date in TDB time scale
-     * @return Position vector [AU] in J2000 ecliptic frame
+     * @param body Celestial body
+     * @param t Instant
+     * @return Position vector [m] in J2000 equatorial frame (ICRF)
      */
-    static Eigen::Vector3d getPosition(CelestialBody body, double jd_tdb);
+    static types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, utils::Instant t);
     
     /**
-     * @brief Get heliocentric velocity of a planet
-     * @param body Celestial body (planet or Moon)
-     * @param jd_tdb Julian Date in TDB time scale
-     * @return Velocity vector [AU/day] in J2000 ecliptic frame
+     * @param body Celestial body
+     * @param t Instant
+     * @return Velocity vector [m/s] in J2000 equatorial frame (ICRF)
      */
-    static Eigen::Vector3d getVelocity(CelestialBody body, double jd_tdb);
+    static types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, utils::Instant t);
     
     /**
-     * @brief Get heliocentric state (position + velocity)
-     * @param body Celestial body (planet or Moon)
-     * @param jd_tdb Julian Date in TDB time scale
-     * @return CartesianState in J2000 ecliptic frame [AU, AU/day]
+     * @param body Celestial body
+     * @param t Instant
+     * @return CartesianState in J2000 equatorial frame [m, m/s]
      */
-    static coordinates::CartesianState getState(CelestialBody body, double jd_tdb);
+    static coordinates::CartesianState getState(CelestialBody body, utils::Instant t);
     
     /**
-     * @brief Get barycentric position (Sun relative to SSB)
-     * @param jd_tdb Julian Date in TDB time scale
-     * @return Position vector [AU] of Sun relative to SSB
+     * @param t Instant
+     * @return Position vector [m] of Sun relative to SSB
      * 
      * Computed as weighted sum of planetary positions.
      * Useful for high-precision orbit determination.
      */
-    static Eigen::Vector3d getSunBarycentricPosition(double jd_tdb);
+    static types::Vector3<core::GCRF, core::Meter> getSunBarycentricPosition(utils::Instant t);
     
     /**
      * @brief Convert heliocentric to barycentric state
      * @param heliocentric_state State relative to Sun
-     * @param jd_tdb Julian Date in TDB
+     * @param t Time
      * @return State relative to Solar System Barycenter
      */
     static coordinates::CartesianState heliocentricToBarycentric(
         const coordinates::CartesianState& heliocentric_state, 
-        double jd_tdb
+        utils::Instant t
     );
 
     /**

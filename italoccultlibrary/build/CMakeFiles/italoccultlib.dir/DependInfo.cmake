@@ -8,11 +8,11 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/src/astdyn_wrapper.cpp" "CMakeFiles/italoccultlib.dir/src/astdyn_wrapper.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/astdyn_wrapper.cpp.o.d"
-  "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/src/chebyshev_approximation.cpp" "CMakeFiles/italoccultlib.dir/src/chebyshev_approximation.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/chebyshev_approximation.cpp.o.d"
-  "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/src/chebyshev_rkf78_propagation.cpp" "CMakeFiles/italoccultlib.dir/src/chebyshev_rkf78_propagation.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/chebyshev_rkf78_propagation.cpp.o.d"
-  "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/src/eq1_parser.cpp" "CMakeFiles/italoccultlib.dir/src/eq1_parser.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/eq1_parser.cpp.o.d"
-  "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/src/orbital_conversions.cpp" "CMakeFiles/italoccultlib.dir/src/orbital_conversions.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/orbital_conversions.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/src/astdyn_wrapper.cpp" "CMakeFiles/italoccultlib.dir/src/astdyn_wrapper.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/astdyn_wrapper.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/src/chebyshev_approximation.cpp" "CMakeFiles/italoccultlib.dir/src/chebyshev_approximation.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/chebyshev_approximation.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/src/chebyshev_rkf78_propagation.cpp" "CMakeFiles/italoccultlib.dir/src/chebyshev_rkf78_propagation.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/chebyshev_rkf78_propagation.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/src/eq1_parser.cpp" "CMakeFiles/italoccultlib.dir/src/eq1_parser.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/eq1_parser.cpp.o.d"
+  "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/src/orbital_conversions.cpp" "CMakeFiles/italoccultlib.dir/src/orbital_conversions.cpp.o" "gcc" "CMakeFiles/italoccultlib.dir/src/orbital_conversions.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

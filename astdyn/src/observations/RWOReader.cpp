@@ -79,7 +79,8 @@ std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) 
         }
         
         std::string date_str = line.substr(17, 21);
-        obs.mjd_utc = parseDate(date_str);
+        double mjd_utc = parseDate(date_str);
+        obs.time = utils::Instant::from_utc(utils::ModifiedJulianDate(mjd_utc));
         // ... (rest of function)
         
         // Fortran FORMAT 521 starts at READ(record(51:),521)

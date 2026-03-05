@@ -15,6 +15,10 @@
 #include "astdyn/observations/Observation.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <vector>
 #include <optional>
 #include <memory>
@@ -31,7 +35,7 @@ namespace astdyn::orbit_determination {
  * @brief Single observation residual
  */
 struct ObservationResidual {
-    double mjd_utc;                      ///< Observation epoch
+    utils::Instant time;                 ///< Observation epoch
     std::string observatory_code;        ///< Observatory
     
     // Angular residuals [rad]
@@ -51,8 +55,8 @@ struct ObservationResidual {
     double computed_dec;                 ///< Computed Dec [rad]
     
     // Geometry
-    double range;                        ///< Topocentric distance [AU]
-    double range_rate;                   ///< Topocentric range rate [AU/day]
+    double range;                        ///< Topocentric distance [m]
+    double range_rate;                   ///< Topocentric range rate [m/s]
     
     // Quality flags
     bool outlier;                        ///< Marked as outlier?
@@ -173,43 +177,43 @@ public:
      * @brief Get observer position at observation time
      * 
      * @param obs Observation with time and observatory code
-     * @return Observer position (heliocentric) [AU], or nullopt if failed
+     * @return Observer position (heliocentric) [m] in GCRF, or nullopt if failed
      */
-    std::optional<astdyn::Vector3d> get_observer_position(
+    std::optional<types::Vector3<core::GCRF, core::Meter>> get_observer_position(
         const astdyn::observations::OpticalObservation& obs) const;
     
     /**
      * @brief Get observer velocity at observation time
      * 
      * @param obs Observation with time and observatory code
-     * @return Observer velocity (heliocentric) [AU/day], or nullopt if failed
+     * @return Observer velocity (heliocentric) [m/s] in GCRF, or nullopt if failed
      */
-    std::optional<astdyn::Vector3d> get_observer_velocity(
+    std::optional<types::Vector3<core::GCRF, core::Meter>> get_observer_velocity(
         const astdyn::observations::OpticalObservation& obs) const;
     
     /**
      * @brief Convert UTC to TDB time scale
      * 
-     * @param mjd_utc Modified Julian Date in UTC
-     * @return MJD in TDB time scale
+     * @param t_utc Time in UTC
+     * @return Instant in TDB time scale
      */
-    static double utc_to_tdb(double mjd_utc);
+    static utils::Instant utc_to_tdb(utils::Instant t_utc);
 
 private:
     /**
      * @brief Compute topocentric position of object
      * 
-     * @param heliocentric_pos Object position (heliocentric) [AU]
-     * @param observer_pos Observer position (heliocentric) [AU]
-     * @param observer_vel Observer velocity (heliocentric) [AU/day]
-     * @param[out] range Topocentric distance [AU]
-     * @param[out] range_rate Topocentric range rate [AU/day]
+     * @param heliocentric_pos Object position (heliocentric) [m]
+     * @param observer_pos Observer position (heliocentric) [m]
+     * @param observer_vel Observer velocity (heliocentric) [m/s]
+     * @param[out] range Topocentric distance [m]
+     * @param[out] range_rate Topocentric range rate [m/s]
      * @return Unit vector from observer to object
      */
-    astdyn::Vector3d compute_topocentric_direction(
-        const astdyn::Vector3d& heliocentric_pos,
-        const astdyn::Vector3d& observer_pos,
-        const astdyn::Vector3d& observer_vel,
+    types::Vector3<core::GCRF, core::Meter> compute_topocentric_direction(
+        const types::Vector3<core::GCRF, core::Meter>& heliocentric_pos,
+        const types::Vector3<core::GCRF, core::Meter>& observer_pos,
+        const types::Vector3<core::GCRF, core::Meter>& observer_vel,
         double& range,
         double& range_rate) const;
     
@@ -217,14 +221,17 @@ private:
      * @brief Convert topocentric Cartesian to RA/Dec
      * 
      * @param direction Unit vector (topocentric)
+     * @param rho_vec Topocentric vector [m]
+     * @param observer_pos Observer heliocentric position [m]
+     * @param observer_vel Observer heliocentric velocity [m/s]
      * @param[out] ra Right ascension [rad]
      * @param[out] dec Declination [rad]
      */
     void cartesian_to_radec(
-        const astdyn::Vector3d& direction,
-        const astdyn::Vector3d& rho_vec,
-        const astdyn::Vector3d& observer_pos,
-        const astdyn::Vector3d& observer_vel,
+        const types::Vector3<core::GCRF, core::Meter>& direction,
+        const types::Vector3<core::GCRF, core::Meter>& rho_vec,
+        const types::Vector3<core::GCRF, core::Meter>& observer_pos,
+        const types::Vector3<core::GCRF, core::Meter>& observer_vel,
         double& ra,
         double& dec) const;
 

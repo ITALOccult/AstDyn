@@ -13,6 +13,10 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <cmath>
 #include <optional>
 
@@ -51,6 +55,15 @@ public:
         : position_(position), 
           velocity_(velocity),
           mu_(mu) {}
+
+    /** @brief Construct from strong-typed vectors. */
+    template<typename Frame, typename Unit>
+    CartesianState(const types::Vector3<Frame, Unit>& pos, 
+                   const types::Vector3<Frame, Unit>& vel,
+                   double mu = constants::GM_SUN)
+        : position_(pos.to_eigen()), 
+          velocity_(vel.to_eigen()),
+          mu_(mu) {}
     
     /**
      * @brief Construct from 6D state vector [rx, ry, rz, vx, vy, vz]
@@ -69,6 +82,12 @@ public:
     
     const Vector3d& position() const { return position_; }
     const Vector3d& velocity() const { return velocity_; }
+
+    template<typename Frame = core::GCRF, typename Unit = core::Meter>
+    types::Vector3<Frame, Unit> position_strong() const { return types::Vector3<Frame, Unit>(position_); }
+
+    template<typename Frame = core::GCRF, typename Unit = core::Meter>
+    types::Vector3<Frame, Unit> velocity_strong() const { return types::Vector3<Frame, Unit>(velocity_); }
     double mu() const { return mu_; }
     
     void set_position(const Vector3d& pos) { position_ = pos; }

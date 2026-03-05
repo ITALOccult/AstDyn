@@ -23,6 +23,10 @@
 #include "astdyn/observations/Observation.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <vector>
 #include <optional>
 
@@ -49,7 +53,7 @@ struct GaussIODResult {
     
     // Resulting orbit
     astdyn::propagation::CartesianElements state;   ///< Heliocentric state at middle obs
-    double epoch_mjd_tdb;                           ///< Epoch of solution [MJD TDB]
+    utils::Instant epoch;                           ///< Epoch of solution
     
     // Quality indicators
     double slant_range_1;                ///< Distance to object [AU] at obs 1
@@ -132,7 +136,7 @@ private:
      * @param dec Declination [rad]
      * @return Unit vector in equatorial frame
      */
-    Vector3d compute_line_of_sight(double ra, double dec) const;
+    types::Vector3<core::GCRF, core::Meter> compute_line_of_sight(double ra, double dec) const;
     
     /**
      * @brief Solve Gauss polynomial for slant ranges
@@ -155,8 +159,12 @@ private:
      */
     bool solve_slant_ranges(
         double tau1, double tau3,
-        const Vector3d& los1, const Vector3d& los2, const Vector3d& los3,
-        const Vector3d& R1, const Vector3d& R2, const Vector3d& R3,
+        const types::Vector3<core::GCRF, core::Meter>& los1, 
+        const types::Vector3<core::GCRF, core::Meter>& los2, 
+        const types::Vector3<core::GCRF, core::Meter>& los3,
+        const types::Vector3<core::GCRF, core::Meter>& R1, 
+        const types::Vector3<core::GCRF, core::Meter>& R2, 
+        const types::Vector3<core::GCRF, core::Meter>& R3,
         double& rho1, double& rho2, double& rho3,
         int& iterations);
     
@@ -172,7 +180,9 @@ private:
      * @return (f, g) coefficients
      */
     std::pair<double, double> compute_f_g_coefficients(
-        const Vector3d& r, const Vector3d& v, double dt, double mu) const;
+        const types::Vector3<core::GCRF, core::Meter>& r, 
+        const types::Vector3<core::GCRF, core::Meter>& v, 
+        double dt, double mu) const;
 };
 
 } // namespace astdyn::orbit_determination

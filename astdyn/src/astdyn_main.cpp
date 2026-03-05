@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
         
         if (opts.have_initial_orbit) {
             propagation::KeplerianElements initial;
-            initial.epoch_mjd_tdb = opts.epoch_mjd;
+            initial.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(opts.epoch_mjd));
             initial.semi_major_axis = opts.a;
             initial.eccentricity = opts.e;
             initial.inclination = opts.i_deg * constants::DEG_TO_RAD;
@@ -287,8 +287,8 @@ int main(int argc, char** argv) {
             // Use observation timespan if not specified
             if (opts.ephem_start == 0.0) {
                 const auto& obs = engine.observations();
-                opts.ephem_start = obs.front().mjd_utc;
-                opts.ephem_end = obs.back().mjd_utc;
+                opts.ephem_start = obs.front().time.mjd.value;
+                opts.ephem_end = obs.back().time.mjd.value;
             }
             
             auto ephemeris = engine.compute_ephemeris(
@@ -304,13 +304,13 @@ int main(int argc, char** argv) {
             file << std::fixed << std::setprecision(9);
             
             for (const auto& state : ephemeris) {
-                file << state.epoch_mjd_tdb << "  "
-                     << state.position[0] << "  "
-                     << state.position[1] << "  "
-                     << state.position[2] << "  "
-                     << state.velocity[0] << "  "
-                     << state.velocity[1] << "  "
-                     << state.velocity[2] << "\n";
+                file << state.epoch.mjd.value << "  "
+                     << state.position.x << "  "
+                     << state.position.y << "  "
+                     << state.position.z << "  "
+                     << state.velocity.x << "  "
+                     << state.velocity.y << "  "
+                     << state.velocity.z << "\n";
             }
             
             std::cout << "Ephemeris saved to: " << ephem_file << "\n";
@@ -328,9 +328,9 @@ int main(int argc, char** argv) {
             // Use extended timespan if not specified
             if (opts.ca_start == 0.0) {
                 const auto& obs = engine.observations();
-                double span = obs.back().mjd_utc - obs.front().mjd_utc;
-                opts.ca_start = obs.front().mjd_utc - span;
-                opts.ca_end = obs.back().mjd_utc + span;
+                double span = obs.back().time.mjd.value - obs.front().time.mjd.value;
+                opts.ca_start = obs.front().time.mjd.value - span;
+                opts.ca_end = obs.back().time.mjd.value + span;
             }
             
             auto approaches = engine.find_close_approaches(
@@ -348,14 +348,14 @@ int main(int argc, char** argv) {
                     // Convert velocity from AU/day to km/s
                     const double km_per_au = 149597870.7;
                     const double sec_per_day = 86400.0;
-                    double vel_kms = ca.relative_velocity * km_per_au / sec_per_day;
+                    double vel_kms = ca.relative_velocity_mag * km_per_au / sec_per_day;
                     
                     // Need to know planet radius for distance in radii - use Earth as default
                     double earth_radius_km = 6378.137;
                     double earth_radius_au = earth_radius_km / km_per_au;
                     
                     file << static_cast<int>(ca.body) << "  "
-                         << ca.mjd_tdb << "  "
+                         << ca.time.mjd.value << "  "
                          << ca.distance << "  "
                          << ca.distance_in_radii(earth_radius_au) << "  "
                          << vel_kms << "\n";

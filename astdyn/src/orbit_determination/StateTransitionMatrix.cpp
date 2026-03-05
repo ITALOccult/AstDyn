@@ -34,19 +34,19 @@ StateTransitionMatrix::StateTransitionMatrix(
 
 STMResult StateTransitionMatrix::compute(
     const CartesianElements& initial,
-    double target_mjd_tdb) {
+    utils::Instant target_time) {
     
-    return propagate_with_stm(initial, target_mjd_tdb);
+    return propagate_with_stm(initial, target_time);
 }
 
 StateTransitionMatrix::ObservationPartials 
 StateTransitionMatrix::compute_with_partials(
     const CartesianElements& initial,
-    double target_mjd_tdb,
-    const Vector3d& observer_pos) {
+    utils::Instant target_time,
+    const types::Vector3<core::GCRF, core::Meter>& observer_pos) {
     
     // Compute STM
-    auto stm_result = propagate_with_stm(initial, target_mjd_tdb);
+    auto stm_result = propagate_with_stm(initial, target_time);
     
     // Compute observation partials ∂(RA,Dec)/∂x
     auto obs_partials = compute_observation_partials(
@@ -62,15 +62,15 @@ StateTransitionMatrix::compute_with_partials(
 
 STMResult StateTransitionMatrix::propagate_with_stm(
     const CartesianElements& initial,
-    double target_mjd_tdb) {
+    utils::Instant target_time) {
     
     // Augmented state vector: [x(6), Φ(36)]
     // Total dimension: 42
     Eigen::VectorXd y0(42);
     
     // Initial state
-    y0.segment<3>(0) = initial.position;
-    y0.segment<3>(3) = initial.velocity;
+    y0.segment<3>(0) = Eigen::Vector3d(initial.position.x, initial.position.y, initial.position.z);
+    y0.segment<3>(3) = Eigen::Vector3d(initial.velocity.x, initial.velocity.y, initial.velocity.z);
     
     // Initial STM: Φ(t₀,t₀) = I
     for (int i = 0; i < 6; ++i) {
@@ -81,7 +81,8 @@ STMResult StateTransitionMatrix::propagate_with_stm(
     }
     
     // Define augmented derivative function
-    auto f_augmented = [this](double t, const Eigen::VectorXd& y) -> Eigen::VectorXd {
+    auto f_augmented = [this](double t_val, const Eigen::VectorXd& y) -> Eigen::VectorXd {
+        const auto t = utils::Instant::from_tt(utils::ModifiedJulianDate(t_val));
         // Extract state
         Eigen::VectorXd state = y.segment<6>(0);
         
@@ -117,14 +118,14 @@ STMResult StateTransitionMatrix::propagate_with_stm(
     
     // Integrate augmented system
     Eigen::VectorXd yf = integrator_->integrate(
-        f_augmented, y0, initial.epoch_mjd_tdb, target_mjd_tdb);
+        f_augmented, y0, initial.epoch.mjd.value, target_time.mjd.value);
     
     // Extract final state
     STMResult result;
-    result.final_state.epoch_mjd_tdb = target_mjd_tdb;
+    result.final_state.epoch = target_time;
     result.final_state.gravitational_parameter = initial.gravitational_parameter;
-    result.final_state.position = yf.segment<3>(0);
-    result.final_state.velocity = yf.segment<3>(3);
+    result.final_state.position = types::Vector3<core::GCRF, core::Meter>(yf[0], yf[1], yf[2]);
+    result.final_state.velocity = types::Vector3<core::GCRF, core::Meter>(yf[3], yf[4], yf[5]);
     
     // Extract STM
     for (int i = 0; i < 6; ++i) {
@@ -137,7 +138,7 @@ STMResult StateTransitionMatrix::propagate_with_stm(
 }
 
 Matrix6d StateTransitionMatrix::compute_jacobian(
-    double t, 
+    utils::Instant t, 
     const Eigen::VectorXd& state) {
     
     Vector3d r = state.segment<3>(0);
@@ -183,10 +184,12 @@ Eigen::Matrix3d StateTransitionMatrix::compute_acceleration_position_partial(
 
 Eigen::Matrix<double, 2, 6> StateTransitionMatrix::compute_observation_partials(
     const CartesianElements& state,
-    const Vector3d& observer_pos) const {
+    const types::Vector3<core::GCRF, core::Meter>& observer_pos) const {
     
     // Topocentric position vector
-    Vector3d rho = state.position - observer_pos;
+    Eigen::Vector3d rho(state.position.x - observer_pos.x,
+                        state.position.y - observer_pos.y,
+                        state.position.z - observer_pos.z);
     double range = rho.norm();
     
     // Unit direction vector

@@ -57,13 +57,23 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary
+CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build
+CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build
 
 #=============================================================================
 # Targets provided globally by CMake.
+
+# Special rule for the target test
+test:
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Running tests..."
+	/opt/homebrew/bin/ctest $(ARGS)
+.PHONY : test
+
+# Special rule for the target test
+test/fast: test
+.PHONY : test/fast
 
 # Special rule for the target edit_cache
 edit_cache:
@@ -132,9 +142,9 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles /Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -173,6 +183,71 @@ italoccultlib: cmake_check_build_system
 italoccultlib/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/italoccultlib.dir/build.make CMakeFiles/italoccultlib.dir/build
 .PHONY : italoccultlib/fast
+
+#=============================================================================
+# Target rules for targets named test_chebyshev
+
+# Build rule for target.
+test_chebyshev: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_chebyshev
+.PHONY : test_chebyshev
+
+# fast build rule for target.
+test_chebyshev/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_chebyshev.dir/build.make tests/CMakeFiles/test_chebyshev.dir/build
+.PHONY : test_chebyshev/fast
+
+#=============================================================================
+# Target rules for targets named test_astdyn_wrapper
+
+# Build rule for target.
+test_astdyn_wrapper: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_astdyn_wrapper
+.PHONY : test_astdyn_wrapper
+
+# fast build rule for target.
+test_astdyn_wrapper/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_astdyn_wrapper.dir/build.make tests/CMakeFiles/test_astdyn_wrapper.dir/build
+.PHONY : test_astdyn_wrapper/fast
+
+#=============================================================================
+# Target rules for targets named test_34713_precision
+
+# Build rule for target.
+test_34713_precision: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_34713_precision
+.PHONY : test_34713_precision
+
+# fast build rule for target.
+test_34713_precision/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_34713_precision.dir/build.make tests/CMakeFiles/test_34713_precision.dir/build
+.PHONY : test_34713_precision/fast
+
+#=============================================================================
+# Target rules for targets named test_asteroid_249_precision
+
+# Build rule for target.
+test_asteroid_249_precision: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_asteroid_249_precision
+.PHONY : test_asteroid_249_precision
+
+# fast build rule for target.
+test_asteroid_249_precision/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_asteroid_249_precision.dir/build.make tests/CMakeFiles/test_asteroid_249_precision.dir/build
+.PHONY : test_asteroid_249_precision/fast
+
+#=============================================================================
+# Target rules for targets named test_allnum_cat_simulation
+
+# Build rule for target.
+test_allnum_cat_simulation: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_allnum_cat_simulation
+.PHONY : test_allnum_cat_simulation
+
+# fast build rule for target.
+test_allnum_cat_simulation/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_allnum_cat_simulation.dir/build.make tests/CMakeFiles/test_allnum_cat_simulation.dir/build
+.PHONY : test_allnum_cat_simulation/fast
 
 src/astdyn_wrapper.o: src/astdyn_wrapper.cpp.o
 .PHONY : src/astdyn_wrapper.o
@@ -306,7 +381,13 @@ help:
 	@echo "... install/strip"
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
+	@echo "... test"
 	@echo "... italoccultlib"
+	@echo "... test_34713_precision"
+	@echo "... test_allnum_cat_simulation"
+	@echo "... test_astdyn_wrapper"
+	@echo "... test_asteroid_249_precision"
+	@echo "... test_chebyshev"
 	@echo "... src/astdyn_wrapper.o"
 	@echo "... src/astdyn_wrapper.i"
 	@echo "... src/astdyn_wrapper.s"

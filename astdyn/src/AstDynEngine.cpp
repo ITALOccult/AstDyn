@@ -301,8 +301,8 @@ int AstDynEngine::load_observations(const std::string& filename) {
         std::cout << "Loaded " << observations_.size() << " observations\n";
         if (!observations_.empty()) {
             std::cout << "Time span: " 
-                     << observations_.front().mjd_utc << " - "
-                     << observations_.back().mjd_utc << " MJD UTC\n";
+                     << observations_.front().time.mjd.value << " - "
+                     << observations_.back().time.mjd.value << " MJD UTC\n";
         }
     }
     
@@ -387,7 +387,7 @@ void AstDynEngine::validate_observations() {
     // Sort by time
     std::sort(observations_.begin(), observations_.end(),
         [](const OpticalObservation& a, const OpticalObservation& b) {
-            return a.mjd_utc < b.mjd_utc;
+            return a.time.mjd.value < b.time.mjd.value;
         });
     
     // Check for valid observatory codes
@@ -417,7 +417,7 @@ void AstDynEngine::set_initial_orbit(const KeplerianElements& elements) {
     if (config_.verbose) {
         std::cout << "\nInitial orbit set:\n";
         std::cout << "  Epoch: " << std::fixed << std::setprecision(6) 
-                 << elements.epoch_mjd_tdb << " MJD TDB\n";
+                 << elements.epoch.mjd.value << " MJD TDB\n";
         std::cout << "  a = " << elements.semi_major_axis << " AU\n";
         std::cout << "  e = " << elements.eccentricity << "\n";
         std::cout << "  i = " << (elements.inclination * constants::RAD_TO_DEG) << " deg\n";
@@ -441,12 +441,13 @@ KeplerianElements AstDynEngine::initial_orbit_determination() {
     std::vector<observations::OpticalObservation> optical_obs;
     for (const auto& obs : observations_) {
         observations::OpticalObservation opt_obs;
-        opt_obs.mjd_utc = obs.mjd_utc;
+        opt_obs.time = obs.time;
         opt_obs.ra = obs.ra;
         opt_obs.dec = obs.dec;
         opt_obs.sigma_ra = 1.0 / 206265.0;  // ~1 arcsec default
         opt_obs.sigma_dec = 1.0 / 206265.0;
         // Copy observatory code
+        opt_obs.observatory_code = obs.observatory_code;
         optical_obs.push_back(opt_obs);
     }
     
@@ -473,8 +474,8 @@ KeplerianElements AstDynEngine::initial_orbit_determination() {
     has_orbit_ = true;
     
     // Simple conversion to Keplerian elements for initial orbit
-    const auto& r = result.state.position;
-    const auto& v = result.state.velocity;
+    const auto r = result.state.position.to_eigen();
+    const auto v = result.state.velocity.to_eigen();
     
     double r_mag = r.norm();
     double v_mag = v.norm();
@@ -525,7 +526,7 @@ KeplerianElements AstDynEngine::initial_orbit_determination() {
     kep_result.longitude_ascending_node = Omega;
     kep_result.argument_perihelion = omega;
     kep_result.mean_anomaly = M;
-    kep_result.epoch_mjd_tdb = result.epoch_mjd_tdb;
+    kep_result.epoch = result.epoch;
     kep_result.gravitational_parameter = constants::GMS;
     
     current_orbit_ = kep_result;
@@ -636,12 +637,12 @@ std::vector<CartesianElements> AstDynEngine::compute_ephemeris(
     }
     
     // Generate epoch list
-    std::vector<double> epochs;
+    std::vector<utils::Instant> epochs;
     for (double mjd = start_mjd; mjd <= end_mjd; mjd += step_days) {
-        epochs.push_back(mjd);
+        epochs.push_back(utils::Instant::from_tt(utils::ModifiedJulianDate(mjd)));
     }
-    if (epochs.back() < end_mjd) {
-        epochs.push_back(end_mjd);
+    if (epochs.back().mjd.value < end_mjd) {
+        epochs.push_back(utils::Instant::from_tt(utils::ModifiedJulianDate(end_mjd)));
     }
     
     // Convert orbit to Cartesian
@@ -662,7 +663,7 @@ KeplerianElements AstDynEngine::propagate_to(double target_mjd) {
         throw std::runtime_error("No orbit available");
     }
     
-    return propagator_->propagate_keplerian(current_orbit_, target_mjd);
+    return propagator_->propagate_keplerian(current_orbit_, utils::Instant::from_tt(utils::ModifiedJulianDate(target_mjd)));
 }
 
 // ============================================================================
@@ -688,14 +689,14 @@ std::vector<CloseApproach> AstDynEngine::find_close_approaches(
     // Search for close approaches
     auto approaches = ca_detector_->find_approaches(
         initial,
-        start_mjd,
-        end_mjd);
+        utils::Instant::from_tt(utils::ModifiedJulianDate(start_mjd)),
+        utils::Instant::from_tt(utils::ModifiedJulianDate(end_mjd)));
     
     if (config_.verbose) {
         std::cout << "Found " << approaches.size() << " close approaches\n";
         for (const auto& ca : approaches) {
             std::cout << "  " << static_cast<int>(ca.body) 
-                     << " at " << ca.mjd_tdb << " MJD: "
+                     << " at " << ca.time.mjd.value << " MJD: "
                      << ca.distance << " AU ("
                      << ca.distance_in_radii(0.0001) << " radii)\n";  // Need planet radius
         }
@@ -737,7 +738,7 @@ void AstDynEngine::print_orbit_summary(std::ostream& os) const {
     }
     
     os << std::fixed << std::setprecision(6);
-    os << "Epoch:    " << current_orbit_.epoch_mjd_tdb << " MJD TDB\n";
+    os << "Epoch:    " << current_orbit_.epoch.mjd.value << " MJD TDB\n";
     os << "a:        " << std::setprecision(9) << current_orbit_.semi_major_axis << " AU\n";
     os << "e:        " << std::setprecision(9) << current_orbit_.eccentricity << "\n";
     os << "i:        " << std::setprecision(6) 
@@ -783,7 +784,7 @@ void AstDynEngine::export_orbit(const std::string& filename,
         // AstDyn Orbit Element Format
         file << std::fixed << std::setprecision(9);
         file << "! AstDyn orbit elements\n";
-        file << "! Epoch (MJD TDB): " << current_orbit_.epoch_mjd_tdb << "\n";
+        file << "! Epoch (MJD TDB): " << current_orbit_.epoch.mjd.value << "\n";
         file << current_orbit_.semi_major_axis << "  ! a (AU)\n";
         file << current_orbit_.eccentricity << "  ! e\n";
         file << (current_orbit_.inclination * constants::RAD_TO_DEG) << "  ! i (deg)\n";
@@ -794,7 +795,7 @@ void AstDynEngine::export_orbit(const std::string& filename,
     else if (format == "mpc" || format == "MPC") {
         // MPC format (simplified)
         file << "! MPC orbital elements\n";
-        file << "! Epoch: " << current_orbit_.epoch_mjd_tdb << " MJD\n";
+        file << "! Epoch: " << current_orbit_.epoch.mjd.value << " MJD\n";
         file << "! a=" << current_orbit_.semi_major_axis 
              << " e=" << current_orbit_.eccentricity 
              << " i=" << (current_orbit_.inclination * constants::RAD_TO_DEG) << "\n";

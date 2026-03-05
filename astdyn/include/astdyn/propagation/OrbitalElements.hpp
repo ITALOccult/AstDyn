@@ -16,9 +16,13 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
-#include <Eigen/Dense>
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <string>
 #include <optional>
+#include <vector>
 
 namespace astdyn::propagation {
 
@@ -29,7 +33,7 @@ namespace astdyn::propagation {
  * Units: km, radians, days (MJD)
  */
 struct KeplerianElements {
-    double epoch_mjd_tdb;           ///< Epoch (MJD TDB)
+    utils::Instant epoch;           ///< Epoch (Instant TDB)
     double semi_major_axis;          ///< Semi-major axis [AU]
     double eccentricity;             ///< Eccentricity [dimensionless]
     double inclination;              ///< Inclination [rad]
@@ -91,9 +95,9 @@ struct KeplerianElements {
  * Units: AU, AU/day
  */
 struct CartesianElements {
-    double epoch_mjd_tdb;              ///< Epoch (MJD TDB)
-    Eigen::Vector3d position;          ///< Position [AU]
-    Eigen::Vector3d velocity;          ///< Velocity [AU/day]
+    utils::Instant epoch;              ///< Epoch (Instant TDB)
+    types::Vector3<core::GCRF, core::Meter> position; ///< Position vector
+    types::Vector3<core::GCRF, core::Meter> velocity; ///< Velocity vector
     
     double gravitational_parameter = constants::GMS;    ///< GM of central body [AU³/day²]
     
@@ -134,7 +138,7 @@ struct CartesianElements {
  * See Walker et al. (1985) Celestial Mechanics.
  */
 struct EquinoctialElements {
-    double epoch_mjd_tdb;     ///< Epoch (MJD TDB)
+    utils::Instant epoch;     ///< Epoch (Instant TDB)
     double a;                 ///< Semi-major axis [AU]
     double h;                 ///< h = e sin(ω + Ω)
     double k;                 ///< k = e cos(ω + Ω)
@@ -162,7 +166,7 @@ struct CometaryElements {
     double inclination;                ///< i [rad]
     double longitude_ascending_node;   ///< Ω [rad]
     double argument_perihelion;        ///< ω [rad]
-    double time_perihelion_mjd_tdb;    ///< Tp [MJD TDB]
+    utils::Instant time_perihelion;    ///< Tp (Instant TDB)
     
     double gravitational_parameter = constants::GMS;    ///< GM [AU³/day²]
     
@@ -243,17 +247,6 @@ CometaryElements keplerian_to_cometary(const KeplerianElements& kep);
  */
 KeplerianElements cometary_to_keplerian(const CometaryElements& com);
 
-/**
- * @brief Solve Kepler's equation M = E - e sin(E) for eccentric anomaly
- * 
- * Uses Newton-Raphson iteration with excellent convergence.
- * 
- * @param M Mean anomaly [rad]
- * @param e Eccentricity
- * @param tolerance Convergence tolerance (default 1e-12)
- * @param max_iter Maximum iterations (default 50)
- * @return Eccentric anomaly E [rad]
- */
 double solve_kepler_equation(double M, double e, 
                              double tolerance = 1e-12, 
                              int max_iter = 50);

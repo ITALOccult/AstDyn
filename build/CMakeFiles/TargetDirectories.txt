@@ -7,3 +7,7 @@
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/test.dir
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/edit_cache.dir
 /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/rebuild_cache.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/list_install_components.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/install.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/install/local.dir
+/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles/install/strip.dir

@@ -47,8 +47,8 @@ public:
     
     ~DE441Provider() override;
     
-    Eigen::Vector3d getPosition(CelestialBody body, double jd_tdb) override;
-    Eigen::Vector3d getVelocity(CelestialBody body, double jd_tdb) override;
+    types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, utils::Instant t) override;
+    types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, utils::Instant t) override;
     
     std::string getName() const override { return "JPL DE441 (Native)"; }
     double getAccuracy() const override { return 0.001; } // ~1 mas
@@ -67,7 +67,7 @@ private:
     /**
      * @brief Convert JD (TDB) to ET (ephemeris time)
      */
-    double jdToET(double jd_tdb) const;
+    double jdToET(utils::Instant t) const;
     
     /**
      * @brief Rotate from J2000 equatorial to ecliptic

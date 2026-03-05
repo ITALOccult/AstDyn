@@ -1,4 +1,4 @@
-# Install script for directory: /Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary
+# Install script for directory: /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -12,7 +12,7 @@ if(NOT DEFINED CMAKE_INSTALL_CONFIG_NAME)
     string(REGEX REPLACE "^[^A-Za-z0-9_]+" ""
            CMAKE_INSTALL_CONFIG_NAME "${BUILD_TYPE}")
   else()
-    set(CMAKE_INSTALL_CONFIG_NAME "Release")
+    set(CMAKE_INSTALL_CONFIG_NAME "")
   endif()
   message(STATUS "Install configuration: \"${CMAKE_INSTALL_CONFIG_NAME}\"")
 endif()
@@ -38,7 +38,7 @@ if(NOT DEFINED CMAKE_OBJDUMP)
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE STATIC_LIBRARY FILES "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/libitaloccultlib.a")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE STATIC_LIBRARY FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/libitaloccultlib.a")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libitaloccultlib.a" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libitaloccultlib.a")
     execute_process(COMMAND "/usr/bin/ranlib" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libitaloccultlib.a")
@@ -47,11 +47,11 @@ endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/italoccultlib" TYPE FILE FILES
-    "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/include/eq1_parser.h"
-    "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/include/orbital_conversions.h"
-    "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/include/astdyn_wrapper.h"
-    "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/include/chebyshev_approximation.h"
-    "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/include/chebyshev_rkf78_propagation.h"
+    "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/include/eq1_parser.h"
+    "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/include/orbital_conversions.h"
+    "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/include/astdyn_wrapper.h"
+    "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/include/chebyshev_approximation.h"
+    "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/include/chebyshev_rkf78_propagation.h"
     )
 endif()
 
@@ -59,7 +59,7 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/ITALOccultLibrary/ITALOccultLibraryTargets.cmake")
     file(DIFFERENT _cmake_export_file_changed FILES
          "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/ITALOccultLibrary/ITALOccultLibraryTargets.cmake"
-         "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/Export/85ecc4ea24538d2b469a4fd2f1ffc2d2/ITALOccultLibraryTargets.cmake")
+         "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/Export/85ecc4ea24538d2b469a4fd2f1ffc2d2/ITALOccultLibraryTargets.cmake")
     if(_cmake_export_file_changed)
       file(GLOB _cmake_old_config_files "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/ITALOccultLibrary/ITALOccultLibraryTargets-*.cmake")
       if(_cmake_old_config_files)
@@ -72,23 +72,28 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
     endif()
     unset(_cmake_export_file_changed)
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/ITALOccultLibrary" TYPE FILE FILES "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/Export/85ecc4ea24538d2b469a4fd2f1ffc2d2/ITALOccultLibraryTargets.cmake")
-  if(CMAKE_INSTALL_CONFIG_NAME MATCHES "^([Rr][Ee][Ll][Ee][Aa][Ss][Ee])$")
-    file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/ITALOccultLibrary" TYPE FILE FILES "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/Export/85ecc4ea24538d2b469a4fd2f1ffc2d2/ITALOccultLibraryTargets-release.cmake")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/ITALOccultLibrary" TYPE FILE FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/Export/85ecc4ea24538d2b469a4fd2f1ffc2d2/ITALOccultLibraryTargets.cmake")
+  if(CMAKE_INSTALL_CONFIG_NAME MATCHES "^()$")
+    file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/ITALOccultLibrary" TYPE FILE FILES "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/Export/85ecc4ea24538d2b469a4fd2f1ffc2d2/ITALOccultLibraryTargets-noconfig.cmake")
   endif()
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/ITALOccultLibrary" TYPE FILE FILES
-    "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/ITALOccultLibraryConfig.cmake"
-    "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/ITALOccultLibraryConfigVersion.cmake"
+    "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/ITALOccultLibraryConfig.cmake"
+    "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/ITALOccultLibraryConfigVersion.cmake"
     )
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/tests/cmake_install.cmake")
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/install_local_manifest.txt"
+  file(WRITE "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()
 if(CMAKE_INSTALL_COMPONENT)
@@ -104,6 +109,6 @@ else()
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/${CMAKE_INSTALL_MANIFEST}"
+  file(WRITE "/Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/italoccultlibrary/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

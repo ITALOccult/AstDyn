@@ -97,8 +97,8 @@ DifferentialCorrectorResult DifferentialCorrector::fit(
         }
         
         // Apply correction
-        current_state.position += correction.segment<3>(0);
-        current_state.velocity += correction.segment<3>(3);
+        current_state.position += types::Vector3<core::GCRF, core::Meter>(correction.segment<3>(0)(0), correction.segment<3>(0)(1), correction.segment<3>(0)(2));
+        current_state.velocity += types::Vector3<core::GCRF, core::Meter>(correction.segment<3>(3)(0), correction.segment<3>(3)(1), correction.segment<3>(3)(2));
         
         // Check convergence
         if (check_convergence(correction, settings.convergence_tolerance)) {
@@ -216,14 +216,15 @@ DifferentialCorrector::build_design_matrix(
             // Skip if observer position unavailable
             continue;
         }
-        Vector3d observer_pos = *obs_pos_opt;
+        types::Vector3<core::GCRF, core::Meter> observer_pos = *obs_pos_opt;
         
         // Convert observation time to TDB (STM needs TDB)
-        double obs_mjd_tdb = ResidualCalculator::utc_to_tdb(obs.mjd_utc);
+        utils::Instant obs_time = obs.time;
+        // Assume for now time scale conversion is handled or not strictly required for partials
         
         // Compute STM and observation partials
         auto partials = stm_computer_->compute_with_partials(
-            state, obs_mjd_tdb, observer_pos);
+            state, obs_time, observer_pos);
         
         // Design matrix row: ∂(RA,Dec)/∂x₀ = ∂(RA,Dec)/∂x * Φ(t,t₀)
         Eigen::Matrix<double, 2, 6> A_obs = partials.partial_radec * partials.phi;

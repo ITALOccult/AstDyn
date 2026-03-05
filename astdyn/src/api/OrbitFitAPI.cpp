@@ -33,6 +33,7 @@ propagation::EquinoctialElements OrbitFitAPI::parse_eq1(const std::string& filep
     }
 
     propagation::EquinoctialElements equ;
+    equ.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(0.0));
     std::string line;
     bool found_equ = false;
     bool found_mjd = false;
@@ -50,7 +51,9 @@ propagation::EquinoctialElements OrbitFitAPI::parse_eq1(const std::string& filep
         }
         else if (trimmed.substr(0, 3) == "MJD") {
             std::istringstream iss(trimmed.substr(3));
-            iss >> equ.epoch_mjd_tdb;
+            double mjd_val;
+            iss >> mjd_val;
+            equ.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(mjd_val));
             found_mjd = true;
         }
 
@@ -79,8 +82,8 @@ propagation::KeplerianElements OrbitFitAPI::convert_mean_equinoctial_to_osculati
     
     // 3. Transform Frame: Ecliptic J2000 -> Equatorial J2000 (ICRF)
     coordinates::CartesianState state_ecliptic(
-        cart_ecliptic.position,
-        cart_ecliptic.velocity,
+        cart_ecliptic.position.to_eigen(),
+        cart_ecliptic.velocity.to_eigen(),
         cart_ecliptic.gravitational_parameter
     );
     
@@ -92,9 +95,9 @@ propagation::KeplerianElements OrbitFitAPI::convert_mean_equinoctial_to_osculati
     
     // 4. Convert back to Keplerian (Equatorial / Osculating)
     propagation::CartesianElements cart_equatorial;
-    cart_equatorial.epoch_mjd_tdb = cart_ecliptic.epoch_mjd_tdb;
-    cart_equatorial.position = state_equatorial.position();
-    cart_equatorial.velocity = state_equatorial.velocity();
+    cart_equatorial.epoch = cart_ecliptic.epoch;
+    cart_equatorial.position = types::Vector3<core::GCRF, core::Meter>(state_equatorial.position());
+    cart_equatorial.velocity = types::Vector3<core::GCRF, core::Meter>(state_equatorial.velocity());
     cart_equatorial.gravitational_parameter = state_equatorial.mu();
     
     return propagation::cartesian_to_keplerian(cart_equatorial);
@@ -140,14 +143,10 @@ OrbitFitResult OrbitFitAPI::run_fit(
             }
         }
 
-        OrbitContext ctx_in;
-        ctx_in.frame = is_equatorial ? ReferenceFrame::EQUATORIAL_J2000 : ReferenceFrame::ECLIPTIC_J2000;
-        ctx_in.center = OriginCenter::SUN;
-        ctx_in.model = OrbitModel::MEAN;
-        ctx_in.format = ElementFormat::KEPLERIAN;
+
 
         propagation::CartesianElements cart_equatorial_elem;
-        cart_equatorial_elem.epoch_mjd_tdb = cart_ecliptic_elem.epoch_mjd_tdb;
+        cart_equatorial_elem.epoch = cart_ecliptic_elem.epoch;
         cart_equatorial_elem.gravitational_parameter = cart_ecliptic_elem.gravitational_parameter;
 
         if (is_equatorial) {
@@ -156,21 +155,13 @@ OrbitFitResult OrbitFitAPI::run_fit(
             cart_equatorial_elem.velocity = cart_ecliptic_elem.velocity;
         } else {
             if (verbose) std::cout << "   Detecting ECLIPTIC frame in .eq1, applying rotation to Equatorial J2000.\n";
-            cart_equatorial_elem.position = coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.position;
-            cart_equatorial_elem.velocity = coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.velocity;
+            cart_equatorial_elem.position = types::Vector3<core::GCRF, core::Meter>(coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.position.to_eigen());
+            cart_equatorial_elem.velocity = types::Vector3<core::GCRF, core::Meter>(coordinates::ReferenceFrame::ecliptic_to_j2000() * cart_ecliptic_elem.velocity.to_eigen());
         }
         
         auto initial_orbit_equatorial = propagation::cartesian_to_keplerian(cart_equatorial_elem);
         
-        OrbitContext ctx_fit;
-        ctx_fit.frame = ReferenceFrame::EQUATORIAL_J2000;
-        ctx_fit.center = OriginCenter::SUN;
-        ctx_fit.model = OrbitModel::OSCULATING;
-        ctx_fit.format = ElementFormat::KEPLERIAN;
-
         if (verbose) {
-            std::cout << "   Initial Context: " << ctx_in.toString() << "\n";
-            std::cout << "   Target Context:  " << ctx_fit.toString() << "\n";
             std::cout << "   Initial Orbit (Ecliptic): a=" << orbfit_orbit_ecliptic.semi_major_axis 
                       << " e=" << orbfit_orbit_ecliptic.eccentricity 
                       << " i=" << orbfit_orbit_ecliptic.inclination * constants::RAD_TO_DEG << "deg\n";
@@ -238,8 +229,8 @@ OrbitFitResult OrbitFitAPI::run_fit(
         // 5. Propagate to Meaningful Epoch (Mean observation time)
         // Helps convergence if the initial epoch is far from observations
         double sum_mjd = 0.0;
-        for (const auto& obs : obs_list) sum_mjd += obs.mjd_utc;
-        double mean_epoch = obs_list.empty() ? initial_orbit_equatorial.epoch_mjd_tdb : (sum_mjd / obs_list.size());
+        for (const auto& obs : obs_list) sum_mjd += obs.time.mjd.value;
+        double mean_epoch = obs_list.empty() ? initial_orbit_equatorial.epoch.mjd.value : (sum_mjd / obs_list.size());
         
         engine.set_initial_orbit(initial_orbit_equatorial);
         auto start_orbit = engine.propagate_to(mean_epoch);
@@ -267,7 +258,7 @@ OrbitFitResult OrbitFitAPI::run_fit(
         
         // Comparison (Propagate initial orbit to result epoch)
         engine.set_initial_orbit(initial_orbit_equatorial);
-        auto initial_at_result_epoch = engine.propagate_to(result.fitted_orbit.epoch_mjd_tdb);
+        auto initial_at_result_epoch = engine.propagate_to(result.fitted_orbit.epoch.mjd.value);
         
         result.delta_a_km = (result.fitted_orbit.semi_major_axis - initial_at_result_epoch.semi_major_axis) * constants::AU;
         result.delta_e = result.fitted_orbit.eccentricity - initial_at_result_epoch.eccentricity;

@@ -29,6 +29,9 @@ constexpr double HALF_PI = PI / 2.0;
 /// 2*Pi
 constexpr double TWO_PI = 2.0 * PI;
 
+/// Tau (2*Pi)
+constexpr double TAU = TWO_PI;
+
 /// Degrees to radians conversion factor
 constexpr double DEG_TO_RAD = PI / 180.0;
 
@@ -66,6 +69,12 @@ constexpr double YEAR = DAYS_PER_YEAR * SECONDS_PER_DAY;
 /// Days per Julian century
 constexpr double DAYS_PER_CENTURY = 36525.0;
 
+/// TAI-TT offset in seconds (32.184s)
+constexpr double TT_MINUS_TAI_SECONDS = 32.184;
+
+/// Placeholder for leap seconds (UTC-TAI difference)
+constexpr double CURRENT_UTC_TAI_DIFF_SECONDS = 37.0;
+
 // ============================================================================
 // Fundamental Astronomical Constants (IAU 2015)
 // ============================================================================
@@ -87,6 +96,9 @@ constexpr double R_EARTH = 6378.137;
 
 /// Earth flattening (WGS84)
 constexpr double EARTH_FLATTENING = 1.0 / 298.257223563;
+
+/// Obliquity of the Ecliptic J2000 [rad]
+constexpr double OBLIQUITY_J2000 = 23.439291111 * DEG_TO_RAD;
 
 // ============================================================================
 // Gravitational Parameters [km^3/s^2] (from JPL DE431)
@@ -129,6 +141,43 @@ constexpr double GM_NEPTUNE = 6836527.100580;
 constexpr double GM_PLUTO = 975.500000;
 
 // ============================================================================
+// Gravitational Parameters in AU³/day² (for orbit propagation)
+// ============================================================================
+
+/// Conversion factor: km³/s² to AU³/day²
+constexpr double GM_KM3S2_TO_AU3DAY2 = (SECONDS_PER_DAY * SECONDS_PER_DAY) / (AU * AU * AU);
+
+/// GM Mercury [AU³/day²]
+constexpr double GM_MERCURY_AU = GM_MERCURY * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Venus [AU³/day²]
+constexpr double GM_VENUS_AU = GM_VENUS * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Earth alone [AU³/day²]
+constexpr double GM_EARTH_AU = GM_EARTH * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Earth+Moon system [AU³/day²]
+constexpr double GM_EARTH_MOON_AU = GM_EARTH_MOON * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Mars system [AU³/day²]
+constexpr double GM_MARS_AU = GM_MARS * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Jupiter system [AU³/day²]
+constexpr double GM_JUPITER_AU = GM_JUPITER * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Saturn system [AU³/day²]
+constexpr double GM_SATURN_AU = GM_SATURN * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Uranus system [AU³/day²]
+constexpr double GM_URANUS_AU = GM_URANUS * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Neptune system [AU³/day²]
+constexpr double GM_NEPTUNE_AU = GM_NEPTUNE * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Moon [AU³/day²]
+constexpr double GM_MOON_AU = GM_MOON * GM_KM3S2_TO_AU3DAY2;
+
+// ============================================================================
 // Heliocentric Gravitational Constant
 // ============================================================================
 
@@ -141,9 +190,6 @@ constexpr double GMS_SI = GM_SUN;
 // ============================================================================
 // Gravitational Parameters in AU³/day² (for orbit propagation)
 // ============================================================================
-
-/// Conversion factor: km³/s² to AU³/day²
-constexpr double GM_KM3S2_TO_AU3DAY2 = (SECONDS_PER_DAY * SECONDS_PER_DAY) / (AU * AU * AU);
 
 /// Speed of light in AU/day
 constexpr double SPEED_OF_LIGHT_AU_PER_DAY = C_LIGHT * SECONDS_PER_DAY / AU;

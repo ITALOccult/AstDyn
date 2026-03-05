@@ -10,8 +10,11 @@
 #include <cmath>
 #include <iostream>
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 
 namespace astdyn::ephemeris {
+
+using Vector3d = Eigen::Vector3d;
 
 // NAIF ID mapping
 int DE441Provider::bodyToNAIFId(CelestialBody body) const {
@@ -32,18 +35,11 @@ int DE441Provider::bodyToNAIFId(CelestialBody body) const {
     }
 }
 
-double DE441Provider::jdToET(double jd_tdb) const {
+double DE441Provider::jdToET(utils::Instant t) const {
     using namespace astdyn::constants;
     constexpr double J2000_JD = JD2000;
-    // SECONDS_PER_DAY is already in constants
     
-    // Heuristic: If jd is small (e.g. < 2M), assume Modified Julian Day (MJD)
-    // and convert to Full JD. AstDyn Propagator typically uses MJD.
-    double full_jd = jd_tdb;
-    if (full_jd < 2000000.0) {
-        full_jd += 2400000.5;
-    }
-    
+    double full_jd = t.mjd.value + 2400000.5;
     return (full_jd - J2000_JD) * SECONDS_PER_DAY;
 }
 
@@ -74,13 +70,11 @@ DE441Provider::DE441Provider(const std::string& bsp_file)
 
 DE441Provider::~DE441Provider() = default;
 
-Eigen::Vector3d DE441Provider::getPosition(CelestialBody body, double jd_tdb) {
+types::Vector3<core::GCRF, core::Meter> DE441Provider::getPosition(CelestialBody body, utils::Instant t) {
     if (!loaded_) throw std::runtime_error("DE441 not loaded");
     
     int target = bodyToNAIFId(body);
-    // std::cout << "DEBUG: DE441 GetPosition Body=" << (int)body << " NAIF=" << target << " JD=" << jd_tdb << "\n";
-    
-    double et = jdToET(jd_tdb);
+    double et = jdToET(t);
     
     // Logic for Element Chaining (Basic High Precision for Planets)
     // Most planets (Mercury-Pluto) in DE4xx are defined as Barycenters (1, 2, ... 9) relative to SSB (0).
@@ -150,35 +144,26 @@ Eigen::Vector3d DE441Provider::getPosition(CelestialBody body, double jd_tdb) {
         throw std::runtime_error("Native SPK Error: " + std::string(e.what()));
     }
     
-    // jpl_pleph / reader restituisce coordinate ECLITTICHE J2000; converti in equatoriali
-    using namespace astdyn::constants;
-    constexpr double KM_PER_AU = AU;
-    Eigen::Vector3d pos_ecl(state[0] / KM_PER_AU,
-                            state[1] / KM_PER_AU,
-                            state[2] / KM_PER_AU);
-    // Converti ECLITTICHE -> EQUATORIALI (J2000): rotazione attorno all'asse X di -eps
-    const double eps = 23.439291111 * PI / 180.0;
-    Eigen::Matrix3d R;
-    R << 1.0, 0.0,        0.0,
-         0.0, std::cos(eps), -std::sin(eps),
-         0.0, std::sin(eps),  std::cos(eps);
-    Eigen::Vector3d pos_eq = R * pos_ecl;
-    return pos_eq;
+    // SPKReader returns km and km/s in Ecliptic J2000 frame.
+    Vector3d pos_ecl(state[0], state[1], state[2]);
+    
+    // Transform Ecliptic J2000 -> GCRF (Equatorial J2000)
+    Vector3d pos_gcrf = coordinates::ReferenceFrame::transform_position(
+        pos_ecl, 
+        coordinates::FrameType::ECLIPTIC, 
+        coordinates::FrameType::J2000
+    );
+    
+    return types::Vector3<core::GCRF, core::Meter>(pos_gcrf.x() * 1000.0, 
+                                                  pos_gcrf.y() * 1000.0, 
+                                                  pos_gcrf.z() * 1000.0);
 }
 
-Eigen::Vector3d DE441Provider::getVelocity(CelestialBody body, double jd_tdb) {
+types::Vector3<core::GCRF, core::Meter> DE441Provider::getVelocity(CelestialBody body, utils::Instant t) {
     if (!loaded_) throw std::runtime_error("DE441 not loaded");
-    // (Similar logic to getPosition but extracting indices 3,4,5)
-    // Since getState reads both, we can't optimize much without refactoring.
-    // Just call the same chaining logic (lazy implementation) or refactor helper.
-    // ... For brevity, duplicated logic for now or implement getState helper.
     
-    // Let's implement full getState helper to avoid duplication
-    // But overriding here due to interface.
-    // Reuse logic:
-    // ... (same ID logic)
     int target = bodyToNAIFId(body);
-    double et = jdToET(jd_tdb);
+    double et = jdToET(t);
     Eigen::VectorXd state(6);
     
     if (target == 399) { // Earth
@@ -198,19 +183,19 @@ Eigen::Vector3d DE441Provider::getVelocity(CelestialBody body, double jd_tdb) {
          state = reader_->getState(seg_id, et);
     }
 
-    using namespace astdyn::constants;
-    const double conversion = SECONDS_PER_DAY / AU;
-    Eigen::Vector3d vel_ecl(state[3] * conversion,
-                            state[4] * conversion,
-                            state[5] * conversion);
-    // Stessa rotazione eclittica -> equatoriale per la velocità
-    const double eps = 23.439291111 * PI / 180.0;
-    Eigen::Matrix3d R;
-    R << 1.0, 0.0,        0.0,
-         0.0, std::cos(eps), -std::sin(eps),
-         0.0, std::sin(eps),  std::cos(eps);
-    Eigen::Vector3d vel_eq = R * vel_ecl;
-    return vel_eq;
+    Vector3d vel_ecl(state[3], state[4], state[5]);
+    
+    // Transform velocity Ecliptic J2000 -> GCRF
+    Eigen::Vector3d vel_gcrf = coordinates::ReferenceFrame::transform_velocity(
+        Eigen::Vector3d::Zero(),
+        vel_ecl,
+        coordinates::FrameType::ECLIPTIC,
+        coordinates::FrameType::J2000
+    );
+    
+    return types::Vector3<core::GCRF, core::Meter>(vel_gcrf.x() * 1000.0, 
+                                                  vel_gcrf.y() * 1000.0, 
+                                                  vel_gcrf.z() * 1000.0);
 }
 
 } // namespace astdyn::ephemeris

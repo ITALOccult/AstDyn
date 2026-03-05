@@ -16,7 +16,7 @@ namespace astdyn {
 namespace observations {
 
 // WGS84 ellipsoid parameters
-static constexpr double WGS84_A = 6378.137;      // Semi-major axis [km]
+static constexpr double WGS84_A = 6378137.0;      // Semi-major axis [m]
 static constexpr double WGS84_F = 1.0 / 298.257223563; // Flattening
 static constexpr double WGS84_B = WGS84_A * (1.0 - WGS84_F); // Semi-minor axis
 
@@ -29,15 +29,17 @@ void Observatory::computeGeocentricPosition() {
     computeParallaxConstants(latitude, altitude, rho_cos_phi, rho_sin_phi);
 }
 
-Eigen::Vector3d Observatory::getPositionJ2000(double mjd_utc) const {
-    // Convert ITRF position to J2000 using Earth rotation
+types::Vector3<core::GCRF, core::Meter> Observatory::getPositionGCRF(utils::Instant t) const {
+    // Convert ITRF position to GCRF using Earth rotation
     // This accounts for Earth's rotation during observation
-    return coordinates::ReferenceFrame::transform_position(
-        position,
+    Eigen::Vector3d pos_itrf(position.x, position.y, position.z);
+    Eigen::Vector3d pos_gcrf = coordinates::ReferenceFrame::transform_position(
+        pos_itrf,
         coordinates::FrameType::ITRF,
         coordinates::FrameType::J2000,
-        mjd_utc
+        t
     );
+    return types::Vector3<core::GCRF, core::Meter>(pos_gcrf.x(), pos_gcrf.y(), pos_gcrf.z());
 }
 
 // ============================================================================
@@ -103,7 +105,7 @@ size_t ObservatoryDatabase::loadFromMPCFile(const std::string& filepath) {
             double rho = std::sqrt(obs.rho_cos_phi * obs.rho_cos_phi +
                                   obs.rho_sin_phi * obs.rho_sin_phi);
             obs.latitude = std::atan2(obs.rho_sin_phi, obs.rho_cos_phi);
-            obs.altitude = (rho - 1.0) * WGS84_A * 1000.0; // Convert to meters
+            obs.altitude = (rho - 1.0) * WGS84_A; // meters
             
             // Compute geocentric position
             obs.computeGeocentricPosition();
@@ -164,7 +166,7 @@ void ObservatoryDatabase::loadDefaultObservatories() {
             obs.latitude = std::atan2(obs.rho_sin_phi, obs.rho_cos_phi);
             double rho = std::sqrt(obs.rho_cos_phi * obs.rho_cos_phi +
                                   obs.rho_sin_phi * obs.rho_sin_phi);
-            obs.altitude = (rho - 1.0) * WGS84_A * 1000.0;
+            obs.altitude = (rho - 1.0) * WGS84_A;
         } else {
             // Geocenter or space-based
             obs.latitude = 0.0;
@@ -205,31 +207,27 @@ std::vector<std::string> ObservatoryDatabase::getAllCodes() const {
 // Coordinate Conversion Functions
 // ============================================================================
 
-Eigen::Vector3d geodeticToGeocentric(
+types::Vector3<core::ITRF, core::Meter> geodeticToGeocentric(
     double lon_geodetic,
     double lat_geodetic,
     double alt_meters)
 {
-    // WGS84 ellipsoid
-    double a = WGS84_A; // Semi-major axis [km]
-    double f = WGS84_F; // Flattening
-    double e2 = 2.0 * f - f * f; // Eccentricity squared
+    constexpr double a = WGS84_A;
+    constexpr double f = WGS84_F;
+    constexpr double e2 = 2.0 * f - f * f;
     
-    // Radius of curvature in prime vertical
-    double sin_lat = std::sin(lat_geodetic);
-    double N = a / std::sqrt(1.0 - e2 * sin_lat * sin_lat);
+    const double sin_lat = std::sin(lat_geodetic);
+    const double cos_lat = std::cos(lat_geodetic);
+    const double sin_lon = std::sin(lon_geodetic);
+    const double cos_lon = std::cos(lon_geodetic);
     
-    // Geocentric Cartesian coordinates [km]
-    double h_km = alt_meters / 1000.0;
-    double cos_lat = std::cos(lat_geodetic);
-    double cos_lon = std::cos(lon_geodetic);
-    double sin_lon = std::sin(lon_geodetic);
+    const double N = a / std::sqrt(1.0 - e2 * sin_lat * sin_lat);
     
-    double x = (N + h_km) * cos_lat * cos_lon;
-    double y = (N + h_km) * cos_lat * sin_lon;
-    double z = (N * (1.0 - e2) + h_km) * sin_lat;
+    const double x = (N + alt_meters) * cos_lat * cos_lon;
+    const double y = (N + alt_meters) * cos_lat * sin_lon;
+    const double z = (N * (1.0 - e2) + alt_meters) * sin_lat;
     
-    return Eigen::Vector3d(x, y, z);
+    return types::Vector3<core::ITRF, core::Meter>(x, y, z);
 }
 
 void computeParallaxConstants(
@@ -245,11 +243,8 @@ void computeParallaxConstants(
     double sin_lat = std::sin(lat_geodetic);
     double cos_lat = std::cos(lat_geodetic);
     
-    // Radius of curvature
-    double N = WGS84_A / std::sqrt(1.0 - e2 * sin_lat * sin_lat);
-    
     // Height above ellipsoid in units of Earth radii
-    double h_earth_radii = (alt_meters / 1000.0) / WGS84_A;
+    double h_earth_radii = alt_meters / WGS84_A;
     
     // Geocentric latitude (phi prime)
     double tan_phi_prime = (1.0 - f) * (1.0 - f) * std::tan(lat_geodetic);

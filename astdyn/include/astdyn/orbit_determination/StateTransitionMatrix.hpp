@@ -17,6 +17,10 @@
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/propagation/Propagator.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <memory>
 
 namespace astdyn::orbit_determination {
@@ -71,7 +75,7 @@ public:
      */
     STMResult compute(
         const astdyn::propagation::CartesianElements& initial,
-        double target_mjd_tdb);
+        utils::Instant target_time);
     
     /**
      * @brief Compute STM and partials w.r.t observations
@@ -93,8 +97,8 @@ public:
     
     ObservationPartials compute_with_partials(
         const astdyn::propagation::CartesianElements& initial,
-        double target_mjd_tdb,
-        const astdyn::Vector3d& observer_pos);
+        utils::Instant target_time,
+        const types::Vector3<core::GCRF, core::Meter>& observer_pos);
     
     /**
      * @brief Set integrator for variational equations
@@ -128,7 +132,7 @@ private:
      * @param state State vector [x,y,z,vx,vy,vz]
      * @return 6x6 Jacobian matrix
      */
-    astdyn::Matrix6d compute_jacobian(double t, const Eigen::VectorXd& state);
+    astdyn::Matrix6d compute_jacobian(utils::Instant t, const Eigen::VectorXd& state);
     
     /**
      * @brief Compute ∂a/∂r for gravitational acceleration
@@ -155,7 +159,7 @@ private:
      */
     STMResult propagate_with_stm(
         const astdyn::propagation::CartesianElements& initial,
-        double target_mjd_tdb);
+        utils::Instant target_time);
     
     /**
      * @brief Compute observation partials ∂(RA,Dec)/∂x
@@ -168,7 +172,7 @@ private:
      */
     Eigen::Matrix<double, 2, 6> compute_observation_partials(
         const astdyn::propagation::CartesianElements& state,
-        const astdyn::Vector3d& observer_pos) const;
+        const types::Vector3<core::GCRF, core::Meter>& observer_pos) const;
 
 private:
     std::shared_ptr<astdyn::propagation::Propagator> propagator_;

@@ -24,7 +24,12 @@
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "src/utils/time_types.hpp"
+#include "src/types/vectors.hpp"
+#include "src/core/frame_tags.hpp"
+#include "src/core/units.hpp"
 #include <iostream>
+#include <fstream>
 
 namespace astdyn {
 namespace ephemeris {
@@ -42,8 +47,8 @@ struct AsteroidFitResult {
     double rms_dec;
     // Number of observations used after outlier rejection
     int num_observations;
-    // Full list of heliocentric positions (AU) for each observation epoch
-    std::vector<Eigen::Vector3d> fitted_positions;
+    // Full list of heliocentric positions (m) for each observation epoch
+    std::vector<types::Vector3<core::GCRF, core::Meter>> fitted_positions;
 };
 
 /**
@@ -72,10 +77,10 @@ public:
         // Load observation epochs (optical observations)
         std::vector<astdyn::observations::OpticalObservation> records =
             astdyn::observations::RWOReader::readFile(rwo_file);
-        std::vector<double> mjd_obs;
-        mjd_obs.reserve(records.size());
+        std::vector<utils::Instant> t_obs;
+        t_obs.reserve(records.size());
         for (const auto& rec : records) {
-            mjd_obs.push_back(rec.mjd_utc);
+            t_obs.push_back(rec.time);
         }
         // Build PositionCalculator element struct from fitted orbit (Equatorial)
         KeplerianElements calc_elem;
@@ -85,11 +90,11 @@ public:
         calc_elem.Omega = result.fitted_orbit.longitude_ascending_node;
         calc_elem.omega = result.fitted_orbit.argument_perihelion;
         calc_elem.M = result.fitted_orbit.mean_anomaly;
-        double epoch_mjd = mjd_obs.empty() ? 0.0 : mjd_obs.front();
-        result.fitted_positions.reserve(mjd_obs.size());
-        for (double mjd : mjd_obs) {
-            Eigen::Vector3d pos = PositionCalculator::computePosition(
-                calc_elem, mjd, epoch_mjd, true /* outputEquatorial */);
+        calc_elem.epoch = t_obs.empty() ? utils::Instant::from_tt(utils::ModifiedJulianDate(0.0)) : t_obs.front();
+        result.fitted_positions.reserve(t_obs.size());
+        for (const auto& t : t_obs) {
+            auto pos = PositionCalculator::computePosition(
+                calc_elem, t, true /* outputEquatorial */);
             result.fitted_positions.push_back(pos);
         }
         return result;
@@ -99,7 +104,7 @@ public:
      * @brief Compute positions from an in‑memory orbit configuration.
      */
     static AsteroidFitResult computeFromMemory(const astdyn::ephemeris::SimpleKeplerianElements& orbit,
-                                               const std::vector<double>& mjd_observations,
+                                               const std::vector<utils::Instant>& t_observations,
                                                bool output_equatorial = true) {
         AsteroidFitResult result;
         result.success = true;
@@ -123,17 +128,11 @@ public:
         calc_elem.Omega = orbit.Omega;
         calc_elem.omega = orbit.omega;
         calc_elem.M = orbit.M;
-        // Use the explicit epoch from the orbital elements
-        double epoch_mjd = orbit.epoch_mjd_tdb;
-        // Fallback or warning could be added if epoch is 0, but 0 is valid MJD (though unlikely for asteroid)
-        if (epoch_mjd == 0.0 && !mjd_observations.empty()) {
-             // If not set, maybe fallback to first observation? 
-             // Ideally we should trust the user provided epoch.
-             // Let's keep it simple: assume user sets it.
-        }
-        for (double mjd : mjd_observations) {
-            Eigen::Vector3d pos = PositionCalculator::computePosition(
-                calc_elem, mjd, epoch_mjd, output_equatorial);
+        calc_elem.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(orbit.epoch_mjd_tdb));
+        
+        for (const auto& t : t_observations) {
+            auto pos = PositionCalculator::computePosition(
+                calc_elem, t, output_equatorial);
             result.fitted_positions.push_back(pos);
         }
         return result;
@@ -238,7 +237,7 @@ public:
             }
             
             // Post-fit propagation if requested and fit success
-            if (result.success && !cfg.mjd_observations.empty()) {
+            if (result.success && !cfg.t_observations.empty()) {
                 result.fitted_positions.clear();
                 
                 // Initialize Engine for propagation
@@ -292,9 +291,9 @@ public:
                 // Set the fitted orbit
                 engine.set_initial_orbit(result.fitted_orbit); 
                 
-                for (double target_mjd : cfg.mjd_observations) {
-                     // Propagate to target MJD
-                     auto state_at_target = engine.propagate_to(target_mjd);
+                for (const auto& target_t : cfg.t_observations) {
+                     // Propagate to target time
+                     auto state_at_target = engine.propagate_to(target_t);
                      
                      // Convert to PositionCalculator format
                      KeplerianElements calc_elem;
@@ -304,11 +303,12 @@ public:
                      calc_elem.Omega = state_at_target.longitude_ascending_node;
                      calc_elem.omega = state_at_target.argument_perihelion;
                      calc_elem.M = state_at_target.mean_anomaly;
+                     calc_elem.epoch = target_t;
                      
                      calc_elem.equatorial = true;
                      
-                     Eigen::Vector3d pos = PositionCalculator::computePosition(
-                        calc_elem, target_mjd, target_mjd, cfg.output_equatorial);
+                     auto pos = PositionCalculator::computePosition(
+                        calc_elem, target_t, cfg.output_equatorial);
                      
                      result.fitted_positions.push_back(pos);
                 }
@@ -391,17 +391,17 @@ public:
              auto state_eq = coordinates::ReferenceFrame::transform_state(state_ecl, coordinates::FrameType::ECLIPTIC, coordinates::FrameType::J2000);
              
              propagation::CartesianElements ce;
-             ce.epoch_mjd_tdb = kep_ecl.epoch_mjd_tdb;
-             ce.position = state_eq.position();
-             ce.velocity = state_eq.velocity();
+             ce.epoch = cfg.orbit.epoch;
+             ce.position = types::Vector3<core::GCRF, core::Meter>(state_eq.position().x(), state_eq.position().y(), state_eq.position().z());
+             ce.velocity = types::Vector3<core::GCRF, core::Meter>(state_eq.velocity().x(), state_eq.velocity().y(), state_eq.velocity().z());
              ce.gravitational_parameter = state_eq.mu();
              propagation::KeplerianElements kep_eq = propagation::cartesian_to_keplerian(ce);
              
              engine.set_initial_orbit(kep_eq);
              
              // 3. Propagate
-             for (double target_mjd : cfg.mjd_observations) {
-                 auto state_at_target = engine.propagate_to(target_mjd);
+             for (const auto& target_t : cfg.t_observations) {
+                 auto state_at_target = engine.propagate_to(target_t);
                  
                  KeplerianElements calc_elem;
                  calc_elem.a = state_at_target.semi_major_axis;
@@ -410,25 +410,26 @@ public:
                  calc_elem.Omega = state_at_target.longitude_ascending_node;
                  calc_elem.omega = state_at_target.argument_perihelion;
                  calc_elem.M = state_at_target.mean_anomaly;
+                 calc_elem.epoch = target_t;
                  calc_elem.equatorial = true; // Engine output is Equatorial
                  
-                 Eigen::Vector3d pos = PositionCalculator::computePosition(
-                    calc_elem, target_mjd, target_mjd, cfg.output_equatorial);
+                 auto pos = PositionCalculator::computePosition(
+                    calc_elem, target_t, cfg.output_equatorial);
                  result.fitted_positions.push_back(pos);
              }
              return result;
         }
 
-        return computeFromMemory(cfg.orbit, cfg.mjd_observations, cfg.output_equatorial);
+        return computeFromMemory(cfg.orbit, cfg.t_observations, cfg.output_equatorial);
     }
     
     /**
      * @brief Deprecated overload: fit directly from SimpleKeplerianElements.
      */
     static AsteroidFitResult fit(const astdyn::ephemeris::SimpleKeplerianElements& orbit,
-                                 const std::vector<double>& mjd_observations,
+                                 const std::vector<utils::Instant>& t_observations,
                                  bool output_equatorial = true) {
-        return computeFromMemory(orbit, mjd_observations, output_equatorial);
+        return computeFromMemory(orbit, t_observations, output_equatorial);
     }
 };
 
