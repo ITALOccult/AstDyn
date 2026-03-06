@@ -43,7 +43,7 @@ StateTransitionMatrix::ObservationPartials
 StateTransitionMatrix::compute_with_partials(
     const physics::CartesianStateTyped<core::GCRF>& initial,
     time::EpochTDB target_time,
-    const types::Vector3<core::GCRF, core::Meter>& observer_pos) {
+    const math::Vector3<core::GCRF, physics::Distance>& observer_pos) {
     
     // Compute STM
     auto stm_result = propagate_with_stm(initial, target_time);
@@ -183,12 +183,12 @@ Eigen::Matrix3d StateTransitionMatrix::compute_acceleration_position_partial(
 
 Eigen::Matrix<double, 2, 6> StateTransitionMatrix::compute_observation_partials(
     const physics::CartesianStateTyped<core::GCRF>& state,
-    const types::Vector3<core::GCRF, core::Meter>& observer_pos) const {
+    const math::Vector3<core::GCRF, physics::Distance>& observer_pos) const {
     
     // Topocentric position vector in meters
-    Eigen::Vector3d rho(state.position.x_si() - observer_pos.x,
-                        state.position.y_si() - observer_pos.y,
-                        state.position.z_si() - observer_pos.z);
+    Eigen::Vector3d rho(state.position.x_si() - observer_pos.x_si(),
+                        state.position.y_si() - observer_pos.y_si(),
+                        state.position.z_si() - observer_pos.z_si());
     double range = rho.norm();
     
     // Unit direction vector

@@ -97,18 +97,18 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     if (!observer_pos_opt) {
         return std::nullopt;
     }
-    types::Vector3<core::GCRF, core::Meter> observer_pos = *observer_pos_opt;
+    math::Vector3<core::GCRF, physics::Distance> observer_pos = *observer_pos_opt;
     
     // Get observer velocity (Heliocentric GCRF Meter/Second)
     auto observer_vel_opt = get_observer_velocity(obs);
     if (!observer_vel_opt) {
         return std::nullopt;
     }
-    types::Vector3<core::GCRF, core::Meter> observer_vel = *observer_vel_opt;
+    math::Vector3<core::GCRF, physics::Velocity> observer_vel = *observer_vel_opt;
     
     // Object state
-    types::Vector3<core::GCRF, core::Meter> object_pos(state.position.to_eigen_si());
-    types::Vector3<core::GCRF, core::Meter> object_vel(state.velocity.to_eigen_si());
+    math::Vector3<core::GCRF, physics::Distance> object_pos = math::Vector3<core::GCRF, physics::Distance>::from_si(state.position.x_si(), state.position.y_si(), state.position.z_si());
+    math::Vector3<core::GCRF, physics::Velocity> object_vel = math::Vector3<core::GCRF, physics::Velocity>::from_si(state.velocity.x_si(), state.velocity.y_si(), state.velocity.z_si());
     
     // Light-time correction
     if (light_time_correction_) {
@@ -117,9 +117,9 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
         constexpr double tau_tol = 1e-10; 
         
         for (int iter = 0; iter < max_iter; ++iter) {
-            types::Vector3<core::GCRF, core::Meter> rho_vec = object_pos - observer_pos;
+            math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos - observer_pos;
             // rho.norm() is in meters. SPEED_OF_LIGHT is in m/s.
-            double tau_new_sec = rho_vec.norm() / constants::C_LIGHT * 1000.0;
+            double tau_new_sec = rho_vec.norm().to_m() / constants::C_LIGHT * 1000.0;
             double tau_new_days = tau_new_sec / 86400.0;
             
             if (iter > 0 && std::abs(tau_new_days - tau) < tau_tol) {
@@ -128,7 +128,7 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
             
             tau = tau_new_days;
             // object_pos ≈ state.position - state.velocity * tau_sec
-            object_pos = types::Vector3<core::GCRF, core::Meter>(state.position.to_eigen_si() - (state.velocity.to_eigen_si() * (tau * 86400.0)));
+            object_pos -= math::Vector3<core::GCRF, physics::Distance>::from_si(state.velocity.x_si() * (tau * 86400.0), state.velocity.y_si() * (tau * 86400.0), state.velocity.z_si() * (tau * 86400.0));
         }
     }
     
@@ -137,9 +137,9 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     auto direction = compute_topocentric_direction(object_pos, observer_pos, observer_vel, range, range_rate);
     
     // Re-calculate range rate properly with object velocity
-    types::Vector3<core::GCRF, core::Meter> rho_vec = object_pos - observer_pos;
-    types::Vector3<core::GCRF, core::Meter> rho_dot = object_vel - observer_vel;
-    range_rate = rho_dot.dot(direction);
+    math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos - observer_pos;
+    math::Vector3<core::GCRF, physics::Velocity> rho_dot = object_vel - observer_vel;
+    range_rate = rho_dot.to_eigen_si().dot(direction.to_eigen_si());
     
     result.range = range;
     result.range_rate = range_rate;
@@ -175,66 +175,70 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     return result;
 }
 
-types::Vector3<core::GCRF, core::Meter> ResidualCalculator::compute_topocentric_direction(
-    const types::Vector3<core::GCRF, core::Meter>& heliocentric_pos,
-    const types::Vector3<core::GCRF, core::Meter>& observer_pos,
-    const types::Vector3<core::GCRF, core::Meter>& observer_vel,
+math::Vector3<core::GCRF, physics::Distance> ResidualCalculator::compute_topocentric_direction(
+    const math::Vector3<core::GCRF, physics::Distance>& heliocentric_pos,
+    const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
+    const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
     double& range,
     double& range_rate) const {
     
-    types::Vector3<core::GCRF, core::Meter> rho = heliocentric_pos - observer_pos;
-    range = rho.norm();
-    auto direction = rho.normalized();
+    math::Vector3<core::GCRF, physics::Distance> rho = heliocentric_pos - observer_pos;
+    range = rho.norm().to_m();
+    auto direction = math::Vector3<core::GCRF, physics::Distance>::from_si(rho.x_si() / range, rho.y_si() / range, rho.z_si() / range);
     range_rate = 0.0; // Placeholder
     return direction;
 }
 
 void ResidualCalculator::cartesian_to_radec(
-    const types::Vector3<core::GCRF, core::Meter>& direction_in,
-    const types::Vector3<core::GCRF, core::Meter>& rho_vec,
-    const types::Vector3<core::GCRF, core::Meter>& observer_pos,
-    const types::Vector3<core::GCRF, core::Meter>& observer_vel,
+    const math::Vector3<core::GCRF, physics::Distance>& direction_in,
+    const math::Vector3<core::GCRF, physics::Distance>& rho_vec,
+    const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
+    const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
     double& ra_rad,
     double& dec_rad) const {
     
     auto direction = direction_in;
 
+    auto eval_dir = direction_in.to_eigen_si();
+    auto eval_obs = observer_pos.to_eigen_si();
+    auto eval_vel = observer_vel.to_eigen_si();
+
     // Relativistic Light Bending (Sun)
-    types::Vector3<core::GCRF, core::Meter> p_sun = -observer_pos; 
+    Eigen::Vector3d p_sun = -eval_obs; 
     double d_sun = p_sun.norm();
     auto u_sun = p_sun.normalized();
-    double cos_elongation = u_sun.dot(direction);
+    double cos_elongation = u_sun.dot(eval_dir);
     
     if (d_sun > 1e6 && cos_elongation < 0.999) { 
         // 2GM/c^2 in meters ≈ 2953 m
         constexpr double TWO_GM_C2 = 2953.36; 
-        auto cross_prod = u_sun.cross(direction);
+        auto cross_prod = u_sun.cross(eval_dir);
         if (cross_prod.norm() > 1e-12) { 
-            auto delta_dir = (TWO_GM_C2 / d_sun) * (cross_prod.cross(direction)) / (1.0 + cos_elongation);
-            direction = (direction + delta_dir).normalized();
+            auto delta_dir = (TWO_GM_C2 / d_sun) * (cross_prod.cross(eval_dir)) / (1.0 + cos_elongation);
+            eval_dir = (eval_dir + delta_dir).normalized();
         }
     }
 
     // Stellar Aberration
     if (aberration_correction_) {
-        auto beta = observer_vel / constants::C_LIGHT * 1000.0;
+        auto beta = eval_vel / constants::C_LIGHT * 1000.0;
         double beta_sq = beta.squaredNorm();
         if (beta_sq < 1.0) {
             double gamma = 1.0 / std::sqrt(1.0 - beta_sq);
-            double beta_dot_u = beta.dot(direction);
+            double beta_dot_u = beta.dot(eval_dir);
             double factor = gamma / (1.0 + gamma);
-            auto num = (1.0/gamma) * direction + beta + (factor * beta_dot_u) * beta;
+            auto num = (1.0/gamma) * eval_dir + beta + (factor * beta_dot_u) * beta;
             double den = 1.0 + beta_dot_u;
-            direction = (num / den).normalized();
+            eval_dir = (num / den).normalized();
         }
     }
     
-    dec_rad = std::asin(direction.z);
-    ra_rad = std::atan2(direction.y, direction.x);
+    dec_rad = std::asin(eval_dir.z());
+    ra_rad = std::atan2(eval_dir.y(), eval_dir.x());
     if (ra_rad < 0.0) ra_rad += TWO_PI;
 }
 
-std::optional<types::Vector3<core::GCRF, core::Meter>> ResidualCalculator::get_observer_position(
+std::optional<math::Vector3<core::GCRF, physics::Distance>> ResidualCalculator::get_observer_position(
     const OpticalObservation& obs) const {
     
     double jd_tdb = utc_to_tdb(obs.time).jd();
@@ -244,17 +248,22 @@ std::optional<types::Vector3<core::GCRF, core::Meter>> ResidualCalculator::get_o
     auto sun_state = ephemeris::PlanetaryEphemeris::getState(
         ephemeris::CelestialBody::SUN, utils::Instant::from_tt(utils::ModifiedJulianDate(jd_tdb - 2400000.5)));
     
-    types::Vector3<core::GCRF, core::Meter> earth_center_vec(earth_state.position() - sun_state.position());
+    math::Vector3<core::GCRF, physics::Distance> earth_center_vec = math::Vector3<core::GCRF, physics::Distance>::from_si(
+        earth_state.position().x() - sun_state.position().x(),
+        earth_state.position().y() - sun_state.position().y(),
+        earth_state.position().z() - sun_state.position().z()
+    );
     
     const auto& obs_db = observations::ObservatoryDatabase::getInstance();
     auto obs_info_opt = obs_db.getObservatory(obs.observatory_code);
     if (!obs_info_opt) return earth_center_vec;
     
     // Simplified: getPositionGCRF handles ITRF -> GCRF
-    return earth_center_vec + obs_info_opt->getPositionGCRF(obs.time);
+    auto obs_gcrf = obs_info_opt->getPositionGCRF(obs.time);
+    return earth_center_vec + math::Vector3<core::GCRF, physics::Distance>::from_si(obs_gcrf.x, obs_gcrf.y, obs_gcrf.z);
 }
 
-std::optional<types::Vector3<core::GCRF, core::Meter>> ResidualCalculator::get_observer_velocity(
+std::optional<math::Vector3<core::GCRF, physics::Velocity>> ResidualCalculator::get_observer_velocity(
     const OpticalObservation& obs) const {
     
     double jd_tdb = utc_to_tdb(obs.time).jd();
@@ -264,7 +273,11 @@ std::optional<types::Vector3<core::GCRF, core::Meter>> ResidualCalculator::get_o
     
     // For now, assume topocentric velocity is negligible or handled by ITRF conversion (not yet in Observatory)
     // In a full implementation, we'd add Earth rotation velocity.
-    return types::Vector3<core::GCRF, core::Meter>(earth_state.velocity());
+    return math::Vector3<core::GCRF, physics::Velocity>::from_si(
+        earth_state.velocity().x(),
+        earth_state.velocity().y(),
+        earth_state.velocity().z()
+    );
 }
 
 ResidualStatistics ResidualCalculator::compute_statistics(

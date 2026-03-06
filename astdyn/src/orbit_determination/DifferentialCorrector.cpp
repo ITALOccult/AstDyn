@@ -221,7 +221,7 @@ DifferentialCorrector::build_design_matrix(
             // Skip if observer position unavailable
             continue;
         }
-        types::Vector3<core::GCRF, core::Meter> observer_pos = *obs_pos_opt;
+        math::Vector3<core::GCRF, physics::Distance> observer_pos = *obs_pos_opt;
         
         // Convert observation time to TDB (STM needs TDB)
         time::EpochTDB obs_time_tdb = ResidualCalculator::utc_to_tdb(obs.time);

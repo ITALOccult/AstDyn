@@ -21,12 +21,12 @@ int main() {
     auto elements = horizons.query_elements("79518", epoch);
     if (elements) {
         std::cout << "[Orbital Elements (ECLIPJ2000)]" << std::endl;
-        std::cout << "  a   = " << elements->a() << " AU" << std::endl;
-        std::cout << "  e   = " << elements->e() << std::endl;
-        std::cout << "  i   = " << elements->i() * constants::RAD_TO_DEG << " deg" << std::endl;
-        std::cout << "  OM  = " << elements->raan() * constants::RAD_TO_DEG << " deg" << std::endl;
-        std::cout << "  W   = " << elements->arg_peri() * constants::RAD_TO_DEG << " deg" << std::endl;
-        std::cout << "  MA  = " << elements->m_anomaly() * constants::RAD_TO_DEG << " deg" << std::endl;
+        std::cout << "  a   = " << elements->a.to_au() << " AU" << std::endl;
+        std::cout << "  e   = " << elements->e << std::endl;
+        std::cout << "  i   = " << elements->i.to_deg() << " deg" << std::endl;
+        std::cout << "  OM  = " << elements->node.to_deg() << " deg" << std::endl;
+        std::cout << "  W   = " << elements->omega.to_deg() << " deg" << std::endl;
+        std::cout << "  MA  = " << elements->M.to_deg() << " deg" << std::endl;
     } else {
         std::cerr << "Error fetching elements." << std::endl;
     }

@@ -23,10 +23,10 @@
 #include "astdyn/observations/Observation.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "src/utils/time_types.hpp"
-#include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
 #include <vector>
 #include <optional>
 
@@ -136,7 +136,7 @@ private:
      * @param dec Declination [rad]
      * @return Unit vector in equatorial frame
      */
-    types::Vector3<core::GCRF, core::Meter> compute_line_of_sight(double ra, double dec) const;
+    math::Vector3<core::GCRF, physics::Distance> compute_line_of_sight(double ra, double dec) const;
     
     /**
      * @brief Solve Gauss polynomial for slant ranges
@@ -159,12 +159,12 @@ private:
      */
     bool solve_slant_ranges(
         double tau1, double tau3,
-        const types::Vector3<core::GCRF, core::Meter>& los1, 
-        const types::Vector3<core::GCRF, core::Meter>& los2, 
-        const types::Vector3<core::GCRF, core::Meter>& los3,
-        const types::Vector3<core::GCRF, core::Meter>& R1, 
-        const types::Vector3<core::GCRF, core::Meter>& R2, 
-        const types::Vector3<core::GCRF, core::Meter>& R3,
+        const math::Vector3<core::GCRF, physics::Distance>& los1, 
+        const math::Vector3<core::GCRF, physics::Distance>& los2, 
+        const math::Vector3<core::GCRF, physics::Distance>& los3,
+        const math::Vector3<core::GCRF, physics::Distance>& R1, 
+        const math::Vector3<core::GCRF, physics::Distance>& R2, 
+        const math::Vector3<core::GCRF, physics::Distance>& R3,
         double& rho1, double& rho2, double& rho3,
         int& iterations);
     
@@ -180,8 +180,8 @@ private:
      * @return (f, g) coefficients
      */
     std::pair<double, double> compute_f_g_coefficients(
-        const types::Vector3<core::GCRF, core::Meter>& r, 
-        const types::Vector3<core::GCRF, core::Meter>& v, 
+        const math::Vector3<core::GCRF, physics::Distance>& r, 
+        const math::Vector3<core::GCRF, physics::Velocity>& v, 
         double dt, double mu) const;
 };
 

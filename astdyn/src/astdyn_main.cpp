@@ -313,13 +313,13 @@ int main(int argc, char** argv) {
             file << std::fixed << std::setprecision(9);
             
             for (const auto& state : ephemeris) {
-                file << state.epoch.mjd.value << "  "
-                     << state.position.x << "  "
-                     << state.position.y << "  "
-                     << state.position.z << "  "
-                     << state.velocity.x << "  "
-                     << state.velocity.y << "  "
-                     << state.velocity.z << "\n";
+                file << state.epoch.mjd() << "  "
+                     << state.position.x_si() << "  "
+                     << state.position.y_si() << "  "
+                     << state.position.z_si() << "  "
+                     << state.velocity.x_si() << "  "
+                     << state.velocity.y_si() << "  "
+                     << state.velocity.z_si() << "\n";
             }
             
             std::cout << "Ephemeris saved to: " << ephem_file << "\n";
@@ -364,7 +364,7 @@ int main(int argc, char** argv) {
                     double earth_radius_au = earth_radius_km / km_per_au;
                     
                     file << static_cast<int>(ca.body) << "  "
-                         << ca.time.mjd.value << "  "
+                         << ca.time.mjd() << "  "
                          << ca.distance << "  "
                          << ca.distance_in_radii(earth_radius_au) << "  "
                          << vel_kms << "\n";

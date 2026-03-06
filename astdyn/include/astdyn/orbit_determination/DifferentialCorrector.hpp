@@ -23,6 +23,8 @@
 #include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/observations/Observation.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include <memory>
 #include <functional>
 

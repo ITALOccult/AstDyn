@@ -15,10 +15,10 @@
 #include "astdyn/observations/Observation.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "src/utils/time_types.hpp"
-#include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
 #include <vector>
 #include <optional>
 #include <memory>
@@ -179,7 +179,7 @@ public:
      * @param obs Observation with time and observatory code
      * @return Observer position (heliocentric) [m] in GCRF, or nullopt if failed
      */
-    std::optional<types::Vector3<core::GCRF, core::Meter>> get_observer_position(
+    std::optional<math::Vector3<core::GCRF, physics::Distance>> get_observer_position(
         const astdyn::observations::OpticalObservation& obs) const;
     
     /**
@@ -188,7 +188,7 @@ public:
      * @param obs Observation with time and observatory code
      * @return Observer velocity (heliocentric) [m/s] in GCRF, or nullopt if failed
      */
-    std::optional<types::Vector3<core::GCRF, core::Meter>> get_observer_velocity(
+    std::optional<math::Vector3<core::GCRF, physics::Velocity>> get_observer_velocity(
         const astdyn::observations::OpticalObservation& obs) const;
     
     /**
@@ -210,10 +210,10 @@ private:
      * @param[out] range_rate Topocentric range rate [m/s]
      * @return Unit vector from observer to object
      */
-    types::Vector3<core::GCRF, core::Meter> compute_topocentric_direction(
-        const types::Vector3<core::GCRF, core::Meter>& heliocentric_pos,
-        const types::Vector3<core::GCRF, core::Meter>& observer_pos,
-        const types::Vector3<core::GCRF, core::Meter>& observer_vel,
+    math::Vector3<core::GCRF, physics::Distance> compute_topocentric_direction(
+        const math::Vector3<core::GCRF, physics::Distance>& heliocentric_pos,
+        const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
+        const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
         double& range,
         double& range_rate) const;
     
@@ -228,10 +228,10 @@ private:
      * @param[out] dec Declination [rad]
      */
     void cartesian_to_radec(
-        const types::Vector3<core::GCRF, core::Meter>& direction,
-        const types::Vector3<core::GCRF, core::Meter>& rho_vec,
-        const types::Vector3<core::GCRF, core::Meter>& observer_pos,
-        const types::Vector3<core::GCRF, core::Meter>& observer_vel,
+        const math::Vector3<core::GCRF, physics::Distance>& direction,
+        const math::Vector3<core::GCRF, physics::Distance>& rho_vec,
+        const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
+        const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
         double& ra,
         double& dec) const;
 

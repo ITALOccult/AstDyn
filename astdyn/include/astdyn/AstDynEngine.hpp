@@ -24,6 +24,7 @@
 #include "astdyn/orbit_determination/Residuals.hpp"
 #include "astdyn/close_approach/CloseApproach.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/propagation/OrbitalElements.hpp"
 #include <memory>
 #include <vector>
 #include <string>
@@ -175,6 +176,24 @@ public:
      * @param elements Initial orbital elements
      */
     void set_initial_orbit(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
+
+    /**
+     * @brief Compatibility overload: set initial orbit from legacy KeplerianElements
+     * @deprecated Prefer the typed KeplerianStateTyped overload
+     */
+    void set_initial_orbit(const propagation::KeplerianElements& elements) {
+        // Convert legacy type to typed representation
+        auto typed = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+            time::EpochTDB::from_mjd(elements.epoch.mjd.value),
+            elements.semi_major_axis,
+            elements.eccentricity,
+            elements.inclination * constants::RAD_TO_DEG,
+            elements.longitude_ascending_node * constants::RAD_TO_DEG,
+            elements.argument_perihelion * constants::RAD_TO_DEG,
+            elements.mean_anomaly * constants::RAD_TO_DEG
+        );
+        set_initial_orbit(typed);
+    }
     
     /**
      * @brief Perform initial orbit determination (IOD) from observations

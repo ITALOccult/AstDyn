@@ -19,20 +19,20 @@ using namespace astdyn;
 using namespace astdyn::ephemeris;
 using namespace astdyn::astrometry;
 
-struct SkyCoord {
+struct BenchSkyCoord {
     double ra_deg;
     double dec_deg;
 };
 
 // J2000 Truth
-SkyCoord get_jpl_truth() {
+BenchSkyCoord get_jpl_truth() {
     // 2026-Mar-27 00:00 UT
     // RA: 02 47 44.11 = 41.9337917 deg
     // Dec: +14 19 02.2 = 14.3172778 deg
     return {41.9337917, 14.3172778};
 }
 
-double angular_separation_arcsec(const SkyCoord& c1, const SkyCoord& c2) {
+double angular_separation_arcsec(const BenchSkyCoord& c1, const BenchSkyCoord& c2) {
     double r1 = c1.ra_deg * constants::DEG_TO_RAD;
     double d1 = c1.dec_deg * constants::DEG_TO_RAD;
     double r2 = c2.ra_deg * constants::DEG_TO_RAD;
@@ -51,7 +51,7 @@ void print_header() {
     std::cout.flush();
 }
 
-void print_row(const std::string& name, const SkyCoord& c, double err, double time) {
+void print_row(const std::string& name, const BenchSkyCoord& c, double err, double time) {
     std::cout << "| " << std::left << std::setw(13) << name << " | "
               << std::fixed << std::setprecision(5) << std::setw(11) << c.ra_deg << " | "
               << std::setw(11) << c.dec_deg << " | "
@@ -81,7 +81,7 @@ double measure_execution(
     const utils::Instant& t_obs,
     const AstDynConfig& engine_cfg,
     const std::string& name,
-    const SkyCoord& truth) 
+    const BenchSkyCoord& truth) 
 {
     auto start = std::chrono::high_resolution_clock::now();
     
@@ -101,7 +101,7 @@ double measure_execution(
         return elapsed.count();
     }
     
-    SkyCoord c = { obs_res->ra.value * constants::RAD_TO_DEG, obs_res->dec.value * constants::RAD_TO_DEG };
+    BenchSkyCoord c = { obs_res->ra.value * constants::RAD_TO_DEG, obs_res->dec.value * constants::RAD_TO_DEG };
     double err = angular_separation_arcsec(truth, c);
     print_row(name, c, err, elapsed.count());
     
@@ -112,7 +112,7 @@ double measure_execution(
 int main() {
     double target_mjd = time::calendar_to_mjd(2026, 3, 27, 0.0);
     utils::Instant t_obs = utils::Instant::from_tt(utils::ModifiedJulianDate(target_mjd));
-    SkyCoord truth = get_jpl_truth();
+    BenchSkyCoord truth = get_jpl_truth();
     
     std::cout << "=== Asteroid 79450 Benchmark ===" << std::endl;
     std::cout << "Target Date: 2026-03-27 00:00 UTC (MJD " << target_mjd << ")" << std::endl;

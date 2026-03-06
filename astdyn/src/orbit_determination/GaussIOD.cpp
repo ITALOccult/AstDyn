@@ -110,10 +110,10 @@ GaussIODResult GaussIOD::compute_from_three(
     auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, 
         utils::Instant::from_tt(utils::ModifiedJulianDate(t3_tdb.mjd())));
     
-    // State::position() returns Vector3d, we need types::Vector3
-    types::Vector3<core::GCRF, core::Meter> R1(earth1.position().x(), earth1.position().y(), earth1.position().z());
-    types::Vector3<core::GCRF, core::Meter> R2(earth2.position().x(), earth2.position().y(), earth2.position().z());
-    types::Vector3<core::GCRF, core::Meter> R3(earth3.position().x(), earth3.position().y(), earth3.position().z());
+    // State::position() returns Vector3d, we need math::Vector3
+    math::Vector3<core::GCRF, physics::Distance> R1 = math::Vector3<core::GCRF, physics::Distance>::from_si(earth1.position().x(), earth1.position().y(), earth1.position().z());
+    math::Vector3<core::GCRF, physics::Distance> R2 = math::Vector3<core::GCRF, physics::Distance>::from_si(earth2.position().x(), earth2.position().y(), earth2.position().z());
+    math::Vector3<core::GCRF, physics::Distance> R3 = math::Vector3<core::GCRF, physics::Distance>::from_si(earth3.position().x(), earth3.position().y(), earth3.position().z());
     
     // Compute line-of-sight unit vectors
     auto los1 = compute_line_of_sight(obs1.ra, obs1.dec);
@@ -150,8 +150,8 @@ GaussIODResult GaussIOD::compute_from_three(
     
     result.state = physics::CartesianStateTyped<core::GCRF>::from_si(
         t2_tdb,
-        r2.x, r2.y, r2.z,
-        v2.x, v2.y, v2.z,
+        r2.x_si(), r2.y_si(), r2.z_si(),
+        v2.x_si(), v2.y_si(), v2.z_si(),
         constants::GM_SUN * 1e9
     );
     result.success = true;
@@ -187,9 +187,9 @@ std::optional<std::array<int, 3>> GaussIOD::select_observations(
     return std::array<int, 3>{idx1, idx2, idx3};
 }
 
-types::Vector3<core::GCRF, core::Meter> GaussIOD::compute_line_of_sight(double ra, double dec) const {
+math::Vector3<core::GCRF, physics::Distance> GaussIOD::compute_line_of_sight(double ra, double dec) const {
     double cos_dec = std::cos(dec);
-    return types::Vector3<core::GCRF, core::Meter>(
+    return math::Vector3<core::GCRF, physics::Distance>::from_si(
         cos_dec * std::cos(ra),
         cos_dec * std::sin(ra),
         std::sin(dec)
@@ -198,23 +198,23 @@ types::Vector3<core::GCRF, core::Meter> GaussIOD::compute_line_of_sight(double r
 
 bool GaussIOD::solve_slant_ranges(
     double tau1, double tau3,
-    const types::Vector3<core::GCRF, core::Meter>& los1, 
-    const types::Vector3<core::GCRF, core::Meter>& los2, 
-    const types::Vector3<core::GCRF, core::Meter>& los3,
-    const types::Vector3<core::GCRF, core::Meter>& R1, 
-    const types::Vector3<core::GCRF, core::Meter>& R2, 
-    const types::Vector3<core::GCRF, core::Meter>& R3,
+    const math::Vector3<core::GCRF, physics::Distance>& los1, 
+    const math::Vector3<core::GCRF, physics::Distance>& los2, 
+    const math::Vector3<core::GCRF, physics::Distance>& los3,
+    const math::Vector3<core::GCRF, physics::Distance>& R1, 
+    const math::Vector3<core::GCRF, physics::Distance>& R2, 
+    const math::Vector3<core::GCRF, physics::Distance>& R3,
     double& rho1, double& rho2, double& rho3,
     int& iterations) {
     
     // Everything here in AU for classical Gauss math
     double au_m = constants::AU_TO_KM * 1000.0;
-    auto l1 = los1.to_eigen();
-    auto l2 = los2.to_eigen();
-    auto l3 = los3.to_eigen();
-    auto r1_au = R1.to_eigen() / au_m;
-    auto r2_au = R2.to_eigen() / au_m;
-    auto r3_au = R3.to_eigen() / au_m;
+    auto l1 = los1.to_eigen_si();
+    auto l2 = los2.to_eigen_si();
+    auto l3 = los3.to_eigen_si();
+    auto r1_au = R1.to_eigen_si() / au_m;
+    auto r2_au = R2.to_eigen_si() / au_m;
+    auto r3_au = R3.to_eigen_si() / au_m;
 
     rho2 = 1.0; 
     
@@ -263,11 +263,11 @@ bool GaussIOD::solve_slant_ranges(
 }
 
 std::pair<double, double> GaussIOD::compute_f_g_coefficients(
-    const types::Vector3<core::GCRF, core::Meter>& r, 
-    const types::Vector3<core::GCRF, core::Meter>& v, 
+    const math::Vector3<core::GCRF, physics::Distance>& r, 
+    const math::Vector3<core::GCRF, physics::Velocity>& v, 
     double dt, double mu) const {
     
-    double r_mag = r.norm();
+    double r_mag = r.norm().to_m();
     // double v_mag = v.norm(); // unused
     // double alpha = 2.0/r_mag - v_mag*v_mag/mu; // unused
     double u = mu / (r_mag * r_mag * r_mag);

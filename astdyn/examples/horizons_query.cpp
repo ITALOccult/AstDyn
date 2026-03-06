@@ -18,9 +18,9 @@ int main() {
     auto elements = horizons.query_elements("1", epoch);
     if (elements) {
         std::cout << "\n[Elements]" << std::endl;
-        std::cout << "  a  = " << elements->a() << " AU" << std::endl;
-        std::cout << "  e  = " << elements->e() << std::endl;
-        std::cout << "  i  = " << elements->i() * constants::RAD_TO_DEG << " deg" << std::endl;
+        std::cout << "  a  = " << elements->a.to_au() << " AU" << std::endl;
+        std::cout << "  e  = " << elements->e << std::endl;
+        std::cout << "  i  = " << elements->i.to_deg() << " deg" << std::endl;
     } else {
         std::cerr << "Failed to query elements." << std::endl;
     }
@@ -29,9 +29,9 @@ int main() {
     auto vectors = horizons.query_vectors("1", epoch, "500@0");
     if (vectors) {
         std::cout << "\n[Vectors (GCRF/SSB)]" << std::endl;
-        std::cout << "  X  = " << vectors->x() << " AU" << std::endl;
-        std::cout << "  Y  = " << vectors->y() << " AU" << std::endl;
-        std::cout << "  Z  = " << vectors->z() << " AU" << std::endl;
+        std::cout << "  X  = " << vectors->position.x_si() / (constants::AU * 1000.0) << " AU" << std::endl;
+        std::cout << "  Y  = " << vectors->position.y_si() / (constants::AU * 1000.0) << " AU" << std::endl;
+        std::cout << "  Z  = " << vectors->position.z_si() / (constants::AU * 1000.0) << " AU" << std::endl;
     }
 
     // 4. Query Astrometric Observation (from Earth)

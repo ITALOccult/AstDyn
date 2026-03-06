@@ -17,10 +17,10 @@
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/propagation/Propagator.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "src/utils/time_types.hpp"
-#include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
 #include <memory>
 
 namespace astdyn::orbit_determination {
@@ -98,7 +98,7 @@ public:
     ObservationPartials compute_with_partials(
         const physics::CartesianStateTyped<core::GCRF>& initial,
         time::EpochTDB target_time,
-        const types::Vector3<core::GCRF, core::Meter>& observer_pos);
+        const math::Vector3<core::GCRF, physics::Distance>& observer_pos);
     
     /**
      * @brief Set integrator for variational equations
@@ -172,7 +172,7 @@ private:
      */
     Eigen::Matrix<double, 2, 6> compute_observation_partials(
         const physics::CartesianStateTyped<core::GCRF>& state,
-        const types::Vector3<core::GCRF, core::Meter>& observer_pos) const;
+        const math::Vector3<core::GCRF, physics::Distance>& observer_pos) const;
 
 private:
     std::shared_ptr<astdyn::propagation::Propagator> propagator_;

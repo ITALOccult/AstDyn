@@ -9,6 +9,9 @@
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/core/physics_state.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "src/core/frame_tags.hpp"
 #include <cmath>
 
 using namespace astdyn;
@@ -262,12 +265,24 @@ TEST(PropagationTest, EnergyConservationTwoBody) {
     kep.mean_anomaly = 45.0 * constants::DEG_TO_RAD;
     kep.gravitational_parameter = constants::GMS;
     
-    // Convert to Cartesian
-    CartesianElements cart0 = keplerian_to_cartesian(kep);
-    double energy0 = cart0.energy();
+    // Convert to CartesianStateTyped (new API)
+    CartesianElements cart0_legacy = keplerian_to_cartesian(kep);
+    // Energy from legacy type
+    double energy0 = cart0_legacy.energy();
     
+    // Build typed state for the propagator
+    physics::CartesianStateTyped<core::GCRF> cart0 = physics::CartesianStateTyped<core::GCRF>::from_si(
+        time::EpochTDB::from_mjd(kep.epoch.mjd.value),
+        cart0_legacy.position.x * constants::AU * 1000.0,
+        cart0_legacy.position.y * constants::AU * 1000.0,
+        cart0_legacy.position.z * constants::AU * 1000.0,
+        cart0_legacy.velocity.x * constants::AU * 1000.0 / 86400.0,
+        cart0_legacy.velocity.y * constants::AU * 1000.0 / 86400.0,
+        cart0_legacy.velocity.z * constants::AU * 1000.0 / 86400.0,
+        constants::GM_SUN * 1e9
+    );
+
     // Propagate using numerical integration (two-body only)
-    // Use RKF78 adaptive integrator for better energy conservation
     auto integrator = std::make_unique<RKF78Integrator>(0.1, 1e-10);
     auto ephemeris = std::make_shared<ephemeris::PlanetaryEphemeris>();
     
@@ -276,12 +291,38 @@ TEST(PropagationTest, EnergyConservationTwoBody) {
     
     Propagator prop(std::move(integrator), ephemeris, settings);
     
-    double dt = 10.0; // 10 days (shorter to reduce numerical error)
-    CartesianElements cart_final = prop.propagate_cartesian(cart0, utils::Instant::from_tt(utils::ModifiedJulianDate(cart0.epoch.mjd.value + dt)));
-    double energy_final = cart_final.energy();
+    double dt = 10.0; // 10 days
+    auto target_t = time::EpochTDB::from_mjd(cart0.epoch.mjd() + dt);
+    auto cart_final = prop.propagate_cartesian(cart0, target_t);
     
-    // Energy should be conserved reasonably well in two-body problem
-    double rel_error = std::abs((energy_final - energy0) / energy0);
+    // Compute energy from final state (in SI, then convert)
+    double r_f = std::sqrt(
+        cart_final.position.x_si() * cart_final.position.x_si() +
+        cart_final.position.y_si() * cart_final.position.y_si() +
+        cart_final.position.z_si() * cart_final.position.z_si()
+    );
+    double v2_f = 
+        cart_final.velocity.x_si() * cart_final.velocity.x_si() +
+        cart_final.velocity.y_si() * cart_final.velocity.y_si() +
+        cart_final.velocity.z_si() * cart_final.velocity.z_si();
+    double mu_si = cart_final.gm.to_m3_s2();
+    double energy_final_si = 0.5 * v2_f - mu_si / r_f;
+    
+    // Build initial energy in SI
+    double r_0 = r_f; // placeholder; use initial position from cart0
+    double r_0_real = std::sqrt(
+        cart0.position.x_si() * cart0.position.x_si() +
+        cart0.position.y_si() * cart0.position.y_si() +
+        cart0.position.z_si() * cart0.position.z_si()
+    );
+    double v2_0 = 
+        cart0.velocity.x_si() * cart0.velocity.x_si() +
+        cart0.velocity.y_si() * cart0.velocity.y_si() +
+        cart0.velocity.z_si() * cart0.velocity.z_si();
+    double energy_initial_si = 0.5 * v2_0 - mu_si / r_0_real;
+    
+    // Energy should be conserved
+    double rel_error = std::abs((energy_final_si - energy_initial_si) / energy_initial_si);
     EXPECT_LT(rel_error, 1e-4);  // 0.01% error acceptable for numerical integration
 }
 

@@ -178,12 +178,9 @@ int main(int argc, char** argv) {
         auto elements = config_mgr.getOsculatingElements();
         auto original = config_mgr.getOriginalElements();
         
-        std::cout << "Element type: " << 
-            (config_mgr.getElementType() == OrbitalElementSubType::MEAN ? "MEAN" : "OSCULATING") << "\n";
-        
         print_elements(original, "Original Elements");
         
-        if (config_mgr.getElementType() == OrbitalElementSubType::MEAN) {
+        if (std::abs(original.semi_major_axis - elements.semi_major_axis) > 1e-12 || std::abs(original.eccentricity - elements.eccentricity) > 1e-12) {
             print_elements(elements, "Converted to Osculating");
             compare_elements(original, elements);
         }

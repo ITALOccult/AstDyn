@@ -303,17 +303,16 @@ public:
                 engine.set_initial_orbit(result.fitted_orbit); 
                 
                 for (const auto& target_t : cfg.t_observations) {
-                     auto state_at_target = engine.propagate_to(target_t.mjd.value);
+                     auto state_at_target = engine.propagate_to(time::EpochTDB::from_mjd(target_t.mjd.value));
                      Eigen::Vector3d target_pos;                    // Convert to PositionCalculator format
                      KeplerianElements calc_elem;
-                     calc_elem.a = state_at_target.semi_major_axis;
-                     calc_elem.e = state_at_target.eccentricity;
-                     calc_elem.i = state_at_target.inclination;
-                     calc_elem.Omega = state_at_target.longitude_ascending_node;
-                     calc_elem.omega = state_at_target.argument_perihelion;
-                     calc_elem.M = state_at_target.mean_anomaly;
-                     calc_elem.epoch = target_t;
-                     
+                     calc_elem.a = state_at_target.a.to_au();
+                     calc_elem.e = state_at_target.e;
+                     calc_elem.i = state_at_target.i.to_rad();
+                     calc_elem.Omega = state_at_target.node.to_rad();
+                     calc_elem.omega = state_at_target.omega.to_rad();
+                     calc_elem.M = state_at_target.M.to_rad();
+                     calc_elem.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(state_at_target.epoch.mjd()));
                      calc_elem.equatorial = true;
                      
                      auto pos = PositionCalculator::computePosition(
@@ -410,16 +409,16 @@ public:
              
              // 3. Propagate
              for (const auto& target_t : cfg.t_observations) {
-                 auto state_at_target = engine.propagate_to(target_t.mjd.value);
+                 auto state_at_target = engine.propagate_to(time::EpochTDB::from_mjd(target_t.mjd.value));
                  
-                 KeplerianElements calc_elem;
-                 calc_elem.a = state_at_target.semi_major_axis;
-                 calc_elem.e = state_at_target.eccentricity;
-                 calc_elem.i = state_at_target.inclination;
-                 calc_elem.Omega = state_at_target.longitude_ascending_node;
-                 calc_elem.omega = state_at_target.argument_perihelion;
-                 calc_elem.M = state_at_target.mean_anomaly;
-                 calc_elem.epoch = target_t;
+                  KeplerianElements calc_elem;
+                  calc_elem.a = state_at_target.a.to_au();
+                  calc_elem.e = state_at_target.e;
+                  calc_elem.i = state_at_target.i.to_rad();
+                  calc_elem.Omega = state_at_target.node.to_rad();
+                  calc_elem.omega = state_at_target.omega.to_rad();
+                  calc_elem.M = state_at_target.M.to_rad();
+                  calc_elem.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(state_at_target.epoch.mjd()));
                  calc_elem.equatorial = true; // Engine output is Equatorial
                  
                  auto pos = PositionCalculator::computePosition(
