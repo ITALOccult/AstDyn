@@ -22,7 +22,10 @@
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include "src/utils/time_types.hpp"
+#include "src/core/frame_tags.hpp"
 #include <cmath>
 #include <string>
 
@@ -329,6 +332,7 @@ public:
      * @param mjd_ut1 Modified Julian Date (for ITRF)
      * @return Position vector in target frame [km]
      */
+    [[deprecated("Use typed transform_pos<FromFrame,ToFrame>() instead")]]
     static Vector3d transform_position(const Vector3d& pos, 
                                       FrameType from, FrameType to,
                                       utils::Instant t_ut1 = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
@@ -349,6 +353,7 @@ public:
      * @param mjd_ut1 Modified Julian Date (for ITRF)
      * @return Velocity vector in target frame [km/s]
      */
+    [[deprecated("Use typed transform_vel<FromFrame,ToFrame>() instead")]]
     static Vector3d transform_velocity(const Vector3d& pos, const Vector3d& vel,
                                       FrameType from, FrameType to,
                                       utils::Instant t_ut1 = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
@@ -386,6 +391,7 @@ public:
      * @param mjd_ut1 Modified Julian Date (for ITRF)
      * @return Cartesian state in target frame
      */
+    [[deprecated("Use typed transform_pos/transform_vel<FromFrame,ToFrame>() instead")]]
     static CartesianState transform_state(const CartesianState& state,
                                          FrameType from, FrameType to,
                                          utils::Instant t_ut1 = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
@@ -439,7 +445,157 @@ public:
         
         return gmst_rad;
     }
+    // ========================================================================
+    // Type-Safe Frame Transformations (AstDyn 3.0)
+    // ========================================================================
+    // These template methods encode the frame in the types, so the compiler
+    // prevents mixing frames at compile-time.
+    //
+    // Usage:
+    //   auto R = ReferenceFrame::get_rotation<core::ECLIPJ2000, core::GCRF>();
+    //   auto pos_gcrf = R * pos_ecliptic;  // compile-time frame check!
+    //
+    //   auto pos_gcrf = ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(pos_ecl);
+    // ========================================================================
+
+    // --- Rotation matrix factories (compile-time frame pair) ---
+
+    /**
+     * @brief Get typed rotation matrix between two frame tags.
+     * 
+     * Specializations exist for all supported pairs.
+     * ITRF transformations require a time parameter.
+     */
+    template <typename FromFrame, typename ToFrame>
+    static math::RotationMatrix<FromFrame, ToFrame> get_rotation(
+        utils::Instant t = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000)));
+
+    // --- Position transformation ---
+
+    /**
+     * @brief Transform a typed position vector between frames.
+     * Returns a Vector3 tagged with ToFrame.
+     */
+    template <typename FromFrame, typename ToFrame, typename PhysUnit>
+    static math::Vector3<ToFrame, PhysUnit> transform_pos(
+        const math::Vector3<FromFrame, PhysUnit>& pos,
+        utils::Instant t = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000)))
+    {
+        auto R = get_rotation<FromFrame, ToFrame>(t);
+        return R * pos;
+    }
+
+    // --- Velocity transformation (with Coriolis for rotating frames) ---
+
+    /**
+     * @brief Transform typed velocity between frames. 
+     * Handles Coriolis term for ITRF.
+     */
+    template <typename FromFrame, typename ToFrame>
+    static math::Vector3<ToFrame, physics::Velocity> transform_vel(
+        const math::Vector3<FromFrame, physics::Distance>& pos,
+        const math::Vector3<FromFrame, physics::Velocity>& vel,
+        utils::Instant t = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000)))
+    {
+        auto R = get_rotation<FromFrame, ToFrame>(t);
+        return R * vel; // Default: pure rotation (inertial-to-inertial)
+    }
 };
+
+// ============================================================================
+// Template specializations for get_rotation
+// ============================================================================
+
+// --- Identity (same frame) ---
+template<> inline
+math::RotationMatrix<core::GCRF, core::GCRF> ReferenceFrame::get_rotation<core::GCRF, core::GCRF>(utils::Instant) {
+    return math::RotationMatrix<core::GCRF, core::GCRF>::from_eigen(Matrix3d::Identity());
+}
+template<> inline
+math::RotationMatrix<core::ECLIPJ2000, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::ECLIPJ2000>(utils::Instant) {
+    return math::RotationMatrix<core::ECLIPJ2000, core::ECLIPJ2000>::from_eigen(Matrix3d::Identity());
+}
+template<> inline
+math::RotationMatrix<core::ITRF, core::ITRF> ReferenceFrame::get_rotation<core::ITRF, core::ITRF>(utils::Instant) {
+    return math::RotationMatrix<core::ITRF, core::ITRF>::from_eigen(Matrix3d::Identity());
+}
+
+// --- ECLIPJ2000 ↔ GCRF ---
+template<> inline
+math::RotationMatrix<core::ECLIPJ2000, core::GCRF> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::GCRF>(utils::Instant t) {
+    return math::RotationMatrix<core::ECLIPJ2000, core::GCRF>::from_eigen(
+        ecliptic_to_j2000(t));
+}
+template<> inline
+math::RotationMatrix<core::GCRF, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>(utils::Instant t) {
+    return math::RotationMatrix<core::GCRF, core::ECLIPJ2000>::from_eigen(
+        j2000_to_ecliptic(t));
+}
+
+// --- GCRF ↔ ITRF ---
+template<> inline
+math::RotationMatrix<core::GCRF, core::ITRF> ReferenceFrame::get_rotation<core::GCRF, core::ITRF>(utils::Instant t) {
+    return math::RotationMatrix<core::GCRF, core::ITRF>::from_eigen(
+        j2000_to_itrf_simple(t));
+}
+template<> inline
+math::RotationMatrix<core::ITRF, core::GCRF> ReferenceFrame::get_rotation<core::ITRF, core::GCRF>(utils::Instant t) {
+    return math::RotationMatrix<core::ITRF, core::GCRF>::from_eigen(
+        itrf_to_j2000_simple(t));
+}
+
+// --- ECLIPJ2000 ↔ ITRF (chained via GCRF) ---
+template<> inline
+math::RotationMatrix<core::ECLIPJ2000, core::ITRF> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::ITRF>(utils::Instant t) {
+    return math::RotationMatrix<core::ECLIPJ2000, core::ITRF>::from_eigen(
+        j2000_to_itrf_simple(t) * ecliptic_to_j2000(t));
+}
+template<> inline
+math::RotationMatrix<core::ITRF, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::ITRF, core::ECLIPJ2000>(utils::Instant t) {
+    return math::RotationMatrix<core::ITRF, core::ECLIPJ2000>::from_eigen(
+        j2000_to_ecliptic(t) * itrf_to_j2000_simple(t));
+}
+
+// ============================================================================
+// Velocity specializations for ITRF (adds Coriolis term)
+// ============================================================================
+
+template<> inline
+math::Vector3<core::ITRF, physics::Velocity> ReferenceFrame::transform_vel<core::GCRF, core::ITRF>(
+    const math::Vector3<core::GCRF, physics::Distance>& pos,
+    const math::Vector3<core::GCRF, physics::Velocity>& vel,
+    utils::Instant t)
+{
+    auto R = get_rotation<core::GCRF, core::ITRF>(t);
+    auto vel_rotated = R * vel;
+    auto pos_rotated = R * pos;
+    
+    // ω_earth cross r (in ITRF)
+    constexpr double omega_earth = 7.292115e-5; // rad/s
+    // ω = (0, 0, ω_earth) cross pos_rotated
+    double wx = -omega_earth * pos_rotated.y_si();
+    double wy =  omega_earth * pos_rotated.x_si();
+    
+    return vel_rotated - math::Vector3<core::ITRF, physics::Velocity>::from_si(wx, wy, 0.0);
+}
+
+template<> inline
+math::Vector3<core::GCRF, physics::Velocity> ReferenceFrame::transform_vel<core::ITRF, core::GCRF>(
+    const math::Vector3<core::ITRF, physics::Distance>& pos,
+    const math::Vector3<core::ITRF, physics::Velocity>& vel,
+    utils::Instant t)
+{
+    auto R = get_rotation<core::ITRF, core::GCRF>(t);
+    auto vel_rotated = R * vel;
+    auto pos_rotated = R * pos;
+    
+    // ω_earth cross r (in GCRF)
+    constexpr double omega_earth = 7.292115e-5;
+    double wx = -omega_earth * pos_rotated.y_si();
+    double wy =  omega_earth * pos_rotated.x_si();
+    
+    return vel_rotated + math::Vector3<core::GCRF, physics::Velocity>::from_si(wx, wy, 0.0);
+}
 
 } // namespace coordinates
 } // namespace astdyn
