@@ -98,6 +98,17 @@ find_package(Boost 1.70 REQUIRED COMPONENTS
     date_time
 )
 
+# Find CURL for networking
+find_package(CURL REQUIRED)
+
+# Fetch nlohmann/json for JPL Horizons API parsing
+include(FetchContent)
+FetchContent_Declare(
+    json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+)
+FetchContent_MakeAvailable(json)
+
 # Optional: SPICE Toolkit
 if(ASTDYN_USE_SPICE)
     find_package(CSPICE QUIET)

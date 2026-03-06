@@ -12,6 +12,7 @@ namespace astdyn::coordinates {
 using types::OrbitalState;
 using types::CartesianTag;
 using types::KeplerianTag;
+using types::AuDayTag;
 using core::Radian;
 namespace constants = astdyn::constants;
 
@@ -20,7 +21,7 @@ namespace constants = astdyn::constants;
  * @tparam Frame Any reference frame.
  */
 template <typename Frame>
-[[nodiscard]] constexpr OrbitalState<Frame, CartesianTag> keplerian_to_cartesian(
+[[nodiscard]] constexpr OrbitalState<Frame, CartesianTag, AuDayTag> keplerian_to_cartesian(
     const OrbitalState<Frame, KeplerianTag>& state, 
     const double mu = constants::GM_EARTH) {
     const double a = state.a(), e = state.e();
@@ -43,7 +44,7 @@ template <typename Frame>
     const auto final_pos = rot.multiply(pos_p);
     const auto final_vel = rot.multiply(vel_p);
     
-    return OrbitalState<Frame, CartesianTag>({
+    return OrbitalState<Frame, CartesianTag, AuDayTag>({
         final_pos.x, final_pos.y, final_pos.z, 
         final_vel.x, final_vel.y, final_vel.z
     });

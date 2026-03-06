@@ -21,8 +21,7 @@
 #ifndef ASTDYN_CLOSE_APPROACH_HPP
 #define ASTDYN_CLOSE_APPROACH_HPP
 
-#include "astdyn/core/Types.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "src/utils/time_types.hpp"
@@ -74,7 +73,7 @@ struct BPlaneCoordinates {
  * @brief Single close approach event
  */
 struct CloseApproach {
-    utils::Instant time;                ///< Time of closest approach
+    time::EpochTDB time;                ///< Time of closest approach
     BodyType body;                      ///< Target body
     
     // Geometric quantities at closest approach
@@ -160,17 +159,17 @@ public:
      * @return Vector of detected close approaches (sorted by time)
      */
     std::vector<CloseApproach> find_approaches(
-        const propagation::CartesianElements& initial_state,
-        utils::Instant t_start,
-        utils::Instant t_end);
+        const physics::CartesianStateTyped<core::GCRF>& initial_state,
+        time::EpochTDB t_start,
+        time::EpochTDB t_end);
     
     /**
      * @brief Find close approaches (Keplerian initial state)
      */
     std::vector<CloseApproach> find_approaches(
-        const propagation::KeplerianElements& initial_orbit,
-        utils::Instant t_start,
-        utils::Instant t_end);
+        const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_orbit,
+        time::EpochTDB t_start,
+        time::EpochTDB t_end);
     
     /**
      * @brief Compute b-plane coordinates for a close approach
@@ -203,8 +202,8 @@ private:
      * @return Distance to body [AU]
      */
     double compute_distance(
-        utils::Instant t,
-        const propagation::CartesianElements& state,
+        time::EpochTDB t,
+        const physics::CartesianStateTyped<core::GCRF>& state,
         BodyType body) const;
     
     /**
@@ -220,11 +219,11 @@ private:
      * @param body Target body
      * @return Time of closest approach [MJD TDB]
      */
-    utils::Instant refine_approach_time(
-        const propagation::CartesianElements& state_t1,
-        const propagation::CartesianElements& state_t2,
-        utils::Instant t1,
-        utils::Instant t2,
+    time::EpochTDB refine_approach_time(
+        const physics::CartesianStateTyped<core::GCRF>& state_t1,
+        const physics::CartesianStateTyped<core::GCRF>& state_t2,
+        time::EpochTDB t1,
+        time::EpochTDB t2,
         BodyType body) const;
     
     /**
@@ -236,8 +235,8 @@ private:
      * @return Complete CloseApproach structure
      */
     CloseApproach build_approach(
-        utils::Instant t,
-        const propagation::CartesianElements& state,
+        time::EpochTDB t,
+        const physics::CartesianStateTyped<core::GCRF>& state,
         BodyType body) const;
     
     /**

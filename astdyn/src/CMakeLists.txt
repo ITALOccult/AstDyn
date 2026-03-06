@@ -47,6 +47,9 @@ target_link_libraries(astdyn
         Boost::filesystem
         Boost::program_options
         Boost::date_time
+    PRIVATE
+        $<BUILD_INTERFACE:CURL::libcurl>
+        $<BUILD_INTERFACE:nlohmann_json::nlohmann_json>
 )
 
 # Optionally link CSPICE
@@ -71,6 +74,9 @@ if(ASTDYN_BUILD_SHARED)
             Boost::filesystem
             Boost::program_options
             Boost::date_time
+        PRIVATE
+            $<BUILD_INTERFACE:CURL::libcurl>
+            $<BUILD_INTERFACE:nlohmann_json::nlohmann_json>
     )
     
     if(ASTDYN_USE_SPICE AND CSPICE_FOUND)

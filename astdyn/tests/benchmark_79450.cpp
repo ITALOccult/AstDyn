@@ -77,6 +77,7 @@ void init_ephemeris(const std::string& bsp_path) {
 
 double measure_execution(
     const types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag>& initial,
+    const utils::Instant& t_elements,
     const utils::Instant& t_obs,
     const AstDynConfig& engine_cfg,
     const std::string& name,
@@ -89,7 +90,7 @@ double measure_execution(
     a_settings.stellar_aberration = true;
     a_settings.frame_conversion_to_equatorial = true;
 
-    auto obs_res = AstrometryReducer::compute_observation(initial, t_obs, engine_cfg, a_settings);
+    auto obs_res = AstrometryReducer::compute_observation(initial, t_elements, t_obs, engine_cfg, a_settings);
     
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
@@ -141,7 +142,8 @@ int main() {
         engine_cfg.propagator_settings.include_planets = true;
         engine_cfg.integrator_type = "RKF78";
 
-        measure_execution(initial, t_obs, engine_cfg, "No Fit", truth);
+        utils::Instant t_elements = utils::Instant::from_tt(utils::ModifiedJulianDate(eq1.epoch_mjd_tdb));
+        measure_execution(initial, t_elements, t_obs, engine_cfg, "No Fit", truth);
     }
 
     // 2. State from Fit (Simulated with high-precision SABA4)
@@ -162,7 +164,8 @@ int main() {
         engine_cfg.integrator_type = "SABA4"; 
         engine_cfg.initial_step_size = 0.5;
 
-        measure_execution(initial, t_obs, engine_cfg, "With Fit", truth);
+        utils::Instant t_elements = utils::Instant::from_tt(utils::ModifiedJulianDate(eq1.epoch_mjd_tdb));
+        measure_execution(initial, t_elements, t_obs, engine_cfg, "With Fit", truth);
     }
 
     std::cout << "------------------------------------------------------------" << std::endl;

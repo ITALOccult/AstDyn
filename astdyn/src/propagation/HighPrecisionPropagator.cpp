@@ -5,6 +5,7 @@
 
 #include "astdyn/propagation/HighPrecisionPropagator.hpp"
 #include "astdyn/propagation/Propagator.hpp"
+#include "astdyn/propagation/OrbitalElements.hpp"
 #include "src/core/units.hpp"
 #include "src/utils/time_types.hpp"
 #include "src/types/orbital_state.hpp"
@@ -58,36 +59,45 @@ std::unique_ptr<Propagator> HighPrecisionPropagator::createPropagator() const {
 
 HighPrecisionPropagator::ObservationResult 
 HighPrecisionPropagator::calculateGeocentricObservation(
-    const KeplerianElements& initial_elements, 
-    utils::Instant target_time,
-    InputFrame frame
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements, 
+    time::EpochTDB target_time
 ) {
     if (!cached_propagator_) cached_propagator_ = createPropagator();
     
-    CartesianElements cart_icrf = propagate_cartesian(initial_elements, target_time, frame);
+    auto cart_icrf = propagate_cartesian(initial_elements, target_time);
+    return calculateGeocentricObservation(cart_icrf, target_time);
+}
+
+HighPrecisionPropagator::ObservationResult 
+HighPrecisionPropagator::calculateGeocentricObservation(
+    const physics::CartesianStateTyped<core::GCRF>& cart_icrf, 
+    time::EpochTDB target_time
+) {
+    if (!cached_propagator_) cached_propagator_ = createPropagator();
     
     // Earth position at target time
-    auto r_sun_ssb = PlanetaryEphemeris::getSunBarycentricPosition(target_time);
-    auto r_earth_ssb = PlanetaryEphemeris::getPosition(CelestialBody::EARTH, target_time);
+    auto target_time_inst = utils::Instant::from_tt(utils::ModifiedJulianDate(target_time.mjd()));
+    auto r_sun_ssb = PlanetaryEphemeris::getSunBarycentricPosition(target_time_inst);
+    auto r_earth_ssb = PlanetaryEphemeris::getPosition(CelestialBody::EARTH, target_time_inst);
     auto r_earth_helio = r_earth_ssb - r_sun_ssb;
 
     double lt_sec = 0.0;
-    CartesianElements state_at_emit = cart_icrf;
+    physics::CartesianStateTyped<core::GCRF> state_at_emit = cart_icrf;
     
     // Light-time correction loop
     for (int i = 0; i < 3; ++i) {
-        auto t_emit = utils::Instant::from_tt(utils::ModifiedJulianDate(target_time.mjd.value - lt_sec / 86400.0));
+        auto t_emit = time::EpochTDB::from_mjd(target_time.mjd() - lt_sec / 86400.0);
         state_at_emit = cached_propagator_->propagate_cartesian(cart_icrf, t_emit);
         
-        double dist = (state_at_emit.position - r_earth_helio).norm();
+        double dist = (state_at_emit.position.to_eigen_si() - r_earth_helio.to_eigen()).norm();
         lt_sec = dist / (constants::C_LIGHT * 1000.0);
     }
 
-    auto r_geo = state_at_emit.position - r_earth_helio;
+    auto r_geo = state_at_emit.position.to_eigen_si() - r_earth_helio.to_eigen();
     double dist = r_geo.norm();
     
-    double ra = atan2(r_geo.y, r_geo.x);
-    double dec = asin(r_geo.z / dist);
+    double ra = atan2(r_geo.y(), r_geo.x());
+    double dec = asin(r_geo.z() / dist);
 
     if (ra < 0) ra += astdyn::constants::TWO_PI;
 
@@ -96,7 +106,7 @@ HighPrecisionPropagator::calculateGeocentricObservation(
     result.dec_deg = dec * astdyn::constants::RAD_TO_DEG;
     result.distance_au = dist / (constants::AU * 1000.0);
     result.light_time_sec = lt_sec;
-    result.geocentric_position = r_geo;
+    result.geocentric_position = types::Vector3<core::GCRF, core::Meter>(r_geo);
 
     return result;
 }
@@ -110,29 +120,49 @@ void HighPrecisionPropagator::setPlanetaryEphemeris(std::shared_ptr<astdyn::ephe
     cached_propagator_.reset();
 }
 
-CartesianElements HighPrecisionPropagator::propagate_cartesian(
-    const KeplerianElements& initial_elements,
-    utils::Instant target_time,
-    InputFrame frame
+physics::CartesianStateTyped<core::GCRF> HighPrecisionPropagator::propagate_cartesian(
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
+    time::EpochTDB target_time
 ) {
     if (!cached_propagator_) cached_propagator_ = createPropagator();
     
-    CartesianElements cart_start = keplerian_to_cartesian(initial_elements);
+    // Bridge to un-typed format for conversion math
+    KeplerianElements kep_old;
+    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(initial_elements.epoch.mjd()));
+    kep_old.semi_major_axis = initial_elements.a.to_au();
+    kep_old.eccentricity = initial_elements.e;
+    kep_old.inclination = initial_elements.i.to_rad();
+    kep_old.longitude_ascending_node = initial_elements.node.to_rad();
+    kep_old.argument_perihelion = initial_elements.omega.to_rad();
+    kep_old.mean_anomaly = initial_elements.M.to_rad();
+    kep_old.gravitational_parameter = initial_elements.gm.to_au3_d2();
     
-    if (frame == InputFrame::ECLIPTIC) {
-        // VSOP87 elements are usually in ecliptic frame. 
-        // Need to ensure they are rotated to GCRF (Equatorial J2000) if requested.
-        // For now assume keplerian_to_cartesian handles the requested frame or we convert here.
-        // Actually, reference_frame.hpp transform_position handles this.
-        auto pos_ecl = cart_start.position.to_eigen();
-        auto vel_ecl = cart_start.velocity.to_eigen();
-        auto pos_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl;
-        auto vel_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl;
-        cart_start.position = types::Vector3<core::GCRF, core::Meter>(pos_eq);
-        cart_start.velocity = types::Vector3<core::GCRF, core::Meter>(vel_eq);
-    }
+    // Convert to un-typed Cartesian (which returns SI internally!)
+    CartesianElements cart_old = keplerian_to_cartesian(kep_old);
+    
+    // Rotate to ICRF
+    auto pos_ecl = cart_old.position.to_eigen();
+    auto vel_ecl = cart_old.velocity.to_eigen();
+    auto pos_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl;
+    auto vel_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl;
+    
+    // Bring into AstDyn 3.0 Type Safety
+    auto cart_typed = physics::CartesianStateTyped<core::GCRF>::from_si(
+        initial_elements.epoch,
+        pos_eq.x(), pos_eq.y(), pos_eq.z(),
+        vel_eq.x(), vel_eq.y(), vel_eq.z(),
+        constants::GM_SUN * 1e9
+    );
 
-    return cached_propagator_->propagate_cartesian(cart_start, target_time);
+    return cached_propagator_->propagate_cartesian(cart_typed, target_time);
+}
+
+physics::CartesianStateTyped<core::GCRF> HighPrecisionPropagator::propagate_cartesian(
+    const physics::CartesianStateTyped<core::GCRF>& initial_elements,
+    time::EpochTDB target_time
+) {
+    if (!cached_propagator_) cached_propagator_ = createPropagator();
+    return cached_propagator_->propagate_cartesian(initial_elements, target_time);
 }
 
 } // namespace astdyn::propagation

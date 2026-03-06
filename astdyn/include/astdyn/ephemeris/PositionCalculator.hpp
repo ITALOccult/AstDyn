@@ -7,6 +7,7 @@
 #define ASTDYN_EPHEMERIS_POSITIONCALCULATOR_HPP
 
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "src/utils/time_types.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
@@ -66,20 +67,12 @@ public:
         // heliocentric ecliptic coordinates (the library works internally in the
         // ecliptic frame). The obliquity of the ecliptic J2000 is ε = 23.43928°.
         if (elem.equatorial) {
-            constexpr double epsilon = 23.43928 * M_PI / 180.0; // rad
-            Eigen::Matrix3d R;
-            R << 1, 0, 0,
-                 0, std::cos(epsilon), std::sin(epsilon),
-                 0, -std::sin(epsilon), std::cos(epsilon);
+            auto R = coordinates::ReferenceFrame::j2000_to_ecliptic(target_time);
             pos = R * pos; // convert equatorial -> ecliptic
         }
         if (outputEquatorial) {
             // Convert back to equatorial frame
-            constexpr double epsilon = 23.43928 * M_PI / 180.0; // rad
-            Eigen::Matrix3d R;
-            R << 1, 0, 0,
-                 0, std::cos(epsilon), -std::sin(epsilon),
-                 0, std::sin(epsilon),  std::cos(epsilon);
+            auto R = coordinates::ReferenceFrame::ecliptic_to_j2000(target_time);
             pos = R * pos; // ecliptic -> equatorial
         }
         
@@ -95,11 +88,7 @@ public:
         assert(state.size() >= 3 && "State vector must contain at least 3 elements (x, y, z)");
         Eigen::Vector3d pos = state.head<3>();
         if (outputEquatorial) {
-            constexpr double epsilon = 23.43928 * M_PI / 180.0; // rad
-            Eigen::Matrix3d R;
-            R << 1, 0, 0,
-                 0, std::cos(epsilon), -std::sin(epsilon),
-                 0, std::sin(epsilon),  std::cos(epsilon);
+            auto R = coordinates::ReferenceFrame::ecliptic_to_j2000(); // Assume J2000 if no time context
             pos = R * pos; // ecliptic -> equatorial
         }
         // Convert to meters (assuming input state was in AU)

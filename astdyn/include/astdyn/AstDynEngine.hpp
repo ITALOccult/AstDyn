@@ -16,8 +16,7 @@
 #ifndef ASTDYN_ORBFITENGINE_HPP
 #define ASTDYN_ORBFITENGINE_HPP
 
-#include "astdyn/core/Types.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/observations/Observation.hpp"
 #include "astdyn/observations/MPCReader.hpp"
@@ -79,7 +78,7 @@ struct AstDynConfig {
  * @brief Results from orbit determination
  */
 struct OrbitDeterminationResult {
-    propagation::KeplerianElements orbit;    ///< Fitted orbital elements
+    physics::KeplerianStateTyped<core::ECLIPJ2000> orbit;    ///< Fitted orbital elements
     Eigen::MatrixXd covariance;              ///< Covariance matrix (6×6)
     std::vector<double> residuals_ra;        ///< RA residuals [arcsec]
     std::vector<double> residuals_dec;       ///< Dec residuals [arcsec]
@@ -175,7 +174,7 @@ public:
      * 
      * @param elements Initial orbital elements
      */
-    void set_initial_orbit(const propagation::KeplerianElements& elements);
+    void set_initial_orbit(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
     
     /**
      * @brief Perform initial orbit determination (IOD) from observations
@@ -185,7 +184,7 @@ public:
      * @return Initial orbital elements
      * @throws std::runtime_error if insufficient observations
      */
-    propagation::KeplerianElements initial_orbit_determination();
+    physics::KeplerianStateTyped<core::ECLIPJ2000> initial_orbit_determination();
     
     /**
      * @brief Fit orbit to observations using differential correction
@@ -201,7 +200,7 @@ public:
     /**
      * @brief Get current best-fit orbit
      */
-    const propagation::KeplerianElements& orbit() const {
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& orbit() const {
         return current_orbit_;
     }
     
@@ -225,9 +224,9 @@ public:
      * @return Vector of Cartesian states at each epoch
      * @throws std::runtime_error if no orbit available
      */
-    std::vector<propagation::CartesianElements> compute_ephemeris(
-        double start_mjd,
-        double end_mjd,
+    std::vector<physics::CartesianStateTyped<core::GCRF>> compute_ephemeris(
+        time::EpochTDB start_time,
+        time::EpochTDB end_time,
         double step_days);
     
     /**
@@ -236,7 +235,7 @@ public:
      * @param target_mjd Target epoch [MJD TDB]
      * @return Orbital elements at target epoch
      */
-    propagation::KeplerianElements propagate_to(double target_mjd);
+    physics::KeplerianStateTyped<core::ECLIPJ2000> propagate_to(time::EpochTDB target_time);
     
     // ========================================================================
     // Close Approach Analysis
@@ -252,8 +251,8 @@ public:
      * @return Vector of detected close approaches
      */
     std::vector<close_approach::CloseApproach> find_close_approaches(
-        double start_mjd,
-        double end_mjd);
+        time::EpochTDB start_time,
+        time::EpochTDB end_time);
     
     /**
      * @brief Compute MOID (Minimum Orbital Intersection Distance) with planet
@@ -338,7 +337,7 @@ private:
     std::vector<observations::OpticalObservation> observations_;
     
     // Current orbit
-    propagation::KeplerianElements current_orbit_;
+    physics::KeplerianStateTyped<core::ECLIPJ2000> current_orbit_;
     bool has_orbit_ = false;
     
     // Last orbit determination result

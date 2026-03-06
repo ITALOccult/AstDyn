@@ -7,7 +7,7 @@
 #ifndef ASTDYN_HIGH_PRECISION_PROPAGATOR_HPP
 #define ASTDYN_HIGH_PRECISION_PROPAGATOR_HPP
 
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "src/utils/time_types.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
@@ -95,9 +95,13 @@ public:
      * @return ObservationResult
      */
     ObservationResult calculateGeocentricObservation(
-        const KeplerianElements& initial_elements, 
-        utils::Instant target_time,
-        InputFrame frame = InputFrame::ECLIPTIC
+        const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements, 
+        time::EpochTDB target_time
+    );
+    
+    ObservationResult calculateGeocentricObservation(
+        const physics::CartesianStateTyped<core::GCRF>& initial_elements, 
+        time::EpochTDB target_time
     );
 
     /**
@@ -123,10 +127,14 @@ public:
      * @param frame Input frame
      * @return Cartesian state at target epoch (ICRF Equatorial)
      */
-    CartesianElements propagate_cartesian(
-        const KeplerianElements& initial_elements,
-        utils::Instant target_time,
-        InputFrame frame = InputFrame::ECLIPTIC
+    physics::CartesianStateTyped<core::GCRF> propagate_cartesian(
+        const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
+        time::EpochTDB target_time
+    );
+    
+    physics::CartesianStateTyped<core::GCRF> propagate_cartesian(
+        const physics::CartesianStateTyped<core::GCRF>& initial_elements,
+        time::EpochTDB target_time
     );
 
 private:

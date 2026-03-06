@@ -128,13 +128,13 @@ CloseApproachDetector::CloseApproachDetector(
 }
 
 std::vector<CloseApproach> CloseApproachDetector::find_approaches(
-    const CartesianElements& initial_state,
-    utils::Instant t_start,
-    utils::Instant t_end)
+    const physics::CartesianStateTyped<core::GCRF>& initial_state,
+    time::EpochTDB t_start,
+    time::EpochTDB t_end)
 {
     std::vector<CloseApproach> approaches;
     
-    if (t_end.mjd.value <= t_start.mjd.value) {
+    if (t_end.mjd() <= t_start.mjd()) {
         throw std::invalid_argument("t_end must be > t_start");
     }
     
@@ -149,19 +149,19 @@ std::vector<CloseApproach> CloseApproachDetector::find_approaches(
     }
     
     double dt = 1.0;
-    double t = t_start.mjd.value;
-    CartesianElements prev_state = initial_state;
+    double t = t_start.mjd();
+    physics::CartesianStateTyped<core::GCRF> prev_state = initial_state;
     
     std::map<BodyType, double> prev_distances;
     for (auto body : bodies) {
-        prev_distances[body] = compute_distance(utils::Instant::from_tt(utils::ModifiedJulianDate(t)), prev_state, body);
+        prev_distances[body] = compute_distance(t_start, prev_state, body);
     }
     
-    while (t < t_end.mjd.value) {
-        double t_next_val = std::min(t + dt, t_end.mjd.value);
-        utils::Instant t_next = utils::Instant::from_tt(utils::ModifiedJulianDate(t_next_val));
+    while (t < t_end.mjd()) {
+        double t_next_val = std::min(t + dt, t_end.mjd());
+        time::EpochTDB t_next = time::EpochTDB::from_mjd(t_next_val);
         
-        CartesianElements current_state = propagator_->propagate_cartesian(prev_state, t_next);
+        auto current_state = propagator_->propagate_cartesian(prev_state, t_next);
         
         for (auto body : bodies) {
             if (!settings_.should_check_body(body)) continue;
@@ -170,14 +170,14 @@ std::vector<CloseApproach> CloseApproachDetector::find_approaches(
             double dist_prev = prev_distances[body];
             
             if (dist_current > dist_prev && dist_prev < settings_.detection_distance) {
-                utils::Instant t_ca = t_next;
+                time::EpochTDB t_ca = t_next;
                 if (settings_.refine_time) {
                     t_ca = refine_approach_time(prev_state, current_state, 
-                                                utils::Instant::from_tt(utils::ModifiedJulianDate(t)), 
+                                                time::EpochTDB::from_mjd(t), 
                                                 t_next, body);
                 }
                 
-                CartesianElements state_ca = propagator_->propagate_cartesian(prev_state, t_ca);
+                auto state_ca = propagator_->propagate_cartesian(prev_state, t_ca);
                 CloseApproach ca = build_approach(t_ca, state_ca, body);
                 
                 if (ca.distance < settings_.detection_distance) {
@@ -193,54 +193,76 @@ std::vector<CloseApproach> CloseApproachDetector::find_approaches(
     
     std::sort(approaches.begin(), approaches.end(),
               [](const CloseApproach& a, const CloseApproach& b) {
-                  return a.time.mjd.value < b.time.mjd.value;
+                  return a.time.mjd() < b.time.mjd();
               });
     
     return approaches;
 }
 
 std::vector<CloseApproach> CloseApproachDetector::find_approaches(
-    const KeplerianElements& initial_orbit,
-    utils::Instant t_start,
-    utils::Instant t_end)
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_orbit,
+    time::EpochTDB t_start,
+    time::EpochTDB t_end)
 {
-    CartesianElements cart = propagation::keplerian_to_cartesian(initial_orbit);
-    return find_approaches(cart, t_start, t_end);
+    // Bridge to un-typed format for conversion math
+    KeplerianElements kep_old;
+    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(initial_orbit.epoch.mjd()));
+    kep_old.semi_major_axis = initial_orbit.a.to_au();
+    kep_old.eccentricity = initial_orbit.e;
+    kep_old.inclination = initial_orbit.i.to_rad();
+    kep_old.longitude_ascending_node = initial_orbit.node.to_rad();
+    kep_old.argument_perihelion = initial_orbit.omega.to_rad();
+    kep_old.mean_anomaly = initial_orbit.M.to_rad();
+    kep_old.gravitational_parameter = initial_orbit.gm.to_au3_d2();
+    
+    // Convert to un-typed Cartesian (which returns SI internally!)
+    CartesianElements cart_old = keplerian_to_cartesian(kep_old);
+    
+    // Bring into AstDyn 3.0 Type Safety
+    auto cart_typed = physics::CartesianStateTyped<core::GCRF>::from_si(
+        initial_orbit.epoch,
+        cart_old.position.x, cart_old.position.y, cart_old.position.z,
+        cart_old.velocity.x, cart_old.velocity.y, cart_old.velocity.z,
+        constants::GM_SUN * 1e9
+    );
+    
+    return find_approaches(cart_typed, t_start, t_end);
 }
 
 double CloseApproachDetector::compute_distance(
-    utils::Instant t,
-    const CartesianElements& state,
+    time::EpochTDB t,
+    const physics::CartesianStateTyped<core::GCRF>& state,
     BodyType body) const
 {
     CelestialBody cb = to_celestial_body(body);
-    auto planet_pos = PlanetaryEphemeris::getPosition(cb, t);
-    Vector3d rel_pos = state.position.to_eigen() - planet_pos.to_eigen();
+    auto planet_pos = PlanetaryEphemeris::getPosition(cb, 
+        utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd())));
+    Vector3d rel_pos = state.position.to_eigen_si() - planet_pos.to_eigen();
     return rel_pos.norm();
 }
 
-utils::Instant CloseApproachDetector::refine_approach_time(
-    const CartesianElements& state_t1,
-    const CartesianElements& state_t2,
-    utils::Instant t1,
-    utils::Instant t2,
+time::EpochTDB CloseApproachDetector::refine_approach_time(
+    const physics::CartesianStateTyped<core::GCRF>& state_t1,
+    const physics::CartesianStateTyped<core::GCRF>& state_t2,
+    time::EpochTDB t1,
+    time::EpochTDB t2,
     BodyType body) const
 {
     const double phi = (1.0 + std::sqrt(5.0)) / 2.0;
     const double resphi = 2.0 - phi;
     
-    double a = t1.mjd.value;
-    double b = t2.mjd.value;
+    double a = t1.mjd();
+    double b = t2.mjd();
     double tol = settings_.time_tolerance;
     
     double x1_val = a + resphi * (b - a);
     double x2_val = b - resphi * (b - a);
     
-    utils::Instant x1 = utils::Instant::from_tt(utils::ModifiedJulianDate(x1_val));
-    utils::Instant x2 = utils::Instant::from_tt(utils::ModifiedJulianDate(x2_val));
+    time::EpochTDB x1 = time::EpochTDB::from_mjd(x1_val);
+    time::EpochTDB x2 = time::EpochTDB::from_mjd(x2_val);
     
-    CartesianElements state_x1 = propagator_->propagate_cartesian(state_t1, x1);
-    CartesianElements state_x2 = propagator_->propagate_cartesian(state_t1, x2);
+    auto state_x1 = propagator_->propagate_cartesian(state_t1, x1);
+    auto state_x2 = propagator_->propagate_cartesian(state_t1, x2);
     
     double f1 = compute_distance(x1, state_x1, body);
     double f2 = compute_distance(x2, state_x2, body);
@@ -252,7 +274,7 @@ utils::Instant CloseApproachDetector::refine_approach_time(
             x2_val = x1_val;
             f2 = f1;
             x1_val = a + resphi * (b - a);
-            x1 = utils::Instant::from_tt(utils::ModifiedJulianDate(x1_val));
+            x1 = time::EpochTDB::from_mjd(x1_val);
             state_x1 = propagator_->propagate_cartesian(state_t1, x1);
             f1 = compute_distance(x1, state_x1, body);
         } else {
@@ -260,31 +282,33 @@ utils::Instant CloseApproachDetector::refine_approach_time(
             x1_val = x2_val;
             f1 = f2;
             x2_val = b - resphi * (b - a);
-            x2 = utils::Instant::from_tt(utils::ModifiedJulianDate(x2_val));
+            x2 = time::EpochTDB::from_mjd(x2_val);
             state_x2 = propagator_->propagate_cartesian(state_t1, x2);
             f2 = compute_distance(x2, state_x2, body);
         }
         iter++;
     }
     
-    return utils::Instant::from_tt(utils::ModifiedJulianDate((a + b) / 2.0));
+    return time::EpochTDB::from_mjd((a + b) / 2.0);
 }
 
 CloseApproach CloseApproachDetector::build_approach(
-    utils::Instant t,
-    const CartesianElements& state,
+    time::EpochTDB t,
+    const physics::CartesianStateTyped<core::GCRF>& state,
     BodyType body) const
 {
     CloseApproach ca;
     ca.time = t;
     ca.body = body;
     
-    ca.position_object = state.position;
-    ca.velocity_object = state.velocity;
+    ca.position_object = types::Vector3<core::GCRF, core::Meter>(state.position.to_eigen_si());
+    ca.velocity_object = types::Vector3<core::GCRF, core::Meter>(state.velocity.to_eigen_si());
     
     CelestialBody cb = to_celestial_body(body);
-    ca.position_body = PlanetaryEphemeris::getPosition(cb, t);
-    ca.velocity_body = PlanetaryEphemeris::getVelocity(cb, t);
+    ca.position_body = PlanetaryEphemeris::getPosition(cb, 
+        utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd())));
+    ca.velocity_body = PlanetaryEphemeris::getVelocity(cb, 
+        utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd())));
     
     ca.rel_position = types::Vector3<core::GCRF, core::Meter>(ca.position_object.to_eigen() - ca.position_body.to_eigen());
     ca.rel_velocity = types::Vector3<core::GCRF, core::Meter>(ca.velocity_object.to_eigen() - ca.velocity_body.to_eigen());

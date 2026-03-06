@@ -13,7 +13,7 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/observations/Observation.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "src/utils/time_types.hpp"
 #include "src/types/vectors.hpp"
@@ -122,7 +122,7 @@ public:
      */
     std::vector<ObservationResidual> compute_residuals(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
-        const astdyn::propagation::CartesianElements& state) const;
+        const physics::CartesianStateTyped<core::GCRF>& state) const;
     
     /**
      * @brief Compute residual for single observation
@@ -133,7 +133,7 @@ public:
      */
     std::optional<ObservationResidual> compute_residual(
         const astdyn::observations::OpticalObservation& obs,
-        const astdyn::propagation::CartesianElements& state) const;
+        const physics::CartesianStateTyped<core::GCRF>& state) const;
     
     /**
      * @brief Compute statistics from residuals
@@ -197,7 +197,7 @@ public:
      * @param t_utc Time in UTC
      * @return Instant in TDB time scale
      */
-    static utils::Instant utc_to_tdb(utils::Instant t_utc);
+    static time::EpochTDB utc_to_tdb(utils::Instant t_utc);
 
 private:
     /**

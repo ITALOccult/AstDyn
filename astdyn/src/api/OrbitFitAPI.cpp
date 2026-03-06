@@ -141,17 +141,25 @@ OrbitFitResult OrbitFitAPI::run_fit(
 
         for (const auto& obs : obs_list) engine.add_observation(obs);
 
-        // Convert OrbitalState to legacy KeplerianElements for current engine compatibility
-        propagation::KeplerianElements legacy_init;
-        legacy_init.semi_major_axis = initial_state.a();
-        legacy_init.eccentricity = initial_state.e();
-        legacy_init.inclination = initial_state.i();
-        legacy_init.longitude_ascending_node = initial_state.raan();
-        legacy_init.argument_perihelion = initial_state.arg_peri();
-        legacy_init.mean_anomaly = initial_state.m_anomaly();
-        legacy_init.epoch = equ.epoch;
+        // Convert to typed ECLIPJ2000 for engine
+        auto start_epoch = time::EpochTDB::from_mjd(equ.epoch.mjd.value);
         
-        engine.set_initial_orbit(legacy_init);
+        // initial_state is GCRF Keplerian (from prepare_initial_state), we need ECLIPJ2000
+        // Actually kep_ecl was already available in prepare_initial_state step 1.
+        // Let's just re-derive it here or simplify prepare_initial_state.
+        auto kep_ecl_old = propagation::equinoctial_to_keplerian(equ);
+        
+        auto engine_init = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+            start_epoch,
+            kep_ecl_old.semi_major_axis, kep_ecl_old.eccentricity,
+            kep_ecl_old.inclination * constants::RAD_TO_DEG,
+            kep_ecl_old.longitude_ascending_node * constants::RAD_TO_DEG,
+            kep_ecl_old.argument_perihelion * constants::RAD_TO_DEG,
+            kep_ecl_old.mean_anomaly * constants::RAD_TO_DEG,
+            physics::GravitationalParameter::sun()
+        );
+        
+        engine.set_initial_orbit(engine_init);
         auto engine_result = engine.fit_orbit();
         
         result.success = true;
@@ -159,12 +167,12 @@ OrbitFitResult OrbitFitAPI::run_fit(
         
         // Pack into OrbitalState Result
         result.fitted_state = types::OrbitalState<core::GCRF, types::KeplerianTag>(std::array<double, 6>{
-            engine_result.orbit.semi_major_axis,
-            engine_result.orbit.eccentricity,
-            engine_result.orbit.inclination,
-            engine_result.orbit.longitude_ascending_node,
-            engine_result.orbit.argument_perihelion,
-            engine_result.orbit.mean_anomaly
+            engine_result.orbit.a.to_au(),
+            engine_result.orbit.e,
+            engine_result.orbit.i.to_rad(),
+            engine_result.orbit.node.to_rad(),
+            engine_result.orbit.omega.to_rad(),
+            engine_result.orbit.M.to_rad()
         });
         
         result.rms_ra = core::MilliArcSecond(engine_result.rms_ra * 1000.0);
@@ -173,8 +181,8 @@ OrbitFitResult OrbitFitAPI::run_fit(
         result.iterations = engine_result.num_iterations;
 
         // Comparison against initial guess
-        result.delta_a_km = std::abs(engine_result.orbit.semi_major_axis - initial_state.a()) * constants::AU;
-        result.delta_e = std::abs(engine_result.orbit.eccentricity - initial_state.e());
+        result.delta_a_km = std::abs(engine_result.orbit.a.to_au() - initial_state.a()) * constants::AU;
+        result.delta_e = std::abs(engine_result.orbit.e - initial_state.e());
 
     } catch (const std::exception& e) {
         result.success = false;

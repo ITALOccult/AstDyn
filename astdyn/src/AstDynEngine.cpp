@@ -10,6 +10,7 @@
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/observations/MPCReader.hpp"
 #include "astdyn/coordinates/KeplerianElements.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/time/TimeScale.hpp"
 #include "astdyn/io/AstDynConfig.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
@@ -426,21 +427,21 @@ void AstDynEngine::validate_observations() {
 // Orbit Determination
 // ============================================================================
 
-void AstDynEngine::set_initial_orbit(const KeplerianElements& elements) {
+void AstDynEngine::set_initial_orbit(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements) {
     current_orbit_ = elements;
     has_orbit_ = true;
     
     if (config_.verbose) {
         std::cout << "\nInitial orbit set:\n";
         std::cout << "  Epoch: " << std::fixed << std::setprecision(6) 
-                 << elements.epoch.mjd.value << " MJD TDB\n";
-        std::cout << "  a = " << elements.semi_major_axis << " AU\n";
-        std::cout << "  e = " << elements.eccentricity << "\n";
-        std::cout << "  i = " << (elements.inclination * constants::RAD_TO_DEG) << " deg\n";
+                 << elements.epoch.mjd() << " MJD TDB\n";
+        std::cout << "  a = " << elements.a.to_au() << " AU\n";
+        std::cout << "  e = " << elements.e << "\n";
+        std::cout << "  i = " << elements.i.to_deg() << " deg\n";
     }
 }
 
-KeplerianElements AstDynEngine::initial_orbit_determination() {
+physics::KeplerianStateTyped<core::ECLIPJ2000> AstDynEngine::initial_orbit_determination() {
     if (observations_.size() < 3) {
         throw std::runtime_error(
             "Insufficient observations for IOD (need at least 3, have " +
@@ -486,69 +487,41 @@ KeplerianElements AstDynEngine::initial_orbit_determination() {
         result.print_summary();
     }
     
-    // Store the Cartesian state and compute basic Keplerian elements
+    // 4. Bring into AstDyn 3.0 Type Safety
+    auto cart_typed = result.state; // GaussIODResult::state is already CartesianStateTyped<core::GCRF>
+    
+    // Convert to Keplerian (Ecliptic J2000)
+    // Bridge back to un-typed for returning to Keplerian
+    CartesianElements cart_old;
+    cart_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(cart_typed.epoch.mjd()));
+    
+    // Rotate back to Ecliptic
+    auto pos_eq = cart_typed.position.to_eigen_si();
+    auto vel_eq = cart_typed.velocity.to_eigen_si();
+    auto mat_ecl_to_eq = coordinates::ReferenceFrame::ecliptic_to_j2000();
+    auto pos_ecl = mat_ecl_to_eq.transpose() * pos_eq;
+    auto vel_ecl = mat_ecl_to_eq.transpose() * vel_eq;
+    
+    cart_old.position = types::Vector3<core::GCRF, core::Meter>(pos_ecl);
+    cart_old.velocity = types::Vector3<core::GCRF, core::Meter>(vel_ecl);
+    cart_old.gravitational_parameter = constants::GM_SUN * 1e9;
+    
+    KeplerianElements kep_old = cartesian_to_keplerian(cart_old);
+    
+    current_orbit_ = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        cart_typed.epoch,
+        kep_old.semi_major_axis, kep_old.eccentricity,
+        kep_old.inclination * constants::RAD_TO_DEG,
+        kep_old.longitude_ascending_node * constants::RAD_TO_DEG,
+        kep_old.argument_perihelion * constants::RAD_TO_DEG,
+        kep_old.mean_anomaly * constants::RAD_TO_DEG,
+        physics::GravitationalParameter::from_si(cart_old.gravitational_parameter)
+    );
+    
     has_orbit_ = true;
-    
-    // Simple conversion to Keplerian elements for initial orbit
-    const auto r = result.state.position.to_eigen();
-    const auto v = result.state.velocity.to_eigen();
-    
-    double r_mag = r.norm();
-    double v_mag = v.norm();
-    
-    // Specific angular momentum
-    Vector3d h = r.cross(v);
-    double h_mag = h.norm();
-    
-    // Inclination
-    double i = std::acos(h[2] / h_mag);
-    
-    // Check if the frame is Equatorial or Ecliptic by looking at i
-    // If i is near 23.44 and the object is at node 0, it might be Ecliptic confused as Equatorial.
-    // Standardizing on ReferenceFrame.
-    
-    // Node vector
-    Vector3d n = Vector3d(0, 0, 1).cross(h);
-    double n_mag = n.norm();
-    
-    // Longitude of ascending node
-    double Omega = (n_mag > 1e-10) ? std::atan2(n[1], n[0]) : 0.0;
-    if (Omega < 0) Omega += 2.0 * constants::PI;
-    
-    // Eccentricity vector
-    Vector3d e_vec = ((v_mag*v_mag - constants::GMS/r_mag) * r - r.dot(v) * v) / constants::GMS;
-    double e = e_vec.norm();
-    
-    // Argument of periapsis
-    double omega = (n_mag > 1e-10 && e > 1e-10) ? std::acos(n.dot(e_vec) / (n_mag * e)) : 0.0;
-    if (e_vec[2] < 0) omega = 2.0 * constants::PI - omega;
-    
-    // True anomaly
-    double nu = (e > 1e-10) ? std::acos(e_vec.dot(r) / (e * r_mag)) : 0.0;
-    if (r.dot(v) < 0) nu = 2.0 * constants::PI - nu;
-    
-    // Semi-major axis
-    double a = 1.0 / (2.0/r_mag - v_mag*v_mag/constants::GMS);
-    
-    // Eccentric anomaly and mean anomaly
-    double E = 2.0 * std::atan(std::sqrt((1-e)/(1+e)) * std::tan(nu/2.0));
-    double M = E - e * std::sin(E);
-    
-    // Create Keplerian elements
-    KeplerianElements kep_result;
-    kep_result.semi_major_axis = a;
-    kep_result.eccentricity = e;
-    kep_result.inclination = i;
-    kep_result.longitude_ascending_node = Omega;
-    kep_result.argument_perihelion = omega;
-    kep_result.mean_anomaly = M;
-    kep_result.epoch = result.epoch;
-    kep_result.gravitational_parameter = constants::GMS;
-    
-    current_orbit_ = kep_result;
-    
-    return kep_result;
+    return current_orbit_;
 }
+
 
 OrbitDeterminationResult AstDynEngine::fit_orbit() {
     if (!has_orbit_) {
@@ -580,7 +553,33 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
         residual_calc, stm_computer);
     
     // Convert initial orbit to Cartesian at reference epoch
-    propagation::CartesianElements initial_state = keplerian_to_cartesian(current_orbit_);
+    // 1. Bridge to un-typed format for conversion math
+    KeplerianElements kep_start_old;
+    kep_start_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(current_orbit_.epoch.mjd()));
+    kep_start_old.semi_major_axis = current_orbit_.a.to_au();
+    kep_start_old.eccentricity = current_orbit_.e;
+    kep_start_old.inclination = current_orbit_.i.to_rad();
+    kep_start_old.longitude_ascending_node = current_orbit_.node.to_rad();
+    kep_start_old.argument_perihelion = current_orbit_.omega.to_rad();
+    kep_start_old.mean_anomaly = current_orbit_.M.to_rad();
+    kep_start_old.gravitational_parameter = current_orbit_.gm.to_au3_d2();
+    
+    // 2. Convert to un-typed Cartesian (SI internally)
+    CartesianElements cart_start_old = keplerian_to_cartesian(kep_start_old);
+    
+    // 3. Rotate to ICRF
+    auto pos_ecl_start = cart_start_old.position.to_eigen();
+    auto vel_ecl_start = cart_start_old.velocity.to_eigen();
+    auto pos_eq_start = coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl_start;
+    auto vel_eq_start = coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl_start;
+    
+    // 4. Bring into AstDyn 3.0 Type Safety
+    auto initial_state = physics::CartesianStateTyped<core::GCRF>::from_si(
+        current_orbit_.epoch,
+        pos_eq_start.x(), pos_eq_start.y(), pos_eq_start.z(),
+        vel_eq_start.x(), vel_eq_start.y(), vel_eq_start.z(),
+        current_orbit_.gm.to_m3_s2()
+    );
     
     // Setup differential corrector settings
     orbit_determination::DifferentialCorrectorSettings dc_settings;
@@ -598,8 +597,31 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
     // Perform differential correction using fit() method
     auto result_dc = corrector->fit(observations_, initial_state, dc_settings);
     
-    // Convert final state back to Keplerian
-    current_orbit_ = cartesian_to_keplerian(result_dc.final_state);
+    // Convert final state back to Keplerian (Ecliptic J2000)
+    auto cart_final = result_dc.final_state;
+    auto pos_eq_final = cart_final.position.to_eigen_si();
+    auto vel_eq_final = cart_final.velocity.to_eigen_si();
+    auto mat_ecl_to_eq_final = coordinates::ReferenceFrame::ecliptic_to_j2000();
+    auto pos_ecl_final = mat_ecl_to_eq_final.transpose() * pos_eq_final;
+    auto vel_ecl_final = mat_ecl_to_eq_final.transpose() * vel_eq_final;
+    
+    CartesianElements cart_final_old;
+    cart_final_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(cart_final.epoch.mjd()));
+    cart_final_old.position = types::Vector3<core::GCRF, core::Meter>(pos_ecl_final);
+    cart_final_old.velocity = types::Vector3<core::GCRF, core::Meter>(vel_ecl_final);
+    cart_final_old.gravitational_parameter = cart_final.gm.to_m3_s2();
+    
+    KeplerianElements kep_final_old = cartesian_to_keplerian(cart_final_old);
+    
+    current_orbit_ = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        cart_final.epoch,
+        kep_final_old.semi_major_axis, kep_final_old.eccentricity,
+        kep_final_old.inclination * constants::RAD_TO_DEG,
+        kep_final_old.longitude_ascending_node * constants::RAD_TO_DEG,
+        kep_final_old.argument_perihelion * constants::RAD_TO_DEG,
+        kep_final_old.mean_anomaly * constants::RAD_TO_DEG,
+        cart_final.gm
+    );
     
     // Build result structure
     OrbitDeterminationResult result;
@@ -636,9 +658,9 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
 // Ephemeris Generation
 // ============================================================================
 
-std::vector<CartesianElements> AstDynEngine::compute_ephemeris(
-    double start_mjd,
-    double end_mjd,
+std::vector<physics::CartesianStateTyped<core::GCRF>> AstDynEngine::compute_ephemeris(
+    time::EpochTDB start_time,
+    time::EpochTDB end_time,
     double step_days)
 {
     if (!has_orbit_) {
@@ -647,22 +669,45 @@ std::vector<CartesianElements> AstDynEngine::compute_ephemeris(
     
     if (config_.verbose) {
         std::cout << "\n=== Computing Ephemeris ===\n";
-        std::cout << "Start: " << start_mjd << " MJD\n";
-        std::cout << "End:   " << end_mjd << " MJD\n";
+        std::cout << "Start: " << start_time.mjd() << " MJD\n";
+        std::cout << "End:   " << end_time.mjd() << " MJD\n";
         std::cout << "Step:  " << step_days << " days\n";
     }
     
     // Generate epoch list
-    std::vector<utils::Instant> epochs;
-    for (double mjd = start_mjd; mjd <= end_mjd; mjd += step_days) {
-        epochs.push_back(utils::Instant::from_tt(utils::ModifiedJulianDate(mjd)));
+    std::vector<time::EpochTDB> epochs;
+    for (double mjd = start_time.mjd(); mjd <= end_time.mjd(); mjd += step_days) {
+        epochs.push_back(time::EpochTDB::from_mjd(mjd));
     }
-    if (epochs.back().mjd.value < end_mjd) {
-        epochs.push_back(utils::Instant::from_tt(utils::ModifiedJulianDate(end_mjd)));
+    if (epochs.back().mjd() < end_time.mjd()) {
+        epochs.push_back(end_time);
     }
     
-    // Convert orbit to Cartesian
-    CartesianElements initial = keplerian_to_cartesian(current_orbit_);
+    // Convert orbit to Cartesian J2000 Equatorial
+    // 1. Bridge to un-typed format
+    KeplerianElements kep_old;
+    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(current_orbit_.epoch.mjd()));
+    kep_old.semi_major_axis = current_orbit_.a.to_au();
+    kep_old.eccentricity = current_orbit_.e;
+    kep_old.inclination = current_orbit_.i.to_rad();
+    kep_old.longitude_ascending_node = current_orbit_.node.to_rad();
+    kep_old.argument_perihelion = current_orbit_.omega.to_rad();
+    kep_old.mean_anomaly = current_orbit_.M.to_rad();
+    kep_old.gravitational_parameter = current_orbit_.gm.to_au3_d2();
+    
+    CartesianElements cart_old = keplerian_to_cartesian(kep_old);
+    
+    auto pos_ecl = cart_old.position.to_eigen();
+    auto vel_ecl = cart_old.velocity.to_eigen();
+    auto pos_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl;
+    auto vel_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl;
+    
+    auto initial = physics::CartesianStateTyped<core::GCRF>::from_si(
+        current_orbit_.epoch,
+        pos_eq.x(), pos_eq.y(), pos_eq.z(),
+        vel_eq.x(), vel_eq.y(), vel_eq.z(),
+        current_orbit_.gm.to_m3_s2()
+    );
     
     // Propagate to all epochs
     auto ephemeris = propagator_->propagate_ephemeris(initial, epochs);
@@ -674,12 +719,12 @@ std::vector<CartesianElements> AstDynEngine::compute_ephemeris(
     return ephemeris;
 }
 
-KeplerianElements AstDynEngine::propagate_to(double target_mjd) {
+physics::KeplerianStateTyped<core::ECLIPJ2000> AstDynEngine::propagate_to(time::EpochTDB target_time) {
     if (!has_orbit_) {
         throw std::runtime_error("No orbit available");
     }
     
-    return propagator_->propagate_keplerian(current_orbit_, utils::Instant::from_tt(utils::ModifiedJulianDate(target_mjd)));
+    return propagator_->propagate_keplerian(current_orbit_, target_time);
 }
 
 // ============================================================================
@@ -687,8 +732,8 @@ KeplerianElements AstDynEngine::propagate_to(double target_mjd) {
 // ============================================================================
 
 std::vector<CloseApproach> AstDynEngine::find_close_approaches(
-    double start_mjd,
-    double end_mjd)
+    time::EpochTDB start_time,
+    time::EpochTDB end_time)
 {
     if (!has_orbit_) {
         throw std::runtime_error("No orbit available");
@@ -696,23 +741,46 @@ std::vector<CloseApproach> AstDynEngine::find_close_approaches(
     
     if (config_.verbose) {
         std::cout << "\n=== Close Approach Search ===\n";
-        std::cout << "Searching from " << start_mjd << " to " << end_mjd << " MJD\n";
+        std::cout << "Searching from " << start_time.mjd() << " to " << end_time.mjd() << " MJD\n";
     }
     
-    // Convert orbit to Cartesian
-    CartesianElements initial = keplerian_to_cartesian(current_orbit_);
+    // Convert orbit to Cartesian J2000 Equatorial
+    // 1. Bridge to un-typed format
+    KeplerianElements kep_old;
+    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(current_orbit_.epoch.mjd()));
+    kep_old.semi_major_axis = current_orbit_.a.to_au();
+    kep_old.eccentricity = current_orbit_.e;
+    kep_old.inclination = current_orbit_.i.to_rad();
+    kep_old.longitude_ascending_node = current_orbit_.node.to_rad();
+    kep_old.argument_perihelion = current_orbit_.omega.to_rad();
+    kep_old.mean_anomaly = current_orbit_.M.to_rad();
+    kep_old.gravitational_parameter = current_orbit_.gm.to_au3_d2();
+    
+    CartesianElements cart_old = keplerian_to_cartesian(kep_old);
+    
+    auto pos_ecl = cart_old.position.to_eigen();
+    auto vel_ecl = cart_old.velocity.to_eigen();
+    auto pos_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl;
+    auto vel_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl;
+    
+    auto initial = physics::CartesianStateTyped<core::GCRF>::from_si(
+        current_orbit_.epoch,
+        pos_eq.x(), pos_eq.y(), pos_eq.z(),
+        vel_eq.x(), vel_eq.y(), vel_eq.z(),
+        current_orbit_.gm.to_m3_s2()
+    );
     
     // Search for close approaches
     auto approaches = ca_detector_->find_approaches(
         initial,
-        utils::Instant::from_tt(utils::ModifiedJulianDate(start_mjd)),
-        utils::Instant::from_tt(utils::ModifiedJulianDate(end_mjd)));
+        start_time,
+        end_time);
     
     if (config_.verbose) {
         std::cout << "Found " << approaches.size() << " close approaches\n";
         for (const auto& ca : approaches) {
             std::cout << "  " << static_cast<int>(ca.body) 
-                     << " at " << ca.time.mjd.value << " MJD: "
+                     << " at " << ca.time.mjd() << " MJD: "
                      << ca.distance << " AU ("
                      << ca.distance_in_radii(0.0001) << " radii)\n";  // Need planet radius
         }
@@ -754,17 +822,17 @@ void AstDynEngine::print_orbit_summary(std::ostream& os) const {
     }
     
     os << std::fixed << std::setprecision(6);
-    os << "Epoch:    " << current_orbit_.epoch.mjd.value << " MJD TDB\n";
-    os << "a:        " << std::setprecision(9) << current_orbit_.semi_major_axis << " AU\n";
-    os << "e:        " << std::setprecision(9) << current_orbit_.eccentricity << "\n";
+    os << "Epoch:    " << current_orbit_.epoch.mjd() << " MJD TDB\n";
+    os << "a:        " << std::setprecision(9) << current_orbit_.a.to_au() << " AU\n";
+    os << "e:        " << std::setprecision(9) << current_orbit_.e << "\n";
     os << "i:        " << std::setprecision(6) 
-       << (current_orbit_.inclination * constants::RAD_TO_DEG) << " deg\n";
-    os << "Ω:        " << (current_orbit_.longitude_ascending_node * constants::RAD_TO_DEG) << " deg\n";
-    os << "ω:        " << (current_orbit_.argument_perihelion * constants::RAD_TO_DEG) << " deg\n";
-    os << "M:        " << (current_orbit_.mean_anomaly * constants::RAD_TO_DEG) << " deg\n";
-    os << "Period:   " << std::setprecision(3) << current_orbit_.period() << " days\n";
-    os << "q:        " << std::setprecision(6) << current_orbit_.perihelion_distance() << " AU\n";
-    os << "Q:        " << current_orbit_.aphelion_distance() << " AU\n";
+       << current_orbit_.i.to_deg() << " deg\n";
+    os << "Ω:        " << current_orbit_.node.to_deg() << " deg\n";
+    os << "ω:        " << current_orbit_.omega.to_deg() << " deg\n";
+    os << "M:        " << current_orbit_.M.to_deg() << " deg\n";
+    os << "Period:   " << std::setprecision(3) << current_orbit_.period_days() << " days\n";
+    os << "q:        " << std::setprecision(6) << current_orbit_.perihelion_au() << " AU\n";
+    os << "Q:        " << current_orbit_.aphelion_au() << " AU\n";
 }
 
 void AstDynEngine::print_residuals_summary(std::ostream& os) const {
@@ -800,21 +868,21 @@ void AstDynEngine::export_orbit(const std::string& filename,
         // AstDyn Orbit Element Format
         file << std::fixed << std::setprecision(9);
         file << "! AstDyn orbit elements\n";
-        file << "! Epoch (MJD TDB): " << current_orbit_.epoch.mjd.value << "\n";
-        file << current_orbit_.semi_major_axis << "  ! a (AU)\n";
-        file << current_orbit_.eccentricity << "  ! e\n";
-        file << (current_orbit_.inclination * constants::RAD_TO_DEG) << "  ! i (deg)\n";
-        file << (current_orbit_.longitude_ascending_node * constants::RAD_TO_DEG) << "  ! Omega (deg)\n";
-        file << (current_orbit_.argument_perihelion * constants::RAD_TO_DEG) << "  ! omega (deg)\n";
-        file << (current_orbit_.mean_anomaly * constants::RAD_TO_DEG) << "  ! M (deg)\n";
+        file << "! Epoch (MJD TDB): " << current_orbit_.epoch.mjd() << "\n";
+        file << current_orbit_.a.to_au() << "  ! a (AU)\n";
+        file << current_orbit_.e << "  ! e\n";
+        file << current_orbit_.i.to_deg() << "  ! i (deg)\n";
+        file << current_orbit_.node.to_deg() << "  ! Omega (deg)\n";
+        file << current_orbit_.omega.to_deg() << "  ! omega (deg)\n";
+        file << current_orbit_.M.to_deg() << "  ! M (deg)\n";
     }
     else if (format == "mpc" || format == "MPC") {
         // MPC format (simplified)
         file << "! MPC orbital elements\n";
-        file << "! Epoch: " << current_orbit_.epoch.mjd.value << " MJD\n";
-        file << "! a=" << current_orbit_.semi_major_axis 
-             << " e=" << current_orbit_.eccentricity 
-             << " i=" << (current_orbit_.inclination * constants::RAD_TO_DEG) << "\n";
+        file << "! Epoch: " << current_orbit_.epoch.mjd() << " MJD\n";
+        file << "! a=" << current_orbit_.a.to_au() 
+             << " e=" << current_orbit_.e 
+             << " i=" << current_orbit_.i.to_deg() << "\n";
     }
     else {
         throw std::runtime_error("Unknown format: " + format);

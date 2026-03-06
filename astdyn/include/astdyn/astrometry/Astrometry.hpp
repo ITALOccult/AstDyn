@@ -8,6 +8,7 @@
 
 #include "AstrometricTypes.hpp"
 #include "src/types/orbital_state.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/AstDynEngine.hpp"
 #include <Eigen/Dense>
 #include <optional>
@@ -36,14 +37,26 @@ public:
      */
     static std::expected<AstrometricObservation, AstrometryError> compute_observation(
         const types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag>& initial_state,
+        const utils::Instant& t_elements,
+        const utils::Instant& t_obs,
+        const AstDynConfig& engine_cfg,
+        const AstrometricSettings& a_cfg);
+
+    /** @brief Computes an observation starting from truth Cartesian vector (meters, m/s). */
+    static std::expected<AstrometricObservation, AstrometryError> compute_observation_from_cartesian(
+        const physics::CartesianStateTyped<core::GCRF>& initial_state,
+        const utils::Instant& t_elements,
         const utils::Instant& t_obs,
         const AstDynConfig& engine_cfg,
         const AstrometricSettings& a_cfg);
 
 private:
+    static Eigen::Vector3d compute_light_time_corrected_pos_internal(
+        AstDynEngine& engine, const utils::Instant& t_obs, const Eigen::Vector3d& earth_pos);
     /** @brief Step 1: Iterative Light-Time Correction Kernel. */
     static Eigen::Vector3d compute_light_time_corrected_pos(
         const types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag>& initial,
+        const utils::Instant& t_elements,
         const utils::Instant& t_obs,
         const Eigen::Vector3d& earth_pos,
         const AstDynConfig& cfg);

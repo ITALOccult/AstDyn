@@ -144,19 +144,11 @@ types::Vector3<core::GCRF, core::Meter> DE441Provider::getPosition(CelestialBody
         throw std::runtime_error("Native SPK Error: " + std::string(e.what()));
     }
     
-    // SPKReader returns km and km/s in Ecliptic J2000 frame.
-    Vector3d pos_ecl(state[0], state[1], state[2]);
-    
-    // Transform Ecliptic J2000 -> GCRF (Equatorial J2000)
-    Vector3d pos_gcrf = coordinates::ReferenceFrame::transform_position(
-        pos_ecl, 
-        coordinates::FrameType::ECLIPTIC, 
-        coordinates::FrameType::J2000
-    );
-    
-    return types::Vector3<core::GCRF, core::Meter>(pos_gcrf.x() * 1000.0, 
-                                                  pos_gcrf.y() * 1000.0, 
-                                                  pos_gcrf.z() * 1000.0);
+    // SPKReader returns km and km/s in ICRF (Equatorial J2000) frame.
+    // Conversion to Meters
+    return types::Vector3<core::GCRF, core::Meter>(state[0] * 1000.0, 
+                                                  state[1] * 1000.0, 
+                                                  state[2] * 1000.0);
 }
 
 types::Vector3<core::GCRF, core::Meter> DE441Provider::getVelocity(CelestialBody body, utils::Instant t) {
@@ -164,38 +156,37 @@ types::Vector3<core::GCRF, core::Meter> DE441Provider::getVelocity(CelestialBody
     
     int target = bodyToNAIFId(body);
     double et = jdToET(t);
+    
     Eigen::VectorXd state(6);
-    
-    if (target == 399) { // Earth
-        state = reader_->getState(399, et) + reader_->getState(3, et);
-    } else if (target == 301) {
-        state = reader_->getState(301, et) + reader_->getState(3, et);
-    } else {
-         int seg_id = target;
-         if (target == 199) seg_id = 1;
-         else if (target == 299) seg_id = 2;
-         else if (target == 499) seg_id = 4;
-         else if (target == 599) seg_id = 5;
-         else if (target == 699) seg_id = 6;
-         else if (target == 799) seg_id = 7;
-         else if (target == 899) seg_id = 8;
-         else if (target == 999) seg_id = 9;
-         state = reader_->getState(seg_id, et);
+    try {
+        if (target == 399) {
+            Eigen::VectorXd s_earth_emb = reader_->getState(399, et);
+            Eigen::VectorXd s_emb_ssb = reader_->getState(3, et);
+            state = s_earth_emb + s_emb_ssb;
+        } else if (target == 301) {
+            Eigen::VectorXd s_moon_emb = reader_->getState(301, et);
+            Eigen::VectorXd s_emb_ssb = reader_->getState(3, et);
+            state = s_moon_emb + s_emb_ssb;
+        } else {
+            int seg_id = target;
+            if (target == 199) seg_id = 1;
+            else if (target == 299) seg_id = 2;
+            else if (target == 499) seg_id = 4;
+            else if (target == 599) seg_id = 5;
+            else if (target == 699) seg_id = 6;
+            else if (target == 799) seg_id = 7;
+            else if (target == 899) seg_id = 8;
+            else if (target == 999) seg_id = 9;
+            state = reader_->getState(seg_id, et);
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Native SPK Error: " + std::string(e.what()));
     }
-
-    Vector3d vel_ecl(state[3], state[4], state[5]);
     
-    // Transform velocity Ecliptic J2000 -> GCRF
-    Eigen::Vector3d vel_gcrf = coordinates::ReferenceFrame::transform_velocity(
-        Eigen::Vector3d::Zero(),
-        vel_ecl,
-        coordinates::FrameType::ECLIPTIC,
-        coordinates::FrameType::J2000
-    );
-    
-    return types::Vector3<core::GCRF, core::Meter>(vel_gcrf.x() * 1000.0, 
-                                                  vel_gcrf.y() * 1000.0, 
-                                                  vel_gcrf.z() * 1000.0);
+    return types::Vector3<core::GCRF, core::Meter>(state[3] * 1000.0, 
+                                                  state[4] * 1000.0, 
+                                                  state[5] * 1000.0);
 }
+
 
 } // namespace astdyn::ephemeris

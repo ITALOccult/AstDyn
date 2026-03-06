@@ -32,6 +32,9 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
 
+// IO and Networking
+#include "astdyn/io/HorizonsClient.hpp"
+
 // Orbital elements
 #include "astdyn/propagation/OrbitalElements.hpp"
 

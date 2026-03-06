@@ -14,7 +14,7 @@
 #define ASTDYN_ORBIT_DETERMINATION_STATE_TRANSITION_MATRIX_HPP
 
 #include "astdyn/core/Types.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 #include "src/utils/time_types.hpp"
@@ -30,7 +30,7 @@ namespace astdyn::orbit_determination {
  */
 struct STMResult {
     astdyn::Matrix6d phi;                        ///< Φ(t,t₀) - 6x6 state transition matrix
-    astdyn::propagation::CartesianElements final_state;       ///< Propagated state at time t
+    physics::CartesianStateTyped<core::GCRF> final_state;       ///< Propagated state at time t
     
     /**
      * @brief Map covariance from t₀ to t
@@ -74,8 +74,8 @@ public:
      * @return STM result with Φ(t,t₀) and final state
      */
     STMResult compute(
-        const astdyn::propagation::CartesianElements& initial,
-        utils::Instant target_time);
+        const physics::CartesianStateTyped<core::GCRF>& initial,
+        time::EpochTDB target_time);
     
     /**
      * @brief Compute STM and partials w.r.t observations
@@ -92,12 +92,12 @@ public:
     struct ObservationPartials {
         astdyn::Matrix6d phi;                    ///< State transition matrix
         Eigen::Matrix<double, 2, 6> partial_radec; ///< ∂(RA,Dec)/∂x
-        astdyn::propagation::CartesianElements final_state;
+        physics::CartesianStateTyped<core::GCRF> final_state;
     };
     
     ObservationPartials compute_with_partials(
-        const astdyn::propagation::CartesianElements& initial,
-        utils::Instant target_time,
+        const physics::CartesianStateTyped<core::GCRF>& initial,
+        time::EpochTDB target_time,
         const types::Vector3<core::GCRF, core::Meter>& observer_pos);
     
     /**
@@ -132,7 +132,7 @@ private:
      * @param state State vector [x,y,z,vx,vy,vz]
      * @return 6x6 Jacobian matrix
      */
-    astdyn::Matrix6d compute_jacobian(utils::Instant t, const Eigen::VectorXd& state);
+    astdyn::Matrix6d compute_jacobian(time::EpochTDB t, const Eigen::VectorXd& state);
     
     /**
      * @brief Compute ∂a/∂r for gravitational acceleration
@@ -158,8 +158,8 @@ private:
      * @return Final state and STM
      */
     STMResult propagate_with_stm(
-        const astdyn::propagation::CartesianElements& initial,
-        utils::Instant target_time);
+        const physics::CartesianStateTyped<core::GCRF>& initial,
+        time::EpochTDB target_time);
     
     /**
      * @brief Compute observation partials ∂(RA,Dec)/∂x
@@ -171,7 +171,7 @@ private:
      * @return 2x6 matrix of partials
      */
     Eigen::Matrix<double, 2, 6> compute_observation_partials(
-        const astdyn::propagation::CartesianElements& state,
+        const physics::CartesianStateTyped<core::GCRF>& state,
         const types::Vector3<core::GCRF, core::Meter>& observer_pos) const;
 
 private:

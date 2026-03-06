@@ -160,37 +160,71 @@ public:
     // ========================================================================
     
     /**
+     * @brief Calculate the mean obliquity of the ecliptic at a given epoch (IAU 2006).
+     * @param t Epoch (Instant)
+     * @return Mean obliquity [rad]
+     */
+    static double mean_obliquity(utils::Instant t) {
+        // T is Julian centuries from J2000.0
+        double T = (t.mjd.value - constants::MJD2000) / constants::DAYS_PER_CENTURY;
+        
+        // IAU 2006 terms (in arcseconds)
+        double eps_arcsec = 84381.406 
+                          - 46.836769 * T 
+                          - 0.0001831 * T * T 
+                          + 0.00200340 * T * T * T 
+                          - 0.000000576 * T * T * T * T 
+                          - 0.0000000434 * T * T * T * T * T;
+                          
+        return eps_arcsec * constants::ARCSEC_TO_RAD;
+    }
+
+    /**
      * @brief Get transformation matrix from J2000 to Ecliptic
      * 
-     * Rotation about X-axis by the mean obliquity of the ecliptic (ε₀)
-     * at J2000.0 = 23.439291° (IAU 2000)
+     * Rotation about X-axis by the mean obliquity of the ecliptic (ε)
      * 
-     * To go from equatorial to ecliptic, rotate by +ε around X axis
-     * 
+     * @param t Epoch (defaults to J2000.0)
      * @return 3x3 rotation matrix
      */
-    static Matrix3d j2000_to_ecliptic() {
-        // Mean obliquity at J2000.0 (IAU 2000 high-precision: 23° 26' 21".406)
-        constexpr double epsilon0 = 0.4090926227129525;
-        return rotation_x(epsilon0);
+    static Matrix3d j2000_to_ecliptic(utils::Instant t = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
+        return rotation_x(mean_obliquity(t));
     }
     
     /**
      * @brief Get transformation matrix from Ecliptic to J2000
-     * 
-     * To go from ecliptic to equatorial, rotate by -ε around X axis
-     * 
+     * @param t Epoch (defaults to J2000.0)
      * @return 3x3 rotation matrix
      */
-    static Matrix3d ecliptic_to_j2000() {
-        constexpr double epsilon0 = 0.4090926227129525;
-        return rotation_x(-epsilon0);
+    static Matrix3d ecliptic_to_j2000(utils::Instant t = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000))) {
+        return rotation_x(-mean_obliquity(t));
     }
     
     // ========================================================================
     // J2000 ↔ ITRF Transformation (simplified)
     // ========================================================================
     
+    /**
+     * @brief Compute Earth Rotation Angle (ERA)
+     * @param t_utc Epoch in UTC
+     * @param dut1 UT1 - UTC in seconds (from IERS data)
+     * @return ERA in radians
+     */
+    static double computeERA(utils::Instant t_utc, double dut1 = 0.0) {
+        double mjd_ut1 = t_utc.mjd.value + dut1 / 86400.0;
+        
+        constexpr double era_0 = 0.7790572732640;
+        constexpr double era_1 = 1.00273781191135448;
+        
+        double era = 2.0 * constants::PI * (era_0 + era_1 * (mjd_ut1 - 51544.5));
+        
+        // Normalize to [0, 2π)
+        era = std::fmod(era, 2.0 * constants::PI);
+        if (era < 0.0) era += 2.0 * constants::PI;
+        
+        return era;
+    }
+
     /**
      * @brief Get transformation matrix from J2000 to ITRF (simplified)
      * 
@@ -201,20 +235,11 @@ public:
      * - Earth rotation angle
      * - Polar motion
      * 
-     * @param mjd_ut1 Modified Julian Date in UT1 time scale
+     * @param t_ut1 Epoch in UT1 time scale masquerading as Instant for now
      * @return 3x3 rotation matrix
      */
     static Matrix3d j2000_to_itrf_simple(utils::Instant t_ut1) {
-        double mjd_ut1 = t_ut1.mjd.value;
-        // Earth rotation angle (ERA)
-        // ERA = 2π(0.7790572732640 + 1.00273781191135448 × (MJD_UT1 - 51544.5))
-        
-        double T = mjd_ut1 - constants::MJD2000;
-        double era = 2.0 * constants::PI * (0.7790572732640 + 1.00273781191135448 * T);
-        
-        // Normalize to [0, 2π)
-        era = std::fmod(era, 2.0 * constants::PI);
-        if (era < 0.0) era += 2.0 * constants::PI;
+        double era = computeERA(t_ut1, 0.0);
         
         // Rotation about Z-axis (negative for celestial to terrestrial)
         return rotation_z(-era);
@@ -255,10 +280,10 @@ public:
             return icrs_to_j2000();
         }
         if (from == FrameType::J2000 && to == FrameType::ECLIPTIC) {
-            return j2000_to_ecliptic();
+            return j2000_to_ecliptic(t_ut1);
         }
         if (from == FrameType::ECLIPTIC && to == FrameType::J2000) {
-            return ecliptic_to_j2000();
+            return ecliptic_to_j2000(t_ut1);
         }
         if (from == FrameType::J2000 && to == FrameType::ITRF) {
             return j2000_to_itrf_simple(t_ut1);
@@ -270,10 +295,10 @@ public:
         // Chain transformations through J2000
         // Example: ICRS → ECLIPTIC = ICRS → J2000 → ECLIPTIC
         if (from == FrameType::ICRS && to == FrameType::ECLIPTIC) {
-            return j2000_to_ecliptic() * icrs_to_j2000();
+            return j2000_to_ecliptic(t_ut1) * icrs_to_j2000();
         }
         if (from == FrameType::ECLIPTIC && to == FrameType::ICRS) {
-            return j2000_to_icrs() * ecliptic_to_j2000();
+            return j2000_to_icrs() * ecliptic_to_j2000(t_ut1);
         }
         if (from == FrameType::ICRS && to == FrameType::ITRF) {
             return j2000_to_itrf_simple(t_ut1) * icrs_to_j2000();
@@ -282,10 +307,10 @@ public:
             return j2000_to_icrs() * itrf_to_j2000_simple(t_ut1);
         }
         if (from == FrameType::ECLIPTIC && to == FrameType::ITRF) {
-            return j2000_to_itrf_simple(t_ut1) * ecliptic_to_j2000();
+            return j2000_to_itrf_simple(t_ut1) * ecliptic_to_j2000(t_ut1);
         }
         if (from == FrameType::ITRF && to == FrameType::ECLIPTIC) {
-            return j2000_to_ecliptic() * itrf_to_j2000_simple(t_ut1);
+            return j2000_to_ecliptic(t_ut1) * itrf_to_j2000_simple(t_ut1);
         }
         
         // Default: return identity (should not reach here)

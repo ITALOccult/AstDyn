@@ -39,18 +39,18 @@ ResidualCalculator::ResidualCalculator(
 
 std::vector<ObservationResidual> ResidualCalculator::compute_residuals(
     const std::vector<OpticalObservation>& observations,
-    const CartesianElements& state) const {
+    const physics::CartesianStateTyped<core::GCRF>& state) const {
     
     std::vector<ObservationResidual> residuals;
     residuals.reserve(observations.size());
     
     for (const auto& obs : observations) {
         // Convert observation time from UTC to TDB
-        utils::Instant obs_time_tdb = utc_to_tdb(obs.time);
+        time::EpochTDB obs_time_tdb = utc_to_tdb(obs.time);
         
         // Propagate state to observation epoch if propagator available
-        CartesianElements state_at_obs = state;
-        if (propagator_ && std::abs(obs_time_tdb.mjd.value - state.epoch.mjd.value) > 1e-10) {
+        auto state_at_obs = state;
+        if (propagator_ && std::abs(obs_time_tdb.mjd() - state.epoch.mjd()) > 1e-10) {
             state_at_obs = propagator_->propagate_cartesian(state, obs_time_tdb);
         }
         
@@ -63,7 +63,7 @@ std::vector<ObservationResidual> ResidualCalculator::compute_residuals(
     return residuals;
 }
 
-utils::Instant ResidualCalculator::utc_to_tdb(utils::Instant t_utc) {
+time::EpochTDB ResidualCalculator::utc_to_tdb(utils::Instant t_utc) {
     // Simplified conversion UTC -> TDB
     // UTC -> TAI (+37s) -> TT (+32.184s) -> TDB (periodic terms)
     
@@ -78,15 +78,14 @@ utils::Instant ResidualCalculator::utc_to_tdb(utils::Instant t_utc) {
     double g = 357.53 + 0.9856003 * (jd_tt - 2451545.0);
     g = std::fmod(g, 360.0) * astdyn::constants::DEG_TO_RAD;
     
-    double tdb_correction = 0.001658 * std::sin(g) + 0.000014 * std::sin(2.0 * g);
-    double mjd_tdb = mjd_tt + tdb_correction / 86400.0;
+    double mjd_tdb = mjd_tt + 0.001658 * std::sin(g + 0.0167 * std::sin(g)) / 86400.0;
     
-    return utils::Instant::from_tt(utils::ModifiedJulianDate(mjd_tdb)); // marked as TDB/TT conceptually
+    return time::EpochTDB::from_mjd(mjd_tdb);
 }
 
 std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     const OpticalObservation& obs,
-    const CartesianElements& state) const {
+    const physics::CartesianStateTyped<core::GCRF>& state) const {
     
     ObservationResidual result;
     result.time = obs.time;
@@ -108,8 +107,8 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     types::Vector3<core::GCRF, core::Meter> observer_vel = *observer_vel_opt;
     
     // Object state
-    types::Vector3<core::GCRF, core::Meter> object_pos = state.position;
-    types::Vector3<core::GCRF, core::Meter> object_vel = state.velocity;
+    types::Vector3<core::GCRF, core::Meter> object_pos(state.position.to_eigen_si());
+    types::Vector3<core::GCRF, core::Meter> object_vel(state.velocity.to_eigen_si());
     
     // Light-time correction
     if (light_time_correction_) {
@@ -129,7 +128,7 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
             
             tau = tau_new_days;
             // object_pos ≈ state.position - state.velocity * tau_sec
-            object_pos = state.position - (state.velocity * (tau * 86400.0));
+            object_pos = types::Vector3<core::GCRF, core::Meter>(state.position.to_eigen_si() - (state.velocity.to_eigen_si() * (tau * 86400.0)));
         }
     }
     
@@ -238,8 +237,7 @@ void ResidualCalculator::cartesian_to_radec(
 std::optional<types::Vector3<core::GCRF, core::Meter>> ResidualCalculator::get_observer_position(
     const OpticalObservation& obs) const {
     
-    double mjd_utc = obs.time.mjd.value;
-    double jd_tdb = utc_to_tdb(obs.time).mjd.value + 2400000.5;
+    double jd_tdb = utc_to_tdb(obs.time).jd();
     
     auto earth_state = ephemeris::PlanetaryEphemeris::getState(
         ephemeris::CelestialBody::EARTH, utils::Instant::from_tt(utils::ModifiedJulianDate(jd_tdb - 2400000.5)));
@@ -259,7 +257,7 @@ std::optional<types::Vector3<core::GCRF, core::Meter>> ResidualCalculator::get_o
 std::optional<types::Vector3<core::GCRF, core::Meter>> ResidualCalculator::get_observer_velocity(
     const OpticalObservation& obs) const {
     
-    double jd_tdb = utc_to_tdb(obs.time).mjd.value + 2400000.5;
+    double jd_tdb = utc_to_tdb(obs.time).jd();
     
     auto earth_state = ephemeris::PlanetaryEphemeris::getState(
         ephemeris::CelestialBody::EARTH, utils::Instant::from_tt(utils::ModifiedJulianDate(jd_tdb - 2400000.5)));

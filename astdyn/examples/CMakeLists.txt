@@ -50,6 +50,18 @@ target_link_libraries(example_basic PRIVATE astdyn)
 # add_executable(check_de441_positions check_de441_positions.cpp)
 # target_link_libraries(check_de441_positions PRIVATE astdyn)
 
+# JPL Horizons API Query Example
+add_executable(horizons_query horizons_query.cpp)
+target_link_libraries(horizons_query PRIVATE astdyn)
+
+# Test asteroid 79518 for specific date
+add_executable(test_79518 test_79518.cpp)
+target_link_libraries(test_79518 PRIVATE astdyn)
+
+# Benchmark Integrators and Models
+add_executable(benchmark_integrators benchmark_integrators.cpp)
+target_link_libraries(benchmark_integrators PRIVATE astdyn)
+
 # Install examples (optional)
 install(TARGETS example_basic
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples

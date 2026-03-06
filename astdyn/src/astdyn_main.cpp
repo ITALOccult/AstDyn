@@ -248,7 +248,16 @@ int main(int argc, char** argv) {
             initial.mean_anomaly = opts.M_deg * constants::DEG_TO_RAD;
             initial.gravitational_parameter = constants::GMS;
             
-            engine.set_initial_orbit(initial);
+            auto initial_typed = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+                time::EpochTDB::from_mjd(initial.epoch.mjd.value),
+                initial.semi_major_axis, initial.eccentricity,
+                initial.inclination * constants::RAD_TO_DEG,
+                initial.longitude_ascending_node * constants::RAD_TO_DEG,
+                initial.argument_perihelion * constants::RAD_TO_DEG,
+                initial.mean_anomaly * constants::RAD_TO_DEG,
+                physics::GravitationalParameter::sun()
+            );
+            engine.set_initial_orbit(initial_typed);
         } else {
             std::cout << "No initial orbit provided - attempting IOD...\n";
             try {
@@ -292,8 +301,8 @@ int main(int argc, char** argv) {
             }
             
             auto ephemeris = engine.compute_ephemeris(
-                opts.ephem_start,
-                opts.ephem_end,
+                time::EpochTDB::from_mjd(opts.ephem_start),
+                time::EpochTDB::from_mjd(opts.ephem_end),
                 opts.ephem_step);
             
             // Save ephemeris to file
@@ -334,8 +343,8 @@ int main(int argc, char** argv) {
             }
             
             auto approaches = engine.find_close_approaches(
-                opts.ca_start,
-                opts.ca_end);
+                time::EpochTDB::from_mjd(opts.ca_start),
+                time::EpochTDB::from_mjd(opts.ca_end));
             
             if (!approaches.empty()) {
                 std::string ca_file = opts.output_prefix + "_close_approaches.txt";

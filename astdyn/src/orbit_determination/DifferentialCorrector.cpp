@@ -30,15 +30,12 @@ DifferentialCorrector::DifferentialCorrector(
 
 DifferentialCorrectorResult DifferentialCorrector::fit(
     const std::vector<OpticalObservation>& observations,
-    const CartesianElements& initial_guess,
+    const physics::CartesianStateTyped<core::GCRF>& initial_guess,
     const DifferentialCorrectorSettings& settings) {
     
-    DifferentialCorrectorResult result;
-    result.final_state = initial_guess;
-    result.converged = false;
-    result.iterations = 0;
+    DifferentialCorrectorResult result{initial_guess, false, 0};
     
-    CartesianElements current_state = initial_guess;
+    physics::CartesianStateTyped<core::GCRF> current_state = initial_guess;
     
     if (settings.verbose) {
         std::cout << "\n========================================\n";
@@ -97,8 +94,16 @@ DifferentialCorrectorResult DifferentialCorrector::fit(
         }
         
         // Apply correction
-        current_state.position += types::Vector3<core::GCRF, core::Meter>(correction.segment<3>(0)(0), correction.segment<3>(0)(1), correction.segment<3>(0)(2));
-        current_state.velocity += types::Vector3<core::GCRF, core::Meter>(correction.segment<3>(3)(0), correction.segment<3>(3)(1), correction.segment<3>(3)(2));
+        current_state = physics::CartesianStateTyped<core::GCRF>::from_si(
+            current_state.epoch,
+            current_state.position.x_si() + correction[0] * constants::AU * 1000.0,
+            current_state.position.y_si() + correction[1] * constants::AU * 1000.0,
+            current_state.position.z_si() + correction[2] * constants::AU * 1000.0,
+            current_state.velocity.x_si() + correction[3] * constants::AU * 1000.0 / 86400.0,
+            current_state.velocity.y_si() + correction[4] * constants::AU * 1000.0 / 86400.0,
+            current_state.velocity.z_si() + correction[5] * constants::AU * 1000.0 / 86400.0,
+            current_state.gm.to_m3_s2()
+        );
         
         // Check convergence
         if (check_convergence(correction, settings.convergence_tolerance)) {
@@ -144,7 +149,7 @@ DifferentialCorrectorResult DifferentialCorrector::fit(
 
 bool DifferentialCorrector::iteration(
     const std::vector<OpticalObservation>& observations,
-    const CartesianElements& current_state,
+    const physics::CartesianStateTyped<core::GCRF>& current_state,
     Eigen::VectorXd& correction,
     std::vector<ObservationResidual>& residuals) {
     
@@ -179,7 +184,7 @@ bool DifferentialCorrector::iteration(
 DifferentialCorrector::DesignMatrixResult 
 DifferentialCorrector::build_design_matrix(
     const std::vector<OpticalObservation>& observations,
-    const CartesianElements& state,
+    const physics::CartesianStateTyped<core::GCRF>& state,
     const std::vector<ObservationResidual>& residuals) {
     
     DesignMatrixResult result;
@@ -219,12 +224,11 @@ DifferentialCorrector::build_design_matrix(
         types::Vector3<core::GCRF, core::Meter> observer_pos = *obs_pos_opt;
         
         // Convert observation time to TDB (STM needs TDB)
-        utils::Instant obs_time = obs.time;
-        // Assume for now time scale conversion is handled or not strictly required for partials
+        time::EpochTDB obs_time_tdb = ResidualCalculator::utc_to_tdb(obs.time);
         
         // Compute STM and observation partials
         auto partials = stm_computer_->compute_with_partials(
-            state, obs_time, observer_pos);
+            state, obs_time_tdb, observer_pos);
         
         // Design matrix row: ∂(RA,Dec)/∂x₀ = ∂(RA,Dec)/∂x * Φ(t,t₀)
         Eigen::Matrix<double, 2, 6> A_obs = partials.partial_radec * partials.phi;
@@ -284,7 +288,7 @@ std::optional<Eigen::VectorXd> DifferentialCorrector::solve_normal_equations(
 
 Matrix6d DifferentialCorrector::compute_covariance(
     const std::vector<OpticalObservation>& observations,
-    const CartesianElements& final_state,
+    const physics::CartesianStateTyped<core::GCRF>& final_state,
     const std::vector<ObservationResidual>& residuals) {
     
     // Rebuild design matrix for final state

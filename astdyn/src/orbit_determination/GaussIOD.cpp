@@ -32,7 +32,7 @@ void GaussIODResult::print_summary() const {
         return;
     }
     
-    std::cout << "Epoch: MJD " << epoch.mjd.value << "\n";
+    std::cout << "Epoch: MJD " << epoch.mjd() << "\n";
     std::cout << "Observations used: #" << obs_index_1 << ", #" << obs_index_2 
               << ", #" << obs_index_3 << "\n";
     std::cout << "Iterations: " << iterations << "\n";
@@ -41,8 +41,8 @@ void GaussIODResult::print_summary() const {
     
     // Display position and velocity
     std::cout << "\nCartesian State:\n";
-    std::cout << "  r = [" << state.position.x << ", " << state.position.y << ", " << state.position.z << "] m\n";
-    std::cout << "  v = [" << state.velocity.x << ", " << state.velocity.y << ", " << state.velocity.z << "] m/s\n";
+    std::cout << "  r = [" << state.position.x_si() << ", " << state.position.y_si() << ", " << state.position.z_si() << "] m\n";
+    std::cout << "  v = [" << state.velocity.x_si() << ", " << state.velocity.y_si() << ", " << state.velocity.z_si() << "] m/s\n";
 }
 
 // ============================================================================
@@ -100,17 +100,20 @@ GaussIODResult GaussIOD::compute_from_three(
     auto t3_tdb = ResidualCalculator::utc_to_tdb(obs3.time);
     
     result.epoch = t2_tdb;
-    result.state.epoch = t2_tdb;
+    // result.state is CartesianStateTyped<core::GCRF>, it will be initialized later via from_si
     
     // Get Earth positions
-    auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t1_tdb);
-    auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t2_tdb);
-    auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t3_tdb);
+    auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, 
+        utils::Instant::from_tt(utils::ModifiedJulianDate(t1_tdb.mjd())));
+    auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, 
+        utils::Instant::from_tt(utils::ModifiedJulianDate(t2_tdb.mjd())));
+    auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, 
+        utils::Instant::from_tt(utils::ModifiedJulianDate(t3_tdb.mjd())));
     
     // State::position() returns Vector3d, we need types::Vector3
-    types::Vector3<core::GCRF, core::Meter> R1(earth1.position());
-    types::Vector3<core::GCRF, core::Meter> R2(earth2.position());
-    types::Vector3<core::GCRF, core::Meter> R3(earth3.position());
+    types::Vector3<core::GCRF, core::Meter> R1(earth1.position().x(), earth1.position().y(), earth1.position().z());
+    types::Vector3<core::GCRF, core::Meter> R2(earth2.position().x(), earth2.position().y(), earth2.position().z());
+    types::Vector3<core::GCRF, core::Meter> R3(earth3.position().x(), earth3.position().y(), earth3.position().z());
     
     // Compute line-of-sight unit vectors
     auto los1 = compute_line_of_sight(obs1.ra, obs1.dec);
@@ -145,8 +148,12 @@ GaussIODResult GaussIOD::compute_from_three(
     
     auto v2 = (r3 - r1) / (tau * 86400.0);
     
-    result.state.position = r2;
-    result.state.velocity = v2;
+    result.state = physics::CartesianStateTyped<core::GCRF>::from_si(
+        t2_tdb,
+        r2.x, r2.y, r2.z,
+        v2.x, v2.y, v2.z,
+        constants::GM_SUN * 1e9
+    );
     result.success = true;
     
     return result;

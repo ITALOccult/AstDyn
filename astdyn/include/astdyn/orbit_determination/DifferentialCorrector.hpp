@@ -21,8 +21,8 @@
 #include "astdyn/core/Types.hpp"
 #include "astdyn/orbit_determination/Residuals.hpp"
 #include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/observations/Observation.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
 #include <memory>
 #include <functional>
 
@@ -49,8 +49,7 @@ struct DifferentialCorrectorSettings {
  * @brief Result of differential corrections
  */
 struct DifferentialCorrectorResult {
-    // Final orbit
-    astdyn::propagation::CartesianElements final_state;
+    physics::CartesianStateTyped<core::GCRF> final_state;
     bool converged;
     int iterations;
     
@@ -114,7 +113,7 @@ public:
      */
     DifferentialCorrectorResult fit(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
-        const astdyn::propagation::CartesianElements& initial_guess,
+        const physics::CartesianStateTyped<core::GCRF>& initial_guess,
         const DifferentialCorrectorSettings& settings = {});
     
     /**
@@ -128,7 +127,7 @@ public:
      */
     bool iteration(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
-        const astdyn::propagation::CartesianElements& current_state,
+        const physics::CartesianStateTyped<core::GCRF>& current_state,
         Eigen::VectorXd& correction,
         std::vector<ObservationResidual>& residuals);
     
@@ -142,7 +141,7 @@ public:
      */
     astdyn::Matrix6d compute_covariance(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
-        const astdyn::propagation::CartesianElements& final_state,
+        const physics::CartesianStateTyped<core::GCRF>& final_state,
         const std::vector<ObservationResidual>& residuals);
     
     /**
@@ -175,7 +174,7 @@ private:
     
     DesignMatrixResult build_design_matrix(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
-        const astdyn::propagation::CartesianElements& state,
+        const physics::CartesianStateTyped<core::GCRF>& state,
         const std::vector<ObservationResidual>& residuals);
     
     /**

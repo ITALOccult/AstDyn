@@ -21,7 +21,7 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/observations/Observation.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "src/utils/time_types.hpp"
 #include "src/types/vectors.hpp"
@@ -52,8 +52,8 @@ struct GaussIODResult {
     std::string error_message;
     
     // Resulting orbit
-    astdyn::propagation::CartesianElements state;   ///< Heliocentric state at middle obs
-    utils::Instant epoch;                           ///< Epoch of solution
+    physics::CartesianStateTyped<core::GCRF> state;   ///< Heliocentric state at middle obs
+    time::EpochTDB epoch;                           ///< Epoch of solution
     
     // Quality indicators
     double slant_range_1;                ///< Distance to object [AU] at obs 1

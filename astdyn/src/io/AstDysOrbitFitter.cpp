@@ -70,7 +70,7 @@ void AstDysOrbitFitter::set_elements_file(const std::string& filename,
     }
 }
 
-void AstDysOrbitFitter::set_elements(const propagation::KeplerianElements& elements) {
+void AstDysOrbitFitter::set_elements(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements) {
     initial_elements_ = elements;
     
     if (verbose_) {
@@ -87,7 +87,7 @@ void AstDysOrbitFitter::set_config_file(const std::string& filename) {
 }
 
 void AstDysOrbitFitter::set_reference_orbit(
-    const propagation::KeplerianElements& elements) {
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements) {
     reference_orbit_ = elements;
 }
 
@@ -107,8 +107,8 @@ AstDysFitResult AstDysOrbitFitter::fit() {
     if (verbose_) {
         std::cout << "\n=== Starting Orbit Fit ===\n";
         std::cout << "Observations: " << observations_.size() << "\n";
-        std::cout << "Initial epoch: MJD " << initial_elements_->epoch.mjd.value << "\n";
-        std::cout << "Initial a: " << initial_elements_->semi_major_axis << " AU\n\n";
+        std::cout << "Initial epoch: MJD " << initial_elements_->epoch.mjd() << " MJD TDB\n";
+        std::cout << "Initial a: " << initial_elements_->a.to_au() << " AU\n\n";
     }
     
     // Create AstDyn engine
@@ -147,11 +147,11 @@ AstDysFitResult AstDysOrbitFitter::fit() {
     if (reference_orbit_.has_value()) {
         result.reference_orbit = *reference_orbit_;
         
-        double da = (result.fitted_orbit.semi_major_axis - 
-                    reference_orbit_->semi_major_axis) * constants::AU;
-        double de = result.fitted_orbit.eccentricity - reference_orbit_->eccentricity;
-        double di = (result.fitted_orbit.inclination - 
-                    reference_orbit_->inclination) * 180.0 / constants::PI;
+        double da = (result.fitted_orbit.a.to_au() - 
+                    reference_orbit_->a.to_au()) * constants::AU;
+        double de = result.fitted_orbit.e - reference_orbit_->e;
+        double di = (result.fitted_orbit.i.to_rad() - 
+                    reference_orbit_->i.to_rad()) * 180.0 / constants::PI;
         
         result.delta_a_km = da / 1000.0;
         result.delta_e = de;
@@ -271,43 +271,39 @@ void AstDysOrbitFitter::load_json_file(const std::string& filename) {
     }
 }
 
-propagation::KeplerianElements AstDysOrbitFitter::equinoctial_to_keplerian(
+physics::KeplerianStateTyped<core::ECLIPJ2000> AstDysOrbitFitter::equinoctial_to_keplerian(
     double a, double h, double k, double p, double q, double lambda, double mjd) {
-    
-    propagation::KeplerianElements kep;
-    
-    kep.semi_major_axis = a;
     
     // Eccentricity
     double e = std::sqrt(h*h + k*k);
-    kep.eccentricity = e;
     
     // Inclination
     double tan_half_i = std::sqrt(p*p + q*q);
-    kep.inclination = 2.0 * std::atan(tan_half_i);
+    double i_rad = 2.0 * std::atan(tan_half_i);
     
     // Longitude of ascending node
     double Omega = std::atan2(p, q);
     if (Omega < 0) Omega += 2.0 * constants::PI;
-    kep.longitude_ascending_node = Omega;
     
     // Argument of perihelion
     double omega_plus_Omega = std::atan2(h, k);
     if (omega_plus_Omega < 0) omega_plus_Omega += 2.0 * constants::PI;
     double omega = omega_plus_Omega - Omega;
     if (omega < 0) omega += 2.0 * constants::PI;
-    kep.argument_perihelion = omega;
     
     // Mean anomaly
     double M = lambda - omega_plus_Omega;
     while (M < 0) M += 2.0 * constants::PI;
     while (M >= 2.0*constants::PI) M -= 2.0 * constants::PI;
-    kep.mean_anomaly = M;
     
-    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(mjd));
-    kep.gravitational_parameter = constants::GMS;
-    
-    return kep;
+    return physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(mjd),
+        a, e, i_rad * constants::RAD_TO_DEG,
+        Omega * constants::RAD_TO_DEG,
+        omega * constants::RAD_TO_DEG,
+        M * constants::RAD_TO_DEG,
+        physics::GravitationalParameter::sun()
+    );
 }
 
 std::string AstDysOrbitFitter::detect_format(const std::string& filename) {

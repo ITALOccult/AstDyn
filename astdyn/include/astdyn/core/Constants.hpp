@@ -97,8 +97,10 @@ constexpr double R_EARTH = 6378.137;
 /// Earth flattening (WGS84)
 constexpr double EARTH_FLATTENING = 1.0 / 298.257223563;
 
-/// Obliquity of the Ecliptic J2000 [rad]
-constexpr double OBLIQUITY_J2000 = 23.439291111 * DEG_TO_RAD;
+/// Obliquity of the Ecliptic J2000 [rad] (IAU 2006: 84381.406 arcsec)
+/// @deprecated Use coordinates::ReferenceFrame::mean_obliquity(t) for time-varying value.
+[[deprecated("Use coordinates::ReferenceFrame::mean_obliquity(t)")]]
+constexpr double OBLIQUITY_J2000 = 84381.406 * ARCSEC_TO_RAD;
 
 // ============================================================================
 // Gravitational Parameters [km^3/s^2] (from JPL DE431)

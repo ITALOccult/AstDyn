@@ -89,17 +89,17 @@ struct KeplerianElements {
 };
 
 /**
- * @brief Cartesian state vector
+ * @brief Cartesian state vector — always in SI units.
  * 
- * Position and velocity in J2000 equatorial frame.
- * Units: AU, AU/day
+ * Position in meters, velocity in m/s, gravitational parameter in m³/s².
+ * Reference frame: GCRF (J2000 equatorial).
  */
 struct CartesianElements {
     utils::Instant epoch;              ///< Epoch (Instant TDB)
-    types::Vector3<core::GCRF, core::Meter> position; ///< Position vector
-    types::Vector3<core::GCRF, core::Meter> velocity; ///< Velocity vector
+    types::Vector3<core::GCRF, core::Meter> position; ///< Position vector [m]
+    types::Vector3<core::GCRF, core::Meter> velocity; ///< Velocity vector [m/s]
     
-    double gravitational_parameter = constants::GMS;    ///< GM of central body [AU³/day²]
+    double gravitational_parameter = constants::GM_SUN * 1e9;  ///< GM [m³/s²] (default: solar)
     
     // Optional covariance (6x6: position, velocity)
     std::optional<Eigen::Matrix<double, 6, 6>> covariance;
