@@ -394,9 +394,11 @@ public:
              
              // 2. Transform to Equatorial J2000
              auto cart_ecl = propagation::keplerian_to_cartesian(kep_ecl);
-             coordinates::CartesianState state_ecl(cart_ecl.position, cart_ecl.velocity, cart_ecl.gravitational_parameter);
-             
-             auto state_eq = coordinates::ReferenceFrame::transform_state(state_ecl, coordinates::FrameType::ECLIPTIC, coordinates::FrameType::J2000);
+             // Use rotation matrix directly (non-deprecated path)
+             Eigen::Matrix3d R = coordinates::ReferenceFrame::ecliptic_to_j2000();
+             Eigen::Vector3d pos_eq = R * Eigen::Vector3d(cart_ecl.position.x, cart_ecl.position.y, cart_ecl.position.z);
+             Eigen::Vector3d vel_eq = R * Eigen::Vector3d(cart_ecl.velocity.x, cart_ecl.velocity.y, cart_ecl.velocity.z);
+             coordinates::CartesianState state_eq(pos_eq, vel_eq, cart_ecl.gravitational_parameter);
              
              propagation::CartesianElements ce;
              ce.epoch = cfg.orbit.epoch;

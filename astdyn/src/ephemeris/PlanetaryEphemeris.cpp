@@ -306,12 +306,9 @@ Vector3d PlanetaryEphemeris::elementsToPosition(const double elements[6]) {
     Vector3d pos_ecliptic(x, y, z);
     
     // Convert Ecliptic J2000 -> Equatorial J2000
-    // This rotation is critical for consistency with JPL ephemerides and the propagator frame
-    return coordinates::ReferenceFrame::transform_position(
-        pos_ecliptic, 
-        coordinates::FrameType::ECLIPTIC, 
-        coordinates::FrameType::J2000
-    );
+    // Use rotation matrix directly (avoids deprecated runtime dispatch)
+    Matrix3d R = coordinates::ReferenceFrame::ecliptic_to_j2000();
+    return R * pos_ecliptic;
 }
 
 Vector3d PlanetaryEphemeris::elementsToVelocity(const double elements[6], double gm) {
@@ -376,12 +373,8 @@ Vector3d PlanetaryEphemeris::elementsToVelocity(const double elements[6], double
     
     // Convert Ecliptic J2000 -> Equatorial J2000
     // (Velocity rotation is same as position for inertial frames)
-    return coordinates::ReferenceFrame::transform_velocity(
-        Vector3d::Zero(), // Position doesn't matter for inertial rotation
-        vel_ecliptic,
-        coordinates::FrameType::ECLIPTIC,
-        coordinates::FrameType::J2000
-    );
+    Matrix3d R = coordinates::ReferenceFrame::ecliptic_to_j2000();
+    return R * vel_ecliptic;
 }
 
 Vector3d PlanetaryEphemeris::computePerturbations(CelestialBody body, double T) {

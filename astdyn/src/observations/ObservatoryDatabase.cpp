@@ -31,14 +31,10 @@ void Observatory::computeGeocentricPosition() {
 
 types::Vector3<core::GCRF, core::Meter> Observatory::getPositionGCRF(utils::Instant t) const {
     // Convert ITRF position to GCRF using Earth rotation
-    // This accounts for Earth's rotation during observation
+    // Uses rotation matrix directly (non-deprecated path)
     Eigen::Vector3d pos_itrf(position.x, position.y, position.z);
-    Eigen::Vector3d pos_gcrf = coordinates::ReferenceFrame::transform_position(
-        pos_itrf,
-        coordinates::FrameType::ITRF,
-        coordinates::FrameType::J2000,
-        t
-    );
+    Eigen::Matrix3d R = coordinates::ReferenceFrame::itrf_to_j2000_simple(t);
+    Eigen::Vector3d pos_gcrf = R * pos_itrf;
     return types::Vector3<core::GCRF, core::Meter>(pos_gcrf.x(), pos_gcrf.y(), pos_gcrf.z());
 }
 

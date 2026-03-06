@@ -256,12 +256,9 @@ Eigen::Vector3d AsteroidPerturbations::keplerianToCartesian(
     pos_ecliptic[2] = (sin_omega * sin_i) * x_orb + (cos_omega * sin_i) * y_orb;
     
     // Transform Ecliptic J2000 -> Equatorial J2000
-    // We utilize the ReferenceFrame static method for consistency
-    return coordinates::ReferenceFrame::transform_position(
-        pos_ecliptic,
-        coordinates::FrameType::ECLIPTIC,
-        coordinates::FrameType::J2000
-    );
+    // Use rotation matrix directly (non-deprecated path)
+    Eigen::Matrix3d R = coordinates::ReferenceFrame::ecliptic_to_j2000();
+    return R * pos_ecliptic;
 }
 
 // AST17 default data implementation
