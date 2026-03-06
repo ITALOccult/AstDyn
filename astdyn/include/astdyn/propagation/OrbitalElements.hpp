@@ -32,7 +32,7 @@ namespace astdyn::propagation {
  * Standard osculating elements at a given epoch.
  * Units: km, radians, days (MJD)
  */
-struct KeplerianElements {
+struct [[deprecated("Use physics::KeplerianStateTyped<Frame> instead")]] KeplerianElements {
     utils::Instant epoch;           ///< Epoch (Instant TDB)
     double semi_major_axis;          ///< Semi-major axis [AU]
     double eccentricity;             ///< Eccentricity [dimensionless]
@@ -94,7 +94,7 @@ struct KeplerianElements {
  * Position in meters, velocity in m/s, gravitational parameter in m³/s².
  * Reference frame: GCRF (J2000 equatorial).
  */
-struct CartesianElements {
+struct [[deprecated("Use physics::CartesianStateTyped<Frame> instead")]] CartesianElements {
     utils::Instant epoch;              ///< Epoch (Instant TDB)
     types::Vector3<core::GCRF, core::Meter> position; ///< Position vector [m]
     types::Vector3<core::GCRF, core::Meter> velocity; ///< Velocity vector [m/s]

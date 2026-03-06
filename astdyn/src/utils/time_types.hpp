@@ -38,7 +38,14 @@ enum class TimeScale {
  * 
  * CTFYH adherence: Private constructor, Factory methods for data honesty.
  */
-struct Instant {
+/**
+ * @brief Representation of a temporal point in a specific scale.
+ * 
+ * @deprecated Use time::EpochTDB, time::EpochUTC etc. instead.
+ * This type carries the scale at runtime; the new Epoch<Scale> types
+ * carry it at compile-time, preventing scale-mixing bugs.
+ */
+struct [[deprecated("Use time::EpochTDB / time::EpochUTC instead")]] Instant {
     ModifiedJulianDate mjd;
     TimeScale scale;
 
@@ -72,4 +79,37 @@ private:
 
 } // namespace astdyn::utils
 
+// ============================================================================
+// Conversion helpers between legacy Instant and typed Epoch
+// ============================================================================
+#include "astdyn/time/epoch.hpp"
+
+namespace astdyn::utils {
+
+/// Convert legacy Instant to EpochTDB (assumes MJD is in TDB scale)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+[[nodiscard]] inline time::EpochTDB to_epoch_tdb(const Instant& inst) noexcept {
+    return time::EpochTDB::from_mjd(inst.mjd.value);
+}
+
+/// Convert legacy Instant to EpochUTC (assumes MJD is in UTC scale)
+[[nodiscard]] inline time::EpochUTC to_epoch_utc(const Instant& inst) noexcept {
+    return time::EpochUTC::from_mjd(inst.mjd.value);
+}
+
+/// Convert EpochTDB to legacy Instant (for backward compat)
+[[nodiscard]] inline Instant from_epoch(const time::EpochTDB& e) noexcept {
+    return Instant::from_tt(ModifiedJulianDate(e.mjd())); // TDB ≈ TT for our purposes
+}
+
+/// Convert EpochUTC to legacy Instant
+[[nodiscard]] inline Instant from_epoch(const time::EpochUTC& e) noexcept {
+    return Instant::from_utc(ModifiedJulianDate(e.mjd()));
+}
+#pragma GCC diagnostic pop
+
+} // namespace astdyn::utils
+
 #endif // ASTDYN_UTILS_TIME_TYPES_HPP
+
