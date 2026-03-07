@@ -32,7 +32,7 @@ public:
         const Eigen::Vector3d& r1_vec,
         const Eigen::Vector3d& r2_vec,
         double dt,
-        double mu = constants::GM_SUN_AU,
+        double mu = astdyn::constants::GMS,
         bool retrograde = false);
 
 private:

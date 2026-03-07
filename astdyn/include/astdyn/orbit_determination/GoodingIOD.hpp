@@ -44,10 +44,16 @@ struct GoodingIODResult {
 class GoodingIOD {
 public:
     struct Settings {
-        int max_iterations = 80;
-        double tolerance = 1e-12; // in AU
-        double mu = constants::GM_SUN_AU; // AU^3/day^2
-        bool verbose = false;
+        int max_iterations;
+        double tolerance;
+        double mu;
+        bool verbose;
+
+        Settings() : 
+            max_iterations(80),
+            tolerance(1e-12),
+            mu(astdyn::constants::GMS),
+            verbose(false) {}
     };
 
     explicit GoodingIOD(const Settings& settings = Settings());

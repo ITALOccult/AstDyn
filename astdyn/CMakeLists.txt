@@ -110,6 +110,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+# Python Bindings (pybind11)
+option(ASTDYN_BUILD_PYTHON "Build Python bindings" ON)
+if(ASTDYN_BUILD_PYTHON)
+    FetchContent_Declare(
+      pybind11
+      GIT_REPOSITORY https://github.com/pybind/pybind11.git
+      GIT_TAG v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
+endif()
+
 # Catalog module dependencies (SQLite3, LibXml2, ZLIB — CURL already required above)
 if(ASTDYN_BUILD_CATALOG)
     find_package(SQLite3 REQUIRED)
@@ -198,6 +209,10 @@ endif()
 
 if(ASTDYN_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if(ASTDYN_BUILD_PYTHON)
+    add_subdirectory(src/python)
 endif()
 
 if(ASTDYN_BUILD_DOCS)

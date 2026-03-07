@@ -1,9 +1,10 @@
 /**
  * @file ResidualAnalysis.cpp
- * @brief Implementation of orbit validation summary report.
+ * @brief Analysis of orbit residuals (O-C).
  */
 
 #include "astdyn/orbit_determination/ResidualAnalysis.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include <iomanip>
 #include <sstream>
 #include <cmath>
@@ -11,66 +12,66 @@
 namespace astdyn::orbit_determination {
 
 OrbitValidationSummary ResidualAnalysis::analyze_orbit(
-    const physics::CartesianStateTyped<core::GCRF>& initial_state,
+    const physics::CartesianStateTyped<core::GCRF>& state,
     const std::vector<observations::OpticalObservation>& obs,
     std::shared_ptr<propagation::Propagator> propagator)
 {
-    OrbitValidationSummary results;
-    results.num_observations = (int)obs.size();
-    
-    std::stringstream report;
-    report << "--- Orbit Validation Report ---\n";
-    report << std::left << std::setw(20) << "Time (MJD)" 
-           << std::setw(15) << "RA-res (\")" 
-           << std::setw(15) << "Dec-res (\")" << "\n";
-    report << std::string(50, '-') << "\n";
+    OrbitValidationSummary summary;
+    std::stringstream ss;
 
-    double sum_sq_ra = 0.0, sum_sq_dec = 0.0, sum_sq_tot = 0.0;
-    
-    for (const auto& o : obs) {
+    ss << "--- Residual Analysis Report ---\n";
+    ss << std::fixed << std::setprecision(3);
+    ss << "Observation          Time (TDB)    dRA (\")    dDec (\")\n";
+    ss << "---------------------------------------------------------\n";
+
+    double sum_sq_ra = 0.0;
+    double sum_sq_dec = 0.0;
+
+    for (size_t i = 0; i < obs.size(); ++i) {
+        const auto& o = obs[i];
         time::EpochTDB t_obs = time::to_tdb(o.time);
+
+        // Propagate state to observation time
+        auto state_at_t = propagator->propagate_cartesian(state, t_obs);
+
+        // Get observer position (Earth)
+        auto earth_pos = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::EARTH, t_obs);
         
-        // Propagate
-        auto state_calc = propagator->propagate_cartesian(initial_state, t_obs);
-        
-        // Predict observation (geocentric)
-        auto earth_pos_si = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::EARTH, t_obs);
-        auto R_obs = earth_pos_si.to_eigen(); 
-        
-        // rho = r - R
-        auto rho_vec = state_calc.position.to_eigen_si() - R_obs;
+        // Calculate Line of Sight (relative to observer)
+        Eigen::Vector3d rho_vec = state_at_t.position.to_eigen_si() - Eigen::Vector3d(earth_pos.x, earth_pos.y, earth_pos.z);
+
         double rho = rho_vec.norm();
         double ra_calc = std::atan2(rho_vec.y(), rho_vec.x());
         double dec_calc = std::asin(rho_vec.z() / rho);
-        
-        // Differences (arcsec)
-        double dra = (o.ra - ra_calc);
-        while (dra > M_PI) dra -= 2.0 * M_PI;
-        while (dra < -M_PI) dra += 2.0 * M_PI;
-        dra *= std::cos(o.dec) * constants::RAD_TO_DEG * 3600.0;
-        
-        double ddec = (o.dec - dec_calc) * constants::RAD_TO_DEG * 3600.0;
-        
-        sum_sq_ra += dra * dra;
-        sum_sq_dec += ddec * ddec;
-        sum_sq_tot += dra * dra + ddec * ddec;
-        
-        report << std::fixed << std::setprecision(5) << std::setw(20) << o.time.mjd() 
-               << std::setw(15) << dra 
-               << std::setw(15) << ddec << "\n";
+
+        // Residuals
+        double d_ra = o.ra - ra_calc;
+        while (d_ra > constants::PI) d_ra -= constants::TWO_PI;
+        while (d_ra < -constants::PI) d_ra += constants::TWO_PI;
+        double d_dec = o.dec - dec_calc;
+
+        // Convert to arcseconds
+        double dra_arcsec = d_ra * std::cos(o.dec) * constants::RAD_TO_ARCSEC;
+        double ddec_arcsec = d_dec * constants::RAD_TO_ARCSEC;
+
+        ss << std::setw(3) << i << "  " << t_obs.mjd() << "  " 
+           << std::setw(8) << dra_arcsec << "  " << std::setw(8) << ddec_arcsec << "\n";
+
+        sum_sq_ra += dra_arcsec * dra_arcsec;
+        sum_sq_dec += ddec_arcsec * ddec_arcsec;
     }
 
-    results.rms_ra = std::sqrt(sum_sq_ra / results.num_observations);
-    results.rms_dec = std::sqrt(sum_sq_dec / results.num_observations);
-    results.rms_total = std::sqrt(sum_sq_tot / results.num_observations);
+    summary.rms_ra = std::sqrt(sum_sq_ra / obs.size());
+    summary.rms_dec = std::sqrt(sum_sq_dec / obs.size());
+    summary.rms_total = std::sqrt((sum_sq_ra + sum_sq_dec) / (2.0 * obs.size()));
 
-    report << std::string(50, '-') << "\n";
-    report << "RMS RA:   " << std::fixed << std::setprecision(3) << results.rms_ra << " arcsec\n";
-    report << "RMS Dec:  " << std::fixed << std::setprecision(3) << results.rms_dec << " arcsec\n";
-    report << "RMS Total:" << std::fixed << std::setprecision(3) << results.rms_total << " arcsec\n";
-    
-    results.report_text = report.str();
-    return results;
+    ss << "---------------------------------------------------------\n";
+    ss << "RMS RA:   " << summary.rms_ra << " \"\n";
+    ss << "RMS Dec:  " << summary.rms_dec << " \"\n";
+    ss << "RMS Total: " << summary.rms_total << " \"\n";
+
+    summary.report_text = ss.str();
+    return summary;
 }
 
 } // namespace astdyn::orbit_determination

@@ -30,9 +30,14 @@ struct EKFResult {
 class ExtendedKalmanFilter {
 public:
     struct Settings {
-        astdyn::Matrix6d process_noise = Matrix6d::Identity() * 1e-18;
-        double default_ra_sigma = 0.5 * constants::ARCSEC_TO_RAD;
-        double default_dec_sigma = 0.5 * constants::ARCSEC_TO_RAD;
+        astdyn::Matrix6d process_noise;
+        double default_ra_sigma;
+        double default_dec_sigma;
+
+        Settings() : 
+            process_noise(astdyn::Matrix6d::Identity() * 1e-18),
+            default_ra_sigma(0.5 * astdyn::constants::ARCSEC_TO_RAD),
+            default_dec_sigma(0.5 * astdyn::constants::ARCSEC_TO_RAD) {}
     };
 
     explicit ExtendedKalmanFilter(
