@@ -176,8 +176,7 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     double specific_energy = 0.5 * v_mag * v_mag - mu / r_mag;
     double a = -mu / (2.0 * specific_energy);
     // CartesianElements is always SI (m, m/s, m³/s²), so 'a' is in meters.
-    // KeplerianElements.semi_major_axis is always in AU.
-    const double AU_M = AU * 1000.0; // meters per AU
+    // KeplerianElements.semi_major_axis is always in AU. AU_M defined above.
     double a_au = a / AU_M;
     
     kep.semi_major_axis = a_au;

@@ -17,6 +17,7 @@ option(ASTDYN_BUILD_DOCS "Build documentation" OFF)
 option(ASTDYN_USE_SPICE "Use SPICE toolkit for ephemerides" OFF)
 option(ASTDYN_ENABLE_PROFILING "Enable profiling support" OFF)
 option(ASTDYN_BUILD_SHARED "Build shared library in addition to static" ON)
+option(ASTDYN_BUILD_CATALOG "Build Gaia DR3 stellar catalog module (requires local catalog data)" OFF)
 
 # ============================================================================
 # C++ Standard and Compiler Settings
@@ -109,6 +110,19 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+# Catalog module dependencies (SQLite3, LibXml2, ZLIB — CURL already required above)
+if(ASTDYN_BUILD_CATALOG)
+    find_package(SQLite3 REQUIRED)
+    find_package(LibXml2 REQUIRED)
+    find_package(ZLIB REQUIRED)
+    find_package(OpenMP QUIET)
+
+    # Disable ioc_gaialib examples and tests to avoid build noise
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING  OFF CACHE BOOL "" FORCE)
+    add_subdirectory(external/ioc_gaialib)
+endif()
+
 # Optional: SPICE Toolkit
 if(ASTDYN_USE_SPICE)
     find_package(CSPICE QUIET)
@@ -174,6 +188,10 @@ include_directories(
 
 add_subdirectory(src)
 
+if(ASTDYN_BUILD_CATALOG)
+    add_subdirectory(src/catalog)
+endif()
+
 if(ASTDYN_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
@@ -237,6 +255,7 @@ message(STATUS "║   Build Examples: ${ASTDYN_BUILD_EXAMPLES}")
 message(STATUS "║   Build Docs:     ${ASTDYN_BUILD_DOCS}")
 message(STATUS "║   Use SPICE:      ${ASTDYN_USE_SPICE}")
 message(STATUS "║   Profiling:      ${ASTDYN_ENABLE_PROFILING}")
+message(STATUS "║   Gaia Catalog:   ${ASTDYN_BUILD_CATALOG}")
 message(STATUS "╠════════════════════════════════════════════════════════════╣")
 message(STATUS "║ Dependencies:")
 message(STATUS "║   Eigen3:         ${EIGEN3_VERSION_STRING}")
