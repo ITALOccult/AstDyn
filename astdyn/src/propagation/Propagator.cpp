@@ -189,34 +189,4 @@ Eigen::VectorXd Propagator::integrate_raw_au(const Eigen::VectorXd& y0_au, doubl
     return integrator_->integrate(f, y0_au, t0_mjd, tf_mjd);
 }
 
-// Analytical TwoBodyPropagator
-KeplerianElements TwoBodyPropagator::propagate(const KeplerianElements& initial,
-                                               time::EpochTDB target_time) {
-    using namespace astdyn::propagation;
-    using ::astdyn::core::GCRF;
-    using ::astdyn::types::TimedState;
-
-    std::array<double, 6> arr = {
-        initial.semi_major_axis, initial.eccentricity, initial.inclination,
-        initial.longitude_ascending_node, initial.argument_perihelion, initial.mean_anomaly
-    };
-    const auto state_kep = astdyn::types::OrbitalState<GCRF, astdyn::types::KeplerianTag>(arr);
-    
-    KeplerPropagator<GCRF> engine(initial.gravitational_parameter);
-    const auto result = engine.propagate(TimedState<GCRF, astdyn::types::KeplerianTag>(state_kep, initial.epoch), target_time);
-
-    if (!result.has_value()) return initial;
-
-    KeplerianElements final = initial;
-    final.epoch = target_time;
-    final.mean_anomaly = result->state.m_anomaly();
-    
-    return final;
-}
-
-double TwoBodyPropagator::mean_anomaly_at_epoch(const KeplerianElements& initial,
-                                                time::EpochTDB target_time) {
-    return propagate(initial, target_time).mean_anomaly;
-}
-
 } // namespace astdyn::propagation

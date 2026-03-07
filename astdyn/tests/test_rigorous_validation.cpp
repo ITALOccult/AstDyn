@@ -78,36 +78,34 @@ TEST(RigorousValidation, PropagationTest) {
     double a = 7000000.0; // 7000 km
     double mu = constants::GM_EARTH * 1e9; // km^3/s^2 to m^3/s^2
     
-    KeplerianElements initial;
-    initial.semi_major_axis = a;
-    initial.eccentricity = 0.0;
-    initial.inclination = 0.0;
-    initial.longitude_ascending_node = 0.0;
-    initial.argument_perihelion = 0.0;
-    initial.mean_anomaly = 0.0;
-    initial.gravitational_parameter = mu;
-    initial.epoch = time::EpochTT::from_mjd(51544.5);
+    auto initial = physics::KeplerianStateTyped<core::GCRF>::from_traditional(
+        time::EpochTDB::from_mjd(51544.5),
+        a / (constants::AU * 1000.0), 0.0, 0.0, 0.0, 0.0, 0.0,
+        physics::GravitationalParameter::from_si(mu)
+    );
     
-    double period = initial.period(); // seconds
+    double a_au = initial.a.to_au();
+    double mu_au_d2 = initial.gm.to_au3_d2();
+    double n_rad_day = std::sqrt(mu_au_d2 / (a_au * a_au * a_au));
+    double period_days = constants::TWO_PI / n_rad_day;
     
-    time::EpochTT t_start = time::EpochTT::from_mjd(51544.5);
-    double period_days = period / 86400.0;
+    time::EpochTDB t_start = time::EpochTDB::from_mjd(51544.5);
     time::EpochTDB t_end = time::EpochTDB::from_mjd(51544.5 + period_days);
     
-    KeplerianElements final = TwoBodyPropagator::propagate(initial, t_end);
+    auto final = TwoBodyPropagator::propagate(initial, t_end);
     
     // Period should be exactly recovered
-    EXPECT_NEAR(final.semi_major_axis, initial.semi_major_axis, 1e-7);
-    EXPECT_LT(final.eccentricity, constants::EPSILON * 1e6); // Tight tolerance
+    EXPECT_NEAR(final.a.to_au(), initial.a.to_au(), 1e-7);
+    EXPECT_LT(final.e, constants::EPSILON * 1e6); // Tight tolerance
     
     // Cartesian recovery
-    CartesianElements cart_init = keplerian_to_cartesian(initial);
-    CartesianElements cart_final = keplerian_to_cartesian(final);
+    auto cart_init = propagation::keplerian_to_cartesian(initial);
+    auto cart_final = propagation::keplerian_to_cartesian(final);
     
     double dist_err = std::sqrt(
-        std::pow(cart_init.position.x - cart_final.position.x, 2) +
-        std::pow(cart_init.position.y - cart_final.position.y, 2) +
-        std::pow(cart_init.position.z - cart_final.position.z, 2)
+        std::pow(cart_init.position.x_si() - cart_final.position.x_si(), 2) +
+        std::pow(cart_init.position.y_si() - cart_final.position.y_si(), 2) +
+        std::pow(cart_init.position.z_si() - cart_final.position.z_si(), 2)
     );
     
     EXPECT_LT(dist_err, 1e-2); // < 1 centimeter

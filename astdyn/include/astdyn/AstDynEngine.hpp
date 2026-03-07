@@ -25,6 +25,7 @@
 #include "astdyn/close_approach/CloseApproach.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 #include <memory>
 #include <vector>
 #include <string>
@@ -171,28 +172,21 @@ public:
     // ========================================================================
     
     /**
-     * @brief Set initial orbital elements (for refinement)
-     * 
-     * @param elements Initial orbital elements
+     * @brief Set the initial orbit for propagation
+     * @tparam Frame Reference frame of the elements (GCRF, ECLIPJ2000, etc.)
      */
-    void set_initial_orbit(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
-
-    /**
-     * @brief Compatibility overload: set initial orbit from legacy KeplerianElements
-     * @deprecated Prefer the typed KeplerianStateTyped overload
-     */
-    void set_initial_orbit(const propagation::KeplerianElements& elements) {
-        // Convert legacy type to typed representation
-        auto typed = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-            elements.epoch,
-            elements.semi_major_axis,
-            elements.eccentricity,
-            elements.inclination * constants::RAD_TO_DEG,
-            elements.longitude_ascending_node * constants::RAD_TO_DEG,
-            elements.argument_perihelion * constants::RAD_TO_DEG,
-            elements.mean_anomaly * constants::RAD_TO_DEG
-        );
-        set_initial_orbit(typed);
+    template <typename Frame>
+    void set_initial_orbit(const physics::KeplerianStateTyped<Frame>& elements) {
+        if constexpr (std::is_same_v<Frame, core::ECLIPJ2000>) {
+            set_initial_orbit_ecl(elements);
+        } else {
+            // Automatic transformation to Ecliptic for internal engine consistency
+            auto cart = propagation::keplerian_to_cartesian(elements);
+            auto pos_ecl = coordinates::ReferenceFrame::transform_pos<Frame, core::ECLIPJ2000>(cart.position);
+            auto vel_ecl = coordinates::ReferenceFrame::transform_vel<Frame, core::ECLIPJ2000>(cart.position, cart.velocity);
+            auto cart_ecl = physics::CartesianStateTyped<core::ECLIPJ2000>(cart.epoch, pos_ecl, vel_ecl, cart.gm);
+            set_initial_orbit_ecl(propagation::cartesian_to_keplerian<core::ECLIPJ2000>(cart_ecl));
+        }
     }
     
     /**
@@ -371,6 +365,7 @@ private:
     // Catalog Biases
     std::map<std::string, std::pair<double, double>> catalog_biases_; // Code -> {RA, Dec} arcsec
     void load_catalog_biases(const std::string& filename);
+    void set_initial_orbit_ecl(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
 };
 
 } // namespace astdyn

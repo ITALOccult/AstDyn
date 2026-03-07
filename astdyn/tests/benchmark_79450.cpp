@@ -76,7 +76,7 @@ void init_ephemeris(const std::string& bsp_path) {
 }
 
 double measure_execution(
-    const types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag>& initial,
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
     const time::EpochTDB& t_elements,
     const time::EpochTDB& t_obs,
     const AstDynConfig& engine_cfg,
@@ -111,7 +111,8 @@ double measure_execution(
 
 int main() {
     double target_mjd = time::calendar_to_mjd(2026, 3, 27, 0.0);
-    time::EpochTDB t_obs = time::EpochTT::from_mjd(target_mjd).to_tdb();
+    // Convert to TDB (assuming UTC input)
+    time::EpochTDB t_obs = time::EpochTDB::from_mjd(target_mjd); // Simplification for test
     BenchSkyCoord truth = get_jpl_truth();
     
     std::cout << "=== Asteroid 79450 Benchmark ===" << std::endl;
@@ -131,10 +132,14 @@ int main() {
         io::parsers::OrbFitEQ1Parser parser;
         auto eq1 = parser.parse("data/79450.eq1");
         
-        types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag> initial({
-            eq1.semi_major_axis, eq1.eccentricity, eq1.inclination,
-            eq1.longitude_asc_node, eq1.argument_perihelion, eq1.mean_anomaly
-        });
+        auto initial = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+            eq1.epoch,
+            eq1.semi_major_axis, eq1.eccentricity,
+            eq1.inclination * constants::RAD_TO_DEG,
+            eq1.longitude_asc_node * constants::RAD_TO_DEG,
+            eq1.argument_perihelion * constants::RAD_TO_DEG,
+            eq1.mean_anomaly * constants::RAD_TO_DEG
+        );
 
         AstDynConfig engine_cfg;
         engine_cfg.ephemeris_file = bsp;
@@ -142,7 +147,7 @@ int main() {
         engine_cfg.propagator_settings.include_planets = true;
         engine_cfg.integrator_type = "RKF78";
 
-        measure_execution(initial, time::EpochTT::from_mjd(eq1.epoch_mjd_tdb).to_tdb(), t_obs, engine_cfg, "No Fit", truth);
+        measure_execution(initial, eq1.epoch, t_obs, engine_cfg, "No Fit", truth);
     }
 
     // 2. State from Fit (Simulated with high-precision SABA4)
@@ -150,10 +155,14 @@ int main() {
         io::parsers::OrbFitEQ1Parser parser;
         auto eq1 = parser.parse("data/79450.eq1");
         
-        types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag> initial({
-            eq1.semi_major_axis, eq1.eccentricity, eq1.inclination,
-            eq1.longitude_asc_node, eq1.argument_perihelion, eq1.mean_anomaly
-        });
+        auto initial = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+            eq1.epoch,
+            eq1.semi_major_axis, eq1.eccentricity,
+            eq1.inclination * constants::RAD_TO_DEG,
+            eq1.longitude_asc_node * constants::RAD_TO_DEG,
+            eq1.argument_perihelion * constants::RAD_TO_DEG,
+            eq1.mean_anomaly * constants::RAD_TO_DEG
+        );
 
         AstDynConfig engine_cfg;
         engine_cfg.ephemeris_file = bsp;
@@ -163,7 +172,7 @@ int main() {
         engine_cfg.integrator_type = "SABA4"; 
         engine_cfg.initial_step_size = 0.5;
 
-        measure_execution(initial, time::EpochTT::from_mjd(eq1.epoch_mjd_tdb).to_tdb(), t_obs, engine_cfg, "With Fit", truth);
+        measure_execution(initial, eq1.epoch, t_obs, engine_cfg, "With Fit", truth);
     }
 
     std::cout << "------------------------------------------------------------" << std::endl;

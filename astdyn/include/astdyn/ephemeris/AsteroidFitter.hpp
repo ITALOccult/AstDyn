@@ -41,7 +41,7 @@ struct AsteroidFitResult {
     bool success;
     std::string message;
     // Final fitted Keplerian elements (Equatorial J2000)
-    propagation::KeplerianElements fitted_orbit;
+    physics::KeplerianStateTyped<core::GCRF> fitted_orbit;
     // RMS of residuals (arcsec)
     double rms_ra;
     double rms_dec;
@@ -72,15 +72,19 @@ public:
             return result;
         }
 
-        // Convert OrbitalState back to legacy KeplerianElements for AsteroidFitResult
+        // Populate typed fitted_orbit
         const auto& state = *api_result.fitted_state;
-        result.fitted_orbit.semi_major_axis = state.a();
-        result.fitted_orbit.eccentricity = state.e();
-        result.fitted_orbit.inclination = state.i();
-        result.fitted_orbit.longitude_ascending_node = state.raan();
-        result.fitted_orbit.argument_perihelion = state.arg_peri();
-        result.fitted_orbit.mean_anomaly = state.m_anomaly();
-        // Note: Epoch should be preserved from parse_eq1 if needed, but OrbitFitAPI currently sets it internal to run_fit
+        auto eq1_data = api::OrbitFitAPI::parse_eq1(eq1_file);
+        
+        result.fitted_orbit = physics::KeplerianStateTyped<core::GCRF>::from_traditional(
+            eq1_data.epoch,
+            state.a(),
+            state.e(),
+            state.i() * constants::RAD_TO_DEG,
+            state.raan() * constants::RAD_TO_DEG,
+            state.arg_peri() * constants::RAD_TO_DEG,
+            state.m_anomaly() * constants::RAD_TO_DEG
+        );
         
         result.rms_ra = api_result.rms_ra.value / 1000.0; // mas -> arcsec
         result.rms_dec = api_result.rms_dec.value / 1000.0;
@@ -95,17 +99,18 @@ public:
         }
         // Build PositionCalculator element struct from fitted orbit (Equatorial)
         KeplerianElements calc_elem;
-        calc_elem.a = result.fitted_orbit.semi_major_axis;
-        calc_elem.e = result.fitted_orbit.eccentricity;
-        calc_elem.i = result.fitted_orbit.inclination;
-        calc_elem.Omega = result.fitted_orbit.longitude_ascending_node;
-        calc_elem.omega = result.fitted_orbit.argument_perihelion;
-        calc_elem.M = result.fitted_orbit.mean_anomaly;
+        calc_elem.a = result.fitted_orbit.a.to_au();
+        calc_elem.e = result.fitted_orbit.e;
+        calc_elem.i = result.fitted_orbit.i.to_rad();
+        calc_elem.Omega = result.fitted_orbit.node.to_rad();
+        calc_elem.omega = result.fitted_orbit.omega.to_rad();
+        calc_elem.M = result.fitted_orbit.M.to_rad();
         calc_elem.epoch = t_obs.empty() ? time::EpochTDB::from_mjd(0.0) : time::EpochTDB::from_mjd(t_obs.front().mjd());
+        calc_elem.equatorial = true;
         result.fitted_positions.reserve(t_obs.size());
         for (const auto& t : t_obs) {
             auto pos = PositionCalculator::computePosition(
-                calc_elem, t, true /* outputEquatorial */);
+                calc_elem, time::EpochTDB::from_mjd(t.mjd()), true /* outputEquatorial */);
             result.fitted_positions.push_back(pos);
         }
         return result;
@@ -120,13 +125,12 @@ public:
         AsteroidFitResult result;
         result.success = true;
         result.message = "Positions computed from in‑memory orbital elements.";
-        // Populate fitted_orbit (propagation namespace) from SimpleKeplerianElements
-        result.fitted_orbit.semi_major_axis = orbit.a;
-        result.fitted_orbit.eccentricity = orbit.e;
-        result.fitted_orbit.inclination = orbit.i;
-        result.fitted_orbit.longitude_ascending_node = orbit.Omega;
-        result.fitted_orbit.argument_perihelion = orbit.omega;
-        result.fitted_orbit.mean_anomaly = orbit.M;
+        // Populate typed fitted_orbit (GCRF assumed if from memory for now?)
+        result.fitted_orbit = physics::KeplerianStateTyped<core::GCRF>::from_traditional(
+            orbit.epoch, orbit.a, orbit.e, 
+            orbit.i * constants::RAD_TO_DEG, orbit.Omega * constants::RAD_TO_DEG, 
+            orbit.omega * constants::RAD_TO_DEG, orbit.M * constants::RAD_TO_DEG
+        );
         result.rms_ra = 0.0;
         result.rms_dec = 0.0;
         result.num_observations = static_cast<int>(t_observations.size());
@@ -143,7 +147,7 @@ public:
         
         for (const auto& t : t_observations) {
             auto pos = PositionCalculator::computePosition(
-                calc_elem, t, output_equatorial);
+                calc_elem, time::EpochTDB::from_mjd(t.mjd()), output_equatorial);
             result.fitted_positions.push_back(pos);
         }
         return result;
@@ -316,7 +320,7 @@ public:
                      calc_elem.equatorial = true;
                      
                      auto pos = PositionCalculator::computePosition(
-                        calc_elem, target_t, cfg.output_equatorial);
+                        calc_elem, time::EpochTDB::from_mjd(target_t.mjd()), cfg.output_equatorial);
                      
                      result.fitted_positions.push_back(pos);
                 }
@@ -376,38 +380,22 @@ public:
              conf.tolerance = cfg.engine_config.tolerance;
              engine.set_config(conf);
              
-             // Set Initial Orbit (Convert Simple -> Keplerian)
-             // Note: SimpleKeplerianElements are usually Ecliptic. 
-             // AstDynEngine usually takes Equatorial. 
-             // We must transform it!
+             auto initial_ecl = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+                 cfg.orbit.epoch, cfg.orbit.a, cfg.orbit.e, 
+                 cfg.orbit.i * constants::RAD_TO_DEG, cfg.orbit.Omega * constants::RAD_TO_DEG, 
+                 cfg.orbit.omega * constants::RAD_TO_DEG, cfg.orbit.M * constants::RAD_TO_DEG
+             );
+             auto cart_ecl = propagation::keplerian_to_cartesian(initial_ecl);
+             auto pos_eq = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(cart_ecl.position);
+             auto vel_eq = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, core::GCRF>(cart_ecl.position, cart_ecl.velocity);
+             auto cart_eq = physics::CartesianStateTyped<core::GCRF>(cart_ecl.epoch, pos_eq, vel_eq, cart_ecl.gm);
              
-             // 1. Fill Keplerian (Ecliptic)
-             propagation::KeplerianElements kep_ecl;
-             kep_ecl.semi_major_axis = cfg.orbit.a;
-             kep_ecl.eccentricity = cfg.orbit.e;
-             kep_ecl.inclination = cfg.orbit.i;
-             kep_ecl.longitude_ascending_node = cfg.orbit.Omega;
-             kep_ecl.argument_perihelion = cfg.orbit.omega;
-             kep_ecl.mean_anomaly = cfg.orbit.M;
-             kep_ecl.epoch = cfg.orbit.epoch;
-             kep_ecl.gravitational_parameter = constants::GMS;
-             
-             // 2. Transform to Equatorial J2000
-             auto cart_ecl = propagation::keplerian_to_cartesian(kep_ecl);
-             // Use rotation matrix directly (non-deprecated path)
-             Eigen::Matrix3d R = coordinates::ReferenceFrame::ecliptic_to_j2000();
-             Eigen::Vector3d pos_eq = R * Eigen::Vector3d(cart_ecl.position.x, cart_ecl.position.y, cart_ecl.position.z);
-             Eigen::Vector3d vel_eq = R * Eigen::Vector3d(cart_ecl.velocity.x, cart_ecl.velocity.y, cart_ecl.velocity.z);
-             coordinates::CartesianState state_eq(pos_eq, vel_eq, cart_ecl.gravitational_parameter);
-             
-             propagation::CartesianElements ce;
-             ce.epoch = cfg.orbit.epoch;
-             ce.position = types::Vector3<core::GCRF, core::Meter>(state_eq.position().x(), state_eq.position().y(), state_eq.position().z());
-             ce.velocity = types::Vector3<core::GCRF, core::Meter>(state_eq.velocity().x(), state_eq.velocity().y(), state_eq.velocity().z());
-             ce.gravitational_parameter = state_eq.mu();
-             propagation::KeplerianElements kep_eq = propagation::cartesian_to_keplerian(ce);
-             
-             engine.set_initial_orbit(kep_eq);
+             // AstDynEngine requires ECLIPJ2000 for its internal integrator consistency
+             auto pos_ecl_back = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(cart_eq.position);
+             auto vel_ecl_back = coordinates::ReferenceFrame::transform_vel<core::GCRF, core::ECLIPJ2000>(cart_eq.position, cart_eq.velocity);
+             auto cart_ecl_back = physics::CartesianStateTyped<core::ECLIPJ2000>(cart_eq.epoch, pos_ecl_back, vel_ecl_back, cart_eq.gm);
+
+             engine.set_initial_orbit(propagation::cartesian_to_keplerian<core::ECLIPJ2000>(cart_ecl_back));
              
              // 3. Propagate
              for (const auto& target_t : cfg.t_observations) {
@@ -424,7 +412,7 @@ public:
                  calc_elem.equatorial = true; // Engine output is Equatorial
                  
                  auto pos = PositionCalculator::computePosition(
-                    calc_elem, target_t, cfg.output_equatorial);
+                    calc_elem, time::EpochTDB::from_mjd(target_t.mjd()), cfg.output_equatorial);
                  result.fitted_positions.push_back(pos);
              }
              return result;

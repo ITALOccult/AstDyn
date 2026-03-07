@@ -104,9 +104,8 @@ TEST(ReferenceFrameTest, J2000ICRSRoundTrip) {
 TEST(ReferenceFrameTest, J2000ToEcliptic) {
     Matrix3d R = ReferenceFrame::j2000_to_ecliptic();
     
-    // Should be rotation about X-axis by obliquity (~23.44°)
-    double epsilon = 23.439291 * DEG_TO_RAD;
-    Matrix3d expected = ReferenceFrame::rotation_x(epsilon);
+    // Should be rotation about X-axis by obliquity
+    Matrix3d expected = ReferenceFrame::rotation_x(constants::OBLIQUITY_J2000);
     
     EXPECT_TRUE(R.isApprox(expected, 1e-10));
 }
@@ -172,8 +171,8 @@ TEST(ReferenceFrameTest, ITRFRotation) {
     // Position at different times should show Earth rotation
     Vector3d pos_j2000(7000.0, 0.0, 0.0);
     
-    time::EpochUTC mjd1_instant = time::EpochUTC::from_mjd(MJD2000);
-    time::EpochUTC mjd2_instant = time::EpochUTC::from_mjd(MJD2000 + 0.25); // 6 hours later
+    time::EpochTDB mjd1_instant = time::EpochTDB::from_mjd(MJD2000);
+    time::EpochTDB mjd2_instant = time::EpochTDB::from_mjd(MJD2000 + 0.25); // 6 hours later
     
     Vector3d pos_itrf1 = ReferenceFrame::transform_position(
         pos_j2000, FrameType::J2000, FrameType::ITRF, mjd1_instant);
@@ -268,7 +267,7 @@ TEST(ReferenceFrameTest, ITRFVelocityTransformation) {
     Vector3d vel(0.0, 7.5, 0.0);
     CartesianState state_j2000(pos, vel, GM_EARTH);
     
-    time::EpochUTC mjd_instant = time::EpochUTC::from_mjd(MJD2000);
+    time::EpochTDB mjd_instant = time::EpochTDB::from_mjd(MJD2000);
     
     // Transform to ITRF
     CartesianState state_itrf = ReferenceFrame::transform_state(

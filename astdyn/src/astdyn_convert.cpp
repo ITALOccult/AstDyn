@@ -92,7 +92,7 @@ ProgramOptions parse_args(int argc, char** argv) {
 void print_elements(const propagation::KeplerianElements& elem, const std::string& label) {
     std::cout << "\n=== " << label << " ===\n";
     std::cout << std::fixed << std::setprecision(9);
-    std::cout << "Epoch:  " << elem.epoch.mjd.value << " MJD TDB\n";
+    std::cout << "Epoch:  " << elem.epoch.mjd() << " MJD TDB\n";
     std::cout << "a:      " << elem.semi_major_axis << " AU\n";
     std::cout << "e:      " << elem.eccentricity << "\n";
     std::cout << std::setprecision(6);
@@ -190,8 +190,8 @@ int main(int argc, char** argv) {
         std::cout << "\nObservations: " << observations.size() << " loaded\n";
         
         if (!observations.empty()) {
-            std::cout << "Time span: " << observations.front().time.mjd.value 
-                     << " - " << observations.back().time.mjd.value << " MJD\n";
+            std::cout << "Time span: " << observations.front().time.mjd() 
+                     << " - " << observations.back().time.mjd() << " MJD\n";
         }
         
         // Save to output directory

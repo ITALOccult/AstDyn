@@ -194,33 +194,53 @@ private:
     PropagatorSettings settings_;
 };
 
-/**
- * @brief Simple two-body propagator (analytical)
- * 
- * Uses Keplerian orbital mechanics for fast propagation
- * without perturbations. Useful for short arcs or preliminary orbits.
- */
 class TwoBodyPropagator {
 public:
     /**
      * @brief Propagate using Keplerian motion
      * 
-     * @param initial Initial Keplerian elements
-     * @param target_mjd_tdb Target epoch
+     * @param initial Initial Keplerian elements (typed)
+     * @param target_time Target epoch
      * @return Keplerian elements at target (only M changes)
      */
-    static KeplerianElements propagate(const KeplerianElements& initial,
-                                       time::EpochTDB target_time);
+    template <typename Frame>
+    static physics::KeplerianStateTyped<Frame> propagate(
+        const physics::KeplerianStateTyped<Frame>& initial,
+        time::EpochTDB target_time)
+    {
+        double dt_days = target_time.mjd() - initial.epoch.mjd();
+        double a_au = initial.a.to_au();
+        double mu_au_d2 = initial.gm.to_au3_d2();
+        
+        // n = sqrt(mu / a^3) in rad/day
+        double n = std::sqrt(mu_au_d2 / (a_au * a_au * a_au));
+        
+        double m_new = initial.M.to_rad() + n * dt_days;
+        
+        // Normalize M to [0, 2pi]
+        m_new = std::fmod(m_new, constants::TWO_PI);
+        if (m_new < 0) m_new += constants::TWO_PI;
+        
+        auto result = initial;
+        result.epoch = target_time;
+        result.M = astrometry::Angle::from_rad(m_new);
+        return result;
+    }
     
     /**
      * @brief Compute mean anomaly at epoch from initial state
      * 
-     * @param initial Initial elements
-     * @param target_mjd_tdb Target epoch
+     * @param initial Initial elements (typed)
+     * @param target_time Target epoch
      * @return Mean anomaly at target epoch [rad]
      */
-    static double mean_anomaly_at_epoch(const KeplerianElements& initial,
-                                        time::EpochTDB target_time);
+    template <typename Frame>
+    static double mean_anomaly_at_epoch(
+        const physics::KeplerianStateTyped<Frame>& initial,
+        time::EpochTDB target_time)
+    {
+        return propagate(initial, target_time).M.to_rad();
+    }
 };
 
 // ============================================================================
@@ -272,49 +292,14 @@ physics::KeplerianStateTyped<Frame> Propagator::propagate_keplerian(
     const physics::KeplerianStateTyped<Frame>& initial,
     time::EpochTDB target_time) 
 {
-    // 1. Bridge to un-typed format for conversion math
-    KeplerianElements kep_old;
-    kep_old.epoch = initial.epoch;
-    kep_old.semi_major_axis = initial.a.to_au();
-    kep_old.eccentricity = initial.e;
-    kep_old.inclination = initial.i.to_rad();
-    kep_old.longitude_ascending_node = initial.node.to_rad();
-    kep_old.argument_perihelion = initial.omega.to_rad();
-    kep_old.mean_anomaly = initial.M.to_rad();
-    kep_old.gravitational_parameter = initial.gm.to_au3_d2();
+    // 1. Convert to Cartesian (Type Safe)
+    auto cart_initial = keplerian_to_cartesian(initial);
     
-    // 2. Convert to un-typed Cartesian (which now returns SI internally!)
-    CartesianElements cart_old = keplerian_to_cartesian(kep_old);
+    // 2. Propagate Cartesian
+    auto cart_final = propagate_cartesian(cart_initial, target_time);
     
-    // 3. Bring into AstDyn 3.0 Type Safety
-    auto cart_typed = physics::CartesianStateTyped<Frame>::from_si(
-        initial.epoch,
-        cart_old.position.x, cart_old.position.y, cart_old.position.z,
-        cart_old.velocity.x, cart_old.velocity.y, cart_old.velocity.z,
-        constants::GM_SUN * 1e9
-    );
-    
-    // 4. Propagate strongly-typed
-    auto cart_final = propagate_cartesian(cart_typed, target_time);
-    
-    // 5. Bridge back to un-typed for returning to Keplerian
-    cart_old.epoch = target_time;
-    cart_old.position = types::Vector3<core::GCRF, core::Meter>(cart_final.position.to_eigen_si());
-    cart_old.velocity = types::Vector3<core::GCRF, core::Meter>(cart_final.velocity.to_eigen_si());
-    cart_old.gravitational_parameter = constants::GM_SUN * 1e9;
-    
-    KeplerianElements kep_final_old = cartesian_to_keplerian(cart_old);
-    
-    return physics::KeplerianStateTyped<Frame>::from_traditional(
-        target_time,
-        kep_final_old.semi_major_axis,
-        kep_final_old.eccentricity,
-        kep_final_old.inclination * constants::RAD_TO_DEG,
-        kep_final_old.longitude_ascending_node * constants::RAD_TO_DEG,
-        kep_final_old.argument_perihelion * constants::RAD_TO_DEG,
-        kep_final_old.mean_anomaly * constants::RAD_TO_DEG,
-        initial.gm
-    );
+    // 3. Convert back to Keplerian (Type Safe)
+    return cartesian_to_keplerian<Frame>(cart_final);
 }
 
 } // namespace astdyn::propagation

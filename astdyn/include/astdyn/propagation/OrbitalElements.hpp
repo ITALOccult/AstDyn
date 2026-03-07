@@ -19,6 +19,7 @@
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include <string>
 #include <optional>
 #include <vector>
@@ -209,6 +210,59 @@ CartesianElements keplerian_to_cartesian(const KeplerianElements& kep);
  * @return Keplerian elements
  */
 KeplerianElements cartesian_to_keplerian(const CartesianElements& cart);
+
+/**
+ * @brief Type-safe conversion from Keplerian to Cartesian state
+ * @tparam Frame Reference frame of the state
+ */
+template <typename Frame>
+physics::CartesianStateTyped<Frame> keplerian_to_cartesian(const physics::KeplerianStateTyped<Frame>& kep) {
+    // Bridge to un-typed format for conversion logic (defined in .cpp)
+    KeplerianElements legacy;
+    legacy.epoch = kep.epoch;
+    legacy.semi_major_axis = kep.a.to_au();
+    legacy.eccentricity = kep.e;
+    legacy.inclination = kep.i.to_rad();
+    legacy.longitude_ascending_node = kep.node.to_rad();
+    legacy.argument_perihelion = kep.omega.to_rad();
+    legacy.mean_anomaly = kep.M.to_rad();
+    legacy.gravitational_parameter = kep.gm.to_au3_d2();
+
+    auto cart_legacy = keplerian_to_cartesian(legacy);
+    
+    return physics::CartesianStateTyped<Frame>::from_si(
+        kep.epoch,
+        cart_legacy.position.x, cart_legacy.position.y, cart_legacy.position.z,
+        cart_legacy.velocity.x, cart_legacy.velocity.y, cart_legacy.velocity.z,
+        cart_legacy.gravitational_parameter
+    );
+}
+
+/**
+ * @brief Type-safe conversion from Cartesian to Keplerian state
+ * @tparam Frame Reference frame of the state
+ */
+template <typename Frame>
+physics::KeplerianStateTyped<Frame> cartesian_to_keplerian(const physics::CartesianStateTyped<Frame>& cart) {
+    CartesianElements legacy;
+    legacy.epoch = cart.epoch;
+    legacy.position = types::Vector3<core::GCRF, core::Meter>(cart.position.to_eigen_si());
+    legacy.velocity = types::Vector3<core::GCRF, core::Meter>(cart.velocity.to_eigen_si());
+    legacy.gravitational_parameter = cart.gm.to_m3_s2();
+
+    auto kep_legacy = cartesian_to_keplerian(legacy);
+
+    return physics::KeplerianStateTyped<Frame>::from_traditional(
+        cart.epoch,
+        kep_legacy.semi_major_axis,
+        kep_legacy.eccentricity,
+        kep_legacy.inclination * constants::RAD_TO_DEG,
+        kep_legacy.longitude_ascending_node * constants::RAD_TO_DEG,
+        kep_legacy.argument_perihelion * constants::RAD_TO_DEG,
+        kep_legacy.mean_anomaly * constants::RAD_TO_DEG,
+        cart.gm
+    );
+}
 
 /**
  * @brief Convert Keplerian to Equinoctial

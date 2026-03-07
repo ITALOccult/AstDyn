@@ -129,22 +129,7 @@ int main(int argc, char* argv[]) {
     auto truth_obs = *truth_res;
 
     // 5. Build Keplerian state (ECLIPTIC) - used for standard APIs
-    // Conversion to Keplerian is still a bit manual in current header but let's use the provided bridge
-    propagation::CartesianElements ce_old;
-    ce_old.epoch = start_time_tdb;
-    ce_old.position = types::Vector3<core::GCRF, core::Meter>(pos_ecl.to_eigen_si()); // bridge
-    ce_old.velocity = types::Vector3<core::GCRF, core::Meter>(vel_ecl.to_eigen_si());
-    ce_old.gravitational_parameter = initial_vectors_eq.gm.to_m3_s2();
-    
-    auto kep_old = propagation::cartesian_to_keplerian(ce_old);
-    auto initial_state_kep = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-        start_time_tdb, kep_old.semi_major_axis, kep_old.eccentricity,
-        kep_old.inclination * constants::RAD_TO_DEG,
-        kep_old.longitude_ascending_node * constants::RAD_TO_DEG,
-        kep_old.argument_perihelion * constants::RAD_TO_DEG,
-        kep_old.mean_anomaly * constants::RAD_TO_DEG,
-        initial_vectors_eq.gm
-    );
+    auto initial_state_kep = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(initial_vectors_ecl);
 
     std::cout << "\nInitial Keplerian Elements (Ecliptic J2000):" << std::endl;
     std::cout << "  a  = " << initial_state_kep.a.to_au() << " AU" << std::endl;

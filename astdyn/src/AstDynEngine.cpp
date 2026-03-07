@@ -427,7 +427,7 @@ void AstDynEngine::validate_observations() {
 // Orbit Determination
 // ============================================================================
 
-void AstDynEngine::set_initial_orbit(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements) {
+void AstDynEngine::set_initial_orbit_ecl(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements) {
     current_orbit_ = elements;
     has_orbit_ = true;
     

@@ -145,19 +145,9 @@ Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     for (int i = 0; i < 3; ++i) {
         auto el_kep_ecl = engine.propagate_to(time::EpochTDB::from_mjd(t_obs.mjd() - tau_days));
         
-        // Convert Keplerian Ecliptic to Cartesian Ecliptic for distance check
-        propagation::KeplerianElements kep_old;
-        kep_old.epoch = el_kep_ecl.epoch;
-        kep_old.semi_major_axis = el_kep_ecl.a.to_au();
-        kep_old.eccentricity = el_kep_ecl.e;
-        kep_old.inclination = el_kep_ecl.i.to_rad();
-        kep_old.longitude_ascending_node = el_kep_ecl.node.to_rad();
-        kep_old.argument_perihelion = el_kep_ecl.omega.to_rad();
-        kep_old.mean_anomaly = el_kep_ecl.M.to_rad();
-        kep_old.gravitational_parameter = el_kep_ecl.gm.to_au3_d2();
-        
-        auto cart_ecl_old = propagation::keplerian_to_cartesian(kep_old);
-        ast_p_ecl = cart_ecl_old.position.to_eigen(); // This is Ecliptic meters
+        // Convert Keplerian Ecliptic to Cartesian Ecliptic for distance check using type-safe API
+        auto cart_ecl = propagation::keplerian_to_cartesian(el_kep_ecl);
+        ast_p_ecl = cart_ecl.position.to_eigen_si();
         
         tau_days = (ast_p_ecl - earth_pos_helio_ecl).norm() / (constants::C_LIGHT * 1000.0 * 86400.0);
     }

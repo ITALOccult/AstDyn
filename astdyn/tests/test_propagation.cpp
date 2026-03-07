@@ -24,7 +24,7 @@ using namespace astdyn::propagation;
 TEST(OrbitalElementsTest, KeplerianToCartesianCircular) {
     // Circular orbit at 1 AU
     KeplerianElements kep;
-    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
+    kep.epoch = time::EpochTDB::from_mjd(constants::MJD2000);
     kep.semi_major_axis = 1.0; // AU
     kep.eccentricity = 0.0;
     kep.inclination = 0.0;
@@ -35,22 +35,25 @@ TEST(OrbitalElementsTest, KeplerianToCartesianCircular) {
     
     CartesianElements cart = keplerian_to_cartesian(kep);
     
-    // At M=0, true anomaly=0, so object is at perihelion along x-axis
-    EXPECT_NEAR(cart.position.x, 1.0, 1e-10);
-    EXPECT_NEAR(cart.position.y, 0.0, 1e-10);
-    EXPECT_NEAR(cart.position.z, 0.0, 1e-10);
+    double au_m = constants::AU * 1000.0;
+    double gm_si = constants::GM_SUN * 1e9;
     
-    // Velocity should be along y-axis for circular orbit
-    double v_circular = std::sqrt(constants::GMS / 1.0);
-    EXPECT_NEAR(cart.velocity.x, 0.0, 1e-10);
-    EXPECT_NEAR(cart.velocity.y, v_circular, 1e-10);
-    EXPECT_NEAR(cart.velocity.z, 0.0, 1e-10);
+    // At M=0, true anomaly=0, so object is at perihelion along x-axis (in meters)
+    EXPECT_NEAR(cart.position.x, au_m, 1e-5);
+    EXPECT_NEAR(cart.position.y, 0.0, 1e-5);
+    EXPECT_NEAR(cart.position.z, 0.0, 1e-5);
+    
+    // Velocity should be along y-axis for circular orbit (in m/s)
+    double v_circular = std::sqrt(gm_si / au_m);
+    EXPECT_NEAR(cart.velocity.x, 0.0, 1e-5);
+    EXPECT_NEAR(cart.velocity.y, v_circular, 1e-5);
+    EXPECT_NEAR(cart.velocity.z, 0.0, 1e-5);
 }
 
 TEST(OrbitalElementsTest, CartesianToKeplerianRoundTrip) {
     // Create Keplerian elements for Earth-like orbit
     KeplerianElements kep1;
-    kep1.epoch = time::EpochTT::from_mjd(constants::MJD2000);
+    kep1.epoch = time::EpochTDB::from_mjd(constants::MJD2000);
     kep1.semi_major_axis = 1.0;
     kep1.eccentricity = 0.0167;
     kep1.inclination = 0.0;
@@ -96,7 +99,7 @@ TEST(OrbitalElementsTest, KeplerEquationSolver) {
 
 TEST(OrbitalElementsTest, EquinoctialConversion) {
     KeplerianElements kep;
-    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
+    kep.epoch = time::EpochTDB::from_mjd(constants::MJD2000);
     kep.semi_major_axis = 2.5;
     kep.eccentricity = 0.2;
     kep.inclination = 15.0 * constants::DEG_TO_RAD;
@@ -203,50 +206,47 @@ TEST(IntegratorTest, RK4vsRKF78Accuracy) {
 
 TEST(TwoBodyPropagatorTest, CircularOrbitPeriod) {
     // Circular orbit should return to same position after one period
-    KeplerianElements kep;
-    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
-    kep.semi_major_axis = 1.0;
-    kep.eccentricity = 0.0;
-    kep.inclination = 0.0;
-    kep.longitude_ascending_node = 0.0;
-    kep.argument_perihelion = 0.0;
-    kep.mean_anomaly = 0.0;
-    kep.gravitational_parameter = constants::GMS;
+    auto kep = physics::KeplerianStateTyped<core::GCRF>::from_traditional(
+        time::EpochTDB::from_mjd(constants::MJD2000),
+        1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        physics::GravitationalParameter::sun()
+    );
     
-    double period = kep.period();
+    double a_au = kep.a.to_au();
+    double mu_au_d2 = kep.gm.to_au3_d2();
+    double n_rad_day = std::sqrt(mu_au_d2 / (a_au * a_au * a_au));
+    double period = constants::TWO_PI / n_rad_day;
     double target_mjd = kep.epoch.mjd() + period;
     
-    KeplerianElements final = TwoBodyPropagator::propagate(kep, time::EpochTT::from_mjd(target_mjd));
+    auto final = TwoBodyPropagator::propagate(kep, time::EpochTDB::from_mjd(target_mjd));
     
     // Mean anomaly should be ~0 or ~2π after one period
-    double M_normalized = std::fmod(final.mean_anomaly, constants::TWO_PI);
+    double M_normalized = std::fmod(final.M.to_rad(), constants::TWO_PI);
     if (M_normalized < 0.0) M_normalized += constants::TWO_PI;
     // Check if close to 0 or close to 2π
     EXPECT_TRUE(M_normalized < 1e-6 || std::abs(M_normalized - constants::TWO_PI) < 1e-6);
     
     // Other elements unchanged
-    EXPECT_NEAR(final.semi_major_axis, kep.semi_major_axis, 1e-12);
-    EXPECT_NEAR(final.eccentricity, kep.eccentricity, 1e-12);
+    EXPECT_NEAR(final.a.to_au(), kep.a.to_au(), 1e-12);
+    EXPECT_NEAR(final.e, kep.e, 1e-12);
 }
 
 TEST(TwoBodyPropagatorTest, MeanAnomalyProgression) {
-    KeplerianElements kep;
-    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
-    kep.semi_major_axis = 2.5;
-    kep.eccentricity = 0.2;
-    kep.inclination = 0.0;
-    kep.longitude_ascending_node = 0.0;
-    kep.argument_perihelion = 0.0;
-    kep.mean_anomaly = 0.0;
-    kep.gravitational_parameter = constants::GMS;
+    auto kep = physics::KeplerianStateTyped<core::GCRF>::from_traditional(
+        time::EpochTDB::from_mjd(constants::MJD2000),
+        2.5, 0.2, 0.0, 0.0, 0.0, 0.0,
+        physics::GravitationalParameter::sun()
+    );
     
-    double n = kep.mean_motion();
+    double a_au = kep.a.to_au();
+    double mu_au_d2 = kep.gm.to_au3_d2();
+    double n = std::sqrt(mu_au_d2 / (a_au * a_au * a_au));
     double dt = 100.0; // days
     
-    KeplerianElements final = TwoBodyPropagator::propagate(kep, time::EpochTT::from_mjd(kep.epoch.mjd() + dt));
+    auto final = TwoBodyPropagator::propagate(kep, time::EpochTDB::from_mjd(kep.epoch.mjd() + dt));
     
     double expected_M = n * dt;
-    EXPECT_NEAR(final.mean_anomaly, expected_M, 1e-10);
+    EXPECT_NEAR(final.M.to_rad(), expected_M, 1e-10);
 }
 
 // ============================================================================
@@ -256,7 +256,7 @@ TEST(TwoBodyPropagatorTest, MeanAnomalyProgression) {
 TEST(PropagationTest, EnergyConservationTwoBody) {
     // Create Keplerian orbit
     KeplerianElements kep;
-    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
+    kep.epoch = time::EpochTDB::from_mjd(constants::MJD2000);
     kep.semi_major_axis = 2.0;
     kep.eccentricity = 0.3;
     kep.inclination = 10.0 * constants::DEG_TO_RAD;
