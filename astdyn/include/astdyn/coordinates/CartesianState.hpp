@@ -13,7 +13,6 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
-#include "src/utils/time_types.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"

@@ -63,7 +63,7 @@ protected:
 
 TEST_F(OrbitDeterminationTest, ResidualStructure) {
     ObservationResidual res;
-    res.mjd_utc = 60000.0;
+    res.time = time::EpochUTC::from_mjd(60000.0);
     res.residual_ra = 0.5 * ARCSEC_TO_RAD;
     res.residual_dec = 1.0 * ARCSEC_TO_RAD;
     res.normalized_ra = 1.0;
@@ -152,7 +152,7 @@ TEST_F(OrbitDeterminationTest, OutlierDetection) {
 TEST_F(OrbitDeterminationTest, STMIdentityAtT0) {
     // Create circular orbit at 1 AU
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = 60000.0;
+    kep.epoch = time::EpochTDB::from_mjd(60000.0);
     kep.semi_major_axis = 1.0;
     kep.eccentricity = 0.0;
     kep.inclination = 0.0;
@@ -164,7 +164,7 @@ TEST_F(OrbitDeterminationTest, STMIdentityAtT0) {
     auto cart = keplerian_to_cartesian(kep);
     
     // Compute STM at same epoch (should be identity)
-    auto result = stm_computer_->compute(cart, cart.epoch_mjd_tdb);
+    auto result = stm_computer_->compute(cart, cart.epoch);
     
     // Check that Φ(t₀,t₀) ≈ I
     for (int i = 0; i < 6; ++i) {
@@ -180,7 +180,7 @@ TEST_F(OrbitDeterminationTest, STMIdentityAtT0) {
 TEST_F(OrbitDeterminationTest, STMDeterminant) {
     // Create test orbit
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = 60000.0;
+    kep.epoch = time::EpochTDB::from_mjd(60000.0);
     kep.semi_major_axis = 2.5;
     kep.eccentricity = 0.2;
     kep.inclination = 10.0 * DEG_TO_RAD;
@@ -192,7 +192,7 @@ TEST_F(OrbitDeterminationTest, STMDeterminant) {
     auto cart = keplerian_to_cartesian(kep);
     
     // Propagate for 10 days
-    auto result = stm_computer_->compute(cart, cart.epoch_mjd_tdb + 10.0);
+    auto result = stm_computer_->compute(cart, cart.epoch + time::TimeDuration::from_days(10.0));
     
     // For Hamiltonian systems, det(Φ) should be 1 (symplectic property)
     double det = result.phi.determinant();
@@ -219,7 +219,7 @@ TEST_F(OrbitDeterminationTest, DifferentialCorrectorStructure) {
 TEST_F(OrbitDeterminationTest, SyntheticOrbitRecovery) {
     // Create "true" orbit
     KeplerianElements true_orbit;
-    true_orbit.epoch_mjd_tdb = 60000.0;
+    true_orbit.epoch = time::EpochTDB::from_mjd(60000.0);
     true_orbit.semi_major_axis = 2.5;
     true_orbit.eccentricity = 0.15;
     true_orbit.inclination = 10.0 * DEG_TO_RAD;

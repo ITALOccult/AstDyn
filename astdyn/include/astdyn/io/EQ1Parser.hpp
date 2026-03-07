@@ -1,5 +1,6 @@
 #pragma once
 
+#include "astdyn/time/epoch.hpp"
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -19,7 +20,7 @@ public:
      */
     struct EquinoctialElements {
         std::string object_name;    ///< Object designation
-        double epoch_mjd_tdb;       ///< Epoch in MJD TDB
+        time::EpochTDB epoch;       ///< Epoch (EpochTDB)
         double a;                   ///< Semi-major axis (AU)
         double h;                   ///< e·sin(ϖ) where ϖ = ω + Ω
         double k;                   ///< e·cos(ϖ)
@@ -82,9 +83,11 @@ public:
                 size_t start = line.find("MJD") + 3;
                 std::istringstream iss(line.substr(start));
                 std::string tdt_str;
-                if (!(iss >> elem.epoch_mjd_tdb >> tdt_str)) {
+                double mjd_val;
+                if (!(iss >> mjd_val >> tdt_str)) {
                     throw std::runtime_error("Failed to parse MJD line: " + line);
                 }
+                elem.epoch = time::EpochTDB::from_mjd(mjd_val);
                 found_mjd = true;
                 continue;
             }

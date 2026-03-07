@@ -36,7 +36,7 @@ propagation::EquinoctialElements OrbitFitAPI::parse_eq1(const std::string& filep
     }
 
     propagation::EquinoctialElements equ;
-    equ.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(0.0));
+    equ.epoch = time::EpochTDB::from_mjd(0.0);
     std::string line;
     bool found_equ = false;
     bool found_mjd = false;
@@ -56,7 +56,7 @@ propagation::EquinoctialElements OrbitFitAPI::parse_eq1(const std::string& filep
             std::istringstream iss(trimmed.substr(3));
             double mjd_val;
             iss >> mjd_val;
-            equ.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(mjd_val));
+            equ.epoch = time::EpochTDB::from_mjd(mjd_val);
             found_mjd = true;
         }
 
@@ -142,7 +142,7 @@ OrbitFitResult OrbitFitAPI::run_fit(
         for (const auto& obs : obs_list) engine.add_observation(obs);
 
         // Convert to typed ECLIPJ2000 for engine
-        auto start_epoch = time::EpochTDB::from_mjd(equ.epoch.mjd.value);
+        auto start_epoch = equ.epoch;
         
         // initial_state is GCRF Keplerian (from prepare_initial_state), we need ECLIPJ2000
         // Actually kep_ecl was already available in prepare_initial_state step 1.

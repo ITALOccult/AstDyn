@@ -70,9 +70,9 @@ private:
     static std::string parseDesignation(const std::string& line);
     
     /**
-     * @brief Parse observation date
+     * @brief Parse observation date (returns Epoch UTC)
      */
-    static double parseDate(const std::string& date_str);
+    static time::EpochUTC parseDate(const std::string& date_str);
     
     /**
      * @brief Parse RA from "HH MM SS.ddd" format

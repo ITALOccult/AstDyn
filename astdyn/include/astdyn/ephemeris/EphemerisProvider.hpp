@@ -13,7 +13,7 @@
 #define ASTDYN_EPHEMERIS_PROVIDER_HPP
 
 #include "astdyn/ephemeris/CelestialBody.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
@@ -36,7 +36,7 @@ public:
      * @param t Time
      * @return Position vector [m] in J2000 equatorial frame (ICRF)
      */
-    virtual types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, utils::Instant t) = 0;
+    virtual types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, time::EpochTDB t) = 0;
     
     /**
      * @brief Get velocity of celestial body
@@ -45,7 +45,7 @@ public:
      * @param t Time
      * @return Velocity vector [m/s] in J2000 equatorial frame (ICRF)
      */
-    virtual types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, utils::Instant t) = 0;
+    virtual types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, time::EpochTDB t) = 0;
     
     /**
      * @brief Get full state (position + velocity)
@@ -54,7 +54,7 @@ public:
      * @param jd_tdb Julian Date (TDB time scale)
      * @return State vector [pos (AU), vel (AU/day)] in J2000 ecliptic frame
      */
-    virtual Eigen::Matrix<double, 6, 1> getState(CelestialBody body, utils::Instant t) {
+    virtual Eigen::Matrix<double, 6, 1> getState(CelestialBody body, time::EpochTDB t) {
         Eigen::Matrix<double, 6, 1> state;
         const auto pos = getPosition(body, t);
         const auto vel = getVelocity(body, t);

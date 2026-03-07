@@ -6,7 +6,6 @@
 #include <gtest/gtest.h>
 #include <astdyn/core/Types.hpp>
 #include <astdyn/core/Constants.hpp>
-#include "src/utils/time_types.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
@@ -17,7 +16,6 @@
 
 using namespace astdyn;
 using namespace astdyn::core;
-using namespace astdyn::utils;
 using namespace astdyn::types;
 using namespace astdyn::propagation;
 
@@ -57,7 +55,7 @@ TEST(RigorousValidation, TransformationTest) {
     const auto& mk = *mk_opt;
 
     // Epoch: J2000.0 (2000-01-01 12:00:00 UTC)
-    Instant t = Instant::from_utc(ModifiedJulianDate(51544.5));
+    time::EpochUTC t = time::EpochUTC::from_mjd(51544.5);
     
     // Convert to GCRF
     auto pos_gcrf = mk.getPositionGCRF(t);
@@ -88,13 +86,13 @@ TEST(RigorousValidation, PropagationTest) {
     initial.argument_perihelion = 0.0;
     initial.mean_anomaly = 0.0;
     initial.gravitational_parameter = mu;
-    initial.epoch = Instant::from_tt(ModifiedJulianDate(51544.5));
+    initial.epoch = time::EpochTT::from_mjd(51544.5);
     
     double period = initial.period(); // seconds
     
-    Instant t_start = Instant::from_tt(ModifiedJulianDate(51544.5));
+    time::EpochTT t_start = time::EpochTT::from_mjd(51544.5);
     double period_days = period / 86400.0;
-    Instant t_end = Instant::from_tt(ModifiedJulianDate(51544.5 + period_days));
+    time::EpochTDB t_end = time::EpochTDB::from_mjd(51544.5 + period_days);
     
     KeplerianElements final = TwoBodyPropagator::propagate(initial, t_end);
     

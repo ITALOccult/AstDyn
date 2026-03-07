@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
         
         if (opts.have_initial_orbit) {
             propagation::KeplerianElements initial;
-            initial.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(opts.epoch_mjd));
+            initial.epoch = time::EpochTDB::from_mjd(opts.epoch_mjd);
             initial.semi_major_axis = opts.a;
             initial.eccentricity = opts.e;
             initial.inclination = opts.i_deg * constants::DEG_TO_RAD;
@@ -249,7 +249,7 @@ int main(int argc, char** argv) {
             initial.gravitational_parameter = constants::GMS;
             
             auto initial_typed = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-                time::EpochTDB::from_mjd(initial.epoch.mjd.value),
+                initial.epoch,
                 initial.semi_major_axis, initial.eccentricity,
                 initial.inclination * constants::RAD_TO_DEG,
                 initial.longitude_ascending_node * constants::RAD_TO_DEG,
@@ -296,8 +296,8 @@ int main(int argc, char** argv) {
             // Use observation timespan if not specified
             if (opts.ephem_start == 0.0) {
                 const auto& obs = engine.observations();
-                opts.ephem_start = obs.front().time.mjd.value;
-                opts.ephem_end = obs.back().time.mjd.value;
+                opts.ephem_start = obs.front().time.mjd();
+                opts.ephem_end = obs.back().time.mjd();
             }
             
             auto ephemeris = engine.compute_ephemeris(
@@ -337,9 +337,9 @@ int main(int argc, char** argv) {
             // Use extended timespan if not specified
             if (opts.ca_start == 0.0) {
                 const auto& obs = engine.observations();
-                double span = obs.back().time.mjd.value - obs.front().time.mjd.value;
-                opts.ca_start = obs.front().time.mjd.value - span;
-                opts.ca_end = obs.back().time.mjd.value + span;
+                double span = obs.back().time.mjd() - obs.front().time.mjd();
+                opts.ca_start = obs.front().time.mjd() - span;
+                opts.ca_end = obs.back().time.mjd() + span;
             }
             
             auto approaches = engine.find_close_approaches(

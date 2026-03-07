@@ -22,7 +22,7 @@
 #define ASTDYN_EPHEMERIS_PLANETARYEPHEMERIS_HPP
 
 #include "astdyn/core/Constants.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
@@ -59,43 +59,43 @@ public:
      */
     /**
      * @param body Celestial body
-     * @param t Instant
+     * @param t Epoch (TDB)
      * @return Position vector [m] in J2000 equatorial frame (ICRF)
      */
-    static types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, utils::Instant t);
+    static types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, time::EpochTDB t);
     
     /**
      * @param body Celestial body
-     * @param t Instant
+     * @param t Epoch (TDB)
      * @return Velocity vector [m/s] in J2000 equatorial frame (ICRF)
      */
-    static types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, utils::Instant t);
+    static types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, time::EpochTDB t);
     
     /**
      * @param body Celestial body
-     * @param t Instant
+     * @param t Epoch (TDB)
      * @return CartesianState in J2000 equatorial frame [m, m/s]
      */
-    static coordinates::CartesianState getState(CelestialBody body, utils::Instant t);
+    static coordinates::CartesianState getState(CelestialBody body, time::EpochTDB t);
     
     /**
-     * @param t Instant
+     * @param t Epoch (TDB)
      * @return Position vector [m] of Sun relative to SSB
      * 
      * Computed as weighted sum of planetary positions.
      * Useful for high-precision orbit determination.
      */
-    static types::Vector3<core::GCRF, core::Meter> getSunBarycentricPosition(utils::Instant t);
+    static types::Vector3<core::GCRF, core::Meter> getSunBarycentricPosition(time::EpochTDB t);
     
     /**
      * @brief Convert heliocentric to barycentric state
      * @param heliocentric_state State relative to Sun
-     * @param t Time
+     * @param t Epoch (TDB)
      * @return State relative to Solar System Barycenter
      */
     static coordinates::CartesianState heliocentricToBarycentric(
         const coordinates::CartesianState& heliocentric_state, 
-        utils::Instant t
+        time::EpochTDB t
     );
 
     /**

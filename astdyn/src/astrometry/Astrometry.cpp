@@ -1,6 +1,7 @@
 #include "astdyn/astrometry/Astrometry.hpp"
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
@@ -29,20 +30,10 @@ static std::shared_ptr<ephemeris::DE441Provider> get_cached_provider(const std::
     return cache[path];
 }
 
-static propagation::KeplerianElements state_to_kep(
-    const types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag>& s, const utils::Instant& t) {
-    propagation::KeplerianElements k;
-    k.semi_major_axis = s.a(); k.eccentricity = s.e(); k.inclination = s.i();
-    k.longitude_ascending_node = s.raan(); k.argument_perihelion = s.arg_peri();
-    k.mean_anomaly = s.m_anomaly(); k.epoch = t; 
-    k.gravitational_parameter = GMS;
-    return k;
-}
-
 std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::compute_observation(
-    const types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag>& initial,
-    const utils::Instant& t_elements,
-    const utils::Instant& t_obs,
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
+    const time::EpochTDB& t_elements,
+    const time::EpochTDB& t_obs,
     const AstDynConfig& e_cfg,
     const AstrometricSettings& a_cfg) {
     
@@ -54,38 +45,55 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     // Sync PlanetaryEphemeris provider too
     ephemeris::PlanetaryEphemeris::setProvider(de441);
 
-    auto mat_ecl = coordinates::ReferenceFrame::j2000_to_ecliptic();
-    auto earth_p_ssb = (mat_ecl * de441->getPosition(ephemeris::CelestialBody::EARTH, t_obs).to_eigen()).eval(); 
-    auto earth_v_ssb = (mat_ecl * de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen()).eval();
+    // Get Earth state in GCRF and transform to Ecliptic J2000
+    auto earth_p_eq_types = de441->getPosition(ephemeris::CelestialBody::EARTH, t_obs);
+    auto earth_v_eq_types = de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs);
     
-    // 2. SUN position (to convert Earth to HELIOCENTRIC)
-    auto sun_p_ssb = (mat_ecl * ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t_obs).to_eigen()).eval();
-    Eigen::Vector3d earth_pos = earth_p_ssb - sun_p_ssb;
+    // Explicitly convert types::Vector3 to math::Vector3 (required by transform_pos)
+    math::Vector3<core::GCRF, core::Meter> earth_p_eq_math = math::Vector3<core::GCRF, core::Meter>::from_si(
+        earth_p_eq_types.x, earth_p_eq_types.y, earth_p_eq_types.z);
+    
+    auto earth_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(earth_p_eq_math);
+    
+    // 2. SUN position
+    auto sun_p_eq_types = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::SUN, t_obs);
+    math::Vector3<core::GCRF, core::Meter> sun_p_eq_math = math::Vector3<core::GCRF, core::Meter>::from_si(
+        sun_p_eq_types.x, sun_p_eq_types.y, sun_p_eq_types.z);
+    
+    auto sun_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(sun_p_eq_math);
+    
+    Eigen::Vector3d earth_pos_helio_ecl = earth_p_ecl.to_eigen_si() - sun_p_ecl.to_eigen_si();
 
-    // 3. Light-time Iteration (Step 1)
-    auto ast_pos = compute_light_time_corrected_pos(initial, t_elements, t_obs, earth_pos, e_cfg);
+    // 3. Light-time Iteration
+    auto ast_pos_ecl = compute_light_time_corrected_pos(initial, t_elements, t_obs, earth_pos_helio_ecl, e_cfg);
     
     // DEBUG
-    std::cout << "    [DEBUG-ATR] Earth Helio (Ecl): " << (earth_pos.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
-    std::cout << "    [DEBUG-ATR] Ast   Helio (Ecl): " << (ast_pos.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
+    if (e_cfg.verbose) {
+        std::cout << "    [DEBUG-ATR] Earth Helio (Ecl): " << (earth_pos_helio_ecl.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
+        std::cout << "    [DEBUG-ATR] Ast   Helio (Ecl): " << (ast_pos_ecl.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
+    }
 
-    auto raw_rho = ast_pos - earth_pos;
-    std::cout << "    [DEBUG-ATR] Geoc. Dist (Ecl): " << (raw_rho.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
+    auto raw_rho_ecl = ast_pos_ecl - earth_pos_helio_ecl;
 
-    // 4. Aberration (Step 2)
-    auto aberr_rho = a_cfg.stellar_aberration ? apply_stellar_aberration(raw_rho, earth_v_ssb) : raw_rho;
+    // 4. Aberration
+    // Aberration is usually computed in Equatorial frame using Velocity in GCRF
+    // Let's transform rho to Equatorial using typesafe API
+    auto rho_ecl_math = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(raw_rho_ecl.x(), raw_rho_ecl.y(), raw_rho_ecl.z());
+    auto raw_rho_eq_math = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_ecl_math);
+    auto raw_rho_eq = raw_rho_eq_math.to_eigen_si();
+    
+    auto earth_v_gcrf = earth_v_eq_types.to_eigen();
+    
+    auto final_rho_eq = a_cfg.stellar_aberration ? apply_stellar_aberration(raw_rho_eq, earth_v_gcrf) : raw_rho_eq;
 
-    // 4. Frame Reduction (Step 3)
-    auto final_rho = convert_frame_if_needed(aberr_rho, a_cfg);
-
-    // 5. Build Result (Step 4)
-    return finalize_observation(final_rho);
+    // 5. Build Result
+    return finalize_observation(final_rho_eq);
 }
 
 std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::compute_observation_from_cartesian(
     const physics::CartesianStateTyped<core::GCRF>& initial,
-    const utils::Instant& t_elements,
-    const utils::Instant& t_obs,
+    const time::EpochTDB& t_elements,
+    const time::EpochTDB& t_obs,
     const AstDynConfig& e_cfg,
     const AstrometricSettings& a_cfg) {
     
@@ -94,161 +102,89 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     if (!de441) return std::unexpected(AstrometryError::EphemerisUnavailable);
     ephemeris::PlanetaryEphemeris::setProvider(de441);
 
-    auto mat_ecl = coordinates::ReferenceFrame::j2000_to_ecliptic();
-    auto earth_p_ssb = (mat_ecl * de441->getPosition(ephemeris::CelestialBody::EARTH, t_obs).to_eigen()).eval(); 
-    auto earth_v_ssb = (mat_ecl * de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen()).eval();
-    auto sun_p_ssb = (mat_ecl * ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t_obs).to_eigen()).eval();
-    Eigen::Vector3d earth_pos = earth_p_ssb - sun_p_ssb;
-
-    // Convert to Keplerian (Ecliptic J2000)
-    // First ensure we rotate from GCRF to Ecliptic
-    auto pos_eq = initial.position.to_eigen_si();
-    auto vel_eq = initial.velocity.to_eigen_si();
-    auto mat_ecl_rot = coordinates::ReferenceFrame::j2000_to_ecliptic();
+    // Transform initial state to Ecliptic properly
+    auto pos_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(initial.position);
+    auto vel_ecl = coordinates::ReferenceFrame::transform_vel<core::GCRF, core::ECLIPJ2000>(initial.position, initial.velocity);
     
-    propagation::CartesianElements cart_ecl;
-    cart_ecl.epoch = t_elements;
-    cart_ecl.position = types::Vector3<core::GCRF, core::Meter>(mat_ecl_rot * pos_eq);
-    cart_ecl.velocity = types::Vector3<core::GCRF, core::Meter>(mat_ecl_rot * vel_eq);
-    cart_ecl.gravitational_parameter = initial.gm.to_m3_s2();
+    // Bridge to Engine's expected Keplerian format (AstDynEngine currently fits/propagates in Ecliptic)
+    // We'll use the proper typesafe bridge if we can or use the legacy conversion but with correct tags
+    propagation::CartesianElements cart_ecl_old;
+    cart_ecl_old.epoch = t_elements;
+    cart_ecl_old.position = types::Vector3<core::GCRF, core::Meter>(pos_ecl.to_eigen_si()); // Struct-enforced GCRF tag, but numbers are Ecliptic
+    cart_ecl_old.velocity = types::Vector3<core::GCRF, core::Meter>(vel_ecl.to_eigen_si());
+    cart_ecl_old.gravitational_parameter = initial.gm.to_m3_s2();
     
-    auto kep_ecl = propagation::cartesian_to_keplerian(cart_ecl);
+    auto kep_ecl_legacy = propagation::cartesian_to_keplerian(cart_ecl_old);
     
-    AstDynEngine engine(e_cfg);
-    auto engine_init = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-        time::EpochTDB::from_mjd(kep_ecl.epoch.mjd.value),
-        kep_ecl.semi_major_axis, kep_ecl.eccentricity,
-        kep_ecl.inclination * constants::RAD_TO_DEG,
-        kep_ecl.longitude_ascending_node * constants::RAD_TO_DEG,
-        kep_ecl.argument_perihelion * constants::RAD_TO_DEG,
-        kep_ecl.mean_anomaly * constants::RAD_TO_DEG,
-        physics::GravitationalParameter::sun()
+    auto initial_state_kep_ecl = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        t_elements,
+        kep_ecl_legacy.semi_major_axis, kep_ecl_legacy.eccentricity,
+        kep_ecl_legacy.inclination * constants::RAD_TO_DEG,
+        kep_ecl_legacy.longitude_ascending_node * constants::RAD_TO_DEG,
+        kep_ecl_legacy.argument_perihelion * constants::RAD_TO_DEG,
+        kep_ecl_legacy.mean_anomaly * constants::RAD_TO_DEG,
+        initial.gm
     );
-    engine.set_initial_orbit(engine_init);
 
-    auto ast_pos = compute_light_time_corrected_pos_internal(engine, t_obs, earth_pos);
-    
-    // DEBUG
-    if (e_cfg.verbose) {
-        std::cout << "    [DEBUG-ATR-V] Earth Helio (Ecl): " << (earth_pos.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
-        std::cout << "    [DEBUG-ATR-V] Ast   Helio (Ecl): " << (ast_pos.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
-    }
-
-    auto raw_rho = ast_pos - earth_pos;
-    if (e_cfg.verbose) {
-        std::cout << "    [DEBUG-ATR-V] Geoc. Dist (Ecl): " << (raw_rho.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
-    }
-
-    auto aberr_rho = a_cfg.stellar_aberration ? apply_stellar_aberration(raw_rho, earth_v_ssb) : raw_rho;
-    auto final_rho = convert_frame_if_needed(aberr_rho, a_cfg);
-
-    return finalize_observation(final_rho);
-}
-
-Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos_internal(
-    AstDynEngine& engine, const utils::Instant& t_obs, const Eigen::Vector3d& earth_pos) {
-    
-    // We work in Ecliptic J2000 for light-time
-    auto mat_eq = coordinates::ReferenceFrame::ecliptic_to_j2000();
-    auto mat_ecl = coordinates::ReferenceFrame::j2000_to_ecliptic();
-    Eigen::Vector3d earth_pos_eq = mat_eq * earth_pos;
-    
-    double tau_days = 0.0; Eigen::Vector3d ast_p;
-    for (int i = 0; i < 3; ++i) {
-        auto el = engine.propagate_to(time::EpochTDB::from_mjd(t_obs.mjd.value - tau_days));
-        
-        // Convert typed ECLIP Keplerian to Equatorial Cartesian for LOS
-        propagation::KeplerianElements kep_old;
-        kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(el.epoch.mjd()));
-        kep_old.semi_major_axis = el.a.to_au();
-        kep_old.eccentricity = el.e;
-        kep_old.inclination = el.i.to_rad();
-        kep_old.longitude_ascending_node = el.node.to_rad();
-        kep_old.argument_perihelion = el.omega.to_rad();
-        kep_old.mean_anomaly = el.M.to_rad();
-        kep_old.gravitational_parameter = el.gm.to_au3_d2();
-        
-        auto cart_ecl = propagation::keplerian_to_cartesian(kep_old);
-        ast_p = mat_eq * cart_ecl.position.to_eigen(); // Equatorial
-        tau_days = (ast_p - earth_pos_eq).norm() / (constants::C_LIGHT * 1000.0 * 86400.0);
-    }
-    return mat_ecl * ast_p;
+    return compute_observation(initial_state_kep_ecl, t_elements, t_obs, e_cfg, a_cfg);
 }
 
 Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
-    const types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag>& initial,
-    const utils::Instant& t_elements,
-    const utils::Instant& t_obs,
-    const Eigen::Vector3d& earth_pos,
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
+    const time::EpochTDB& t_elements,
+    const time::EpochTDB& t_obs,
+    const Eigen::Vector3d& earth_pos_helio_ecl,
     const AstDynConfig& cfg) {
     
     AstDynEngine engine(cfg);
-    auto engine_init = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-        time::EpochTDB::from_mjd(t_elements.mjd.value),
-        initial.a(), initial.e(), initial.i() * constants::RAD_TO_DEG,
-        initial.raan() * constants::RAD_TO_DEG, initial.arg_peri() * constants::RAD_TO_DEG,
-        initial.m_anomaly() * constants::RAD_TO_DEG,
-        physics::GravitationalParameter::sun()
-    );
-    engine.set_initial_orbit(engine_init);
+    engine.set_initial_orbit(initial);
 
-    double tau_days = 0.0; Eigen::Vector3d ast_p;
-    auto mat_eq = coordinates::ReferenceFrame::ecliptic_to_j2000();
-    auto mat_ecl = coordinates::ReferenceFrame::j2000_to_ecliptic();
-    Eigen::Vector3d earth_pos_eq = mat_eq * earth_pos;
-
+    double tau_days = 0.0; 
+    Eigen::Vector3d ast_p_ecl;
+    
     for (int i = 0; i < 3; ++i) {
-        auto el = engine.propagate_to(time::EpochTDB::from_mjd(t_obs.mjd.value - tau_days));
+        auto el_kep_ecl = engine.propagate_to(time::EpochTDB::from_mjd(t_obs.mjd() - tau_days));
         
-        // Convert typed ECLIP Keplerian to Equatorial Cartesian for LOS
+        // Convert Keplerian Ecliptic to Cartesian Ecliptic for distance check
         propagation::KeplerianElements kep_old;
-        kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(el.epoch.mjd()));
-        kep_old.semi_major_axis = el.a.to_au();
-        kep_old.eccentricity = el.e;
-        kep_old.inclination = el.i.to_rad();
-        kep_old.longitude_ascending_node = el.node.to_rad();
-        kep_old.argument_perihelion = el.omega.to_rad();
-        kep_old.mean_anomaly = el.M.to_rad();
-        kep_old.gravitational_parameter = el.gm.to_au3_d2();
+        kep_old.epoch = el_kep_ecl.epoch;
+        kep_old.semi_major_axis = el_kep_ecl.a.to_au();
+        kep_old.eccentricity = el_kep_ecl.e;
+        kep_old.inclination = el_kep_ecl.i.to_rad();
+        kep_old.longitude_ascending_node = el_kep_ecl.node.to_rad();
+        kep_old.argument_perihelion = el_kep_ecl.omega.to_rad();
+        kep_old.mean_anomaly = el_kep_ecl.M.to_rad();
+        kep_old.gravitational_parameter = el_kep_ecl.gm.to_au3_d2();
         
-        auto cart_ecl = propagation::keplerian_to_cartesian(kep_old);
-        ast_p = mat_eq * cart_ecl.position.to_eigen(); // Equatorial
-        tau_days = (ast_p - earth_pos_eq).norm() / (constants::C_LIGHT * 1000.0 * 86400.0);
+        auto cart_ecl_old = propagation::keplerian_to_cartesian(kep_old);
+        ast_p_ecl = cart_ecl_old.position.to_eigen(); // This is Ecliptic meters
+        
+        tau_days = (ast_p_ecl - earth_pos_helio_ecl).norm() / (constants::C_LIGHT * 1000.0 * 86400.0);
     }
-    return mat_ecl * ast_p;
+    return ast_p_ecl;
 }
 
 Eigen::Vector3d AstrometryReducer::apply_stellar_aberration(
-    const Eigen::Vector3d& rho, const Eigen::Vector3d& earth_vel) {
-    double r = rho.norm();
-    Eigen::Vector3d u = rho / r, v_c = earth_vel / (C_LIGHT * 1000.0);
-    double d_uv = u.dot(v_c), b = std::sqrt(1.0 - v_c.squaredNorm());
-    return ((b * u + (1.0 + d_uv / (1.0 + b)) * v_c) / (1.0 + d_uv)) * r;
-}
-
-Eigen::Vector3d AstrometryReducer::convert_frame_if_needed(
-    const Eigen::Vector3d& vec,
-    const AstrometricSettings& settings) {
+    const Eigen::Vector3d& rho_eq, const Eigen::Vector3d& earth_vel_eq) {
+    double r = rho_eq.norm();
+    Eigen::Vector3d u = rho_eq / r;
+    Eigen::Vector3d v_c = earth_vel_eq / (C_LIGHT * 1000.0); // m/s to c
     
-    if (!settings.frame_conversion_to_equatorial) {
-        std::cout << "[DEBUG-ATR] NO FRAME CONVERSION APPLIED!\n";
-        return vec;
-    }
+    double d_uv = u.dot(v_c);
+    double beta_inv = std::sqrt(1.0 - v_c.squaredNorm());
     
-    auto R = coordinates::ReferenceFrame::ecliptic_to_j2000();
-    auto result = R * vec;
-    
-    std::cout << "[DEBUG-ATR] R:\n" << R << "\n";
-    std::cout << "  Input  (Ecl): " << vec.transpose() << "\n";
-    std::cout << "  Output (Eq) : " << result.transpose() << "\n";
-    
-    return result;
+    // Lorentz transform of direction vector (approx. SR aberration)
+    return ((beta_inv * u + (1.0 + d_uv / (1.0 + beta_inv)) * v_c) / (1.0 + d_uv)) * r;
 }
 
 AstrometricObservation AstrometryReducer::finalize_observation(
-    const Eigen::Vector3d& rho) {
-    double r = rho.norm(), ra = std::atan2(rho.y(), rho.x()); if (ra < 0) ra += TWO_PI;
-    return { core::Radian(ra), core::Radian(std::asin(rho.z() / r)), core::Meter(r) };
+    const Eigen::Vector3d& rho_eq) {
+    double r = rho_eq.norm();
+    double ra = std::atan2(rho_eq(1), rho_eq(0)); 
+    if (ra < 0) ra += constants::TWO_PI;
+    double dec = std::asin(rho_eq(2) / r);
+    
+    return { core::Radian(ra), core::Radian(dec), core::Meter(r) };
 }
 
 } // namespace astdyn::astrometry

@@ -1,4 +1,5 @@
 #include "astdyn/io/HorizonsClient.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <sstream>
@@ -53,7 +54,7 @@ std::expected<std::string, HorizonsError> HorizonsClient::fetch_url(const std::s
 // --- Query Implementations ---
 
 std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, HorizonsError> 
-HorizonsClient::query_elements(const std::string& target, const utils::Instant& epoch) {
+HorizonsClient::query_elements(const std::string& target, const time::EpochTDB& epoch) {
     auto url = build_elements_url(target, epoch);
     auto raw = fetch_url(url);
     if (!raw) return std::unexpected(raw.error());
@@ -78,7 +79,7 @@ HorizonsClient::query_elements(const std::string& target, const utils::Instant& 
         double ma = find_val("MA=");
 
         return physics::KeplerianStateTyped<core::ECLIPJ2000>{
-            time::EpochTDB::from_mjd(epoch.mjd.value),
+            epoch,
             physics::Distance::from_au(a_km / constants::AU),
             e,
             astrometry::Angle::from_deg(i),
@@ -93,8 +94,9 @@ HorizonsClient::query_elements(const std::string& target, const utils::Instant& 
 }
 
 std::expected<physics::CartesianStateTyped<core::GCRF>, HorizonsError> 
-HorizonsClient::query_vectors(const std::string& target, const utils::Instant& epoch, const std::string& center) {
+HorizonsClient::query_vectors(const std::string& target, const time::EpochTDB& epoch, const std::string& center) {
     auto url = build_vectors_url(target, epoch, center);
+    std::cout << "  [DEBUG-HZN] VEC URL: " << url << std::endl << std::flush;
     auto raw = fetch_url(url);
     if (!raw) return std::unexpected(raw.error());
 
@@ -118,7 +120,7 @@ HorizonsClient::query_vectors(const std::string& target, const utils::Instant& e
         // Standardize to meters and m/s to match convention. Return type is MeterTag.
         constexpr double KM_TO_M = 1000.0;
         return physics::CartesianStateTyped<core::GCRF>::from_si(
-            time::EpochTDB::from_mjd(epoch.mjd.value),
+            epoch,
             find_coord(" X =") * KM_TO_M, find_coord(" Y =") * KM_TO_M, find_coord(" Z =") * KM_TO_M,
             find_coord(" VX=") * KM_TO_M, find_coord(" VY=") * KM_TO_M, find_coord(" VZ=") * KM_TO_M
         );
@@ -128,8 +130,9 @@ HorizonsClient::query_vectors(const std::string& target, const utils::Instant& e
 }
 
 std::expected<astrometry::AstrometricObservation, HorizonsError> 
-HorizonsClient::query_observation(const std::string& target, const utils::Instant& epoch, const std::string& observer) {
+HorizonsClient::query_observation(const std::string& target, const time::EpochTDB& epoch, const std::string& observer) {
     auto url = build_observer_url(target, epoch, observer);
+    std::cout << "  [DEBUG-HZN] OBS URL: " << url << std::endl << std::flush;
     auto raw = fetch_url(url);
     if (!raw) return std::unexpected(raw.error());
 
@@ -170,33 +173,34 @@ HorizonsClient::query_observation(const std::string& target, const utils::Instan
 
 // --- URL Builders ---
 
-std::string HorizonsClient::build_elements_url(const std::string& target, const utils::Instant& epoch) {
+std::string HorizonsClient::build_elements_url(const std::string& target, const time::EpochTDB& epoch) {
     std::stringstream ss;
     ss << config_.base_url << "?format=json&COMMAND='" << url_encode(target) << "'"
        << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='ELEMENTS'&CENTER='500@10'"
-       << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd.value + 2400000.5) << "'"
-       << "&STOP_TIME='JD" << (epoch.mjd.value + 2400000.6) << "'"
+       << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.5) << "'"
+       << "&STOP_TIME='JD" << (epoch.mjd() + 2400000.6) << "'"
        << "&STEP_SIZE='1d'";
     return ss.str();
 }
 
-std::string HorizonsClient::build_vectors_url(const std::string& target, const utils::Instant& epoch, const std::string& center) {
+std::string HorizonsClient::build_vectors_url(const std::string& target, const time::EpochTDB& epoch, const std::string& center) {
     std::stringstream ss;
     ss << config_.base_url << "?format=json&COMMAND='" << url_encode(target) << "'"
        << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='VECTORS'&CENTER='" << center << "'"
-       << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd.value + 2400000.5) << "'"
-       << "&STOP_TIME='JD" << (epoch.mjd.value + 2400000.6) << "'"
+       << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.5) << "'"
+       << "&STOP_TIME='JD" << (epoch.mjd() + 2400000.6) << "'"
        << "&STEP_SIZE='1d'&CSV_FORMAT='NO'&REF_PLANE='FRAME'";
     return ss.str();
 }
 
-std::string HorizonsClient::build_observer_url(const std::string& target, const utils::Instant& epoch, const std::string& observer) {
+std::string HorizonsClient::build_observer_url(const std::string& target, const time::EpochTDB& epoch, const std::string& observer) {
     std::stringstream ss;
+    auto epoch_utc = time::to_utc(epoch);
     ss << config_.base_url << "?format=json&COMMAND='" << url_encode(target) << "'"
        << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='OBSERVER'&CENTER='" << observer << "'"
-       << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd.value + 2400000.5) << "'"
-       << "&STOP_TIME='JD" << (epoch.mjd.value + 2400000.6) << "'"
-       << "&STEP_SIZE='1d'&QUANTITIES='1,20'";
+       << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch_utc.mjd() + 2400000.5) << "'"
+       << "&STOP_TIME='JD" << (epoch_utc.mjd() + 2400000.6) << "'"
+       << "&STEP_SIZE='1d'&QUANTITIES='1,20'&EXTRA_PREC='YES'";
     return ss.str();
 }
 

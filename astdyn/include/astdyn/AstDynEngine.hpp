@@ -184,7 +184,7 @@ public:
     void set_initial_orbit(const propagation::KeplerianElements& elements) {
         // Convert legacy type to typed representation
         auto typed = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-            time::EpochTDB::from_mjd(elements.epoch.mjd.value),
+            elements.epoch,
             elements.semi_major_axis,
             elements.eccentricity,
             elements.inclination * constants::RAD_TO_DEG,

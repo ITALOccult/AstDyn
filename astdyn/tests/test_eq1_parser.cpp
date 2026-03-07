@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
         auto elem = astdyn::io::EQ1Parser::parse(argv[1]);
 
         std::cout << "Object: " << elem.object_name << "\n";
-        std::cout << "Epoch: MJD " << std::fixed << std::setprecision(6) << elem.epoch_mjd_tdb << " TDB\n\n";
+        std::cout << "Epoch: MJD " << std::fixed << std::setprecision(6) << elem.epoch.mjd() << " TDB\n\n";
 
         std::cout << "Equinoctial Elements:\n";
         std::cout << "  a      = " << std::setprecision(10) << elem.a << " AU\n";

@@ -1,7 +1,7 @@
 #ifndef ASTDYN_IO_HORIZONS_CLIENT_HPP
 #define ASTDYN_IO_HORIZONS_CLIENT_HPP
 
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/astrometry/AstrometricTypes.hpp"
 #include <string>
@@ -41,21 +41,21 @@ public:
      * @return Strongly-typed KeplerianState in ECLIPJ2000 frame
      */
     std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, HorizonsError> 
-    query_elements(const std::string& target, const utils::Instant& epoch);
+    query_elements(const std::string& target, const time::EpochTDB& epoch);
 
     /**
      * @brief Query state vectors for a specific target and epoch.
      * @return Strongly-typed CartesianState in GCRF/ICRF frame.
      */
     std::expected<physics::CartesianStateTyped<core::GCRF>, HorizonsError> 
-    query_vectors(const std::string& target, const utils::Instant& epoch, const std::string& center = "500@0");
+    query_vectors(const std::string& target, const time::EpochTDB& epoch, const std::string& center = "500@0");
 
     /**
      * @brief Query observed position (RA/Dec) for a specific target and epoch
      * @return AstrometricObservation
      */
     std::expected<astrometry::AstrometricObservation, HorizonsError> 
-    query_observation(const std::string& target, const utils::Instant& epoch, const std::string& observer = "500@399");
+    query_observation(const std::string& target, const time::EpochTDB& epoch, const std::string& observer = "500@399");
 
 private:
     Config config_;
@@ -64,9 +64,9 @@ private:
     std::expected<std::string, HorizonsError> fetch_url(const std::string& url);
     
     // URL Builders
-    std::string build_elements_url(const std::string& target, const utils::Instant& epoch);
-    std::string build_vectors_url(const std::string& target, const utils::Instant& epoch, const std::string& center);
-    std::string build_observer_url(const std::string& target, const utils::Instant& epoch, const std::string& center);
+    std::string build_elements_url(const std::string& target, const time::EpochTDB& epoch);
+    std::string build_vectors_url(const std::string& target, const time::EpochTDB& epoch, const std::string& center);
+    std::string build_observer_url(const std::string& target, const time::EpochTDB& epoch, const std::string& center);
 };
 
 } // namespace astdyn::io

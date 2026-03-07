@@ -35,11 +35,11 @@ int DE441Provider::bodyToNAIFId(CelestialBody body) const {
     }
 }
 
-double DE441Provider::jdToET(utils::Instant t) const {
+double DE441Provider::jdToET(time::EpochTDB t) const {
     using namespace astdyn::constants;
     constexpr double J2000_JD = JD2000;
     
-    double full_jd = t.mjd.value + 2400000.5;
+    double full_jd = t.jd();
     return (full_jd - J2000_JD) * SECONDS_PER_DAY;
 }
 
@@ -70,7 +70,7 @@ DE441Provider::DE441Provider(const std::string& bsp_file)
 
 DE441Provider::~DE441Provider() = default;
 
-types::Vector3<core::GCRF, core::Meter> DE441Provider::getPosition(CelestialBody body, utils::Instant t) {
+types::Vector3<core::GCRF, core::Meter> DE441Provider::getPosition(CelestialBody body, time::EpochTDB t) {
     if (!loaded_) throw std::runtime_error("DE441 not loaded");
     
     int target = bodyToNAIFId(body);
@@ -151,7 +151,7 @@ types::Vector3<core::GCRF, core::Meter> DE441Provider::getPosition(CelestialBody
                                                   state[2] * 1000.0);
 }
 
-types::Vector3<core::GCRF, core::Meter> DE441Provider::getVelocity(CelestialBody body, utils::Instant t) {
+types::Vector3<core::GCRF, core::Meter> DE441Provider::getVelocity(CelestialBody body, time::EpochTDB t) {
     if (!loaded_) throw std::runtime_error("DE441 not loaded");
     
     int target = bodyToNAIFId(body);

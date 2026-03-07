@@ -20,7 +20,6 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/AsteroidPerturbations.hpp"
 #include "astdyn/core/physics_state.hpp"
-#include "src/utils/time_types.hpp"
 #include <memory>
 
 namespace astdyn::propagation {
@@ -99,7 +98,7 @@ public:
      * @brief Propagate Keplerian state
      * 
      * @param initial Initial Keplerian state (strongly-typed)
-     * @param target_time Target epoch (Instant)
+     * @param target_time Target epoch (time::EpochTDB)
      * @return Keplerian state at target epoch in the same reference frame
      */
     template <typename Frame>
@@ -111,7 +110,7 @@ public:
      * @brief Propagate Cartesian state to target epoch
      * 
      * @param initial Initial Cartesian state (strongly-typed, SI units internally)
-     * @param target_time Target epoch (Instant)
+     * @param target_time Target epoch (time::EpochTDB)
      * @return Cartesian state at target epoch
      */
     template <typename Frame>
@@ -211,7 +210,7 @@ public:
      * @return Keplerian elements at target (only M changes)
      */
     static KeplerianElements propagate(const KeplerianElements& initial,
-                                       utils::Instant target_time);
+                                       time::EpochTDB target_time);
     
     /**
      * @brief Compute mean anomaly at epoch from initial state
@@ -221,7 +220,7 @@ public:
      * @return Mean anomaly at target epoch [rad]
      */
     static double mean_anomaly_at_epoch(const KeplerianElements& initial,
-                                        utils::Instant target_time);
+                                        time::EpochTDB target_time);
 };
 
 // ============================================================================
@@ -275,7 +274,7 @@ physics::KeplerianStateTyped<Frame> Propagator::propagate_keplerian(
 {
     // 1. Bridge to un-typed format for conversion math
     KeplerianElements kep_old;
-    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(initial.epoch.mjd()));
+    kep_old.epoch = initial.epoch;
     kep_old.semi_major_axis = initial.a.to_au();
     kep_old.eccentricity = initial.e;
     kep_old.inclination = initial.i.to_rad();
@@ -299,7 +298,7 @@ physics::KeplerianStateTyped<Frame> Propagator::propagate_keplerian(
     auto cart_final = propagate_cartesian(cart_typed, target_time);
     
     // 5. Bridge back to un-typed for returning to Keplerian
-    cart_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(target_time.mjd()));
+    cart_old.epoch = target_time;
     cart_old.position = types::Vector3<core::GCRF, core::Meter>(cart_final.position.to_eigen_si());
     cart_old.velocity = types::Vector3<core::GCRF, core::Meter>(cart_final.velocity.to_eigen_si());
     cart_old.gravitational_parameter = constants::GM_SUN * 1e9;

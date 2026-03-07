@@ -7,6 +7,7 @@
 
 #include "astdyn/orbit_determination/DifferentialCorrector.hpp"
 #include "astdyn/orbit_determination/Residuals.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include "astdyn/core/Constants.hpp"
 #include <iostream>
 #include <iomanip>
@@ -224,7 +225,7 @@ DifferentialCorrector::build_design_matrix(
         math::Vector3<core::GCRF, physics::Distance> observer_pos = *obs_pos_opt;
         
         // Convert observation time to TDB (STM needs TDB)
-        time::EpochTDB obs_time_tdb = ResidualCalculator::utc_to_tdb(obs.time);
+        time::EpochTDB obs_time_tdb = astdyn::time::to_tdb(obs.time);
         
         // Compute STM and observation partials
         auto partials = stm_computer_->compute_with_partials(
@@ -339,7 +340,7 @@ bool DifferentialCorrector::check_convergence(
     double tolerance) const {
     
     // Check if position correction is below tolerance
-    double pos_correction = correction.segment<3>(0).norm();
+    double pos_correction = correction.template segment<3>(0).norm();
     return pos_correction < tolerance;
 }
 

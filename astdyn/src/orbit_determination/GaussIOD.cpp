@@ -86,29 +86,26 @@ GaussIODResult GaussIOD::compute_from_three(
     result.success = false;
     
     // Time intervals (in days)
-    double t1 = obs1.time.mjd.value;
-    double t2 = obs2.time.mjd.value;
-    double t3 = obs3.time.mjd.value;
+    double t1 = obs1.time.mjd();
+    double t2 = obs2.time.mjd();
+    double t3 = obs3.time.mjd();
     
     double tau1 = t1 - t2; 
     double tau3 = t3 - t2; 
     double tau = tau3 - tau1;
     
     // Convert to TDB
-    auto t1_tdb = ResidualCalculator::utc_to_tdb(obs1.time);
-    auto t2_tdb = ResidualCalculator::utc_to_tdb(obs2.time);
-    auto t3_tdb = ResidualCalculator::utc_to_tdb(obs3.time);
+    auto t1_tdb = astdyn::time::to_tdb(obs1.time);
+    auto t2_tdb = astdyn::time::to_tdb(obs2.time);
+    auto t3_tdb = astdyn::time::to_tdb(obs3.time);
     
     result.epoch = t2_tdb;
     // result.state is CartesianStateTyped<core::GCRF>, it will be initialized later via from_si
     
     // Get Earth positions
-    auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, 
-        utils::Instant::from_tt(utils::ModifiedJulianDate(t1_tdb.mjd())));
-    auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, 
-        utils::Instant::from_tt(utils::ModifiedJulianDate(t2_tdb.mjd())));
-    auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, 
-        utils::Instant::from_tt(utils::ModifiedJulianDate(t3_tdb.mjd())));
+    auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t1_tdb);
+    auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t2_tdb);
+    auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t3_tdb);
     
     // State::position() returns Vector3d, we need math::Vector3
     math::Vector3<core::GCRF, physics::Distance> R1 = math::Vector3<core::GCRF, physics::Distance>::from_si(earth1.position().x(), earth1.position().y(), earth1.position().z());
@@ -167,7 +164,7 @@ std::optional<std::array<int, 3>> GaussIOD::select_observations(
     
     int idx1 = -1;
     for (int i = idx2 - 1; i >= 0; --i) {
-        double sep = observations[idx2].time.mjd.value - observations[i].time.mjd.value;
+        double sep = observations[idx2].time.mjd() - observations[i].time.mjd();
         if (sep >= settings_.min_separation_days) {
             idx1 = i;
             break;
@@ -176,7 +173,7 @@ std::optional<std::array<int, 3>> GaussIOD::select_observations(
     
     int idx3 = -1;
     for (int i = idx2 + 1; i < n; ++i) {
-        double sep = observations[i].time.mjd.value - observations[idx2].time.mjd.value;
+        double sep = observations[i].time.mjd() - observations[idx2].time.mjd();
         if (sep >= settings_.min_separation_days) {
             idx3 = i;
             break;

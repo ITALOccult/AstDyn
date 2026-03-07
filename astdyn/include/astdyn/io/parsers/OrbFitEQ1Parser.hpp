@@ -58,7 +58,10 @@ public:
                 }
             } else if (trimmed.starts_with("MJD")) {
                 std::istringstream iss(trimmed.substr(3));
-                iss >> elem.epoch_mjd_tdb;
+                double mjd_val;
+                if (iss >> mjd_val) {
+                    elem.epoch = time::EpochTDB::from_mjd(mjd_val);
+                }
             } else if (trimmed.starts_with("MAG")) {
                 std::istringstream iss(trimmed.substr(3));
                 iss >> elem.magnitude >> elem.mag_slope;

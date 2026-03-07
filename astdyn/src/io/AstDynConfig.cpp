@@ -54,7 +54,7 @@ OrbitalElementFile OEFFileHandler::read(const std::string& filename) {
         double a, e, i, Omega, omega, M;
         file >> a >> e >> i >> Omega >> omega >> M;
         
-        oef.keplerian.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(oef.epoch_mjd));
+        oef.keplerian.epoch = time::EpochTDB::from_mjd(oef.epoch_mjd);
         oef.keplerian.semi_major_axis = a;
         oef.keplerian.eccentricity = e;
         oef.keplerian.inclination = i * DEG_TO_RAD;
@@ -215,7 +215,7 @@ RWOObservation RWOFileHandler::parseLine(const std::string& line) {
         int day_int = static_cast<int>(day);
         double fraction = day - day_int;
         double mjd_val = astdyn::time::calendar_to_mjd(year, month, day_int, fraction);
-        rwo.observation.time = utils::Instant::from_utc(utils::ModifiedJulianDate(mjd_val));
+        rwo.observation.time = time::EpochUTC::from_mjd(mjd_val);
         
         // Parse RA (columns 51-62, starting at index 50): "HH MM SS.sss"
         std::string ra_str = line.substr(50, 12);

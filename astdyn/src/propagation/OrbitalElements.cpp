@@ -277,7 +277,7 @@ KeplerianElements equinoctial_to_keplerian(const EquinoctialElements& eq) {
 
 CometaryElements keplerian_to_cometary(const KeplerianElements& kep) {
     CometaryElements com;
-    com.epoch_mjd_tdb = kep.epoch.mjd.value;
+    com.epoch = kep.epoch;
     com.gravitational_parameter = kep.gravitational_parameter;
     
     com.perihelion_distance = kep.perihelion_distance();
@@ -289,14 +289,14 @@ CometaryElements keplerian_to_cometary(const KeplerianElements& kep) {
     // Compute time of perihelion from M and epoch
     double n = kep.mean_motion();
     double time_since_perihelion = -kep.mean_anomaly / n;
-    com.time_perihelion = utils::Instant::from_tt(utils::ModifiedJulianDate(kep.epoch.mjd.value + time_since_perihelion));
+    com.time_perihelion = time::EpochTDB::from_mjd(kep.epoch.mjd() + time_since_perihelion);
     
     return com;
 }
 
 KeplerianElements cometary_to_keplerian(const CometaryElements& com) {
     KeplerianElements kep;
-    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(com.epoch_mjd_tdb));
+    kep.epoch = com.epoch;
     kep.gravitational_parameter = com.gravitational_parameter;
     
     kep.semi_major_axis = com.semi_major_axis();
@@ -308,7 +308,7 @@ KeplerianElements cometary_to_keplerian(const CometaryElements& com) {
     // Compute mean anomaly from time of perihelion
     double n = std::sqrt(com.gravitational_parameter / 
                         (kep.semi_major_axis * kep.semi_major_axis * kep.semi_major_axis));
-    double time_since_perihelion = com.epoch_mjd_tdb - com.time_perihelion.mjd.value;
+    double time_since_perihelion = com.epoch.mjd() - com.time_perihelion.mjd();
     kep.mean_anomaly = n * time_since_perihelion;
     
     return kep;
@@ -389,7 +389,7 @@ KeplerianElements mean_to_osculating(
              const_cast<KeplerianElements&>(mean_elements).gravitational_parameter = constants::GMS;
              osc.gravitational_parameter = constants::GMS;
         }
-        auto corrections = mk_theory.calculateCorrections(mean_elements, mean_elements.epoch.mjd.value, false);
+        auto corrections = mk_theory.calculateCorrections(mean_elements, mean_elements.epoch.mjd(), false);
 
         // Apply semi-major axis correction Delta a (index 0)
         osc.semi_major_axis += corrections[0];

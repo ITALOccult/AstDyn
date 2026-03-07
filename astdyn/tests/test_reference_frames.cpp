@@ -149,7 +149,7 @@ TEST(ReferenceFrameTest, EclipticRoundTrip) {
 TEST(ReferenceFrameTest, J2000ToITRFSimple) {
     // At J2000.0 epoch
     
-    Matrix3d R = ReferenceFrame::j2000_to_itrf_simple(utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000)));
+    Matrix3d R = ReferenceFrame::j2000_to_itrf_simple(time::EpochUTC::from_mjd(MJD2000));
     
     // Should be orthogonal
     EXPECT_TRUE((R * R.transpose()).isApprox(Matrix3d::Identity(), 1e-10));
@@ -159,7 +159,7 @@ TEST(ReferenceFrameTest, J2000ToITRFSimple) {
 }
 
 TEST(ReferenceFrameTest, ITRFToJ2000Inverse) {
-    utils::Instant mjd_instant = utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000 + 1.0)); // One day after J2000
+    time::EpochUTC mjd_instant = time::EpochUTC::from_mjd(MJD2000 + 1.0); // One day after J2000
     
     Matrix3d to_itrf = ReferenceFrame::j2000_to_itrf_simple(mjd_instant);
     Matrix3d from_itrf = ReferenceFrame::itrf_to_j2000_simple(mjd_instant);
@@ -172,8 +172,8 @@ TEST(ReferenceFrameTest, ITRFRotation) {
     // Position at different times should show Earth rotation
     Vector3d pos_j2000(7000.0, 0.0, 0.0);
     
-    utils::Instant mjd1_instant = utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000));
-    utils::Instant mjd2_instant = utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000 + 0.25)); // 6 hours later
+    time::EpochUTC mjd1_instant = time::EpochUTC::from_mjd(MJD2000);
+    time::EpochUTC mjd2_instant = time::EpochUTC::from_mjd(MJD2000 + 0.25); // 6 hours later
     
     Vector3d pos_itrf1 = ReferenceFrame::transform_position(
         pos_j2000, FrameType::J2000, FrameType::ITRF, mjd1_instant);
@@ -268,7 +268,7 @@ TEST(ReferenceFrameTest, ITRFVelocityTransformation) {
     Vector3d vel(0.0, 7.5, 0.0);
     CartesianState state_j2000(pos, vel, GM_EARTH);
     
-    utils::Instant mjd_instant = utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000));
+    time::EpochUTC mjd_instant = time::EpochUTC::from_mjd(MJD2000);
     
     // Transform to ITRF
     CartesianState state_itrf = ReferenceFrame::transform_state(
@@ -296,14 +296,14 @@ TEST(ReferenceFrameTest, IsRotating) {
 
 TEST(ReferenceFrameTest, GMSTCalculation) {
     // GMST at J2000.0 should be approximately 6h 41m 50.5s = 100.4606° = 1.753368 rad
-    double gmst0 = ReferenceFrame::gmst(utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000)));
+    double gmst0 = ReferenceFrame::gmst(time::EpochUTC::from_mjd(MJD2000));
     
     // Check it's in valid range [0, 2π)
     EXPECT_GE(gmst0, 0.0);
     EXPECT_LT(gmst0, 2.0 * PI);
     
     // GMST should increase with time
-    double gmst_later = ReferenceFrame::gmst(utils::Instant::from_utc(utils::ModifiedJulianDate(MJD2000 + 1.0)));
+    double gmst_later = ReferenceFrame::gmst(time::EpochUTC::from_mjd(MJD2000 + 1.0));
     EXPECT_NE(gmst0, gmst_later);
 }
 

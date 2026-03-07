@@ -24,7 +24,7 @@ using namespace astdyn::propagation;
 TEST(OrbitalElementsTest, KeplerianToCartesianCircular) {
     // Circular orbit at 1 AU
     KeplerianElements kep;
-    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
+    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
     kep.semi_major_axis = 1.0; // AU
     kep.eccentricity = 0.0;
     kep.inclination = 0.0;
@@ -50,7 +50,7 @@ TEST(OrbitalElementsTest, KeplerianToCartesianCircular) {
 TEST(OrbitalElementsTest, CartesianToKeplerianRoundTrip) {
     // Create Keplerian elements for Earth-like orbit
     KeplerianElements kep1;
-    kep1.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
+    kep1.epoch = time::EpochTT::from_mjd(constants::MJD2000);
     kep1.semi_major_axis = 1.0;
     kep1.eccentricity = 0.0167;
     kep1.inclination = 0.0;
@@ -96,7 +96,7 @@ TEST(OrbitalElementsTest, KeplerEquationSolver) {
 
 TEST(OrbitalElementsTest, EquinoctialConversion) {
     KeplerianElements kep;
-    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
+    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
     kep.semi_major_axis = 2.5;
     kep.eccentricity = 0.2;
     kep.inclination = 15.0 * constants::DEG_TO_RAD;
@@ -204,7 +204,7 @@ TEST(IntegratorTest, RK4vsRKF78Accuracy) {
 TEST(TwoBodyPropagatorTest, CircularOrbitPeriod) {
     // Circular orbit should return to same position after one period
     KeplerianElements kep;
-    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
+    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
     kep.semi_major_axis = 1.0;
     kep.eccentricity = 0.0;
     kep.inclination = 0.0;
@@ -214,9 +214,9 @@ TEST(TwoBodyPropagatorTest, CircularOrbitPeriod) {
     kep.gravitational_parameter = constants::GMS;
     
     double period = kep.period();
-    double target_mjd = kep.epoch.mjd.value + period;
+    double target_mjd = kep.epoch.mjd() + period;
     
-    KeplerianElements final = TwoBodyPropagator::propagate(kep, utils::Instant::from_tt(utils::ModifiedJulianDate(target_mjd)));
+    KeplerianElements final = TwoBodyPropagator::propagate(kep, time::EpochTT::from_mjd(target_mjd));
     
     // Mean anomaly should be ~0 or ~2π after one period
     double M_normalized = std::fmod(final.mean_anomaly, constants::TWO_PI);
@@ -231,7 +231,7 @@ TEST(TwoBodyPropagatorTest, CircularOrbitPeriod) {
 
 TEST(TwoBodyPropagatorTest, MeanAnomalyProgression) {
     KeplerianElements kep;
-    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
+    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
     kep.semi_major_axis = 2.5;
     kep.eccentricity = 0.2;
     kep.inclination = 0.0;
@@ -243,7 +243,7 @@ TEST(TwoBodyPropagatorTest, MeanAnomalyProgression) {
     double n = kep.mean_motion();
     double dt = 100.0; // days
     
-    KeplerianElements final = TwoBodyPropagator::propagate(kep, utils::Instant::from_tt(utils::ModifiedJulianDate(kep.epoch.mjd.value + dt)));
+    KeplerianElements final = TwoBodyPropagator::propagate(kep, time::EpochTT::from_mjd(kep.epoch.mjd() + dt));
     
     double expected_M = n * dt;
     EXPECT_NEAR(final.mean_anomaly, expected_M, 1e-10);
@@ -256,7 +256,7 @@ TEST(TwoBodyPropagatorTest, MeanAnomalyProgression) {
 TEST(PropagationTest, EnergyConservationTwoBody) {
     // Create Keplerian orbit
     KeplerianElements kep;
-    kep.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(constants::MJD2000));
+    kep.epoch = time::EpochTT::from_mjd(constants::MJD2000);
     kep.semi_major_axis = 2.0;
     kep.eccentricity = 0.3;
     kep.inclination = 10.0 * constants::DEG_TO_RAD;
@@ -272,7 +272,7 @@ TEST(PropagationTest, EnergyConservationTwoBody) {
     
     // Build typed state for the propagator
     physics::CartesianStateTyped<core::GCRF> cart0 = physics::CartesianStateTyped<core::GCRF>::from_si(
-        time::EpochTDB::from_mjd(kep.epoch.mjd.value),
+        time::EpochTDB::from_mjd(kep.epoch.mjd()),
         cart0_legacy.position.x * constants::AU * 1000.0,
         cart0_legacy.position.y * constants::AU * 1000.0,
         cart0_legacy.position.z * constants::AU * 1000.0,

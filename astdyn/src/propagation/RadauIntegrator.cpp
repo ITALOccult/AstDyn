@@ -101,9 +101,11 @@ Eigen::VectorXd RadauIntegrator::integrate(const DerivativeFunction& f,
     double h = h_initial_;
     
     // Adaptive integration loop
-    while (t < tf) {
-        // Don't overshoot target
-        if (t + h > tf) {
+    double direction = (tf > t0) ? 1.0 : -1.0;
+    h = std::abs(h) * direction;
+
+    while (std::abs(tf - t) > 1e-14) {
+        if (std::abs(tf - t) < std::abs(h)) {
             h = tf - t;
         }
         
@@ -138,8 +140,11 @@ void RadauIntegrator::integrate_steps(const DerivativeFunction& f,
     t_out.push_back(t);
     y_out.push_back(y);
     
-    while (t < tf) {
-        if (t + h > tf) {
+    double direction = (tf > t0) ? 1.0 : -1.0;
+    h = std::abs(h) * direction;
+
+    while (std::abs(tf - t) > 1e-14) {
+        if (std::abs(tf - t) < std::abs(h)) {
             h = tf - t;
         }
         
@@ -163,6 +168,7 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
                                     double& h,
                                     double t_target) {
     const int n = y.size();
+    double direction = (h >= 0) ? 1.0 : -1.0;
     
     // Compute Jacobian (numerical if not provided)
     Eigen::MatrixXd jacobian;
@@ -181,7 +187,7 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
     if (!converged) {
         // Newton didn't converge, reduce step size
         h *= 0.5;
-        h = std::max(h, h_min_);
+        if (std::abs(h) < h_min_) h = direction * h_min_;
         return false;
     }
     
@@ -218,14 +224,14 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
         
         // Increase step size for next step
         h *= fac;
-        h = std::min(h, h_max_);
-        h = std::min(h, t_target - t);
+        if (std::abs(h) > h_max_) h = direction * h_max_;
+        if (std::abs(t_target - t) < std::abs(h)) h = t_target - t;
         
         return true;
     } else {
         // Reject step, reduce step size
         h *= fac;
-        h = std::max(h, h_min_);
+        if (std::abs(h) < h_min_) h = direction * h_min_;
         return false;
     }
 }

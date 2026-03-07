@@ -15,8 +15,7 @@
 #define ASTDYN_ORBITAL_ELEMENTS_HPP
 
 #include "astdyn/core/Types.hpp"
-#include "astdyn/core/Constants.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
@@ -33,7 +32,7 @@ namespace astdyn::propagation {
  * Units: km, radians, days (MJD)
  */
 struct [[deprecated("Use physics::KeplerianStateTyped<Frame> instead")]] KeplerianElements {
-    utils::Instant epoch;           ///< Epoch (Instant TDB)
+    time::EpochTDB epoch;           ///< Epoch (EpochTDB)
     double semi_major_axis;          ///< Semi-major axis [AU]
     double eccentricity;             ///< Eccentricity [dimensionless]
     double inclination;              ///< Inclination [rad]
@@ -95,7 +94,7 @@ struct [[deprecated("Use physics::KeplerianStateTyped<Frame> instead")]] Kepleri
  * Reference frame: GCRF (J2000 equatorial).
  */
 struct [[deprecated("Use physics::CartesianStateTyped<Frame> instead")]] CartesianElements {
-    utils::Instant epoch;              ///< Epoch (Instant TDB)
+    time::EpochTDB epoch;              ///< Epoch (EpochTDB)
     types::Vector3<core::GCRF, core::Meter> position; ///< Position vector [m]
     types::Vector3<core::GCRF, core::Meter> velocity; ///< Velocity vector [m/s]
     
@@ -138,7 +137,7 @@ struct [[deprecated("Use physics::CartesianStateTyped<Frame> instead")]] Cartesi
  * See Walker et al. (1985) Celestial Mechanics.
  */
 struct EquinoctialElements {
-    utils::Instant epoch;     ///< Epoch (Instant TDB)
+    time::EpochTDB epoch;     ///< Epoch (EpochTDB)
     double a;                 ///< Semi-major axis [AU]
     double h;                 ///< h = e sin(ω + Ω)
     double k;                 ///< k = e cos(ω + Ω)
@@ -160,13 +159,13 @@ struct EquinoctialElements {
  * Useful for parabolic/hyperbolic orbits.
  */
 struct CometaryElements {
-    double epoch_mjd_tdb;              ///< Epoch (MJD TDB)
+    time::EpochTDB epoch;              ///< Epoch (EpochTDB)
     double perihelion_distance;        ///< q [AU]
     double eccentricity;               ///< e [dimensionless]
     double inclination;                ///< i [rad]
     double longitude_ascending_node;   ///< Ω [rad]
     double argument_perihelion;        ///< ω [rad]
-    utils::Instant time_perihelion;    ///< Tp (Instant TDB)
+    time::EpochTDB time_perihelion;    ///< Tp (EpochTDB)
     
     double gravitational_parameter = constants::GMS;    ///< GM [AU³/day²]
     

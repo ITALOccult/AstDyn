@@ -20,14 +20,10 @@
 #include <Eigen/Dense>
 #include <vector>
 #include <functional>
-#include "astdyn/orbit_determination/CommonTypes.hpp"
+#include "astdyn/orbit_determination/Residuals.hpp"
+#include "astdyn/time/epoch.hpp"
 
 namespace astdyn::orbit_determination {
-
-/**
-    double weight_dec;
-    bool rejected;              ///< Outlier flag
-};
 
 /**
  * @brief Least squares fit result
@@ -61,7 +57,7 @@ public:
      * Format: [ra1, dec1, ra2, dec2, ...] in arcsec
      */
     using ResidualFunction = std::function<std::vector<ObservationResidual>(
-        const Eigen::Vector<double, 6>&, double)>;
+        const Eigen::Vector<double, 6>&, time::EpochTDB)>;
     
     /**
      * @brief STM function signature
@@ -71,7 +67,7 @@ public:
     using STMFunction = std::function<std::pair<
         Eigen::Vector<double, 6>,
         Eigen::Matrix<double, 6, 6>
-    >(const Eigen::Vector<double, 6>&, double, double)>;
+    >(const Eigen::Vector<double, 6>&, time::EpochTDB, time::EpochTDB)>;
     
     /**
      * @brief Construct fitter
@@ -89,7 +85,7 @@ public:
      */
     FitResult fit(
         const Eigen::Vector<double, 6>& initial_state,
-        double epoch_mjd,
+        time::EpochTDB epoch,
         ResidualFunction residual_func,
         STMFunction stm_func
     );
@@ -131,7 +127,7 @@ private:
     Eigen::MatrixXd build_design_matrix(
         const std::vector<ObservationResidual>& residuals,
         const Eigen::Vector<double, 6>& state,
-        double epoch_mjd,
+        time::EpochTDB epoch,
         STMFunction stm_func
     );
     

@@ -38,7 +38,7 @@ propagation::EquinoctialElements parse_eq1_file(const std::string& filepath) {
     propagation::EquinoctialElements equ;
     std::string line;
     bool found_equ = false;
-    bool found_mjd = false;
+    bool found_epoch = false;
 
     while (std::getline(file, line)) {
         std::string trimmed = ltrim(line);
@@ -53,14 +53,16 @@ propagation::EquinoctialElements parse_eq1_file(const std::string& filepath) {
         }
         else if (trimmed.substr(0, 3) == "MJD") {
             std::istringstream iss(trimmed.substr(3));
-            iss >> equ.epoch_mjd_tdb;
-            found_mjd = true;
+            double mjd_val;
+            iss >> mjd_val;
+            equ.epoch = time::EpochTDB::from_mjd(mjd_val);
+            found_epoch = true;
         }
 
-        if (found_equ && found_mjd) break;
+        if (found_equ && found_epoch) break;
     }
 
-    if (!found_equ || !found_mjd) {
+    if (!found_equ || !found_epoch) {
         throw std::runtime_error("Could not parse equinoctial elements from file");
     }
 
@@ -92,7 +94,7 @@ int main(int argc, char** argv) {
         // Example: Asteroid 79148 (1992 SN3)
         // Epoch: 58749.5 MJD TDB
         propagation::CartesianElements cart_eq;
-        cart_eq.epoch_mjd_tdb = time::jd_to_mjd(2458749.5);
+        cart_eq.epoch = time::EpochTDB::from_jd(2458749.5);
         cart_eq.gravitational_parameter = constants::GMS;
         
         // Horizons State Vector (Heliocentric ICRF)
@@ -102,7 +104,7 @@ int main(int argc, char** argv) {
         // For display
         auto kep_eq = propagation::cartesian_to_keplerian(cart_eq);
         
-        std::cout << "Initial Epoch: " << std::fixed << std::setprecision(5) << kep_eq.epoch_mjd_tdb << " MJD TDB\n";
+        std::cout << "Initial Epoch: " << std::fixed << std::setprecision(5) << kep_eq.epoch.mjd() << " MJD TDB\n";
         std::cout << "Initial State (Equatorial J2000):\n";
         std::cout << "  X = " << cart_eq.position[0] << " AU\n";
         std::cout << "  Y = " << cart_eq.position[1] << " AU\n";
@@ -143,11 +145,11 @@ int main(int argc, char** argv) {
         
         std::cout << "Propagating to " << target_mjd << " MJD (2026-04-30 00:00 UTC/TDB)...\n";
         
-        auto final_state = engine.propagate_to(target_mjd);
+        auto final_state = engine.propagate_to(time::EpochTDB::from_mjd(target_mjd));
         auto final_cart = propagation::keplerian_to_cartesian(final_state);
         
         std::cout << "\n=== FINAL STATE (2026-04-30 00:00:00) ===\n";
-        std::cout << "Epoch: " << final_cart.epoch_mjd_tdb << " MJD TDB\n";
+        std::cout << "Epoch: " << final_cart.epoch.mjd() << " MJD TDB\n";
         
         std::cout << std::setprecision(12);
         std::cout << "Position (AU) [J2000 Eq]:\n";
@@ -209,10 +211,10 @@ int main(int argc, char** argv) {
         // Iterazione per il tempo luce (3 iterazioni sono sufficienti)
         for(int k=0; k<3; ++k) {
             tau = range / c_au_day;
-            double retarded_mjd = target_mjd - tau;
+            time::EpochTDB retarded_epoch = time::EpochTDB::from_mjd(target_mjd - tau);
             
             // Propaghiamo l'asteroide al tempo ritardato
-            auto state_retarded = engine.propagate_to(retarded_mjd);
+            auto state_retarded = engine.propagate_to(retarded_epoch);
             auto cart_retarded = propagation::keplerian_to_cartesian(state_retarded);
             asteroid_pos_retarded = cart_retarded.position;
             

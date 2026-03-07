@@ -62,10 +62,10 @@ void test_conversion_accuracy() {
     };
     
     std::vector<TestOrbit> test_orbits = {
-        {"Earth-like (circular)", {constants::MJD2000, 1.0, 0.0167, 0.0, 0.0, 0.0, 0.0, constants::GMS}},
-        {"Mars-like", {constants::MJD2000, 1.524, 0.0934, 1.85*constants::DEG_TO_RAD, 49.6*constants::DEG_TO_RAD, 286.5*constants::DEG_TO_RAD, 0.0, constants::GMS}},
-        {"Asteroid belt", {constants::MJD2000, 2.7, 0.15, 10.0*constants::DEG_TO_RAD, 80.0*constants::DEG_TO_RAD, 73.0*constants::DEG_TO_RAD, 45.0*constants::DEG_TO_RAD, constants::GMS}},
-        {"Highly eccentric", {constants::MJD2000, 3.0, 0.7, 25.0*constants::DEG_TO_RAD, 120.0*constants::DEG_TO_RAD, 90.0*constants::DEG_TO_RAD, 0.0, constants::GMS}}
+        {"Earth-like (circular)", {time::EpochTDB::from_mjd(constants::MJD2000), 1.0, 0.0167, 0.0, 0.0, 0.0, 0.0, constants::GMS}},
+        {"Mars-like", {time::EpochTDB::from_mjd(constants::MJD2000), 1.524, 0.0934, 1.85*constants::DEG_TO_RAD, 49.6*constants::DEG_TO_RAD, 286.5*constants::DEG_TO_RAD, 0.0, constants::GMS}},
+        {"Asteroid belt", {time::EpochTDB::from_mjd(constants::MJD2000), 2.7, 0.15, 10.0*constants::DEG_TO_RAD, 80.0*constants::DEG_TO_RAD, 73.0*constants::DEG_TO_RAD, 45.0*constants::DEG_TO_RAD, constants::GMS}},
+        {"Highly eccentric", {time::EpochTDB::from_mjd(constants::MJD2000), 3.0, 0.7, 25.0*constants::DEG_TO_RAD, 120.0*constants::DEG_TO_RAD, 90.0*constants::DEG_TO_RAD, 0.0, constants::GMS}}
     };
     
     std::cout << std::left << std::setw(20) << "Orbit" 
@@ -249,7 +249,7 @@ void test_propagation_methods() {
     std::cout << "Initial orbit: a=2.5 AU, e=0.15, i=10°\n\n";
     
     KeplerianElements initial;
-    initial.epoch_mjd_tdb = constants::MJD2000;
+    initial.epoch = time::EpochTDB::from_mjd(constants::MJD2000);
     initial.semi_major_axis = 2.5;
     initial.eccentricity = 0.15;
     initial.inclination = 10.0 * constants::DEG_TO_RAD;
@@ -259,7 +259,7 @@ void test_propagation_methods() {
     initial.gravitational_parameter = constants::GMS;
     
     double dt = 30.0;  // 30 days propagation
-    double target_mjd = initial.epoch_mjd_tdb + dt;
+    time::EpochTDB target_epoch = time::EpochTDB::from_mjd(initial.epoch.mjd() + dt);
     
     std::cout << std::left << std::setw(25) << "Method"
               << std::right << std::setw(15) << "Δa (AU)"
@@ -270,7 +270,7 @@ void test_propagation_methods() {
     // 1. Analytical two-body
     KeplerianElements analytical;
     double time_analytical = measureTime([&]() {
-        analytical = TwoBodyPropagator::propagate(initial, target_mjd);
+        analytical = TwoBodyPropagator::propagate(initial, target_epoch);
     });
     
     std::cout << std::left << std::setw(25) << "Analytical (2-body)"
@@ -310,7 +310,7 @@ void test_propagation_methods() {
         
         KeplerianElements result;
         double time = measureTime([&]() {
-            result = prop.propagate_keplerian(initial, target_mjd);
+            result = prop.propagate_keplerian(initial, target_epoch);
         });
         
         double delta_a = std::abs(result.semi_major_axis - analytical.semi_major_axis);
@@ -334,7 +334,7 @@ void test_propagation_methods() {
         
         KeplerianElements result;
         double time = measureTime([&]() {
-            result = prop.propagate_keplerian(initial, target_mjd);
+            result = prop.propagate_keplerian(initial, target_epoch);
         });
         
         double delta_a = std::abs(result.semi_major_axis - analytical.semi_major_axis);

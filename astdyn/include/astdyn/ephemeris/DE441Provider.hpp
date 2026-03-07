@@ -16,6 +16,7 @@
 #define ASTDYN_DE441_PROVIDER_HPP
 
 #include "EphemerisProvider.hpp"
+#include "astdyn/time/epoch.hpp"
 #include <string>
 #include <stdexcept>
 #include <memory> 
@@ -47,8 +48,8 @@ public:
     
     ~DE441Provider() override;
     
-    types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, utils::Instant t) override;
-    types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, utils::Instant t) override;
+    types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, time::EpochTDB t) override;
+    types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, time::EpochTDB t) override;
     
     std::string getName() const override { return "JPL DE441 (Native)"; }
     double getAccuracy() const override { return 0.001; } // ~1 mas
@@ -67,7 +68,7 @@ private:
     /**
      * @brief Convert JD (TDB) to ET (ephemeris time)
      */
-    double jdToET(utils::Instant t) const;
+    double jdToET(time::EpochTDB t) const;
     
     /**
      * @brief Rotate from J2000 equatorial to ecliptic

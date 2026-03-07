@@ -11,22 +11,26 @@ Tutto il codice è racchiuso nel namespace base `astdyn::`.
 
 Al cuore di AstDyn c'è una fortissima infrastruttura di "domain-driven type safety", la cui priorità è rendere impossibili a *compile-time* gli errori fisici e geometrici (es. confondere ITRF con GCRF o TT con UTC).
 
-### `astdyn::utils::Instant`
-Rappresenta un istante nel tempo assoluto agganciato a uno specifico *TimeScale* (UTC, TAI, TT, TDB).
-*Uso consigliato: Passare ovunque referenze a `Instant` in luogo di `double MJD` ambigui.*
+### Time and Epochs
+- `time::EpochTDB`: Standard epoch for dynamics (Barycentric Dynamical Time).
+- `time::EpochUTC`: Standard epoch for observations (Coordinated Universal Time).
+- `time::EpochTT`: Terrestrial Time.
+- `.mjd()`: Returns the Modified Julian Date as a double.
+- `.jd()`: Returns the Julian Date as a double.
 
 ```cpp
-#include <astdyn/utils/time_types.hpp>
+#include <astdyn/time/epoch.hpp>
 
-using astdyn::utils::Instant;
+using astdyn::time::EpochTDB;
+using astdyn::time::EpochUTC;
 
 // Costruzione
-auto utc_time = Instant::from_utc(astdyn::utils::ModifiedJulianDate(60310.0));
-auto tdb_time = Instant::from_tdb(60310.0); // MJD TDB diretto
+auto utc_time = EpochUTC::from_mjd(60310.0);
+auto tdb_time = EpochTDB::from_mjd(60310.0); // MJD TDB diretto
 
 // Conversione Sicura
-auto to_tt = utc_time.to_time_scale(astdyn::time::TimeScale::TT);
-double tdb_mjd = utc_time.get_mjd_tdb(); // Restituisce TDB come double nativo
+auto to_tt = utc_time.to_tt();
+double tdb_mjd = utc_time.to_tdb().mjd(); // Restituisce TDB come double nativo
 ```
 
 ### `astdyn::types::Vector3<Frame, Unit>`
@@ -53,7 +57,7 @@ auto res = position + r2; // OK: Entrambi GCRF Meter
 
 ## 2. Coordinate e Trasformazioni (`astdyn::coordinates`)
 
-AstDyn mette a disposizione trasformazioni rigorose attraverso matrici di rotazione del frame, pilotate da `astdyn::utils::Instant` (dato l'angolo siderale richiesto).
+AstDyn mette a disposizione trasformazioni rigorose attraverso matrici di rotazione del frame, pilotate dai tipi `time::Epoch` (dato l'angolo siderale richiesto).
 
 ```cpp
 #include <astdyn/coordinates/frame_transforms.hpp>
@@ -152,18 +156,19 @@ engine.set_verbose(true);
 
 // 2. Elementi di Partenza
 KeplerianElements initial_state;
-initial_state.epoch_mjd_tdb = 60000.0;
+initial_state.epoch = time::EpochTDB::from_mjd(60000.0);
 initial_state.semi_major_axis = 2.76;
 // ... (riempi attributi fisici) ...
 engine.set_initial_orbit(initial_state);
 
-// 3. Propagazione al Punto B (TDB MJD Forward/Backward)
-double target_epoch = 60642.0; 
+// 3. Propagazione al Punto B (EpochTDB Forward/Backward)
+time::EpochTDB target_epoch = time::EpochTDB::from_mjd(60642.0); 
 KeplerianElements final_state = engine.propagate_to(target_epoch);
 
 // 4. Oppure: Generazione Ephemeris in batch (Per grafico/plot lunghi)
 // E.g Da epoca 60000 a 60300 a passi di 5 giorni
-auto ephemeris = engine.compute_ephemeris(60000.0, 60300.0, 5.0);
+auto ephemeris = engine.compute_ephemeris(time::EpochTDB::from_mjd(60000.0), 
+                                         time::EpochTDB::from_mjd(60300.0), 5.0);
 std::cout << "Trovati " << ephemeris.size() << " campioni\n";
 ```
 
@@ -225,7 +230,7 @@ std::cout << "Step totali O(8): " << stats.num_steps << "\n";
 ---
 
 ## Best Practices
-1. **Passa sempre un `Instant`**. Tutte le nuove interfacce preferiscono la classe specializzata in `utils` per impedire ambiguità su `TDB`, `UTC`, o `TT`.
+1. **Passa sempre un tipo `Epoch`**. Tutte le nuove interfacce preferiscono le classi specializzate in `time` per impedire ambiguità su `TDB`, `UTC`, o `TT`.
 2. **Usa `Vector3` espliciti** ove possible per la geometria (ad. es geodetica e ground radar tracking), avviliti solo al fallback standard (array doppi) quando l'IO non offre il porting immediato.
 3. Lo **Stream I/O** è fortemente preferito per la programmazione distribuita: genera sempre uno `std::istringstream` invece di buttare dati transitori in una directory cache.
 4. L'Engine copre già *l'Energy Conservation* in propagazioni `J2` su run lunghi (l'errore di drift sull'RKF78 si assale in `< 0.001` AU/D over 5 anni testati), ma in framework di milioni di particelle a N-Body, preferire l'integrazione di `GaussIntegrator` bypassando il wrapper.

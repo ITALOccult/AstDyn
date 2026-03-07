@@ -77,8 +77,8 @@ void init_ephemeris(const std::string& bsp_path) {
 
 double measure_execution(
     const types::OrbitalState<core::ECLIPJ2000, types::KeplerianTag>& initial,
-    const utils::Instant& t_elements,
-    const utils::Instant& t_obs,
+    const time::EpochTDB& t_elements,
+    const time::EpochTDB& t_obs,
     const AstDynConfig& engine_cfg,
     const std::string& name,
     const BenchSkyCoord& truth) 
@@ -111,7 +111,7 @@ double measure_execution(
 
 int main() {
     double target_mjd = time::calendar_to_mjd(2026, 3, 27, 0.0);
-    utils::Instant t_obs = utils::Instant::from_tt(utils::ModifiedJulianDate(target_mjd));
+    time::EpochTDB t_obs = time::EpochTT::from_mjd(target_mjd).to_tdb();
     BenchSkyCoord truth = get_jpl_truth();
     
     std::cout << "=== Asteroid 79450 Benchmark ===" << std::endl;
@@ -142,8 +142,7 @@ int main() {
         engine_cfg.propagator_settings.include_planets = true;
         engine_cfg.integrator_type = "RKF78";
 
-        utils::Instant t_elements = utils::Instant::from_tt(utils::ModifiedJulianDate(eq1.epoch_mjd_tdb));
-        measure_execution(initial, t_elements, t_obs, engine_cfg, "No Fit", truth);
+        measure_execution(initial, time::EpochTT::from_mjd(eq1.epoch_mjd_tdb).to_tdb(), t_obs, engine_cfg, "No Fit", truth);
     }
 
     // 2. State from Fit (Simulated with high-precision SABA4)
@@ -164,8 +163,7 @@ int main() {
         engine_cfg.integrator_type = "SABA4"; 
         engine_cfg.initial_step_size = 0.5;
 
-        utils::Instant t_elements = utils::Instant::from_tt(utils::ModifiedJulianDate(eq1.epoch_mjd_tdb));
-        measure_execution(initial, t_elements, t_obs, engine_cfg, "With Fit", truth);
+        measure_execution(initial, time::EpochTT::from_mjd(eq1.epoch_mjd_tdb).to_tdb(), t_obs, engine_cfg, "With Fit", truth);
     }
 
     std::cout << "------------------------------------------------------------" << std::endl;

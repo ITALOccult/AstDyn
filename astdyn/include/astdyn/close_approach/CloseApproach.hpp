@@ -24,10 +24,9 @@
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
 #include <vector>
 #include <memory>
 #include <optional>

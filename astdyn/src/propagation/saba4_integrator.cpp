@@ -127,7 +127,10 @@ double SABA4Integrator::compute_energy(const Eigen::VectorXd& y) const {
     if (r < 1e-10) return 0.0;
 
     double kinetic = 0.5 * p.squaredNorm();
-    double potential = -GMS / r;
+    
+    // Choose GM based on units (heuristic)
+    double mu = (r > 1e6) ? (constants::GM_SUN * 1e9) : constants::GMS;
+    double potential = -mu / r;
 
     return kinetic + potential;
 }
@@ -146,7 +149,10 @@ Eigen::VectorXd SABA4Integrator::integrate(const DerivativeFunction& f,
 
     const int max_steps = 5000000;  // safety: avoid runaway with very tight tolerance
     static const int progress_interval = 300;
-    while (t < tf) {
+    double direction = (tf > t0) ? 1.0 : -1.0;
+    h = std::abs(h) * direction;
+
+    while (std::abs(tf - t) > 1e-14) {
         if (stats_.num_steps >= max_steps) {
             std::cerr << "[SABA4] Warning: max steps " << max_steps << " reached at t=" << t << " (tf=" << tf << "). Stopping.\n";
             break;
@@ -154,7 +160,7 @@ Eigen::VectorXd SABA4Integrator::integrate(const DerivativeFunction& f,
         if (stats_.num_steps > 0 && stats_.num_steps % progress_interval == 0) {
             std::cerr << "[SABA4] steps=" << stats_.num_steps << " t=" << t << " h=" << h << " (tf=" << tf << ")\n" << std::flush;
         }
-        if (t + h > tf) h = tf - t;
+        if (std::abs(tf - t) < std::abs(h)) h = tf - t;
 
         Eigen::VectorXd y_saba4 = saba4_step(f, y, t, h);
         Eigen::VectorXd y_saba2 = saba2_step(f, y, t, h);

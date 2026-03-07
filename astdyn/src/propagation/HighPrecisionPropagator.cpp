@@ -7,7 +7,6 @@
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "src/core/units.hpp"
-#include "src/utils/time_types.hpp"
 #include "src/types/orbital_state.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
@@ -76,9 +75,8 @@ HighPrecisionPropagator::calculateGeocentricObservation(
     if (!cached_propagator_) cached_propagator_ = createPropagator();
     
     // Earth position at target time
-    auto target_time_inst = utils::Instant::from_tt(utils::ModifiedJulianDate(target_time.mjd()));
-    auto r_sun_ssb = PlanetaryEphemeris::getSunBarycentricPosition(target_time_inst);
-    auto r_earth_ssb = PlanetaryEphemeris::getPosition(CelestialBody::EARTH, target_time_inst);
+    auto r_sun_ssb = PlanetaryEphemeris::getSunBarycentricPosition(target_time);
+    auto r_earth_ssb = PlanetaryEphemeris::getPosition(CelestialBody::EARTH, target_time);
     auto r_earth_helio = r_earth_ssb - r_sun_ssb;
 
     double lt_sec = 0.0;
@@ -128,7 +126,7 @@ physics::CartesianStateTyped<core::GCRF> HighPrecisionPropagator::propagate_cart
     
     // Bridge to un-typed format for conversion math
     KeplerianElements kep_old;
-    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(initial_elements.epoch.mjd()));
+    kep_old.epoch = initial_elements.epoch;
     kep_old.semi_major_axis = initial_elements.a.to_au();
     kep_old.eccentricity = initial_elements.e;
     kep_old.inclination = initial_elements.i.to_rad();

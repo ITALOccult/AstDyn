@@ -7,25 +7,24 @@ Questo documento illustra l'utilizzo dei moduli principali della libreria AstDyn
 L'oggetto `Instant` è il cuore della gestione temporale in AstDyn. Nasconde la complessità delle scale di tempo fornendo factory methods sicuri ed evitando operazioni su banali `double` non tipizzati.
 
 ```cpp
-#include <astdyn/utils/time_types.hpp>
+#include <astdyn/time/epoch.hpp>
 #include <iostream>
 
-using namespace astdyn::utils;
+using namespace astdyn::time;
 
 void esempio_setup_temporale() {
     // Creazione di un istante di tempo a partire da una data MJD (UTC) nota
-    // Il compiler ci forza ad esplicitare la scala di base tramite ".from_utc"
-    ModifiedJulianDate mjd_utc(60000.0);
-    Instant time_utc = Instant::from_utc(mjd_utc);
+    // Il compiler ci forza ad esplicitare la scala di base tramite il tipo EpochUTC
+    EpochUTC time_utc = EpochUTC::from_mjd(60000.0);
 
     // I calcoli orbitali richiedono sempre il Terrestrial Time (TT).
-    // Instant incapsula le operazioni di conversione rendendole implicite
-    // a patto di effettuare la conversione tramite gli appositi getter.
-    double tempo_tt = time_utc.tt().value;
+    // I tipi Epoch incapsulano le operazioni di conversione rendendole esplicite e sicure.
+    EpochTT time_tt = time_utc.to_tt();
+    double tempo_tt_val = time_tt.mjd();
 
     // Visualizziamo la differenza, tipicamente di ~69.184 secondi (fissa post-2017)
     // TAI-UTC = 37s, TT-TAI = 32.184s
-    double diff_in_days = tempo_tt - time_utc.utc().value;
+    double diff_in_days = time_tt.mjd() - time_utc.mjd();
     double diff_in_seconds = diff_in_days * 86400.0;
     
     std::cout << "Differenza TT - UTC: " << diff_in_seconds << " secondi\n";
@@ -52,12 +51,14 @@ void esempio_trasformazione_frame() {
     types::Vector3<ITRF, Meter> radar_pos_itrf(6378137.0, 0.0, 0.0);
     types::Vector3<ITRF, Meter> radar_vel_itrf(0.0, 0.0, 0.0);
 
-    // Definiamo un'epoca, la rotazione dipende dall'earth orientation (Earth Rotation Angle / GMST)
-    utils::Instant epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(60000.0));
+    // Definiamo un'epoca, la rotazione dipende dall'earth orientation (Earth Rotation Era / GMST)
+    // Si usa EpochUTC per l'input, poi convertita a TT per i calcoli interni se necessario.
+    EpochUTC epoch_utc = EpochUTC::from_mjd(60000.0);
+    EpochTT epoch_tt = epoch_utc.to_tt();
 
     // Estraiamo la matrice di rotazione da ITRF a J2000 (ICRS/GCRF analogo)
     // dal namespace ReferenceFrame interpolando per l'epoca corrente
-    Eigen::Matrix3d R_itrf_to_gcrf = coordinates::ReferenceFrame::itrf_to_j2000_simple(epoch);
+    Eigen::Matrix3d R_itrf_to_gcrf = coordinates::ReferenceFrame::itrf_to_j2000_simple(epoch_tt);
 
     // Trasformazione del vettore nello spazio GCRF inerziale
     // N.B: Il compilatore bloccherebbe a compile-time un'operazione semanticamente
@@ -110,9 +111,7 @@ void esempio_io_propagazione() {
 
     // Definizione del Target della missione: Epoca Base Iniziale + 12 Ore
     double offset_12h_in_days = 0.5;
-    utils::Instant nuova_epoca = utils::Instant::from_tt(
-        utils::ModifiedJulianDate(stato_iniziale.epoch.tt().value + offset_12h_in_days)
-    );
+    time::EpochTDB nuova_epoca = time::EpochTDB::from_mjd(stato_iniziale.epoch.mjd() + offset_12h_in_days);
 
     // Propagazione al target prescelto
     auto prop_result = propagatore_j2.propagate(stato_iniziale, nuova_epoca);

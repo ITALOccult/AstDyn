@@ -17,7 +17,7 @@
 #define ASTDYN_OBSERVATIONS_OBSERVATORYDATABASE_HPP
 
 #include "astdyn/core/Constants.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
@@ -70,7 +70,7 @@ struct Observatory {
      * @param t Time
      * @return Geocentric position [m] in J2000 frame (GCRF)
      */
-    types::Vector3<core::GCRF, core::Meter> getPositionGCRF(utils::Instant t) const;
+    types::Vector3<core::GCRF, core::Meter> getPositionGCRF(time::EpochUTC t) const;
 };
 
 /**

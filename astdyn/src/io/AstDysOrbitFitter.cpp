@@ -135,6 +135,7 @@ AstDysFitResult AstDysOrbitFitter::fit() {
     
     // Fill result structure
     result.fitted_orbit = fit_result.orbit;
+    result.object_name = "Unknown Object"; // Default or extracted
     result.converged = fit_result.converged;
     result.num_iterations = fit_result.num_iterations;
     result.rms_ra = fit_result.rms_ra;
@@ -234,7 +235,7 @@ void AstDysOrbitFitter::load_eq1_file(const std::string& filename) {
         }
     }
     
-    initial_elements_ = equinoctial_to_keplerian(a, h, k, p, q, lambda, mjd);
+    initial_elements_ = equinoctial_to_keplerian(a, h, k, p, q, lambda, time::EpochTDB::from_mjd(mjd));
 }
 
 void AstDysOrbitFitter::load_oel_file(const std::string& filename) {
@@ -272,7 +273,7 @@ void AstDysOrbitFitter::load_json_file(const std::string& filename) {
 }
 
 physics::KeplerianStateTyped<core::ECLIPJ2000> AstDysOrbitFitter::equinoctial_to_keplerian(
-    double a, double h, double k, double p, double q, double lambda, double mjd) {
+    double a, double h, double k, double p, double q, double lambda, time::EpochTDB epoch) {
     
     // Eccentricity
     double e = std::sqrt(h*h + k*k);
@@ -297,7 +298,7 @@ physics::KeplerianStateTyped<core::ECLIPJ2000> AstDysOrbitFitter::equinoctial_to
     while (M >= 2.0*constants::PI) M -= 2.0 * constants::PI;
     
     return physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-        time::EpochTDB::from_mjd(mjd),
+        epoch,
         a, e, i_rad * constants::RAD_TO_DEG,
         Omega * constants::RAD_TO_DEG,
         omega * constants::RAD_TO_DEG,

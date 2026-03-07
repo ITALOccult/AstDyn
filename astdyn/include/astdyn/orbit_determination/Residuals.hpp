@@ -17,7 +17,7 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/math/frame_algebra.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "src/core/frame_tags.hpp"
 #include <vector>
 #include <optional>
@@ -35,7 +35,7 @@ namespace astdyn::orbit_determination {
  * @brief Single observation residual
  */
 struct ObservationResidual {
-    utils::Instant time;                 ///< Observation epoch
+    time::EpochUTC time;                 ///< Observation epoch
     std::string observatory_code;        ///< Observatory
     
     // Angular residuals [rad]
@@ -191,13 +191,7 @@ public:
     std::optional<math::Vector3<core::GCRF, physics::Velocity>> get_observer_velocity(
         const astdyn::observations::OpticalObservation& obs) const;
     
-    /**
-     * @brief Convert UTC to TDB time scale
-     * 
-     * @param t_utc Time in UTC
-     * @return Instant in TDB time scale
-     */
-    static time::EpochTDB utc_to_tdb(utils::Instant t_utc);
+
 
 private:
     /**

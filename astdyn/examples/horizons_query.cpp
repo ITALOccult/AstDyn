@@ -10,7 +10,7 @@ int main() {
     HorizonsClient horizons;
 
     // Epoch: Today (approx)
-    utils::Instant epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(60310.5)); // 2024-01-01
+    time::EpochTT epoch = time::EpochTT::from_mjd(60310.5); // 2024-01-01
 
     std::cout << "--- Querying JPL Horizons for Ceres (1) ---" << std::endl;
 

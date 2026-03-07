@@ -318,8 +318,8 @@ int AstDynEngine::load_observations(const std::string& filename) {
         std::cout << "Loaded " << observations_.size() << " observations\n";
         if (!observations_.empty()) {
             std::cout << "Time span: " 
-                     << observations_.front().time.mjd.value << " - "
-                     << observations_.back().time.mjd.value << " MJD UTC\n";
+                     << observations_.front().time.mjd() << " - "
+                     << observations_.back().time.mjd() << " MJD UTC\n";
         }
     }
     
@@ -404,7 +404,7 @@ void AstDynEngine::validate_observations() {
     // Sort by time
     std::sort(observations_.begin(), observations_.end(),
         [](const OpticalObservation& a, const OpticalObservation& b) {
-            return a.time.mjd.value < b.time.mjd.value;
+            return a.time.mjd() < b.time.mjd();
         });
     
     // Check for valid observatory codes
@@ -493,7 +493,7 @@ physics::KeplerianStateTyped<core::ECLIPJ2000> AstDynEngine::initial_orbit_deter
     // Convert to Keplerian (Ecliptic J2000)
     // Bridge back to un-typed for returning to Keplerian
     CartesianElements cart_old;
-    cart_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(cart_typed.epoch.mjd()));
+    cart_old.epoch = cart_typed.epoch;
     
     // Rotate back to Ecliptic
     auto pos_eq = cart_typed.position.to_eigen_si();
@@ -555,7 +555,7 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
     // Convert initial orbit to Cartesian at reference epoch
     // 1. Bridge to un-typed format for conversion math
     KeplerianElements kep_start_old;
-    kep_start_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(current_orbit_.epoch.mjd()));
+    kep_start_old.epoch = current_orbit_.epoch;
     kep_start_old.semi_major_axis = current_orbit_.a.to_au();
     kep_start_old.eccentricity = current_orbit_.e;
     kep_start_old.inclination = current_orbit_.i.to_rad();
@@ -606,7 +606,7 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
     auto vel_ecl_final = mat_ecl_to_eq_final.transpose() * vel_eq_final;
     
     CartesianElements cart_final_old;
-    cart_final_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(cart_final.epoch.mjd()));
+    cart_final_old.epoch = cart_final.epoch;
     cart_final_old.position = types::Vector3<core::GCRF, core::Meter>(pos_ecl_final);
     cart_final_old.velocity = types::Vector3<core::GCRF, core::Meter>(vel_ecl_final);
     cart_final_old.gravitational_parameter = cart_final.gm.to_m3_s2();
@@ -686,7 +686,7 @@ std::vector<physics::CartesianStateTyped<core::GCRF>> AstDynEngine::compute_ephe
     // Convert orbit to Cartesian J2000 Equatorial
     // 1. Bridge to un-typed format
     KeplerianElements kep_old;
-    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(current_orbit_.epoch.mjd()));
+    kep_old.epoch = current_orbit_.epoch;
     kep_old.semi_major_axis = current_orbit_.a.to_au();
     kep_old.eccentricity = current_orbit_.e;
     kep_old.inclination = current_orbit_.i.to_rad();
@@ -747,7 +747,7 @@ std::vector<CloseApproach> AstDynEngine::find_close_approaches(
     // Convert orbit to Cartesian J2000 Equatorial
     // 1. Bridge to un-typed format
     KeplerianElements kep_old;
-    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(current_orbit_.epoch.mjd()));
+    kep_old.epoch = current_orbit_.epoch;
     kep_old.semi_major_axis = current_orbit_.a.to_au();
     kep_old.eccentricity = current_orbit_.e;
     kep_old.inclination = current_orbit_.i.to_rad();

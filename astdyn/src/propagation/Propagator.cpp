@@ -5,10 +5,8 @@
 
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/core/Constants.hpp"
-#include "src/utils/time_types.hpp"
 #include "astdyn/orbit_determination/Residuals.hpp"
 #include "src/core/frame_tags.hpp"
-#include "src/types/timed_state.hpp"
 #include "src/propagation/kepler_propagator.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include <cmath>
@@ -44,13 +42,11 @@ Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::V
     Eigen::Vector3d velocity = state.tail<3>();
     
     // Get Sun Barycentric Position (KM -> AU and rotate if needed)
-    auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(
-        utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd())));
+    auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
     Eigen::Vector3d sun_pos_bary_vec = sun_pos_bary.to_eigen() / (constants::AU * 1000.0);
     
     // Rotate to Ecliptic if needed
     if (settings_.integrate_in_ecliptic) {
-        auto t_inst = utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd()));
         sun_pos_bary_vec = coordinates::ReferenceFrame::j2000_to_ecliptic() * sun_pos_bary_vec;
     }
     
@@ -101,12 +97,10 @@ Eigen::Vector3d Propagator::planetary_perturbations(const Eigen::Vector3d& posit
                                                   time::EpochTDB t,
                                                   const Eigen::Vector3d& sun_pos_bary) {
     Eigen::Vector3d perturbation = Eigen::Vector3d::Zero();
-    auto t_inst = utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd()));
     auto mat_ecl = coordinates::ReferenceFrame::j2000_to_ecliptic();
 
     auto add_planet_perturbation = [&]( CelestialBody planet, double planet_gm_au) {
-        auto planet_state_bary = ephemeris_->getPosition(planet, 
-            utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd())));
+        auto planet_state_bary = ephemeris_->getPosition(planet, t);
         Eigen::Vector3d p_pos_bary_au = planet_state_bary.to_eigen() / (constants::AU * 1000.0);
         
         if (settings_.integrate_in_ecliptic) {
@@ -155,7 +149,6 @@ Eigen::Vector3d Propagator::asteroid_perturbations(const Eigen::Vector3d& positi
     }
     
     // If in Ecliptic, rotate position back to Equatorial for the perturbation engine
-    auto t_inst = utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd()));
     auto mat_eq = coordinates::ReferenceFrame::ecliptic_to_j2000();
     auto mat_ecl = coordinates::ReferenceFrame::j2000_to_ecliptic();
     
@@ -198,11 +191,10 @@ Eigen::VectorXd Propagator::integrate_raw_au(const Eigen::VectorXd& y0_au, doubl
 
 // Analytical TwoBodyPropagator
 KeplerianElements TwoBodyPropagator::propagate(const KeplerianElements& initial,
-                                               utils::Instant target_time) {
+                                               time::EpochTDB target_time) {
     using namespace astdyn::propagation;
     using ::astdyn::core::GCRF;
     using ::astdyn::types::TimedState;
-    using ::astdyn::utils::Instant;
 
     std::array<double, 6> arr = {
         initial.semi_major_axis, initial.eccentricity, initial.inclination,
@@ -223,7 +215,7 @@ KeplerianElements TwoBodyPropagator::propagate(const KeplerianElements& initial,
 }
 
 double TwoBodyPropagator::mean_anomaly_at_epoch(const KeplerianElements& initial,
-                                                utils::Instant target_time) {
+                                                time::EpochTDB target_time) {
     return propagate(initial, target_time).mean_anomaly;
 }
 

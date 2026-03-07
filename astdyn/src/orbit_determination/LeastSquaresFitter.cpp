@@ -4,17 +4,21 @@
  */
 
 #include "astdyn/orbit_determination/LeastSquaresFitter.hpp"
+#include "astdyn/orbit_determination/Residuals.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include <cmath>
 #include <algorithm>
 
 namespace astdyn::orbit_determination {
+
+using namespace astdyn::constants;
 
 LeastSquaresFitter::LeastSquaresFitter() {}
 
 Eigen::MatrixXd LeastSquaresFitter::build_design_matrix(
     const std::vector<ObservationResidual>& residuals,
     const Eigen::Vector<double, 6>& state,
-    double epoch_mjd,
+    time::EpochTDB epoch,
     STMFunction stm_func
 ) {
     // Design matrix A: each observation contributes 2 rows (RA, Dec)
@@ -31,10 +35,10 @@ Eigen::MatrixXd LeastSquaresFitter::build_design_matrix(
     constexpr double rad_to_arcsec = 206265.04606;
 
     for (int i = 0; i < n_obs; ++i) {
-        double t_obs = residuals[i].epoch_mjd;
+        time::EpochTDB t_obs = astdyn::time::to_tdb(residuals[i].time);
         
         // Get STM from epoch to observation time
-        auto [state_at_obs, stm] = stm_func(state, epoch_mjd, t_obs);
+        auto [state_at_obs, stm] = stm_func(state, epoch, t_obs);
         
         // Calculate Topocentric position if possible? 
         // For partial derivatives, using Heliocentric/Barycentric State at obs time 
@@ -42,7 +46,7 @@ Eigen::MatrixXd LeastSquaresFitter::build_design_matrix(
         // The residuals themselves (O-C) MUST use topocentric, but H can be geocentric/heliocentric approximate.
         
         // state_at_obs is [x, y, z, vx, vy, vz] in Equatorial Frame
-        Eigen::Vector3d r = state_at_obs.head<3>();
+        Eigen::Vector3d r = state_at_obs.template head<3>();
         
         double x = r(0), y = r(1), z = r(2);
         double r_norm = r.norm();
@@ -117,9 +121,9 @@ int LeastSquaresFitter::reject_outliers(std::vector<ObservationResidual>& residu
     int count = 0;
     
     for (const auto& res : residuals) {
-        if (!res.rejected) {
-            sum_sq += res.ra_residual_arcsec * res.ra_residual_arcsec;
-            sum_sq += res.dec_residual_arcsec * res.dec_residual_arcsec;
+        if (!res.outlier) {
+            sum_sq += res.residual_ra * constants::RAD_TO_ARCSEC * res.residual_ra * constants::RAD_TO_ARCSEC;
+            sum_sq += res.residual_dec * constants::RAD_TO_ARCSEC * res.residual_dec * constants::RAD_TO_ARCSEC;
             count += 2;
         }
     }
@@ -140,14 +144,14 @@ int LeastSquaresFitter::reject_outliers(std::vector<ObservationResidual>& residu
     // Reject outliers
     int num_rejected = 0;
     for (auto& res : residuals) {
-        if (!res.rejected) {
+        if (!res.outlier) {
             double res_norm = std::sqrt(
-                res.ra_residual_arcsec * res.ra_residual_arcsec +
-                res.dec_residual_arcsec * res.dec_residual_arcsec
+                res.residual_ra * constants::RAD_TO_ARCSEC * res.residual_ra * constants::RAD_TO_ARCSEC +
+                res.residual_dec * constants::RAD_TO_ARCSEC * res.residual_dec * constants::RAD_TO_ARCSEC
             );
             
             if (res_norm > threshold) {
-                res.rejected = true;
+                res.outlier = true;
                 num_rejected++;
             }
         }
@@ -165,16 +169,16 @@ void LeastSquaresFitter::compute_statistics(
     int count = 0;
     
     for (const auto& res : residuals) {
-        if (!res.rejected) {
-            sum_ra_sq += res.ra_residual_arcsec * res.ra_residual_arcsec;
-            sum_dec_sq += res.dec_residual_arcsec * res.dec_residual_arcsec;
+        if (!res.outlier) {
+            sum_ra_sq += res.residual_ra * constants::RAD_TO_ARCSEC * res.residual_ra * constants::RAD_TO_ARCSEC;
+            sum_dec_sq += res.residual_dec * constants::RAD_TO_ARCSEC * res.residual_dec * constants::RAD_TO_ARCSEC;
             count++;
         }
     }
     
     result.num_observations = residuals.size();
     result.num_rejected = std::count_if(residuals.begin(), residuals.end(),
-                                        [](const auto& r) { return r.rejected; });
+                                        [](const auto& r) { return r.outlier; });
     
     if (count > 0) {
         result.rms_ra_arcsec = std::sqrt(sum_ra_sq / count);
@@ -191,7 +195,7 @@ void LeastSquaresFitter::compute_statistics(
 
 FitResult LeastSquaresFitter::fit(
     const Eigen::Vector<double, 6>& initial_state,
-    double epoch_mjd,
+    time::EpochTDB epoch,
     ResidualFunction residual_func,
     STMFunction stm_func
 ) {
@@ -205,9 +209,9 @@ FitResult LeastSquaresFitter::fit(
         double sum = 0.0;
         int count = 0;
         for (const auto& r : res) {
-            if (!r.rejected) {
-                sum += r.ra_residual_arcsec * r.ra_residual_arcsec + 
-                       r.dec_residual_arcsec * r.dec_residual_arcsec;
+            if (!r.outlier) {
+                sum += r.residual_ra * constants::RAD_TO_ARCSEC * r.residual_ra * constants::RAD_TO_ARCSEC + 
+                       r.residual_dec * constants::RAD_TO_ARCSEC * r.residual_dec * constants::RAD_TO_ARCSEC;
                 count += 2;
             }
         }
@@ -215,7 +219,7 @@ FitResult LeastSquaresFitter::fit(
     };
 
     // Initial residuals
-    auto current_residuals = residual_func(result.state, epoch_mjd);
+    auto current_residuals = residual_func(result.state, epoch);
     double current_rms = calc_rms(current_residuals);
     
     for (int iter = 0; iter < max_iterations_; ++iter) {
@@ -229,7 +233,7 @@ FitResult LeastSquaresFitter::fit(
         }
         
         // Build Design Matrix (A) and Normal Equations
-        auto A = build_design_matrix(current_residuals, result.state, epoch_mjd, stm_func);
+        auto A = build_design_matrix(current_residuals, result.state, epoch, stm_func);
         
         // Pack residuals
         int n_obs = current_residuals.size();
@@ -237,11 +241,11 @@ FitResult LeastSquaresFitter::fit(
         Eigen::VectorXd weights(2 * n_obs);
         
         for (int i = 0; i < n_obs; ++i) {
-            if (!current_residuals[i].rejected) {
+            if (!current_residuals[i].outlier) {
                 // IMPORTANT: Normal Equation is A^T * W * (y - y_model)
                 // residuals vector here contains (Observed - Computed) = y - f(x)
-                res_vec(2*i) = current_residuals[i].ra_residual_arcsec;
-                res_vec(2*i+1) = current_residuals[i].dec_residual_arcsec;
+                res_vec(2*i) = current_residuals[i].residual_ra * constants::RAD_TO_ARCSEC;
+                res_vec(2*i+1) = current_residuals[i].residual_dec * constants::RAD_TO_ARCSEC;
                 weights(2*i) = current_residuals[i].weight_ra;
                 weights(2*i+1) = current_residuals[i].weight_dec;
             } else {
@@ -255,7 +259,7 @@ FitResult LeastSquaresFitter::fit(
         
         // Safety: Limit step size to avoid divergence (Trust Region)
         // Especially for position components [0,1,2] (AU)
-        double pos_step_norm = dx_full.head<3>().norm();
+        double pos_step_norm = dx_full.template head<3>().norm();
         constexpr double MAX_STEP_AU = 0.1; // Max 0.1 AU correction per step
         
         if (pos_step_norm > MAX_STEP_AU) {
@@ -276,13 +280,13 @@ FitResult LeastSquaresFitter::fit(
             candidate_state = result.state + dx_full * scale;
             
             // Compute residuals at candidate
-            candidate_residuals = residual_func(candidate_state, epoch_mjd);
+            candidate_residuals = residual_func(candidate_state, epoch);
             
             // Apply SAME rejection mask as baseline to compare apples to apples?
             // Or re-eval rejection? Usually re-eval happens next iter.
             // Let's assume rejection mask is fixed for the step calculation.
             for(size_t i=0; i<candidate_residuals.size(); ++i) {
-                candidate_residuals[i].rejected = current_residuals[i].rejected;
+                candidate_residuals[i].outlier = current_residuals[i].outlier;
             }
             
             candidate_rms = calc_rms(candidate_residuals);

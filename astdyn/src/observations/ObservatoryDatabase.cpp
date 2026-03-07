@@ -29,7 +29,7 @@ void Observatory::computeGeocentricPosition() {
     computeParallaxConstants(latitude, altitude, rho_cos_phi, rho_sin_phi);
 }
 
-types::Vector3<core::GCRF, core::Meter> Observatory::getPositionGCRF(utils::Instant t) const {
+types::Vector3<core::GCRF, core::Meter> Observatory::getPositionGCRF(time::EpochUTC t) const {
     // Convert ITRF position to GCRF using Earth rotation
     // Uses rotation matrix directly (non-deprecated path)
     Eigen::Vector3d pos_itrf(position.x, position.y, position.z);

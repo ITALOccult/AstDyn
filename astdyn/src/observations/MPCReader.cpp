@@ -153,7 +153,7 @@ std::string MPCReader::parseDesignation(const std::string& packed) {
     return trim(packed);
 }
 
-utils::Instant MPCReader::parseDate(const std::string& date_str) {
+time::EpochUTC MPCReader::parseDate(const std::string& date_str) {
     // Format: "YYYY MM DD.ddddd"
     std::istringstream iss(date_str);
     int year, month;
@@ -165,7 +165,7 @@ utils::Instant MPCReader::parseDate(const std::string& date_str) {
     int day_int = static_cast<int>(day);
     double fraction = day - day_int;
     double mjd = time::calendar_to_mjd(year, month, day_int, fraction);
-    return utils::Instant::from_utc(utils::ModifiedJulianDate(mjd));
+    return time::EpochUTC::from_mjd(mjd);
 }
 
 double MPCReader::parseRA(const std::string& ra_str) {

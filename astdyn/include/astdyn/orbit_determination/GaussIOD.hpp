@@ -25,7 +25,6 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/math/frame_algebra.hpp"
-#include "src/utils/time_types.hpp"
 #include "src/core/frame_tags.hpp"
 #include <vector>
 #include <optional>

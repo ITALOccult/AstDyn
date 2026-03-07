@@ -35,8 +35,8 @@ public:
     explicit constexpr KeplerPropagator(const double gm) noexcept : gravitational_parameter_(gm) {}
 
     [[nodiscard]] std::optional<TimedState<Frame, KeplerianTag>> 
-    propagate(const TimedState<Frame, KeplerianTag>& initial, const Instant& target_time) const override {
-        const double dt_days = target_time.mjd.value - initial.instant.mjd.value;
+    propagate(const TimedState<Frame, KeplerianTag>& initial, const time::EpochTDB& target_time) const override {
+        const double dt_days = target_time.mjd() - initial.instant.mjd();
         if (dt_days < 0.0) return std::nullopt;
         
         const double dt_sec = dt_days * constants::SECONDS_PER_DAY;

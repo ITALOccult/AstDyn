@@ -24,7 +24,7 @@
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
 #include "astdyn/core/Constants.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
@@ -88,7 +88,7 @@ public:
         // Load observation epochs (optical observations)
         std::vector<astdyn::observations::OpticalObservation> records =
             astdyn::observations::RWOReader::readFile(rwo_file);
-        std::vector<utils::Instant> t_obs;
+        std::vector<time::EpochUTC> t_obs;
         t_obs.reserve(records.size());
         for (const auto& rec : records) {
             t_obs.push_back(rec.time);
@@ -101,7 +101,7 @@ public:
         calc_elem.Omega = result.fitted_orbit.longitude_ascending_node;
         calc_elem.omega = result.fitted_orbit.argument_perihelion;
         calc_elem.M = result.fitted_orbit.mean_anomaly;
-        calc_elem.epoch = t_obs.empty() ? utils::Instant::from_tt(utils::ModifiedJulianDate(0.0)) : t_obs.front();
+        calc_elem.epoch = t_obs.empty() ? time::EpochTDB::from_mjd(0.0) : time::EpochTDB::from_mjd(t_obs.front().mjd());
         result.fitted_positions.reserve(t_obs.size());
         for (const auto& t : t_obs) {
             auto pos = PositionCalculator::computePosition(
@@ -115,7 +115,7 @@ public:
      * @brief Compute positions from an in‑memory orbit configuration.
      */
     static AsteroidFitResult computeFromMemory(const astdyn::ephemeris::SimpleKeplerianElements& orbit,
-                                               const std::vector<utils::Instant>& t_observations,
+                                               const std::vector<time::EpochUTC>& t_observations,
                                                bool output_equatorial = true) {
         AsteroidFitResult result;
         result.success = true;
@@ -303,7 +303,7 @@ public:
                 engine.set_initial_orbit(result.fitted_orbit); 
                 
                 for (const auto& target_t : cfg.t_observations) {
-                     auto state_at_target = engine.propagate_to(time::EpochTDB::from_mjd(target_t.mjd.value));
+                     auto state_at_target = engine.propagate_to(time::EpochTDB::from_mjd(target_t.mjd()));
                      Eigen::Vector3d target_pos;                    // Convert to PositionCalculator format
                      KeplerianElements calc_elem;
                      calc_elem.a = state_at_target.a.to_au();
@@ -312,7 +312,7 @@ public:
                      calc_elem.Omega = state_at_target.node.to_rad();
                      calc_elem.omega = state_at_target.omega.to_rad();
                      calc_elem.M = state_at_target.M.to_rad();
-                     calc_elem.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(state_at_target.epoch.mjd()));
+                     calc_elem.epoch = state_at_target.epoch;
                      calc_elem.equatorial = true;
                      
                      auto pos = PositionCalculator::computePosition(
@@ -411,7 +411,7 @@ public:
              
              // 3. Propagate
              for (const auto& target_t : cfg.t_observations) {
-                 auto state_at_target = engine.propagate_to(time::EpochTDB::from_mjd(target_t.mjd.value));
+                 auto state_at_target = engine.propagate_to(time::EpochTDB::from_mjd(target_t.mjd()));
                  
                   KeplerianElements calc_elem;
                   calc_elem.a = state_at_target.a.to_au();
@@ -420,7 +420,7 @@ public:
                   calc_elem.Omega = state_at_target.node.to_rad();
                   calc_elem.omega = state_at_target.omega.to_rad();
                   calc_elem.M = state_at_target.M.to_rad();
-                  calc_elem.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(state_at_target.epoch.mjd()));
+                  calc_elem.epoch = state_at_target.epoch;
                  calc_elem.equatorial = true; // Engine output is Equatorial
                  
                  auto pos = PositionCalculator::computePosition(
@@ -437,7 +437,7 @@ public:
      * @brief Deprecated overload: fit directly from SimpleKeplerianElements.
      */
     static AsteroidFitResult fit(const astdyn::ephemeris::SimpleKeplerianElements& orbit,
-                                 const std::vector<utils::Instant>& t_observations,
+                                 const std::vector<time::EpochUTC>& t_observations,
                                  bool output_equatorial = true) {
         return computeFromMemory(orbit, t_observations, output_equatorial);
     }

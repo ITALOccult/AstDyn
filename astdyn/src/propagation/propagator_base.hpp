@@ -12,7 +12,6 @@ namespace astdyn::propagation {
 
 using core::MessageKey;
 using types::TimedState;
-using utils::Instant;
 
 /**
  * @brief Abstract base for orbital propagators.
@@ -30,7 +29,7 @@ public:
      * @return Expected new TimedState or an error key.
      */
     [[nodiscard]] virtual std::optional<TimedState<Frame, Rep>> 
-    propagate(const TimedState<Frame, Rep>& initial, const Instant& target_time) const = 0;
+    propagate(const TimedState<Frame, Rep>& initial, const time::EpochTDB& target_time) const = 0;
 };
 
 } // namespace astdyn::propagation

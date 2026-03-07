@@ -18,7 +18,7 @@ void print_orbital_elements(const IOrbitParser::OrbitalElements& elem) {
     std::cout << "\n=== Orbital Elements ===" << std::endl;
     std::cout << "Object: " << elem.object_name << std::endl;
     std::cout << "Epoch: MJD " << std::fixed << std::setprecision(6) 
-              << elem.epoch_mjd_tdb << " TDB" << std::endl;
+              << elem.epoch.mjd() << " TDB" << std::endl;
     std::cout << "\nKeplerian Elements:" << std::endl;
     std::cout << "  a = " << std::setprecision(10) << elem.semi_major_axis << " AU" << std::endl;
     std::cout << "  e = " << std::setprecision(8) << elem.eccentricity << std::endl;
@@ -39,10 +39,10 @@ void print_observations_summary(const std::vector<IObservationParser::OpticalObs
     
     if (!obs.empty()) {
         std::cout << "First observation: MJD " << std::fixed << std::setprecision(5) 
-                  << obs.front().mjd_utc << " UTC" << std::endl;
-        std::cout << "Last observation:  MJD " << obs.back().mjd_utc << " UTC" << std::endl;
+                  << obs.front().time.mjd() << " UTC" << std::endl;
+        std::cout << "Last observation:  MJD " << obs.back().time.mjd() << " UTC" << std::endl;
         std::cout << "Time span: " << std::setprecision(2) 
-                  << (obs.back().mjd_utc - obs.front().mjd_utc) << " days" << std::endl;
+                  << (obs.back().time.mjd() - obs.front().time.mjd()) << " days" << std::endl;
         
         // Show first observation details
         std::cout << "\nFirst observation details:" << std::endl;

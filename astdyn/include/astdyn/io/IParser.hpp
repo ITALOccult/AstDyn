@@ -1,6 +1,7 @@
 #ifndef ASTDYN_IO_IPARSER_HPP
 #define ASTDYN_IO_IPARSER_HPP
 
+#include "astdyn/time/epoch.hpp"
 #include <string>
 #include <vector>
 #include <memory>
@@ -15,7 +16,7 @@ class IOrbitParser {
 public:
     struct OrbitalElements {
         std::string object_name;
-        double epoch_mjd_tdb;
+        time::EpochTDB epoch;
         double semi_major_axis;      // AU
         double eccentricity;
         double inclination;          // radianti
@@ -39,7 +40,7 @@ class IObservationParser {
 public:
     struct OpticalObservation {
         std::string object_name;
-        double mjd_utc;
+        time::EpochUTC time;
         double ra, dec;          // radianti
         double mag;
         std::string obs_code;

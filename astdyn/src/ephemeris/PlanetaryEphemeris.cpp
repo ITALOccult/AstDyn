@@ -35,14 +35,14 @@ void PlanetaryEphemeris::setProvider(std::shared_ptr<EphemerisProvider> provider
     global_provider_ = provider;
 }
 
-types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getPosition(CelestialBody body, utils::Instant t) {
+types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getPosition(CelestialBody body, time::EpochTDB t) {
     if (global_provider_ && global_provider_->isAvailable()) {
         return global_provider_->getPosition(body, t);
     }
 
     if (body == CelestialBody::SUN) return types::Vector3<core::GCRF, core::Meter>(0.0, 0.0, 0.0);
     
-    double T = julianCenturies(t.mjd.value + 2400000.5);
+    double T = julianCenturies(t.mjd() + 2400000.5);
     double elements[6];
     computeOrbitalElements(body, T, elements);
     
@@ -53,14 +53,14 @@ types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getPosition(Celestia
     return types::Vector3<core::GCRF, core::Meter>(final_pos.x(), final_pos.y(), final_pos.z());
 }
 
-types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getVelocity(CelestialBody body, utils::Instant t) {
+types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getVelocity(CelestialBody body, time::EpochTDB t) {
     if (global_provider_ && global_provider_->isAvailable()) {
         return global_provider_->getVelocity(body, t);
     }
 
     if (body == CelestialBody::SUN) return types::Vector3<core::GCRF, core::Meter>(0.0, 0.0, 0.0);
     
-    double T = julianCenturies(t.mjd.value + 2400000.5);
+    double T = julianCenturies(t.mjd() + 2400000.5);
     double elements[6];
     computeOrbitalElements(body, T, elements);
     
@@ -70,7 +70,7 @@ types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getVelocity(Celestia
     return types::Vector3<core::GCRF, core::Meter>(vel_ms.x(), vel_ms.y(), vel_ms.z());
 }
 
-CartesianState PlanetaryEphemeris::getState(CelestialBody body, utils::Instant t) {
+CartesianState PlanetaryEphemeris::getState(CelestialBody body, time::EpochTDB t) {
     if (global_provider_ && global_provider_->isAvailable()) {
         return CartesianState(global_provider_->getPosition(body, t), global_provider_->getVelocity(body, t));
     }
@@ -80,7 +80,11 @@ CartesianState PlanetaryEphemeris::getState(CelestialBody body, utils::Instant t
     return CartesianState(pos, vel);
 }
 
-types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getSunBarycentricPosition(utils::Instant t) {
+types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getSunBarycentricPosition(time::EpochTDB t) {
+    if (global_provider_ && global_provider_->isAvailable()) {
+        return global_provider_->getPosition(CelestialBody::SUN, t);
+    }
+    
     // Simplified: Sun offset from barycenter due to planets
     // Dominated by Jupiter (~5e-4 AU) and Saturn (~3e-4 AU)
     
@@ -106,7 +110,7 @@ types::Vector3<core::GCRF, core::Meter> PlanetaryEphemeris::getSunBarycentricPos
 
 CartesianState PlanetaryEphemeris::heliocentricToBarycentric(
     const CartesianState& heliocentric_state, 
-    utils::Instant t) 
+    time::EpochTDB t) 
 {
     auto r_sun = getSunBarycentricPosition(t);
     

@@ -1,7 +1,6 @@
 #ifndef ASTDYN_ASTROMETRY_TYPES_HPP
 #define ASTDYN_ASTROMETRY_TYPES_HPP
 
-#include "src/utils/time_types.hpp"
 #include "src/core/units.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 

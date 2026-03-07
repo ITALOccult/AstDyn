@@ -2,20 +2,20 @@
 #define ASTDYN_TYPES_TIMED_STATE_HPP
 
 #include "src/types/orbital_state.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 
 namespace astdyn::types {
 
 /**
- * @brief Couple of and OrbitalState with its Instant (MJD + Scale).
+ * @brief Couple of an OrbitalState with its Epoch (time::EpochTDB).
  * Semantic carrier for the propagation interface.
  */
 template <typename FrameTag, typename RepresentationTag>
 struct TimedState {
     const OrbitalState<FrameTag, RepresentationTag> state;
-    const utils::Instant instant;
+    const time::EpochTDB instant;
 
-    explicit constexpr TimedState(const OrbitalState<FrameTag, RepresentationTag>& s, const utils::Instant& i) noexcept
+    explicit constexpr TimedState(const OrbitalState<FrameTag, RepresentationTag>& s, const time::EpochTDB& i) noexcept
         : state(s), instant(i) {}
 };
 

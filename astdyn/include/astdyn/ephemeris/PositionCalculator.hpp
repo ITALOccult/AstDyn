@@ -8,7 +8,7 @@
 
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 #include "src/types/vectors.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
@@ -28,7 +28,7 @@ struct KeplerianElements {
     double Omega;  // longitude of ascending node (rad)
     double omega;  // argument of periapsis (rad)
     double M;      // mean anomaly at epoch (rad)
-    utils::Instant epoch; // epoch of elements
+    time::EpochTDB epoch; // epoch of elements
     // Optional: flag indicating whether the elements are expressed in the
     // equatorial J2000 frame. If false they are assumed to be ecliptic J2000.
     bool equatorial = false;
@@ -36,9 +36,9 @@ struct KeplerianElements {
 
 class PositionCalculator {
 public:
-    // Compute heliocentric position (m) at a given Instant.
+    // Compute heliocentric position (m) at a given Epoch.
     static types::Vector3<core::GCRF, core::Meter> computePosition(const KeplerianElements& elem,
-                                           utils::Instant target_time,
+                                           time::EpochTDB target_time,
                                            bool outputEquatorial = true) {
         // Time since epoch in days (not used for pure Keplerian propagation).
         // For a simple two‑body problem the mean motion n = sqrt(mu / a^3).
@@ -46,7 +46,7 @@ public:
         constexpr double k = 0.01720209895;
         double a_au = elem.a; // Assuming elem.a is in AU for this specific calculator
         double n = k * std::sqrt(1.0 / (a_au * a_au * a_au)); // rad/day
-        double dt = target_time.mjd.value - elem.epoch.mjd.value;
+        double dt = target_time.mjd() - elem.epoch.mjd();
         double M = elem.M + n * dt; // propagate mean anomaly
         // Normalize M to [0, 2π)
         M = std::fmod(M, 2.0 * M_PI);

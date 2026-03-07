@@ -83,8 +83,7 @@ std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) 
         }
         
         std::string date_str = line.substr(17, 21);
-        double mjd_utc = parseDate(date_str);
-        obs.time = utils::Instant::from_utc(utils::ModifiedJulianDate(mjd_utc));
+        obs.time = parseDate(date_str);
         // ... (rest of function)
         
         // Fortran FORMAT 521 starts at READ(record(51:),521)
@@ -213,7 +212,7 @@ std::string RWOReader::parseDesignation(const std::string& line) {
     return trim(line.substr(0, 14));
 }
 
-double RWOReader::parseDate(const std::string& date_str) {
+time::EpochUTC RWOReader::parseDate(const std::string& date_str) {
     // Format: "YYYY MM DD.ddddddddddd" from Fortran FORMAT 120: (I4,1X,I2,1X,F13.10)
     std::istringstream iss(date_str);
     int year, month;
@@ -229,7 +228,8 @@ double RWOReader::parseDate(const std::string& date_str) {
     // Convert to MJD
     int day_int = static_cast<int>(day);
     double fraction = day - day_int;
-    return time::calendar_to_mjd(year, month, day_int, fraction);
+    double mjd = time::calendar_to_mjd(year, month, day_int, fraction);
+    return time::EpochUTC::from_mjd(mjd);
 }
 
 double RWOReader::parseRA(const std::string& ra_str) {

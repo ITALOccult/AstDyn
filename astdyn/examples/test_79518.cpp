@@ -12,7 +12,7 @@ int main() {
     // MJD for 2026-03-07 00:00:00 is approx 61106.0
     // 09:00:00 is 9/24 = 0.375 days
     double target_mjd = 61106.375;
-    utils::Instant epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(target_mjd));
+    time::EpochTT epoch = time::EpochTT::from_mjd(target_mjd);
 
     std::cout << "--- Testing JPL Horizons for Asteroid 79518 ---" << std::endl;
     std::cout << "Target Time: 2026-03-07 09:00:00 UTC (MJD " << target_mjd << ")\n" << std::endl;

@@ -37,7 +37,7 @@ namespace {
     
     KeplerianElements get_planet_mean_elements(BodyType planet) {
         KeplerianElements elements;
-        elements.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(0.0)); // MJD J2000.0
+        elements.epoch = time::EpochTDB::from_mjd(0.0); // MJD J2000.0
         elements.gravitational_parameter = 0.295912208; // Sun GM [AU³/day²]
         
         switch (planet) {
@@ -206,7 +206,7 @@ std::vector<CloseApproach> CloseApproachDetector::find_approaches(
 {
     // Bridge to un-typed format for conversion math
     KeplerianElements kep_old;
-    kep_old.epoch = utils::Instant::from_tt(utils::ModifiedJulianDate(initial_orbit.epoch.mjd()));
+    kep_old.epoch = initial_orbit.epoch;
     kep_old.semi_major_axis = initial_orbit.a.to_au();
     kep_old.eccentricity = initial_orbit.e;
     kep_old.inclination = initial_orbit.i.to_rad();
@@ -235,8 +235,7 @@ double CloseApproachDetector::compute_distance(
     BodyType body) const
 {
     CelestialBody cb = to_celestial_body(body);
-    auto planet_pos = PlanetaryEphemeris::getPosition(cb, 
-        utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd())));
+    auto planet_pos = PlanetaryEphemeris::getPosition(cb, t);
     Vector3d rel_pos = state.position.to_eigen_si() - planet_pos.to_eigen();
     return rel_pos.norm();
 }
@@ -305,10 +304,8 @@ CloseApproach CloseApproachDetector::build_approach(
     ca.velocity_object = types::Vector3<core::GCRF, core::Meter>(state.velocity.to_eigen_si());
     
     CelestialBody cb = to_celestial_body(body);
-    ca.position_body = PlanetaryEphemeris::getPosition(cb, 
-        utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd())));
-    ca.velocity_body = PlanetaryEphemeris::getVelocity(cb, 
-        utils::Instant::from_tt(utils::ModifiedJulianDate(t.mjd())));
+    ca.position_body = PlanetaryEphemeris::getPosition(cb, t);
+    ca.velocity_body = PlanetaryEphemeris::getVelocity(cb, t);
     
     ca.rel_position = types::Vector3<core::GCRF, core::Meter>(ca.position_object.to_eigen() - ca.position_body.to_eigen());
     ca.rel_velocity = types::Vector3<core::GCRF, core::Meter>(ca.velocity_object.to_eigen() - ca.velocity_body.to_eigen());

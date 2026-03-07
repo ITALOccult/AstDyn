@@ -24,7 +24,7 @@
  *  78-80: Observatory code
  */
  
-#include "src/utils/time_types.hpp"
+#include "astdyn/time/epoch.hpp"
 
 #ifndef ASTDYN_OBSERVATIONS_MPCREADER_HPP
 #define ASTDYN_OBSERVATIONS_MPCREADER_HPP
@@ -86,9 +86,9 @@ private:
     /**
      * @brief Parse date (columns 16-32)
      * Format: "YYYY MM DD.ddddd"
-     * @return Instant (UTC)
+     * @return Epoch (UTC)
      */
-    static utils::Instant parseDate(const std::string& date_str);
+    static time::EpochUTC parseDate(const std::string& date_str);
     
     /**
      * @brief Parse RA (columns 33-44)
@@ -163,7 +163,7 @@ private:
     /**
      * @brief Format date to MPC format
      */
-    static std::string formatDate(utils::Instant t_utc);
+    static std::string formatDate(time::EpochUTC t_utc);
     
     /**
      * @brief Format RA to MPC format

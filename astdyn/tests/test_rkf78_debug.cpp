@@ -52,7 +52,7 @@ TEST(RKF78Debug, SimpleIntegrationWithDiagnostics) {
     
     // Orbita semplice: Terra
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = MJD2000;
+    kep.epoch = time::EpochTDB::from_mjd(MJD2000);
     kep.semi_major_axis = 1.0;  // AU
     kep.eccentricity = 0.0167;
     kep.inclination = 0.0;
@@ -75,7 +75,7 @@ TEST(RKF78Debug, SimpleIntegrationWithDiagnostics) {
     std::cout << "Propagating from MJD " << MJD2000 << " to " << target_mjd << std::endl;
     
     try {
-        auto result = prop.propagate_keplerian(kep, target_mjd);
+        auto result = prop.propagate_keplerian(kep, time::EpochTDB::from_mjd(target_mjd));
         std::cout << "SUCCESS: Propagation completed" << std::endl;
         std::cout << "Final a = " << result.semi_major_axis << " AU" << std::endl;
     } catch (const std::exception& e) {
@@ -89,7 +89,7 @@ TEST(RKF78Debug, MediumIntegration30Days) {
     std::cout << "\n=== Test 2: Medium Integration (30 days) ===" << std::endl;
     
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = MJD2000;
+    kep.epoch = time::EpochTDB::from_mjd(MJD2000);
     kep.semi_major_axis = 2.5;  // Asteroide nella main belt
     kep.eccentricity = 0.15;
     kep.inclination = 10.0 * DEG_TO_RAD;
@@ -109,7 +109,7 @@ TEST(RKF78Debug, MediumIntegration30Days) {
     std::cout << "Propagating asteroid orbit for 30 days" << std::endl;
     
     try {
-        auto result = prop.propagate_keplerian(kep, target_mjd);
+        auto result = prop.propagate_keplerian(kep, time::EpochTDB::from_mjd(target_mjd));
         std::cout << "SUCCESS: Propagation completed" << std::endl;
         std::cout << "Initial a = " << kep.semi_major_axis << " AU" << std::endl;
         std::cout << "Final a = " << result.semi_major_axis << " AU" << std::endl;
@@ -125,7 +125,7 @@ TEST(RKF78Debug, LongIntegration100DaysWithTimeout) {
     std::cout << "\n=== Test 3: Long Integration (100 days) with timeout ===" << std::endl;
     
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = MJD2000;
+    kep.epoch = time::EpochTDB::from_mjd(MJD2000);
     kep.semi_major_axis = 2.5;
     kep.eccentricity = 0.15;
     kep.inclination = 10.0 * DEG_TO_RAD;
@@ -151,7 +151,7 @@ TEST(RKF78Debug, LongIntegration100DaysWithTimeout) {
             settings.include_planets = false;
             Propagator prop(std::move(integrator), ephemeris, settings);
             
-            auto result = prop.propagate_keplerian(kep, target_mjd);
+            auto result = prop.propagate_keplerian(kep, time::EpochTDB::from_mjd(target_mjd));
             completed = true;
         } catch (const std::exception& e) {
             std::cout << "ERROR in worker thread: " << e.what() << std::endl;
@@ -189,7 +189,7 @@ TEST(RKF78Debug, LargeInitialStepSize) {
     std::cout << "\n=== Test 4: Large Initial Step Size ===" << std::endl;
     
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = MJD2000;
+    kep.epoch = time::EpochTDB::from_mjd(MJD2000);
     kep.semi_major_axis = 1.0;
     kep.eccentricity = 0.0167;
     kep.inclination = 0.0;
@@ -210,7 +210,7 @@ TEST(RKF78Debug, LargeInitialStepSize) {
     std::cout << "Testing with initial step size = 10 days" << std::endl;
     
     try {
-        auto result = prop.propagate_keplerian(kep, target_mjd);
+        auto result = prop.propagate_keplerian(kep, time::EpochTDB::from_mjd(target_mjd));
         std::cout << "SUCCESS with large step size" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "FAILED with large step: " << e.what() << std::endl;
@@ -222,7 +222,7 @@ TEST(RKF78Debug, ToleranceComparison) {
     std::cout << "\n=== Test 5: Tolerance Comparison ===" << std::endl;
     
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = MJD2000;
+    kep.epoch = time::EpochTDB::from_mjd(MJD2000);
     kep.semi_major_axis = 2.5;
     kep.eccentricity = 0.15;
     kep.inclination = 10.0 * DEG_TO_RAD;
@@ -246,7 +246,7 @@ TEST(RKF78Debug, ToleranceComparison) {
             Propagator prop(std::move(integrator), ephemeris, settings);
             
             auto start = std::chrono::steady_clock::now();
-            auto result = prop.propagate_keplerian(kep, target_mjd);
+            auto result = prop.propagate_keplerian(kep, time::EpochTDB::from_mjd(target_mjd));
             auto end = std::chrono::steady_clock::now();
             
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

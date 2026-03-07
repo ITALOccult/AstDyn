@@ -12,6 +12,7 @@ namespace astdyn {
 namespace io {
 
 struct AstDysFitResult {
+    std::string object_name;
     physics::KeplerianStateTyped<core::ECLIPJ2000> fitted_orbit;
     bool converged = false;
     int num_iterations = 0;
@@ -64,7 +65,7 @@ private:
     std::string detect_format(const std::string& filename);
     
     static physics::KeplerianStateTyped<core::ECLIPJ2000> equinoctial_to_keplerian(
-        double a, double h, double k, double p, double q, double lambda, double mjd);
+        double a, double h, double k, double p, double q, double lambda, time::EpochTDB epoch);
 };
 
 } // namespace io
