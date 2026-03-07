@@ -2,6 +2,7 @@
 #define ASTDYN_ASTROMETRY_SKY_TYPES_HPP
 
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include "astdyn/math/frame_algebra.hpp"
 #include <cmath>
 #include <string>
@@ -9,6 +10,8 @@
 #include <sstream>
 
 namespace astdyn::astrometry {
+
+using namespace astdyn::physics;
 
 // ============================================================================
 // Angle Type (Astrometric specific, decoupled from base physics)
@@ -110,6 +113,54 @@ public:
             << std::fixed << std::setprecision(2) << std::setfill('0') << std::setw(5) << s;
         return oss.str();
     }
+};
+
+// ============================================================================
+// Parallax
+// ============================================================================
+class Parallax {
+public:
+    constexpr Parallax() noexcept : mas_(0.0) {}
+    
+    [[nodiscard]] static constexpr Parallax from_mas(double mas) noexcept { return Parallax(mas); }
+    [[nodiscard]] static constexpr Parallax from_arcsec(double sec) noexcept { return Parallax(sec * 1000.0); }
+    
+    [[nodiscard]] constexpr double to_mas() const noexcept { return mas_; }
+    [[nodiscard]] constexpr double to_arcsec() const noexcept { return mas_ / 1000.0; }
+    
+    /// Convert to physical Distance (returns 0 if parallax <= 0)
+    [[nodiscard]] constexpr physics::Distance to_distance() const noexcept {
+        if (mas_ <= 0.0) return physics::Distance::zero();
+        // 1 pc = 206264.806 AU. Distance (pc) = 1 / parallax (arcsec)
+        double au = 1000.0 / mas_ * 206264.806;
+        return physics::Distance::from_au(au);
+    }
+
+private:
+    explicit constexpr Parallax(double mas) noexcept : mas_(mas) {}
+    double mas_;
+};
+
+// ============================================================================
+// Proper Motion
+// ============================================================================
+class ProperMotion {
+public:
+    constexpr ProperMotion() noexcept : mas_yr_(0.0) {}
+    
+    [[nodiscard]] static constexpr ProperMotion from_mas_yr(double val) noexcept { return ProperMotion(val); }
+    
+    [[nodiscard]] constexpr double to_mas_yr() const noexcept { return mas_yr_; }
+    [[nodiscard]] constexpr double to_arcsec_yr() const noexcept { return mas_yr_ / 1000.0; }
+    
+    /// Compute angular displacement over time
+    [[nodiscard]] Angle multiply_time(double years) const noexcept {
+        return Angle::from_mas(mas_yr_ * years);
+    }
+
+private:
+    explicit constexpr ProperMotion(double val) noexcept : mas_yr_(val) {}
+    double mas_yr_;
 };
 
 // ============================================================================

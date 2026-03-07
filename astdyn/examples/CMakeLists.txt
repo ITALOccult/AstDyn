@@ -62,6 +62,10 @@ target_link_libraries(test_79518 PRIVATE astdyn)
 add_executable(benchmark_integrators benchmark_integrators.cpp)
 target_link_libraries(benchmark_integrators PRIVATE astdyn)
 
+# Gaia Occultation Search Test
+add_executable(gaia_occultation_test gaia_occultation_test.cpp)
+target_link_libraries(gaia_occultation_test PRIVATE astdyn)
+
 # Install examples (optional)
 install(TARGETS example_basic
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples

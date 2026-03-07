@@ -15,7 +15,12 @@
 #include <optional>
 #include <functional>
 
+#include "astdyn/astrometry/sky_types.hpp"
+#include "astdyn/time/TimeScale.hpp"
+
 namespace astdyn::catalog {
+
+using namespace astdyn::astrometry;
 
 // ============================================================================
 // Module-local constants
@@ -44,14 +49,14 @@ struct Star {
     std::string sao_designation;        ///< SAO catalog number
 
     // --- Astrometry (ICRS, epoch J2016.0) ---
-    double ra_deg  = 0.0;               ///< Right Ascension [deg]
-    double dec_deg = 0.0;               ///< Declination [deg]
-    double parallax_mas   = 0.0;        ///< Parallax [mas]  (>0 = real star)
-    double parallax_error_mas = 0.0;    ///< Parallax uncertainty [mas]
-    double pmra_mas_yr    = 0.0;        ///< Proper motion in RA * cos(dec) [mas/yr]
-    double pmdec_mas_yr   = 0.0;        ///< Proper motion in Dec [mas/yr]
-    double pmra_error_mas_yr  = 0.0;    ///< PM RA uncertainty [mas/yr]
-    double pmdec_error_mas_yr = 0.0;    ///< PM Dec uncertainty [mas/yr]
+    RightAscension ra;                  ///< Right Ascension
+    Declination    dec;                 ///< Declination
+    Parallax       parallax;            ///< Parallax (mas)
+    double         parallax_error_mas = 0.0;
+    ProperMotion   pm_ra_cosdec;        ///< Proper motion in RA * cos(dec)
+    ProperMotion   pm_dec;              ///< Proper motion in Dec
+    double         pmra_error_mas_yr  = 0.0;
+    double         pmdec_error_mas_yr = 0.0;
 
     // --- Photometry ---
     double g_mag  = 99.0;               ///< Gaia G-band magnitude
@@ -63,15 +68,12 @@ struct Star {
     double ruwe = 0.0;                  ///< Renormalised unit weight error
     double astrometric_excess_noise = 0.0;
 
-    /// Distance in AU inferred from parallax (returns 0 if parallax <= 0)
-    [[nodiscard]] double distance_au() const noexcept {
-        if (parallax_mas <= 0.0) return 0.0;
-        return 1000.0 / parallax_mas * constants::AU_PER_PARSEC;
-    }
+    /// Predict star position at a specific TDB epoch (proper motion + parallax)
+    [[nodiscard]] SkyCoord<core::GCRF> predict_at(time::EpochTDB target_time) const;
 
-    [[nodiscard]] bool has_parallax() const noexcept { return parallax_mas > 0.0; }
+    [[nodiscard]] bool has_parallax() const noexcept { return parallax.to_mas() > 0.0; }
     [[nodiscard]] bool has_proper_motion() const noexcept {
-        return pmra_mas_yr != 0.0 || pmdec_mas_yr != 0.0;
+        return pm_ra_cosdec.to_mas_yr() != 0.0 || pm_dec.to_mas_yr() != 0.0;
     }
 };
 
@@ -83,11 +85,11 @@ struct Star {
  * @brief Parameters for a circular cone search.
  */
 struct ConeQuery {
-    double ra_deg    = 0.0;      ///< Center RA [deg]
-    double dec_deg   = 0.0;      ///< Center Dec [deg]
-    double radius_arcsec = 60.0; ///< Search radius [arcsec]
-    double max_magnitude = 18.0; ///< Faint limit (Gaia G)
-    double min_parallax_mas = 0.0; ///< Optional parallax cut [mas]
+    RightAscension ra;           ///< Center RA
+    Declination    dec;          ///< Center Dec
+    Angle          radius;       ///< Search radius
+    double         max_magnitude = 18.0; ///< Faint limit (Gaia G)
+    Parallax       min_parallax; ///< Optional parallax cut
 };
 
 /**
@@ -104,11 +106,11 @@ struct SkyPoint {
  * Useful for searching stars along the projected path of a solar system body.
  */
 struct CorridorQuery {
-    std::vector<SkyPoint> path;         ///< Ordered sky positions defining the corridor axis
-    double width_arcsec  = 120.0;       ///< Half-width of corridor [arcsec]
-    double max_magnitude = 18.0;        ///< Faint magnitude limit (Gaia G)
-    double min_parallax_mas = 0.0;      ///< Optional parallax cut [mas]
-    size_t max_results = 10000;         ///< Maximum number of returned stars
+    std::vector<SkyCoord<core::GCRF>> path; ///< Ordered sky positions
+    Angle          width;               ///< Half-width of corridor
+    double         max_magnitude = 18.0; ///< Faint magnitude limit (Gaia G)
+    Parallax       min_parallax;        ///< Optional parallax cut
+    size_t         max_results = 10000;  ///< Maximum number of returned stars
 };
 
 /**
@@ -123,6 +125,33 @@ struct ChebyshevSegment {
     double t_end   = 0.0;               ///< Segment end   [JD TDB]
     std::vector<double> ra_coeffs;      ///< Chebyshev coefficients for RA [deg]
     std::vector<double> dec_coeffs;     ///< Chebyshev coefficients for Dec [deg]
+
+    /**
+     * @brief Evaluate polynomial at specific JD.
+     * @param jd Julian Date [TDB]
+     * @return pair of RA, Dec in degrees.
+     */
+    [[nodiscard]] std::pair<double, double> evaluate(double jd) const {
+        if (ra_coeffs.empty() || dec_coeffs.empty()) return {0.0, 0.0};
+        
+        // Normalize JD to [-1, 1]
+        double tau = (2.0 * jd - (t_end + t_start)) / (t_end - t_start);
+        
+        auto eval_at = [](const std::vector<double>& cs, double t) {
+            if (cs.empty()) return 0.0;
+            if (cs.size() == 1) return cs[0];
+            
+            double d1 = 0.0, d2 = 0.0;
+            for (size_t j = cs.size() - 1; j >= 1; --j) {
+                double tmp = d1;
+                d1 = cs[j] + 2.0 * t * d1 - d2;
+                d2 = tmp;
+            }
+            return cs[0] + t * d1 - d2;
+        };
+
+        return {eval_at(ra_coeffs, tau), eval_at(dec_coeffs, tau)};
+    }
 };
 
 /**
@@ -132,12 +161,12 @@ struct ChebyshevSegment {
  * time interval. Build this with make_orbit_query() in CatalogIntegration.hpp.
  */
 struct OrbitQuery {
-    double t_start_jd  = 0.0;              ///< Search window start [JD TDB]
-    double t_end_jd    = 0.0;              ///< Search window end   [JD TDB]
+    time::EpochTDB t_start;             ///< Search window start
+    time::EpochTDB t_end;               ///< Search window end
     std::vector<ChebyshevSegment> segments; ///< Chebyshev approximation of the orbit
-    double width_arcsec  = 120.0;           ///< Corridor half-width [arcsec]
-    double max_magnitude = 18.0;            ///< Faint magnitude limit (Gaia G)
-    double step_days     = 1.0;             ///< Discretisation step for orbit sampling [days]
+    Angle          width;               ///< Corridor half-width
+    double         max_magnitude = 18.0; ///< Faint magnitude limit (Gaia G)
+    double         step_days     = 1.0;  ///< Discretisation step for orbit sampling [days]
 };
 
 // ============================================================================

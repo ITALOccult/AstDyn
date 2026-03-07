@@ -29,24 +29,6 @@ namespace astdyn::catalog {
 // ============================================================================
 
 /**
- * @brief Apply proper motion to propagate a star's position to a target epoch.
- *
- * Uses the linear proper motion model:
- *   RA(t)  = RA(J2016) + pmRA  * (t - J2016) / cos(dec)
- *   Dec(t) = Dec(J2016) + pmDec * (t - J2016)
- *
- * where t is in Julian years from J2016.0 (2457389.0 JD).
- *
- * @param star   Gaia DR3 star (astrometry at J2016.0)
- * @param epoch  Target epoch (TDB)
- * @return Sky position at the target epoch [deg, deg]
- */
-[[nodiscard]] SkyPoint propagate_proper_motion(
-    const Star& star,
-    time::EpochTDB epoch
-) noexcept;
-
-/**
  * @brief Convert a Star to an astrometry::SkyCoord at a given epoch.
  *
  * Applies proper motion correction, then constructs a typed SkyCoord
@@ -92,19 +74,16 @@ namespace astdyn::catalog {
     const std::vector<physics::CartesianStateTyped<core::GCRF>>& earth_states,
     time::EpochTDB t_start,
     time::EpochTDB t_end,
-    double width_arcsec    = 120.0,
-    double max_magnitude   = 18.0,
-    double segment_days    = 10.0,
-    int    chebyshev_degree = 12
+    Angle          width           = Angle::from_arcsec(120.0),
+    double         max_magnitude   = 18.0,
+    double         segment_days    = 10.0,
+    int            chebyshev_degree = 12
 );
 
 /**
- * @brief Compute geocentric RA/Dec from heliocentric body and Earth positions.
- *
- * body_pos and earth_pos must be in the same frame (GCRF, SI meters).
- * Returns {ra_deg, dec_deg} in the ICRS/J2000 equatorial frame.
+ * @brief Compute geocentric SkyCoord from heliocentric body and Earth positions.
  */
-[[nodiscard]] SkyPoint heliocentric_to_radec(
+[[nodiscard]] SkyCoord<core::GCRF> heliocentric_to_skycoord(
     const physics::CartesianStateTyped<core::GCRF>& body,
     const physics::CartesianStateTyped<core::GCRF>& earth
 ) noexcept;
@@ -137,8 +116,66 @@ namespace astdyn::catalog {
     const std::vector<physics::CartesianStateTyped<core::GCRF>>& earth_states,
     time::EpochTDB t_start,
     time::EpochTDB t_end,
-    double width_arcsec  = 120.0,
-    double max_magnitude = 18.0
+    Angle          width         = Angle::from_arcsec(120.0),
+    double         max_magnitude = 18.0
+);
+
+/**
+ * @brief Generate a Chebyshev polynomial approximation for an orbit centered at a target epoch.
+ *
+ * Useful for high-performance interpolation of asteroid positions (geocentric RA/Dec).
+ * Centered on a target epoch (e.g. midnight) with a specified duration and degree.
+ *
+ * @param initial_elements Orbit at some epoch (will be propagated to window)
+ * @param center_epoch     Target epoch for the center of the segment (TDB)
+ * @param duration_days    Total time window duration [days]
+ * @param cfg              AstDyn configuration for propagation
+ * @param degree           Chebyshev polynomial degree (default: 12)
+ * @return Chebyshev coefficients for geocentric RA and Dec
+ */
+[[nodiscard]] ChebyshevSegment fit_chebyshev(
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
+    time::EpochTDB center_epoch,
+    double         duration_days,
+    const AstDynConfig& cfg,
+    int            degree = 12
+);
+
+/**
+ * @brief Find stars along a specific Chebyshev segment corridor.
+ * 
+ * @param catalog       Initialized Gaia catalog.
+ * @param segment       The segment representing the asteroid path (RA/Dec).
+ * @param width         Half-width of the corridor search.
+ * @param max_magnitude Faint magnitude limit (Gaia G).
+ * @return List of candidate stars.
+ */
+[[nodiscard]] std::vector<Star> find_stars_near_segment(
+    const GaiaDR3Catalog& catalog,
+    const ChebyshevSegment& segment,
+    Angle          width,
+    double         max_magnitude = 18.0
+);
+
+/**
+ * @brief Generate a Chebyshev polynomial approximation for an orbit centered at a target epoch.
+ *
+ * Useful for high-performance interpolation of asteroid positions (geocentric RA/Dec).
+ * Centered on a target epoch (e.g. midnight) with a specified duration and degree.
+ *
+ * @param initial_elements Orbit at some epoch (will be propagated to window)
+ * @param center_epoch     Target epoch for the center of the segment (TDB)
+ * @param duration_days    Total time window duration [days]
+ * @param cfg              AstDyn configuration for propagation
+ * @param degree           Chebyshev polynomial degree (default: 12)
+ * @return Chebyshev coefficients for geocentric RA and Dec
+ */
+[[nodiscard]] ChebyshevSegment fit_chebyshev(
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
+    time::EpochTDB center_epoch,
+    double         duration_days,
+    const AstDynConfig& cfg,
+    int            degree = 12
 );
 
 } // namespace astdyn::catalog

@@ -27,14 +27,16 @@ Star from_upstream(const ioc::gaia::GaiaStar& s) {
     out.hip_designation      = s.hip_designation;
     out.tycho2_designation   = s.tycho2_designation;
     out.sao_designation      = s.sao_designation;
-    out.ra_deg               = s.ra;
-    out.dec_deg              = s.dec;
-    out.parallax_mas         = s.parallax;
+    
+    out.ra                   = RightAscension(Angle::from_deg(s.ra));
+    out.dec                  = Declination(Angle::from_deg(s.dec));
+    out.parallax             = Parallax::from_mas(s.parallax);
     out.parallax_error_mas   = s.parallax_error;
-    out.pmra_mas_yr          = s.pmra;
-    out.pmdec_mas_yr         = s.pmdec;
+    out.pm_ra_cosdec         = ProperMotion::from_mas_yr(s.pmra);
+    out.pm_dec               = ProperMotion::from_mas_yr(s.pmdec);
     out.pmra_error_mas_yr    = s.pmra_error;
     out.pmdec_error_mas_yr   = s.pmdec_error;
+    
     out.g_mag                = s.phot_g_mean_mag;
     out.bp_mag               = s.phot_bp_mean_mag;
     out.rp_mag               = s.phot_rp_mean_mag;
@@ -53,31 +55,31 @@ std::vector<Star> from_upstream(const std::vector<ioc::gaia::GaiaStar>& src) {
 
 ioc::gaia::QueryParams to_upstream(const ConeQuery& q) {
     ioc::gaia::QueryParams p;
-    p.ra_center      = q.ra_deg;
-    p.dec_center     = q.dec_deg;
-    p.radius         = q.radius_arcsec / 3600.0; // arcsec → deg
+    p.ra_center      = q.ra.to_deg();
+    p.dec_center     = q.dec.to_deg();
+    p.radius         = q.radius.to_deg();
     p.max_magnitude  = q.max_magnitude;
-    p.min_parallax   = q.min_parallax_mas;
+    p.min_parallax   = q.min_parallax.to_mas();
     return p;
 }
 
 ioc::gaia::CorridorQueryParams to_upstream(const CorridorQuery& q) {
     ioc::gaia::CorridorQueryParams p;
     for (const auto& pt : q.path) {
-        p.path.push_back(ioc::gaia::CelestialPoint(pt.ra_deg, pt.dec_deg));
+        p.path.push_back(ioc::gaia::CelestialPoint(pt.ra().to_deg(), pt.dec().to_deg()));
     }
-    p.width         = q.width_arcsec / 3600.0; // arcsec → deg
+    p.width         = q.width.to_deg();
     p.max_magnitude = q.max_magnitude;
-    p.min_parallax  = q.min_parallax_mas;
+    p.min_parallax  = q.min_parallax.to_mas();
     p.max_results   = q.max_results;
     return p;
 }
 
 ioc::gaia::OrbitQueryParams to_upstream(const OrbitQuery& q) {
     ioc::gaia::OrbitQueryParams p;
-    p.t_start       = q.t_start_jd;
-    p.t_end         = q.t_end_jd;
-    p.width         = q.width_arcsec / 3600.0;
+    p.t_start       = q.t_start.mjd() + 2400000.5;
+    p.t_end         = q.t_end.mjd() + 2400000.5;
+    p.width         = q.width.to_deg();
     p.max_magnitude = q.max_magnitude;
     p.step_size     = q.step_days;
     for (const auto& seg : q.segments) {
@@ -92,6 +94,39 @@ ioc::gaia::OrbitQueryParams to_upstream(const OrbitQuery& q) {
 }
 
 } // namespace
+
+// ============================================================================
+// Star::predict_at implementation
+// ============================================================================
+
+SkyCoord<core::GCRF> Star::predict_at(time::EpochTDB target_time) const {
+    // Gaia reference epoch is J2016.0 (JD 2457388.5 TDB)
+    constexpr double GAIA_EPOCH_JD = 2457388.5;
+    double dt_years = (target_time.mjd() + 2400000.5 - GAIA_EPOCH_JD) / 365.25;
+
+    Angle d_ra  = pm_ra_cosdec.multiply_time(dt_years) * (1.0 / std::cos(dec.to_rad()));
+    Angle d_dec = pm_dec.multiply_time(dt_years);
+
+    // Simplified proper motion (for more rigor, convert to vectors, rotate, back to angles)
+    RightAscension ra_new(ra + d_ra);
+    Declination    dec_new(dec + d_dec);
+
+    // Convert to vector for SkyCoord
+    double cos_dec = std::cos(dec_new.to_rad());
+    Eigen::Vector3d rho(
+        cos_dec * std::cos(ra_new.to_rad()),
+        cos_dec * std::sin(ra_new.to_rad()),
+        std::sin(dec_new.to_rad())
+    );
+
+    // Multiply by distance if we have parallax
+    Distance d = parallax.to_distance();
+    if (d.to_m() > 0) {
+        rho *= d.to_m();
+    }
+
+    return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho));
+}
 
 // ============================================================================
 // GaiaDR3Catalog::Impl — PIMPL hiding UnifiedGaiaCatalog

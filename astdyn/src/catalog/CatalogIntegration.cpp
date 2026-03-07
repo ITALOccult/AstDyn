@@ -1,10 +1,6 @@
-/**
- * @file CatalogIntegration.cpp
- * @brief Bridge between AstDyn propagation output and astdyn::catalog queries
- */
-
 #include "astdyn/catalog/CatalogIntegration.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/astrometry/Astrometry.hpp"
 
 #include <Eigen/Dense>
 
@@ -30,79 +26,26 @@ namespace {
 } // namespace
 
 // ============================================================================
-// propagate_proper_motion
-// ============================================================================
-
-SkyPoint propagate_proper_motion(const Star& star, time::EpochTDB epoch) noexcept {
-    if (!star.has_proper_motion()) {
-        return SkyPoint{star.ra_deg, star.dec_deg};
-    }
-
-    const double dt_yr = (epoch.jd() - GAIA_EPOCH_JD) / JY;
-    const double dec_rad = star.dec_deg * c::DEG_TO_RAD;
-    const double cos_dec = std::cos(dec_rad);
-
-    // Linear model: pmRA is already pmRA*cos(dec) in Gaia convention
-    double ra_new  = star.ra_deg  + (star.pmra_mas_yr  * ARCSEC_TO_DEG / 1000.0 / std::max(cos_dec, 1e-6)) * dt_yr;
-    double dec_new = star.dec_deg + (star.pmdec_mas_yr * ARCSEC_TO_DEG / 1000.0) * dt_yr;
-
-    // Wrap RA to [0, 360)
-    ra_new = std::fmod(ra_new, 360.0);
-    if (ra_new < 0.0) ra_new += 360.0;
-
-    return SkyPoint{ra_new, dec_new};
-}
-
-// ============================================================================
 // to_sky_coord
 // ============================================================================
 
 astrometry::SkyCoord<core::GCRF> to_sky_coord(const Star& star, time::EpochTDB epoch) {
-    SkyPoint pos = propagate_proper_motion(star, epoch);
-    // Build a unit vector in GCRF and wrap it in SkyCoord via from_vector()
-    const double ra_rad  = pos.ra_deg  * c::DEG_TO_RAD;
-    const double dec_rad = pos.dec_deg * c::DEG_TO_RAD;
-    const double cos_dec = std::cos(dec_rad);
-
-    Eigen::Vector3d unit_vec(
-        cos_dec * std::cos(ra_rad),
-        cos_dec * std::sin(ra_rad),
-        std::sin(dec_rad)
-    );
-
-    // Scale to 1 AU (arbitrary — SkyCoord only uses direction)
-    constexpr double AU_M = 1.495978707e11; // 1 AU in meters
-    auto rho = math::Vector3<core::GCRF, physics::Distance>::from_si(
-        unit_vec.x() * AU_M, unit_vec.y() * AU_M, unit_vec.z() * AU_M);
-
-    return astrometry::SkyCoord<core::GCRF>::from_vector(rho);
+    return star.predict_at(epoch);
 }
 
-// ============================================================================
-// heliocentric_to_radec
-// ============================================================================
-
-SkyPoint heliocentric_to_radec(
+SkyCoord<core::GCRF> heliocentric_to_skycoord(
     const physics::CartesianStateTyped<core::GCRF>& body,
     const physics::CartesianStateTyped<core::GCRF>& earth) noexcept
 {
     // Geocentric direction vector (SI meters)
-    const double rx = body.position.x_si() - earth.position.x_si();
-    const double ry = body.position.y_si() - earth.position.y_si();
-    const double rz = body.position.z_si() - earth.position.z_si();
-    const double rho = std::sqrt(rx*rx + ry*ry + rz*rz);
+    Eigen::Vector3d rho_vec = body.position.to_eigen_si() - earth.position.to_eigen_si();
+    Distance rho = Distance::from_si(rho_vec.norm());
 
-    if (rho < 1.0) return SkyPoint{0.0, 0.0}; // degenerate
+    if (rho.to_m() < 1.0) {
+        return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::zero());
+    }
 
-    const double ux = rx / rho;
-    const double uy = ry / rho;
-    const double uz = rz / rho;
-
-    double dec_rad = std::asin(std::clamp(uz, -1.0, 1.0));
-    double ra_rad  = std::atan2(uy, ux);
-    if (ra_rad < 0.0) ra_rad += 2.0 * c::PI;
-
-    return SkyPoint{ra_rad / c::DEG_TO_RAD, dec_rad / c::DEG_TO_RAD};
+    return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho_vec));
 }
 
 // ============================================================================
@@ -152,23 +95,23 @@ OrbitQuery make_orbit_query(
     const std::vector<physics::CartesianStateTyped<core::GCRF>>& earth_states,
     time::EpochTDB t_start,
     time::EpochTDB t_end,
-    double width_arcsec,
-    double max_magnitude,
-    double segment_days,
-    int    chebyshev_degree)
+    Angle          width,
+    double         max_magnitude,
+    double         segment_days,
+    int            chebyshev_degree)
 {
     if (states.size() != earth_states.size() || states.empty()) {
         throw std::invalid_argument("make_orbit_query: states and earth_states must be non-empty and same size");
     }
 
-    // Compute geocentric RA/Dec at each sample epoch
+    // Compute geocentric SkyCoord at each sample epoch
     const std::size_t N = states.size();
     std::vector<double> jd_samples(N), ra_samples(N), dec_samples(N);
     for (std::size_t i = 0; i < N; ++i) {
         jd_samples[i] = states[i].epoch.jd();
-        auto sky = heliocentric_to_radec(states[i], earth_states[i]);
-        ra_samples[i]  = sky.ra_deg;
-        dec_samples[i] = sky.dec_deg;
+        auto sky = heliocentric_to_skycoord(states[i], earth_states[i]);
+        ra_samples[i]  = sky.ra().to_deg();
+        dec_samples[i] = sky.dec().to_deg();
     }
 
     const double jd0 = t_start.jd();
@@ -205,10 +148,10 @@ OrbitQuery make_orbit_query(
     }
 
     OrbitQuery q;
-    q.t_start_jd  = jd0;
-    q.t_end_jd    = jd1;
+    q.t_start     = t_start;
+    q.t_end       = t_end;
     q.segments    = std::move(segments);
-    q.width_arcsec  = width_arcsec;
+    q.width       = width;
     q.max_magnitude = max_magnitude;
     q.step_days     = segment_days / std::max(chebyshev_degree, 1);
     return q;
@@ -224,27 +167,91 @@ std::vector<Star> find_occultation_candidates(
     const std::vector<physics::CartesianStateTyped<core::GCRF>>& earth_states,
     time::EpochTDB t_start,
     time::EpochTDB t_end,
-    double width_arcsec,
-    double max_magnitude)
+    Angle          width,
+    double         max_magnitude)
 {
     OrbitQuery oq = make_orbit_query(
         body_states, earth_states,
         t_start, t_end,
-        width_arcsec, max_magnitude);
+        width, max_magnitude);
 
     std::vector<Star> candidates = catalog.query_orbit(oq);
 
-    // Apply proper motion to mid-epoch for each candidate
+    // Apply proper motion correction to the center of the window
     time::EpochTDB mid_epoch = time::EpochTDB::from_jd(
         0.5 * (t_start.jd() + t_end.jd()));
 
     for (auto& star : candidates) {
-        auto pos = propagate_proper_motion(star, mid_epoch);
-        star.ra_deg  = pos.ra_deg;
-        star.dec_deg = pos.dec_deg;
+        auto sky = star.predict_at(mid_epoch);
+        star.ra  = sky.ra();
+        star.dec = sky.dec();
     }
 
     return candidates;
+}
+
+ChebyshevSegment fit_chebyshev(
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
+    time::EpochTDB center_epoch,
+    double         duration_days,
+    const AstDynConfig& cfg,
+    int            degree)
+{
+    const double t_start = center_epoch.jd() - duration_days / 2.0;
+    const double t_end   = center_epoch.jd() + duration_days / 2.0;
+
+    // Sample the orbit (using +2 points to ensure enough data for degree D)
+    const int N = degree + 5;
+    std::vector<double> jd_samples(N), ra_samples(N), dec_samples(N), tau_samples(N);
+
+    astrometry::AstrometricSettings a_settings;
+    a_settings.light_time_correction = true;
+    a_settings.stellar_aberration     = false;
+    a_settings.frame_conversion_to_equatorial = true;
+
+    for (int i = 0; i < N; ++i) {
+        double tau = -1.0 + 2.0 * i / (N - 1); // Normalized time [-1, 1]
+        double jd  = t_start + (tau + 1.0) * (t_end - t_start) / 2.0;
+        time::EpochTDB t_obs = time::EpochTDB::from_jd(jd);
+
+        auto obs = astrometry::AstrometryReducer::compute_observation(
+            initial_elements, initial_elements.epoch, t_obs, cfg, a_settings
+        );
+
+        if (obs) {
+            jd_samples[i]  = jd;
+            tau_samples[i] = tau;
+            ra_samples[i]  = obs->ra.value * c::RAD_TO_DEG;
+            dec_samples[i] = obs->dec.value * c::RAD_TO_DEG;
+        } else {
+            // Degenerate or failure, should not happen in nominal conditions
+            throw std::runtime_error("fit_chebyshev: propagation failed at JD " + std::to_string(jd));
+        }
+    }
+
+    ChebyshevSegment seg;
+    seg.t_start = t_start;
+    seg.t_end   = t_end;
+    seg.ra_coeffs  = cheby_fit(tau_samples, ra_samples, degree);
+    seg.dec_coeffs = cheby_fit(tau_samples, dec_samples, degree);
+    return seg;
+}
+
+std::vector<Star> find_stars_near_segment(
+    const GaiaDR3Catalog& catalog,
+    const ChebyshevSegment& segment,
+    Angle          width,
+    double         max_magnitude)
+{
+    OrbitQuery oq;
+    oq.t_start     = time::EpochTDB::from_jd(segment.t_start);
+    oq.t_end       = time::EpochTDB::from_jd(segment.t_end);
+    oq.segments    = { segment };
+    oq.width       = width;
+    oq.max_magnitude = max_magnitude;
+    oq.step_days     = (segment.t_end - segment.t_start) / std::max((int)segment.ra_coeffs.size(), 5);
+    
+    return catalog.query_orbit(oq);
 }
 
 } // namespace astdyn::catalog
