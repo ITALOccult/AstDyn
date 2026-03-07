@@ -64,7 +64,10 @@ target_link_libraries(benchmark_integrators PRIVATE astdyn)
 
 # Gaia Occultation Search Test
 add_executable(gaia_occultation_test gaia_occultation_test.cpp)
-target_link_libraries(gaia_occultation_test PRIVATE astdyn)
+target_link_libraries(gaia_occultation_test PRIVATE astdyn Eigen3::Eigen)
+
+add_executable(full_od_workflow full_od_workflow.cpp)
+target_link_libraries(full_od_workflow PRIVATE astdyn Eigen3::Eigen)
 
 # Install examples (optional)
 install(TARGETS example_basic
