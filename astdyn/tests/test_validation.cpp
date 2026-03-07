@@ -277,11 +277,14 @@ TEST(ValidationTest, MagnitudePreservation) {
     double r_mag = pos.norm();
     double v_mag = vel.norm();
     
-    // Transform to multiple frames
-    CartesianState state_icrs = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ICRS);
-    CartesianState state_ecl = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ECLIPTIC);
+    // Transform to multiple frames via rotation matrices
+    auto apply_rot = [](const CartesianState& s, const Matrix3d& R) {
+        return CartesianState(R * s.position(), R * s.velocity(), s.mu());
+    };
+    CartesianState state_icrs = apply_rot(
+        state_j2000, ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ICRS));
+    CartesianState state_ecl  = apply_rot(
+        state_j2000, ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ECLIPTIC));
     
     // Magnitudes should be preserved (rotations only)
     EXPECT_NEAR(state_icrs.radius(), r_mag, 1e-6);

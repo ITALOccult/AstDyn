@@ -89,13 +89,13 @@ TEST(ReferenceFrameTest, ICRSToJ2000Inverse) {
 
 TEST(ReferenceFrameTest, J2000ICRSRoundTrip) {
     Vector3d pos_j2000(7000.0, 0.0, 0.0);
-    
-    // J2000 → ICRS → J2000
-    Vector3d pos_icrs = ReferenceFrame::transform_position(
-        pos_j2000, FrameType::J2000, FrameType::ICRS);
-    Vector3d pos_final = ReferenceFrame::transform_position(
-        pos_icrs, FrameType::ICRS, FrameType::J2000);
-    
+
+    // J2000 → ICRS → J2000 via rotation matrices
+    Matrix3d R_fwd = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ICRS);
+    Matrix3d R_inv = ReferenceFrame::get_transformation(FrameType::ICRS, FrameType::J2000);
+    Vector3d pos_icrs  = R_fwd * pos_j2000;
+    Vector3d pos_final = R_inv * pos_icrs;
+
     EXPECT_TRUE(pos_final.isApprox(pos_j2000, 1e-6));
 }
 
@@ -121,25 +121,25 @@ TEST(ReferenceFrameTest, EclipticToJ2000Inverse) {
 TEST(ReferenceFrameTest, EclipticCoordinates) {
     // Point on equator in J2000 should have non-zero Z in ecliptic
     Vector3d pos_j2000(AU, 0.0, 0.0);
-    
-    Vector3d pos_ecliptic = ReferenceFrame::transform_position(
-        pos_j2000, FrameType::J2000, FrameType::ECLIPTIC);
-    
+
+    Matrix3d R = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ECLIPTIC);
+    Vector3d pos_ecliptic = R * pos_j2000;
+
     // X-component should be unchanged (rotation about X)
     EXPECT_NEAR(pos_ecliptic.x(), pos_j2000.x(), 1e-6);
-    
+
     // Should preserve magnitude
     EXPECT_NEAR(pos_ecliptic.norm(), pos_j2000.norm(), 1e-6);
 }
 
 TEST(ReferenceFrameTest, EclipticRoundTrip) {
     Vector3d pos_j2000(1.5e8, 5.0e7, 2.0e7); // Arbitrary position
-    
-    Vector3d pos_ecliptic = ReferenceFrame::transform_position(
-        pos_j2000, FrameType::J2000, FrameType::ECLIPTIC);
-    Vector3d pos_final = ReferenceFrame::transform_position(
-        pos_ecliptic, FrameType::ECLIPTIC, FrameType::J2000);
-    
+
+    Matrix3d R_fwd = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ECLIPTIC);
+    Matrix3d R_inv = ReferenceFrame::get_transformation(FrameType::ECLIPTIC, FrameType::J2000);
+    Vector3d pos_ecliptic = R_fwd * pos_j2000;
+    Vector3d pos_final    = R_inv * pos_ecliptic;
+
     EXPECT_TRUE(pos_final.isApprox(pos_j2000, 1e-3));
 }
 
@@ -170,18 +170,18 @@ TEST(ReferenceFrameTest, ITRFToJ2000Inverse) {
 TEST(ReferenceFrameTest, ITRFRotation) {
     // Position at different times should show Earth rotation
     Vector3d pos_j2000(7000.0, 0.0, 0.0);
-    
+
     time::EpochTDB mjd1_instant = time::EpochTDB::from_mjd(MJD2000);
     time::EpochTDB mjd2_instant = time::EpochTDB::from_mjd(MJD2000 + 0.25); // 6 hours later
-    
-    Vector3d pos_itrf1 = ReferenceFrame::transform_position(
-        pos_j2000, FrameType::J2000, FrameType::ITRF, mjd1_instant);
-    Vector3d pos_itrf2 = ReferenceFrame::transform_position(
-        pos_j2000, FrameType::J2000, FrameType::ITRF, mjd2_instant);
-    
+
+    Matrix3d R1 = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ITRF, mjd1_instant);
+    Matrix3d R2 = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ITRF, mjd2_instant);
+    Vector3d pos_itrf1 = R1 * pos_j2000;
+    Vector3d pos_itrf2 = R2 * pos_j2000;
+
     // Positions should be different (Earth has rotated)
     EXPECT_GT((pos_itrf2 - pos_itrf1).norm(), 1000.0);
-    
+
     // But magnitude should be preserved
     EXPECT_NEAR(pos_itrf1.norm(), pos_j2000.norm(), 1e-6);
     EXPECT_NEAR(pos_itrf2.norm(), pos_j2000.norm(), 1e-6);
@@ -200,35 +200,42 @@ TEST(ReferenceFrameTest, IdentityTransformation) {
 TEST(ReferenceFrameTest, ChainedTransformation) {
     // ICRS → ECLIPTIC should equal ICRS → J2000 → ECLIPTIC
     Vector3d pos_icrs(AU, 0.0, 0.0);
-    
+
     // Direct transformation
-    Vector3d pos_ecliptic1 = ReferenceFrame::transform_position(
-        pos_icrs, FrameType::ICRS, FrameType::ECLIPTIC);
-    
+    Matrix3d R_direct = ReferenceFrame::get_transformation(FrameType::ICRS, FrameType::ECLIPTIC);
+    Vector3d pos_ecliptic1 = R_direct * pos_icrs;
+
     // Chained through J2000
-    Vector3d pos_j2000 = ReferenceFrame::transform_position(
-        pos_icrs, FrameType::ICRS, FrameType::J2000);
-    Vector3d pos_ecliptic2 = ReferenceFrame::transform_position(
-        pos_j2000, FrameType::J2000, FrameType::ECLIPTIC);
-    
+    Matrix3d R_to_j2000   = ReferenceFrame::get_transformation(FrameType::ICRS, FrameType::J2000);
+    Matrix3d R_to_ecl     = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ECLIPTIC);
+    Vector3d pos_j2000    = R_to_j2000 * pos_icrs;
+    Vector3d pos_ecliptic2 = R_to_ecl * pos_j2000;
+
     EXPECT_TRUE(pos_ecliptic1.isApprox(pos_ecliptic2, 1e-3));
 }
 
 // ========== State Transformation Tests ==========
+
+// Helper: apply a rotation matrix to both position and velocity of a CartesianState.
+// For rotating frames (ITRF) the Coriolis term is not included here;
+// use the typed ReferenceFrame::transform_vel<F,T>() API for that.
+static CartesianState apply_rotation(const CartesianState& s, const Matrix3d& R) {
+    return CartesianState(R * s.position(), R * s.velocity(), s.mu());
+}
 
 TEST(ReferenceFrameTest, StateTransformationPosition) {
     // Create a state in J2000
     Vector3d pos(7000.0, 0.0, 0.0);
     Vector3d vel(0.0, 7.5, 0.0);
     CartesianState state_j2000(pos, vel, GM_EARTH);
-    
-    // Transform to ICRS
-    CartesianState state_icrs = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ICRS);
-    
-    // Position should change slightly
+
+    // Transform to ICRS via rotation matrix
+    Matrix3d R = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ICRS);
+    CartesianState state_icrs = apply_rotation(state_j2000, R);
+
+    // Position should change slightly (frame bias ~0.02 arcsec)
     EXPECT_TRUE(state_icrs.position().isApprox(pos, 1e-2));
-    
+
     // Magnitude should be preserved
     EXPECT_NEAR(state_icrs.radius(), state_j2000.radius(), 1e-6);
 }
@@ -237,12 +244,12 @@ TEST(ReferenceFrameTest, StateTransformationVelocity) {
     Vector3d pos(7000.0, 0.0, 0.0);
     Vector3d vel(0.0, 7.5, 0.0);
     CartesianState state_j2000(pos, vel, GM_EARTH);
-    
-    // Transform to Ecliptic
-    CartesianState state_ecliptic = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ECLIPTIC);
-    
-    // Speed should be preserved
+
+    // Transform to Ecliptic via rotation matrix
+    Matrix3d R = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ECLIPTIC);
+    CartesianState state_ecliptic = apply_rotation(state_j2000, R);
+
+    // Speed should be preserved (pure rotation, no Coriolis)
     EXPECT_NEAR(state_ecliptic.speed(), state_j2000.speed(), 1e-6);
 }
 
@@ -250,31 +257,37 @@ TEST(ReferenceFrameTest, StateTransformationRoundTrip) {
     Vector3d pos(7000.0, 3000.0, 1000.0);
     Vector3d vel(2.0, 5.0, -3.0);
     CartesianState state_orig(pos, vel, GM_EARTH);
-    
+
     // J2000 → ECLIPTIC → J2000
-    CartesianState state_ecliptic = ReferenceFrame::transform_state(
-        state_orig, FrameType::J2000, FrameType::ECLIPTIC);
-    CartesianState state_final = ReferenceFrame::transform_state(
-        state_ecliptic, FrameType::ECLIPTIC, FrameType::J2000);
-    
+    Matrix3d R_fwd = ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ECLIPTIC);
+    Matrix3d R_inv = ReferenceFrame::get_transformation(FrameType::ECLIPTIC, FrameType::J2000);
+    CartesianState state_ecliptic = apply_rotation(state_orig, R_fwd);
+    CartesianState state_final    = apply_rotation(state_ecliptic, R_inv);
+
     EXPECT_TRUE(state_final.position().isApprox(pos, 1e-3));
     EXPECT_TRUE(state_final.velocity().isApprox(vel, 1e-3));
 }
 
 TEST(ReferenceFrameTest, ITRFVelocityTransformation) {
-    // Test that Coriolis term is included for ITRF
-    Vector3d pos(7000.0, 0.0, 0.0);
-    Vector3d vel(0.0, 7.5, 0.0);
-    CartesianState state_j2000(pos, vel, GM_EARTH);
-    
-    time::EpochTDB mjd_instant = time::EpochTDB::from_mjd(MJD2000);
-    
-    // Transform to ITRF
-    CartesianState state_itrf = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ITRF, mjd_instant);
-    
-    // Velocity magnitude should be different (Coriolis effect)
-    EXPECT_NE(state_itrf.speed(), state_j2000.speed());
+    // Test that ITRF velocity differs from inertial (rotation effect).
+    // Use the typed API which correctly handles the Coriolis term.
+    using namespace astdyn::core;
+    using namespace astdyn::physics;
+    using namespace astdyn::math;
+
+    time::EpochTDB t = time::EpochTDB::from_mjd(MJD2000);
+
+    // Construct typed state in GCRF (≈J2000)
+    auto pos_gcrf = Vector3<GCRF, Distance>::from_si(7000.0e3, 0.0, 0.0); // 7000 km in meters
+    auto vel_gcrf = Vector3<GCRF, Velocity>::from_si(0.0, 7500.0, 0.0);   // 7.5 km/s in m/s
+
+    // Transform velocity to ITRF (includes Coriolis)
+    auto vel_itrf = ReferenceFrame::transform_vel<GCRF, ITRF>(pos_gcrf, vel_gcrf, t);
+
+    // Speed in ITRF should differ from GCRF speed due to Earth rotation
+    double speed_gcrf = vel_gcrf.norm().to_ms();
+    double speed_itrf = vel_itrf.norm().to_ms();
+    EXPECT_NE(speed_gcrf, speed_itrf);
 }
 
 // ========== Utility Function Tests ==========

@@ -98,26 +98,17 @@ int main(int argc, char** argv) {
         // 1. Keplerian (Ecliptic) -> Cartesian (Ecliptic)
         auto cart_ecliptic_elem = propagation::keplerian_to_cartesian(orbfit_orbit_ecliptic);
         
-        // Convert to CartesianState for rotation
-        coordinates::CartesianState state_ecliptic(
-            cart_ecliptic_elem.position,
-            cart_ecliptic_elem.velocity,
-            cart_ecliptic_elem.gravitational_parameter
-        );
-        
-        // 2. Rotate Cartesian State: Ecliptic -> Equatorial
-        auto state_equatorial = coordinates::ReferenceFrame::transform_state(
-            state_ecliptic,
-            coordinates::FrameType::ECLIPTIC,
-            coordinates::FrameType::J2000
-        );
-        
-        // Convert back to CartesianElements
+        // 2. Rotate Cartesian State: Ecliptic -> Equatorial (J2000/ICRF)
+        Matrix3d R_ecl_to_j2000 = coordinates::ReferenceFrame::get_transformation(
+            coordinates::FrameType::ECLIPTIC, coordinates::FrameType::J2000);
+
         propagation::CartesianElements cart_equatorial_elem;
         cart_equatorial_elem.epoch = cart_ecliptic_elem.epoch;
-        cart_equatorial_elem.position = state_equatorial.position();
-        cart_equatorial_elem.velocity = state_equatorial.velocity();
-        cart_equatorial_elem.gravitational_parameter = state_equatorial.mu();
+        cart_equatorial_elem.gravitational_parameter = cart_ecliptic_elem.gravitational_parameter;
+        cart_equatorial_elem.position = types::Vector3<core::GCRF, core::Meter>(
+            R_ecl_to_j2000 * cart_ecliptic_elem.position.to_eigen());
+        cart_equatorial_elem.velocity = types::Vector3<core::GCRF, core::Meter>(
+            R_ecl_to_j2000 * cart_ecliptic_elem.velocity.to_eigen());
         
         // 3. Cartesian (Equatorial) -> Keplerian (Equatorial)
         auto orbfit_orbit_equatorial = propagation::cartesian_to_keplerian(cart_equatorial_elem);

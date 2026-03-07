@@ -196,8 +196,9 @@ int main(int argc, char** argv) {
         Vector3d earth_pos = earth_pos_bary - sun_pos_bary;
         
         // If we were using Analytical, we would need:
-        // auto earth_eq = coordinates::ReferenceFrame::transform_state(earth_state_raw, ECLIPTIC, J2000);
-        // earth_pos = earth_eq.position();
+        // Matrix3d R = coordinates::ReferenceFrame::get_transformation(
+        //     coordinates::FrameType::ECLIPTIC, coordinates::FrameType::J2000);
+        // earth_pos = R * earth_state_raw.position();
         
         // Correzione per il Tempo Luce (Light-Time Correction)
         // JPL "Astrometric" include solitamente la correzione per il tempo luce.

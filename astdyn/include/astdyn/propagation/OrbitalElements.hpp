@@ -27,12 +27,16 @@
 namespace astdyn::propagation {
 
 /**
- * @brief Keplerian orbital elements
- * 
- * Standard osculating elements at a given epoch.
- * Units: km, radians, days (MJD)
+ * @brief Keplerian orbital elements — internal propagation representation.
+ *
+ * Internal format used by the propagation engine (OrbitalElements.cpp,
+ * Propagator, etc.).  Units: AU, radians, AU³/day².
+ *
+ * External code should use physics::KeplerianStateTyped<Frame> and the
+ * typed template converters keplerian_to_cartesian<Frame> /
+ * cartesian_to_keplerian<Frame> declared below.
  */
-struct [[deprecated("Use physics::KeplerianStateTyped<Frame> instead")]] KeplerianElements {
+struct KeplerianElements {
     time::EpochTDB epoch;           ///< Epoch (EpochTDB)
     double semi_major_axis;          ///< Semi-major axis [AU]
     double eccentricity;             ///< Eccentricity [dimensionless]
@@ -89,12 +93,16 @@ struct [[deprecated("Use physics::KeplerianStateTyped<Frame> instead")]] Kepleri
 };
 
 /**
- * @brief Cartesian state vector — always in SI units.
- * 
- * Position in meters, velocity in m/s, gravitational parameter in m³/s².
- * Reference frame: GCRF (J2000 equatorial).
+ * @brief Cartesian state vector — internal propagation representation.
+ *
+ * Always in SI units: position [m], velocity [m/s], GM [m³/s²].
+ * Reference frame implied by the propagation context (usually GCRF).
+ *
+ * External code should use physics::CartesianStateTyped<Frame> and the
+ * typed template converters keplerian_to_cartesian<Frame> /
+ * cartesian_to_keplerian<Frame> declared below.
  */
-struct [[deprecated("Use physics::CartesianStateTyped<Frame> instead")]] CartesianElements {
+struct CartesianElements {
     time::EpochTDB epoch;              ///< Epoch (EpochTDB)
     types::Vector3<core::GCRF, core::Meter> position; ///< Position vector [m]
     types::Vector3<core::GCRF, core::Meter> velocity; ///< Velocity vector [m/s]
