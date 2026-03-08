@@ -158,7 +158,7 @@ public:
      * @param t_end End time [MJD TDB]
      * @return Vector of detected close approaches (sorted by time)
      */
-    std::vector<CloseApproach> find_approaches(
+    std::vector<CloseApproach> detect(
         const physics::CartesianStateTyped<core::GCRF>& initial_state,
         time::EpochTDB t_start,
         time::EpochTDB t_end);
@@ -166,7 +166,7 @@ public:
     /**
      * @brief Find close approaches (Keplerian initial state)
      */
-    std::vector<CloseApproach> find_approaches(
+    std::vector<CloseApproach> detect(
         const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_orbit,
         time::EpochTDB t_start,
         time::EpochTDB t_end);
@@ -219,7 +219,7 @@ private:
      * @param body Target body
      * @return Time of closest approach [MJD TDB]
      */
-    time::EpochTDB refine_approach_time(
+    time::EpochTDB detect_approach_time(
         const physics::CartesianStateTyped<core::GCRF>& state_t1,
         const physics::CartesianStateTyped<core::GCRF>& state_t2,
         time::EpochTDB t1,

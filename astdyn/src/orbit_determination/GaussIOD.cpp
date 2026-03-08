@@ -184,12 +184,13 @@ std::optional<std::array<int, 3>> GaussIOD::select_observations(
     return std::array<int, 3>{idx1, idx2, idx3};
 }
 
-math::Vector3<core::GCRF, physics::Distance> GaussIOD::compute_line_of_sight(double ra, double dec) const {
-    double cos_dec = std::cos(dec);
+math::Vector3<core::GCRF, physics::Distance> GaussIOD::compute_line_of_sight(astrometry::RightAscension ra, astrometry::Declination dec) const {
+    double r = ra.to_rad();
+    double d = dec.to_rad();
     return math::Vector3<core::GCRF, physics::Distance>::from_si(
-        cos_dec * std::cos(ra),
-        cos_dec * std::sin(ra),
-        std::sin(dec)
+        std::cos(d) * std::cos(r),
+        std::cos(d) * std::sin(r),
+        std::sin(d)
     );
 }
 

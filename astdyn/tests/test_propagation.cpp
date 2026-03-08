@@ -39,15 +39,15 @@ TEST(OrbitalElementsTest, KeplerianToCartesianCircular) {
     double gm_si = constants::GM_SUN * 1e9;
     
     // At M=0, true anomaly=0, so object is at perihelion along x-axis (in meters)
-    EXPECT_NEAR(cart.position.x, au_m, 1e-5);
-    EXPECT_NEAR(cart.position.y, 0.0, 1e-5);
-    EXPECT_NEAR(cart.position.z, 0.0, 1e-5);
+    EXPECT_NEAR(cart.position.x_si(), au_m, 1e-5);
+    EXPECT_NEAR(cart.position.y_si(), 0.0, 1e-5);
+    EXPECT_NEAR(cart.position.z_si(), 0.0, 1e-5);
     
     // Velocity should be along y-axis for circular orbit (in m/s)
     double v_circular = std::sqrt(gm_si / au_m);
-    EXPECT_NEAR(cart.velocity.x, 0.0, 1e-5);
-    EXPECT_NEAR(cart.velocity.y, v_circular, 1e-5);
-    EXPECT_NEAR(cart.velocity.z, 0.0, 1e-5);
+    EXPECT_NEAR(cart.velocity.x_si(), 0.0, 1e-5);
+    EXPECT_NEAR(cart.velocity.y_si(), v_circular, 1e-5);
+    EXPECT_NEAR(cart.velocity.z_si(), 0.0, 1e-5);
 }
 
 TEST(OrbitalElementsTest, CartesianToKeplerianRoundTrip) {
@@ -273,12 +273,12 @@ TEST(PropagationTest, EnergyConservationTwoBody) {
     // Build typed state for the propagator
     physics::CartesianStateTyped<core::GCRF> cart0 = physics::CartesianStateTyped<core::GCRF>::from_si(
         time::EpochTDB::from_mjd(kep.epoch.mjd()),
-        cart0_legacy.position.x * constants::AU * 1000.0,
-        cart0_legacy.position.y * constants::AU * 1000.0,
-        cart0_legacy.position.z * constants::AU * 1000.0,
-        cart0_legacy.velocity.x * constants::AU * 1000.0 / 86400.0,
-        cart0_legacy.velocity.y * constants::AU * 1000.0 / 86400.0,
-        cart0_legacy.velocity.z * constants::AU * 1000.0 / 86400.0,
+        cart0_legacy.position.x_si(),
+        cart0_legacy.position.y_si(),
+        cart0_legacy.position.z_si(),
+        cart0_legacy.velocity.x_si(),
+        cart0_legacy.velocity.y_si(),
+        cart0_legacy.velocity.z_si(),
         constants::GM_SUN * 1e9
     );
 
@@ -343,7 +343,3 @@ TEST(PropagationTest, Summary) {
     std::cout << "========================================\n\n";
 }
 
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

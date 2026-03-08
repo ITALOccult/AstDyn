@@ -114,31 +114,35 @@ std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
     math::Vector3<core::GCRF, physics::Velocity> rho_dot = object_vel_gcrf - observer_vel_gcrf;
     double range_rate = rho_dot.to_eigen_si().dot(direction.to_eigen_si());
     
-    result.range = range;
-    result.range_rate = range_rate;
+    result.range = physics::Distance::from_si(range);
+    result.range_rate = physics::Velocity::from_si(range_rate);
     
     // 6. Convert to RA/Dec (includes Aberration, Light Bending)
-    double computed_ra_rad, computed_dec_rad;
-    cartesian_to_radec(direction, rho_vec, observer_pos_gcrf, observer_vel_gcrf, computed_ra_rad, computed_dec_rad);
+    astrometry::RightAscension computed_ra;
+    astrometry::Declination computed_dec;
+    cartesian_to_radec(direction, rho_vec, observer_pos_gcrf, observer_vel_gcrf, computed_ra, computed_dec);
     
-    result.computed_ra = computed_ra_rad;
-    result.computed_dec = computed_dec_rad;
+    result.computed_ra = computed_ra;
+    result.computed_dec = computed_dec;
     
-    // 7. Compute residuals O-C (Radians)
-    double d_ra = obs.ra - computed_ra_rad;
-    while (d_ra > constants::PI) d_ra -= constants::TWO_PI;
-    while (d_ra < -constants::PI) d_ra += constants::TWO_PI;
+    // 7. Compute residuals O-C
+    astrometry::Angle d_ra = obs.ra - computed_ra;
+    // Normalize d_ra to [-pi, pi]
+    d_ra = d_ra.wrap_pi();
     
-    result.residual_ra = d_ra * std::cos(obs.dec);
-    result.residual_dec = obs.dec - computed_dec_rad;
+    result.residual_ra = d_ra * std::cos(obs.dec.to_rad());
+    result.residual_dec = obs.dec - computed_dec;
     
-    result.normalized_ra = result.residual_ra / obs.sigma_ra;
-    result.normalized_dec = result.residual_dec / obs.sigma_dec;
+    result.normalized_ra = result.residual_ra.to_rad() / obs.sigma_ra.to_rad();
+    result.normalized_dec = result.residual_dec.to_rad() / obs.sigma_dec.to_rad();
     
-    double sig_ra = (obs.sigma_ra > 0.0) ? obs.sigma_ra : 1e-5;
-    double sig_dec = (obs.sigma_dec > 0.0) ? obs.sigma_dec : 1e-5;
-    result.weight_ra = 1.0 / (sig_ra * sig_ra);
-    result.weight_dec = 1.0 / (sig_dec * sig_dec);
+    double sig_ra_rad = obs.sigma_ra.to_rad();
+    double sig_dec_rad = obs.sigma_dec.to_rad();
+    if (sig_ra_rad <= 0.0) sig_ra_rad = 1e-10;
+    if (sig_dec_rad <= 0.0) sig_dec_rad = 1e-10;
+    
+    result.weight_ra = 1.0 / (sig_ra_rad * sig_ra_rad);
+    result.weight_dec = 1.0 / (sig_dec_rad * sig_dec_rad);
     
     result.chi_squared = result.normalized_ra * result.normalized_ra +
                         result.normalized_dec * result.normalized_dec;
@@ -152,8 +156,8 @@ void ResidualCalculator<Frame>::cartesian_to_radec(
     const math::Vector3<core::GCRF, physics::Distance>& rho_vec,
     const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
     const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
-    double& ra_rad,
-    double& dec_rad) const {
+    astrometry::RightAscension& ra,
+    astrometry::Declination& dec) const {
     
     auto eval_dir = direction_in.to_eigen_si();
     auto eval_obs = observer_pos.to_eigen_si();
@@ -188,9 +192,11 @@ void ResidualCalculator<Frame>::cartesian_to_radec(
         }
     }
     
-    dec_rad = std::asin(eval_dir.z());
-    ra_rad = std::atan2(eval_dir.y(), eval_dir.x());
-    if (ra_rad < 0.0) ra_rad += constants::TWO_PI;
+    double dec_rad = std::asin(eval_dir.z());
+    double ra_rad = std::atan2(eval_dir.y(), eval_dir.x());
+    
+    dec = astrometry::Declination(astrometry::Angle::from_rad(dec_rad));
+    ra = astrometry::RightAscension(astrometry::Angle::from_rad(ra_rad));
 }
 
 template <typename Frame>
@@ -243,8 +249,8 @@ ResidualStatistics ResidualCalculator<Frame>::compute_statistics(
     double chi_squared = 0.0;
     int accepted_count = 0;
     
-    stats.max_abs_ra = 0.0;
-    stats.max_abs_dec = 0.0;
+    stats.max_abs_ra = astrometry::Angle::zero();
+    stats.max_abs_dec = astrometry::Angle::zero();
     
     for (const auto& res : residuals) {
         if (res.outlier) {
@@ -253,21 +259,21 @@ ResidualStatistics ResidualCalculator<Frame>::compute_statistics(
         }
         
         accepted_count++;
-        double res_ra_arcsec = res.residual_ra * constants::RAD_TO_ARCSEC;
-        double res_dec_arcsec = res.residual_dec * constants::RAD_TO_ARCSEC;
+        double res_ra_rad = res.residual_ra.to_rad();
+        double res_dec_rad = res.residual_dec.to_rad();
         
-        sum_sq_ra += res_ra_arcsec * res_ra_arcsec;
-        sum_sq_dec += res_dec_arcsec * res_dec_arcsec;
+        sum_sq_ra += res_ra_rad * res_ra_rad;
+        sum_sq_dec += res_dec_rad * res_dec_rad;
         chi_squared += res.chi_squared;
         
-        stats.max_abs_ra = std::max(stats.max_abs_ra, std::abs(res_ra_arcsec));
-        stats.max_abs_dec = std::max(stats.max_abs_dec, std::abs(res_dec_arcsec));
+        stats.max_abs_ra = astrometry::Angle::from_rad(std::max(stats.max_abs_ra.to_rad(), std::abs(res_ra_rad)));
+        stats.max_abs_dec = astrometry::Angle::from_rad(std::max(stats.max_abs_dec.to_rad(), std::abs(res_dec_rad)));
     }
     
     if (accepted_count > 0) {
-        stats.rms_ra = std::sqrt(sum_sq_ra / accepted_count);
-        stats.rms_dec = std::sqrt(sum_sq_dec / accepted_count);
-        stats.rms_total = std::sqrt((sum_sq_ra + sum_sq_dec) / (2.0 * accepted_count));
+        stats.rms_ra = astrometry::Angle::from_rad(std::sqrt(sum_sq_ra / accepted_count));
+        stats.rms_dec = astrometry::Angle::from_rad(std::sqrt(sum_sq_dec / accepted_count));
+        stats.rms_total = astrometry::Angle::from_rad(std::sqrt((sum_sq_ra + sum_sq_dec) / (2.0 * accepted_count)));
         
         stats.chi_squared = chi_squared;
         stats.degrees_of_freedom = 2 * accepted_count - num_parameters;
@@ -280,9 +286,9 @@ ResidualStatistics ResidualCalculator<Frame>::compute_statistics(
             stats.weighted_rms = 0.0;
         }
     } else {
-        stats.rms_ra = 0.0;
-        stats.rms_dec = 0.0;
-        stats.rms_total = 0.0;
+        stats.rms_ra = astrometry::Angle::zero();
+        stats.rms_dec = astrometry::Angle::zero();
+        stats.rms_total = astrometry::Angle::zero();
         stats.chi_squared = 0.0;
         stats.degrees_of_freedom = 0;
         stats.reduced_chi_squared = 0.0;

@@ -53,15 +53,15 @@ void run_convergence_test() {
     auto initial = get_ceres_initial();
     auto target_epoch = time::EpochTDB::from_mjd(initial.epoch.mjd() + 1682.0); // 1 period
 
-    // Reference: AAS with Very High Precision
-    auto integrator_ref = std::make_shared<propagation::AASIntegrator>(1e-12, constants::GMS);
+    // Reference: Analytical Two-Body Solution (Exact for this scenario)
+    auto initial_kep = propagation::cartesian_to_keplerian(initial);
+    auto ref_state_kep = propagation::TwoBodyPropagator::propagate(initial_kep, target_epoch);
+    auto ref_state = propagation::keplerian_to_cartesian(ref_state_kep);
+
     auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
     propagation::PropagatorSettings settings;
     settings.include_planets = false;
-    propagation::Propagator prop_ref(integrator_ref, ephem, settings);
-    auto ref_state = prop_ref.propagate_cartesian(initial, target_epoch);
-
-    std::vector<double> epsilons = {1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8};
+    settings.central_body_gm = initial.gm.to_au3_d2(); // Ensure consistency
     for (double eps : epsilons) {
         auto integrator = std::make_shared<propagation::AASIntegrator>(eps, constants::GMS);
         propagation::Propagator prop(integrator, ephem, settings);
@@ -105,7 +105,7 @@ void run_work_precision_test() {
         std::vector<double> steps = {1.0, 0.5, 0.1, 0.05, 0.01, 0.005};
         for (double h : steps) {
             AstDynConfig cfg;
-            cfg.integrator_type = "RK4";
+            cfg.integrator_type = IntegratorType::RK4;
             cfg.initial_step_size = h;
             cfg.propagator_settings.include_planets = false;
             auto engine = std::make_unique<AstDynEngine>(cfg);

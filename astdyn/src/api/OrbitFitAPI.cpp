@@ -10,6 +10,7 @@
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
+#include "astdyn/core/Enums.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/types/orbital_state.hpp"
 #include "src/coordinates/state_conversions.hpp"
@@ -127,7 +128,7 @@ OrbitFitResult OrbitFitAPI::run_fit(
         AstDynEngine engine;
         if (!de441_path.empty()) {
             AstDynConfig cfg = engine.config();
-            cfg.ephemeris_type = "DE441";
+            cfg.ephemeris_type = EphemerisType::DE441;
             cfg.ephemeris_file = de441_path;
             engine.set_config(cfg);
         }
@@ -135,7 +136,7 @@ OrbitFitResult OrbitFitAPI::run_fit(
         // CTFYH: Ensure planetary perturbations are enabled by default for precision
         auto config = engine.config();
         config.propagator_settings.include_planets = true;
-        config.integrator_type = "RKF78";
+        config.integrator_type = IntegratorType::RKF78;
         config.verbose = verbose;
         engine.set_config(config);
 

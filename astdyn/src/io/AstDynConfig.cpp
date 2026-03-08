@@ -224,7 +224,7 @@ RWOObservation RWOFileHandler::parseLine(const std::string& line) {
         double ra_s;
         ra_iss >> ra_h >> ra_m >> ra_s;
         double ra_deg = ra_h * 15.0 + ra_m * 0.25 + ra_s * (15.0 / 3600.0);
-        rwo.observation.ra = ra_deg * constants::DEG_TO_RAD;
+        rwo.observation.ra = astrometry::RightAscension(astrometry::Angle::from_deg(ra_deg));
         
         // Parse Dec (columns 104-115, starting at index 103): "sDD MM SS.ss"
         std::string dec_str = line.substr(103, 12);
@@ -235,11 +235,11 @@ RWOObservation RWOFileHandler::parseLine(const std::string& line) {
         dec_iss >> dec_d >> dec_m >> dec_s;
         double dec_deg = dec_d + dec_m / 60.0 + dec_s / 3600.0;
         if (sign == '-') dec_deg = -dec_deg;
-        rwo.observation.dec = dec_deg * constants::DEG_TO_RAD;
+        rwo.observation.dec = astrometry::Declination(astrometry::Angle::from_deg(dec_deg));
         
         // Set default uncertainties
-        rwo.observation.sigma_ra = 0.5 * constants::ARCSEC_TO_RAD;
-        rwo.observation.sigma_dec = 0.5 * constants::ARCSEC_TO_RAD;
+        rwo.observation.sigma_ra = astrometry::Angle::from_arcsec(0.5);
+        rwo.observation.sigma_dec = astrometry::Angle::from_arcsec(0.5);
         
     } catch (...) {
         throw std::runtime_error("Failed to parse RWO line");

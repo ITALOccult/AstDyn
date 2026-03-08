@@ -61,12 +61,12 @@ TEST(RigorousValidation, TransformationTest) {
     auto pos_gcrf = mk.getPositionGCRF(t);
     
     // Verify distance remains Earth-radius scale (~6378 km)
-    double dist = std::sqrt(pos_gcrf.x * pos_gcrf.x + pos_gcrf.y * pos_gcrf.y + pos_gcrf.z * pos_gcrf.z);
+    double dist = std::sqrt(pos_gcrf.x_si() * pos_gcrf.x_si() + pos_gcrf.y_si() * pos_gcrf.y_si() + pos_gcrf.z_si() * pos_gcrf.z_si());
     EXPECT_NEAR(dist, 6378137.0 + 4200.0, 30000.0); // Approx radius + alt, accounting for oblateness
     
     // Check non-zero components
-    EXPECT_NE(pos_gcrf.x, 0.0);
-    EXPECT_NE(pos_gcrf.y, 0.0);
+    EXPECT_NE(pos_gcrf.x_si(), 0.0);
+    EXPECT_NE(pos_gcrf.y_si(), 0.0);
 }
 
 /**
@@ -89,7 +89,6 @@ TEST(RigorousValidation, PropagationTest) {
     double n_rad_day = std::sqrt(mu_au_d2 / (a_au * a_au * a_au));
     double period_days = constants::TWO_PI / n_rad_day;
     
-    time::EpochTDB t_start = time::EpochTDB::from_mjd(51544.5);
     time::EpochTDB t_end = time::EpochTDB::from_mjd(51544.5 + period_days);
     
     auto final = TwoBodyPropagator::propagate(initial, t_end);
@@ -109,9 +108,4 @@ TEST(RigorousValidation, PropagationTest) {
     );
     
     EXPECT_LT(dist_err, 1e-2); // < 1 centimeter
-}
-
-int main(int argc, char** argv) {
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

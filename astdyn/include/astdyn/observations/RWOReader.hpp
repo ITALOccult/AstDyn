@@ -77,12 +77,12 @@ private:
     /**
      * @brief Parse RA from "HH MM SS.ddd" format
      */
-    static double parseRA(const std::string& ra_str);
+    static astrometry::RightAscension parseRA(const std::string& ra_str);
     
     /**
      * @brief Parse Dec from "sDD MM SS.dd" format
      */
-    static double parseDec(const std::string& dec_str);
+    static astrometry::Declination parseDec(const std::string& dec_str);
     
     /**
      * @brief Parse observatory code (usually 3 chars near end)

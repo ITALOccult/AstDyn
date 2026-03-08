@@ -69,6 +69,18 @@ target_link_libraries(gaia_occultation_test PRIVATE astdyn Eigen3::Eigen)
 add_executable(full_od_workflow full_od_workflow.cpp)
 target_link_libraries(full_od_workflow PRIVATE astdyn Eigen3::Eigen)
 
+add_executable(critical_validation critical_validation.cpp)
+target_link_libraries(critical_validation PRIVATE astdyn Eigen3::Eigen)
+
+add_executable(debug_hzn debug_hzn.cpp)
+target_link_libraries(debug_hzn PRIVATE astdyn curl)
+
+add_executable(debug_engine debug_engine.cpp)
+target_link_libraries(debug_engine PRIVATE astdyn curl Eigen3::Eigen)
+
+add_executable(scientific_validation scientific_validation.cpp)
+target_link_libraries(scientific_validation PRIVATE astdyn Eigen3::Eigen curl)
+
 # Install examples (optional)
 install(TARGETS example_basic
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples

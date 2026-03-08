@@ -86,7 +86,7 @@ struct DifferentialCorrectorResult {
         std::cout << "========================================\n";
         std::cout << "Status: " << (converged ? "✓ CONVERGED" : "✗ NOT CONVERGED") << "\n";
         std::cout << "Iterations: " << iterations << "\n\n";
-        std::cout << "Final RMS Total: " << std::fixed << std::setprecision(3) << statistics.rms_total << " arcsec\n";
+        std::cout << "Final RMS Total: " << std::fixed << std::setprecision(3) << statistics.rms_total.to_arcsec() << " arcsec\n";
         std::cout << "Observations Used: " << (statistics.num_observations - statistics.num_outliers) << "\n";
         std::cout << "χ²/dof: " << statistics.reduced_chi_squared << "\n\n";
         std::cout << "========================================\n\n";
@@ -142,7 +142,7 @@ public:
             }
             
             auto stats = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
-            result.rms_history.push_back(stats.rms_total);
+            result.rms_history.push_back(stats.rms_total.to_arcsec());
             result.correction_norm.push_back(correction.norm());
             
             if (iteration_callback_) iteration_callback_(iter + 1, stats);
@@ -223,6 +223,10 @@ public:
     void set_iteration_callback(IterationCallback callback) {
         iteration_callback_ = callback;
     }
+    
+    std::shared_ptr<ResidualCalculator<Frame>> get_residual_calculator() const {
+        return residual_calc_;
+    }
 
 private:
     struct DesignMatrixResult {
@@ -267,10 +271,10 @@ private:
             Eigen::Matrix<double, 2, 6> A_obs = partials.partial_radec * partials.phi;
             result.A.row(row) = A_obs.row(0);
             result.A.row(row + 1) = A_obs.row(1);
-            result.b[row] = res.residual_ra;
-            result.b[row + 1] = res.residual_dec;
-            result.weights[row] = 1.0 / (obs.sigma_ra * obs.sigma_ra);
-            result.weights[row + 1] = 1.0 / (obs.sigma_dec * obs.sigma_dec);
+            result.b[row] = res.residual_ra.to_rad();
+            result.b[row + 1] = res.residual_dec.to_rad();
+            result.weights[row] = 1.0 / (obs.sigma_ra.to_rad() * obs.sigma_ra.to_rad());
+            result.weights[row + 1] = 1.0 / (obs.sigma_dec.to_rad() * obs.sigma_dec.to_rad());
             row += 2;
         }
         return result;

@@ -326,7 +326,3 @@ TEST(ReferenceFrameTest, FrameTypeToString) {
     EXPECT_EQ(frame_type_to_string(FrameType::ITRF), "ITRF");
 }
 
-int main(int argc, char** argv) {
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

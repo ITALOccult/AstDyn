@@ -35,9 +35,9 @@ private:
     /** @brief Helper to parse MPC date (YYYY MM DD.ddddd). */
     static time::EpochUTC parse_date(const std::string& date_str);
     /** @brief Helper to parse MPC RA (HH MM SS.sss). */
-    static double parse_ra(const std::string& ra_str);
+    static astrometry::RightAscension parse_ra(const std::string& ra_str);
     /** @brief Helper to parse MPC Dec (DD MM SS.ss). */
-    static double parse_dec(const std::string& dec_str);
+    static astrometry::Declination parse_dec(const std::string& dec_str);
 };
 
 } // namespace astdyn::io

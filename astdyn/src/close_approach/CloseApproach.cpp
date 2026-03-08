@@ -128,7 +128,7 @@ CloseApproachDetector::CloseApproachDetector(
     }
 }
 
-std::vector<CloseApproach> CloseApproachDetector::find_approaches(
+std::vector<CloseApproach> CloseApproachDetector::detect(
     const physics::CartesianStateTyped<core::GCRF>& initial_state,
     time::EpochTDB t_start,
     time::EpochTDB t_end)
@@ -173,7 +173,7 @@ std::vector<CloseApproach> CloseApproachDetector::find_approaches(
             if (dist_current > dist_prev && dist_prev < settings_.detection_distance) {
                 time::EpochTDB t_ca = t_next;
                 if (settings_.refine_time) {
-                    t_ca = refine_approach_time(prev_state, current_state, 
+                    t_ca = detect_approach_time(prev_state, current_state, 
                                                 time::EpochTDB::from_mjd(t), 
                                                 t_next, body);
                 }
@@ -200,7 +200,7 @@ std::vector<CloseApproach> CloseApproachDetector::find_approaches(
     return approaches;
 }
 
-std::vector<CloseApproach> CloseApproachDetector::find_approaches(
+std::vector<CloseApproach> CloseApproachDetector::detect(
     const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_orbit,
     time::EpochTDB t_start,
     time::EpochTDB t_end)
@@ -215,7 +215,7 @@ std::vector<CloseApproach> CloseApproachDetector::find_approaches(
         initial_orbit.epoch, pos_gcrf, vel_gcrf, initial_orbit.gm
     );
     
-    return find_approaches(cart_typed, t_start, t_end);
+    return detect(cart_typed, t_start, t_end);
 }
 
 double CloseApproachDetector::compute_distance(
@@ -228,7 +228,7 @@ double CloseApproachDetector::compute_distance(
     return (state.position.to_eigen_si() - planet_pos.to_eigen_si()).norm();
 }
 
-time::EpochTDB CloseApproachDetector::refine_approach_time(
+time::EpochTDB CloseApproachDetector::detect_approach_time(
     const physics::CartesianStateTyped<core::GCRF>& state_t1,
     const physics::CartesianStateTyped<core::GCRF>& state_t2,
     time::EpochTDB t1,

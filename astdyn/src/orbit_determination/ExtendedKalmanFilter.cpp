@@ -50,18 +50,18 @@ EKFResult ExtendedKalmanFilter::update(
     double ra_pred = std::atan2(rho_vec.y(), rho_vec.x());
     double dec_pred = std::asin(rho_vec.z() / rho);
 
-    double d_ra = obs.ra - ra_pred;
+    double d_ra = obs.ra.to_rad() - ra_pred;
     while (d_ra > constants::PI) d_ra -= constants::TWO_PI;
     while (d_ra < -constants::PI) d_ra += constants::TWO_PI;
-    double d_dec = obs.dec - dec_pred;
+    double d_dec = obs.dec.to_rad() - dec_pred;
 
-    Eigen::Vector2d y(d_ra * std::cos(obs.dec), d_dec); // Innovation
+    Eigen::Vector2d y(d_ra * std::cos(obs.dec.to_rad()), d_dec); // Innovation
     result.innovation = y;
 
     // 4. Kalman Gain
     Eigen::Matrix2d R;
-    R << std::pow(obs.sigma_ra, 2), 0.0,
-         0.0, std::pow(obs.sigma_dec, 2);
+    R << std::pow(obs.sigma_ra.to_rad(), 2), 0.0,
+         0.0, std::pow(obs.sigma_dec.to_rad(), 2);
     
     Eigen::Matrix2d S = H * P_pred * H.transpose() + R;
     Eigen::Matrix<double, 6, 2> K = P_pred * H.transpose() * S.inverse();

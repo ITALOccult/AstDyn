@@ -69,21 +69,22 @@ time::EpochUTC MPCParser::parse_date(const std::string& date_str) {
     return time::EpochUTC::from_mjd(jd - 2400000.5);
 }
 
-double MPCParser::parse_ra(const std::string& ra_str) {
+astrometry::RightAscension MPCParser::parse_ra(const std::string& ra_str) {
     std::stringstream ss(ra_str);
     double h, m, s;
-    ss >> h >> m >> s;
-    return (h + m / 60.0 + s / 3600.0) * (M_PI / 12.0); // hrs -> rad
+    if (!(ss >> h >> m >> s)) return astrometry::RightAscension();
+    double deg = (h + m / 60.0 + s / 3600.0) * 15.0; // hrs -> deg
+    return astrometry::RightAscension(astrometry::Angle::from_deg(deg));
 }
 
-double MPCParser::parse_dec(const std::string& dec_str) {
+astrometry::Declination MPCParser::parse_dec(const std::string& dec_str) {
     std::stringstream ss(dec_str);
     double d, m, s;
     char sign;
-    ss >> std::skipws >> sign >> d >> m >> s;
+    if (!(ss >> std::skipws >> sign >> d >> m >> s)) return astrometry::Declination();
     double deg = d + m / 60.0 + s / 3600.0;
     if (sign == '-') deg = -deg;
-    return deg * (M_PI / 180.0); // deg -> rad
+    return astrometry::Declination(astrometry::Angle::from_deg(deg));
 }
 
 } // namespace astdyn::io

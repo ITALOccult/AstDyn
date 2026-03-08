@@ -102,15 +102,6 @@ enum class ObservationType {
     ROVING_OBSERVER     ///< Roving observer
 };
 
-/**
- * @brief Integration method types
- */
-enum class IntegratorType {
-    RADAU15,            ///< Radau 15th order implicit
-    RUNGE_KUTTA_GAUSS,  ///< Runge-Kutta-Gauss
-    ADAMS_BASHFORTH,    ///< Adams-Bashforth-Moulton
-    BULIRSCH_STOER      ///< Bulirsch-Stoer
-};
 
 /**
  * @brief Force model components

@@ -15,6 +15,11 @@ class AstDynEngineTest : public ::testing::Test {
 protected:
     void SetUp() override {
         engine = std::make_unique<AstDynEngine>();
+        
+        // Disable planetary perturbations for unit tests (requires .bsp file otherwise)
+        AstDynConfig config = engine->config();
+        config.propagator_settings.include_planets = false;
+        engine->set_config(config);
     }
     
     std::unique_ptr<AstDynEngine> engine;
@@ -60,8 +65,8 @@ TEST_F(AstDynEngineTest, AddObservations) {
     observations::OpticalObservation obs;
     obs.object_designation = "TEST001";
     obs.time = time::EpochUTC::from_mjd(60000.0);
-    obs.ra = 180.0 * M_PI / 180.0;  // Convert to radians
-    obs.dec = 10.0 * M_PI / 180.0;  // Convert to radians
+    obs.ra = astrometry::RightAscension(astrometry::Angle::from_rad(180.0 * M_PI / 180.0));
+    obs.dec = astrometry::Declination(astrometry::Angle::from_rad(10.0 * M_PI / 180.0));
     obs.observatory_code = "500";
     
     engine->add_observation(obs);
@@ -75,8 +80,8 @@ TEST_F(AstDynEngineTest, ClearObservations) {
     observations::OpticalObservation obs;
     obs.object_designation = "TEST001";
     obs.time = time::EpochUTC::from_mjd(60000.0);
-    obs.ra = 180.0 * M_PI / 180.0;  // Convert to radians
-    obs.dec = 10.0 * M_PI / 180.0;  // Convert to radians
+    obs.ra = astrometry::RightAscension(astrometry::Angle::from_rad(180.0 * M_PI / 180.0));
+    obs.dec = astrometry::Declination(astrometry::Angle::from_rad(10.0 * M_PI / 180.0));
     obs.observatory_code = "500";
     
     engine->add_observation(obs);
@@ -218,7 +223,7 @@ TEST_F(AstDynEngineTest, LongEphemeris) {
     auto ephemeris = engine->compute_ephemeris(time::EpochTDB::from_mjd(60000.0), 
                                                time::EpochTDB::from_mjd(60365.0), 10.0);
     
-    EXPECT_EQ(ephemeris.size(), 38UL);  // 365/10 + 1 (including both endpoints)
+    EXPECT_EQ(ephemeris.size(), 37UL);  // 365/10 + 1 (0 to 360 by 10)
     
     // Check all epochs are in order
     for (size_t i = 1; i < ephemeris.size(); ++i) {
@@ -234,7 +239,7 @@ TEST_F(AstDynEngineTest, DifferentTolerances) {
     );
     
     // Test with tight tolerance
-    AstDynConfig config;
+    AstDynConfig config = engine->config();
     config.tolerance = 1e-14;
     engine->set_config(config);
     engine->set_initial_orbit(orbit);

@@ -28,11 +28,13 @@ GoodingIODResult GoodingIOD::compute(
     time::EpochTDB t2 = time::to_tdb(obs2.time);
     time::EpochTDB t3 = time::to_tdb(obs3.time);
 
-    auto compute_los = [](double ra, double dec) {
-        double cra = std::cos(ra);
-        double sra = std::sin(ra);
-        double cdc = std::cos(dec);
-        double sdc = std::sin(dec);
+    auto compute_los = [](astrometry::RightAscension ra, astrometry::Declination dec) {
+        double r = ra.to_rad();
+        double d = dec.to_rad();
+        double cra = std::cos(r);
+        double sra = std::sin(r);
+        double cdc = std::cos(d);
+        double sdc = std::sin(d);
         return math::Vector3<core::GCRF, physics::Distance>::from_si(
             cdc * cra, cdc * sra, sdc);
     };

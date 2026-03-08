@@ -25,6 +25,7 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/astrometry/sky_types.hpp"
 #include "src/core/frame_tags.hpp"
 #include <vector>
 #include <optional>
@@ -135,7 +136,7 @@ private:
      * @param dec Declination [rad]
      * @return Unit vector in equatorial frame
      */
-    math::Vector3<core::GCRF, physics::Distance> compute_line_of_sight(double ra, double dec) const;
+    math::Vector3<core::GCRF, physics::Distance> compute_line_of_sight(astrometry::RightAscension ra, astrometry::Declination dec) const;
     
     /**
      * @brief Solve Gauss polynomial for slant ranges

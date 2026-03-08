@@ -122,8 +122,8 @@ int LeastSquaresFitter::reject_outliers(std::vector<ObservationResidual>& residu
     
     for (const auto& res : residuals) {
         if (!res.outlier) {
-            sum_sq += res.residual_ra * constants::RAD_TO_ARCSEC * res.residual_ra * constants::RAD_TO_ARCSEC;
-            sum_sq += res.residual_dec * constants::RAD_TO_ARCSEC * res.residual_dec * constants::RAD_TO_ARCSEC;
+            sum_sq += res.residual_ra.to_arcsec() * res.residual_ra.to_arcsec();
+            sum_sq += res.residual_dec.to_arcsec() * res.residual_dec.to_arcsec();
             count += 2;
         }
     }
@@ -146,8 +146,8 @@ int LeastSquaresFitter::reject_outliers(std::vector<ObservationResidual>& residu
     for (auto& res : residuals) {
         if (!res.outlier) {
             double res_norm = std::sqrt(
-                res.residual_ra * constants::RAD_TO_ARCSEC * res.residual_ra * constants::RAD_TO_ARCSEC +
-                res.residual_dec * constants::RAD_TO_ARCSEC * res.residual_dec * constants::RAD_TO_ARCSEC
+                res.residual_ra.to_arcsec() * res.residual_ra.to_arcsec() +
+                res.residual_dec.to_arcsec() * res.residual_dec.to_arcsec()
             );
             
             if (res_norm > threshold) {
@@ -170,8 +170,8 @@ void LeastSquaresFitter::compute_statistics(
     
     for (const auto& res : residuals) {
         if (!res.outlier) {
-            sum_ra_sq += res.residual_ra * constants::RAD_TO_ARCSEC * res.residual_ra * constants::RAD_TO_ARCSEC;
-            sum_dec_sq += res.residual_dec * constants::RAD_TO_ARCSEC * res.residual_dec * constants::RAD_TO_ARCSEC;
+            sum_ra_sq += res.residual_ra.to_arcsec() * res.residual_ra.to_arcsec();
+            sum_dec_sq += res.residual_dec.to_arcsec() * res.residual_dec.to_arcsec();
             count++;
         }
     }
@@ -210,8 +210,8 @@ FitResult LeastSquaresFitter::fit(
         int count = 0;
         for (const auto& r : res) {
             if (!r.outlier) {
-                sum += r.residual_ra * constants::RAD_TO_ARCSEC * r.residual_ra * constants::RAD_TO_ARCSEC + 
-                       r.residual_dec * constants::RAD_TO_ARCSEC * r.residual_dec * constants::RAD_TO_ARCSEC;
+                sum += r.residual_ra.to_arcsec() * r.residual_ra.to_arcsec() + 
+                       r.residual_dec.to_arcsec() * r.residual_dec.to_arcsec();
                 count += 2;
             }
         }
@@ -244,8 +244,8 @@ FitResult LeastSquaresFitter::fit(
             if (!current_residuals[i].outlier) {
                 // IMPORTANT: Normal Equation is A^T * W * (y - y_model)
                 // residuals vector here contains (Observed - Computed) = y - f(x)
-                res_vec(2*i) = current_residuals[i].residual_ra * constants::RAD_TO_ARCSEC;
-                res_vec(2*i+1) = current_residuals[i].residual_dec * constants::RAD_TO_ARCSEC;
+                res_vec(2*i) = current_residuals[i].residual_ra.to_arcsec();
+                res_vec(2*i+1) = current_residuals[i].residual_dec.to_arcsec();
                 weights(2*i) = current_residuals[i].weight_ra;
                 weights(2*i+1) = current_residuals[i].weight_dec;
             } else {

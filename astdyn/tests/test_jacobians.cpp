@@ -195,7 +195,3 @@ TEST(JacobianTest, RoundTripCovariance) {
     EXPECT_TRUE(P_kep_final.isApprox(P_kep_orig, 0.01));
 }
 
-int main(int argc, char** argv) {
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

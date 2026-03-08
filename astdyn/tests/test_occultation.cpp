@@ -1,10 +1,13 @@
-#include <iostream>
-#include <cassert>
+#include <gtest/gtest.h>
 #include "astdyn/astrometry/OccultationLogic.hpp"
+#include <cmath>
 
 using namespace astdyn::astrometry;
 
-int main() {
+/**
+ * @brief Test for basic occultation geometry logic
+ */
+TEST(OccultationTest, BasicLogic) {
     // Example: Asteroid moving across a star
     // Star at RA=0, Dec=0
     auto star_ra = RightAscension(Angle::from_deg(0.0));
@@ -29,17 +32,11 @@ int main() {
         dra_dt, ddec_dt, 0.0
     );
 
-    std::cout << "Occultation Parameters:" << std::endl;
-    std::cout << "  Impact Parameter: " << params.impact_parameter_km << " km" << std::endl;
-    std::cout << "  Shadow Velocity:  " << params.shadow_velocity_kms << " km/s" << std::endl;
-    std::cout << "  Position Angle:   " << params.position_angle_deg << " deg" << std::endl;
-    std::cout << "  Time to TCA:      " << params.closest_approach_time_offset_sec << " s" << std::endl;
-    std::cout << "  RA Velocity (mas/s): " << params.d_ra_cos_dec_mas_sec << std::endl;
-
     // Expected:
     // Impact parameter should be dist * tan(0.001 deg)
     double expected_b_km = dist * std::tan(0.001 * M_PI / 180.0) / 1000.0;
-    std::cout << "  Expected Impact:  " << expected_b_km << " km" << std::endl;
-
-    return 0;
+    
+    EXPECT_NEAR(params.impact_parameter_km, expected_b_km, 1e-3);
+    EXPECT_GT(params.shadow_velocity_kms, 0.0);
+    EXPECT_NEAR(params.position_angle_deg, 90.0, 1e-1); // Moving strictly East (PA=90)
 }

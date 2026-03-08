@@ -45,13 +45,13 @@ OrbitValidationSummary ResidualAnalysis::analyze_orbit(
         double dec_calc = std::asin(rho_vec.z() / rho);
 
         // Residuals
-        double d_ra = o.ra - ra_calc;
+        double d_ra = o.ra.to_rad() - ra_calc;
         while (d_ra > constants::PI) d_ra -= constants::TWO_PI;
         while (d_ra < -constants::PI) d_ra += constants::TWO_PI;
-        double d_dec = o.dec - dec_calc;
+        double d_dec = o.dec.to_rad() - dec_calc;
 
         // Convert to arcseconds
-        double dra_arcsec = d_ra * std::cos(o.dec) * constants::RAD_TO_ARCSEC;
+        double dra_arcsec = d_ra * std::cos(o.dec.to_rad()) * constants::RAD_TO_ARCSEC;
         double ddec_arcsec = d_dec * constants::RAD_TO_ARCSEC;
 
         ss << std::setw(3) << i << "  " << t_obs.mjd() << "  " 

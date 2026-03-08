@@ -549,7 +549,3 @@ TEST(CometaryElementsTest, CartesianConversion) {
     EXPECT_NEAR(cart.speed(), v_peri, 1e-3);
 }
 
-int main(int argc, char** argv) {
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

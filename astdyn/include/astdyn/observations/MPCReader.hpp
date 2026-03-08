@@ -93,16 +93,16 @@ private:
     /**
      * @brief Parse RA (columns 33-44)
      * Format: "HH MM SS.ddd"
-     * @return RA in radians
+     * @return RightAscension
      */
-    static double parseRA(const std::string& ra_str);
+    static astrometry::RightAscension parseRA(const std::string& ra_str);
     
     /**
      * @brief Parse Dec (columns 45-56)
      * Format: "sDD MM SS.dd"
-     * @return Dec in radians
+     * @return Declination
      */
-    static double parseDec(const std::string& dec_str);
+    static astrometry::Declination parseDec(const std::string& dec_str);
     
     /**
      * @brief Parse magnitude (columns 65-69)
@@ -168,12 +168,12 @@ private:
     /**
      * @brief Format RA to MPC format
      */
-    static std::string formatRA(double ra_rad);
+    static std::string formatRA(astrometry::RightAscension ra);
     
     /**
      * @brief Format Dec to MPC format
      */
-    static std::string formatDec(double dec_rad);
+    static std::string formatDec(astrometry::Declination dec);
 };
 
 } // namespace observations

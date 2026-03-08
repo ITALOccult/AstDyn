@@ -38,9 +38,9 @@ struct ObservationResidual {
     time::EpochUTC time;                 ///< Observation epoch
     std::string observatory_code;        ///< Observatory
     
-    // Angular residuals [rad]
-    double residual_ra;                  ///< O-C in right ascension
-    double residual_dec;                 ///< O-C in declination
+    // Angular residuals
+    astrometry::Angle residual_ra;       ///< O-C in right ascension (σ_α*cos(δ))
+    astrometry::Angle residual_dec;      ///< O-C in declination
     
     // Weights (1/sigma^2)
     double weight_ra;                    ///< Weight for RA equation
@@ -51,12 +51,12 @@ struct ObservationResidual {
     double normalized_dec;               ///< (O-C) / sigma_dec
     
     // Computed values
-    double computed_ra;                  ///< Computed RA [rad]
-    double computed_dec;                 ///< Computed Dec [rad]
+    astrometry::RightAscension computed_ra;  ///< Computed RA
+    astrometry::Declination computed_dec;   ///< Computed Dec
     
     // Geometry
-    double range;                        ///< Topocentric distance [m]
-    double range_rate;                   ///< Topocentric range rate [m/s]
+    physics::Distance range;             ///< Topocentric distance
+    physics::Velocity range_rate;        ///< Topocentric range rate
     
     // Quality flags
     bool outlier;                        ///< Marked as outlier?
@@ -79,10 +79,10 @@ struct ResidualStatistics {
     int num_outliers;
     int degrees_of_freedom;              ///< N_obs - N_params
     
-    // RMS residuals [arcsec]
-    double rms_ra;
-    double rms_dec;
-    double rms_total;
+    // RMS residuals
+    astrometry::Angle rms_ra;
+    astrometry::Angle rms_dec;
+    astrometry::Angle rms_total;
     
     // Weighted RMS (normalized)
     double weighted_rms;
@@ -92,8 +92,8 @@ struct ResidualStatistics {
     double reduced_chi_squared;          ///< χ²/dof
     
     // Max residuals
-    double max_abs_ra;
-    double max_abs_dec;
+    astrometry::Angle max_abs_ra;
+    astrometry::Angle max_abs_dec;
 };
 
 /**
@@ -226,8 +226,8 @@ private:
         const math::Vector3<core::GCRF, physics::Distance>& rho_vec,
         const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
         const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
-        double& ra,
-        double& dec) const;
+        astrometry::RightAscension& ra,
+        astrometry::Declination& dec) const;
 
 private:
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;

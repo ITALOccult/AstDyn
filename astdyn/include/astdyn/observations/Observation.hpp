@@ -17,9 +17,7 @@
 
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/epoch.hpp"
-#include <string>
-#include <vector>
-#include <optional>
+#include "astdyn/astrometry/sky_types.hpp"
 
 namespace astdyn {
 namespace observations {
@@ -78,10 +76,10 @@ struct OpticalObservation {
     time::EpochUTC time;             ///< Time of observation (UTC)
     
     // Astrometry
-    double ra;                       ///< Right Ascension [radians]
-    double dec;                      ///< Declination [radians]
-    double sigma_ra;                 ///< RA uncertainty [radians], σ_α*cos(δ)
-    double sigma_dec;                ///< Dec uncertainty [radians]
+    astrometry::RightAscension ra;   ///< Right Ascension
+    astrometry::Declination dec;    ///< Declination
+    astrometry::Angle sigma_ra;      ///< RA uncertainty, σ_α*cos(δ)
+    astrometry::Angle sigma_dec;     ///< Dec uncertainty
     
     // Photometry (optional)
     std::optional<double> magnitude; ///< Apparent magnitude
@@ -100,8 +98,10 @@ struct OpticalObservation {
      * @brief Default constructor
      */
     OpticalObservation()
-        : time(time::EpochUTC::from_mjd(0.0)), ra(0.0), dec(0.0), 
-          sigma_ra(1e-5), sigma_dec(1e-5),
+        : time(time::EpochUTC::from_mjd(0.0)),
+          ra(), dec(), 
+          sigma_ra(astrometry::Angle::from_arcsec(0.5)), 
+          sigma_dec(astrometry::Angle::from_arcsec(0.5)),
           catalog(CatalogCode::UNKNOWN),
           is_discovery(false), is_offset(false) {}
 };

@@ -1,5 +1,0 @@
-if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_validation_tests[1]_tests.cmake")
-  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_validation_tests[1]_tests.cmake")
-else()
-  add_test(astdyn_validation_tests_NOT_BUILT astdyn_validation_tests_NOT_BUILT)
-endif()

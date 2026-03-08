@@ -168,8 +168,8 @@ std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) 
             }
         }
 
-        obs.sigma_ra = sigma_ra_arcsec * constants::ARCSEC_TO_RAD;
-        obs.sigma_dec = sigma_dec_arcsec * constants::ARCSEC_TO_RAD;
+        obs.sigma_ra = astrometry::Angle::from_arcsec(sigma_ra_arcsec);
+        obs.sigma_dec = astrometry::Angle::from_arcsec(sigma_dec_arcsec);
         
         return obs;
         
@@ -232,7 +232,7 @@ time::EpochUTC RWOReader::parseDate(const std::string& date_str) {
     return time::EpochUTC::from_mjd(mjd);
 }
 
-double RWOReader::parseRA(const std::string& ra_str) {
+astrometry::RightAscension RWOReader::parseRA(const std::string& ra_str) {
     // Format: "HH MM SS.ddd"
     std::istringstream iss(ra_str);
     int hours, minutes;
@@ -240,12 +240,12 @@ double RWOReader::parseRA(const std::string& ra_str) {
     
     iss >> hours >> minutes >> seconds;
     
-    // Convert to degrees, then radians
+    // Convert to degrees
     double ra_deg = hours * 15.0 + minutes * 0.25 + seconds * (15.0 / 3600.0);
-    return ra_deg * constants::DEG_TO_RAD;
+    return astrometry::RightAscension(astrometry::Angle::from_deg(ra_deg));
 }
 
-double RWOReader::parseDec(const std::string& dec_str) {
+astrometry::Declination RWOReader::parseDec(const std::string& dec_str) {
     // Format: "sDD MM SS.dd" where s is + or -
     char sign = dec_str[0];
     
@@ -261,7 +261,7 @@ double RWOReader::parseDec(const std::string& dec_str) {
         dec_deg = -dec_deg;
     }
     
-    return dec_deg * constants::DEG_TO_RAD;
+    return astrometry::Declination(astrometry::Angle::from_deg(dec_deg));
 }
 
 std::string RWOReader::parseObservatory(const std::string& line) {

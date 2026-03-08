@@ -24,7 +24,7 @@ using namespace astdyn::core;
 class IntegratorValidationTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        config.integrator_type = "AAS";
+        config.integrator_type = IntegratorType::AAS;
         config.initial_step_size = 0.5;
         config.aas_precision = 1e-6;
         config.propagator_settings.include_planets = false; // Disable for core integrator validation
@@ -76,7 +76,7 @@ TEST_F(IntegratorValidationTest, CeresSlopeTest) {
     for (double eps : precisions) {
         AstDynConfig cfg = config;
         cfg.aas_precision = eps;
-        cfg.integrator_type = "AAS";
+        cfg.integrator_type = IntegratorType::AAS;
         cfg.propagator_settings.include_planets = false;
         
         auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
@@ -106,7 +106,8 @@ TEST_F(IntegratorValidationTest, IcarusPerihelionTest) {
         epoch, 1.078, 0.827, 22.8, 88.0, 31.3, 0.0
     );
 
-    auto initial = propagation::keplerian_to_cartesian<GCRF>(icarus);
+    auto initial_cart = propagation::keplerian_to_cartesian(icarus);
+    (void)initial_cart;
     engine->set_initial_orbit(icarus);
 
     std::cout << "\n[PERIHELION TEST] Object: 1566 Icarus (e=0.827)\n";
@@ -115,7 +116,8 @@ TEST_F(IntegratorValidationTest, IcarusPerihelionTest) {
     auto target = time::EpochTDB::from_mjd(epoch.mjd() + 10.0);
     
     EXPECT_NO_THROW({
-        auto final = engine->propagate_to(target);
+        auto final_orb = engine->propagate_to(target);
+        (void)final_orb;
         std::cout << "Successfully integrated through perihelion.\n";
     });
 }
@@ -145,9 +147,4 @@ TEST_F(IntegratorValidationTest, EnergyPreservation) {
     
     // With Shadow Hamiltonian fixes, energy should be conserved very well
     EXPECT_LT(rel_err, 1e-9); 
-}
-
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

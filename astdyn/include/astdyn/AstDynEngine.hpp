@@ -18,14 +18,13 @@
 
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/propagation/Propagator.hpp"
-#include "astdyn/observations/Observation.hpp"
-#include "astdyn/observations/MPCReader.hpp"
-#include "astdyn/orbit_determination/DifferentialCorrector.hpp"
-#include "astdyn/orbit_determination/Residuals.hpp"
-#include "astdyn/close_approach/CloseApproach.hpp"
+#include "astdyn/observations/ObservationManager.hpp"
+#include "astdyn/orbit_determination/OrbitFitter.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
+#include "astdyn/core/Enums.hpp"
+#include "astdyn/close_approach/CloseApproach.hpp"
 #include <memory>
 #include <vector>
 #include <string>
@@ -41,15 +40,15 @@ struct AstDynConfig {
     propagation::PropagatorSettings propagator_settings;
     
     // Integrator settings
-    std::string integrator_type = "RK4";    ///< Integrator type: RK4, RKF78
-    double initial_step_size = 0.1;         ///< Initial step size [days]
-    double tolerance = 1e-12;                ///< Integration tolerance
-    double aas_precision = 1e-4;             ///< Precision metric for AAS integrator (step size control)
+    IntegratorType integrator_type = IntegratorType::RK4; ///< RK4, RKF78, AAS, etc.
+    double initial_step_size = 0.1;                      ///< Initial step size [days]
+    double tolerance = 1e-12;                            ///< Integration tolerance
+    double aas_precision = 1e-4;                         ///< Precision metric for AAS integrator (step size control)
 
-        // Ephemeris Configuration
-        std::string ephemeris_type = "Analytical"; // "Analytical", "DE441"
-        std::string ephemeris_file;                // Path to .bsp file (if DE441)
-        std::string asteroid_ephemeris_file;       // Path to asteroid .bsp file (optional)
+    // Ephemeris Configuration
+    EphemerisType ephemeris_type = EphemerisType::Analytical; ///< Analytical, DE441
+    std::string ephemeris_file;                               ///< Path to .bsp file (if DE441)
+    std::string asteroid_ephemeris_file;                    ///< Path to asteroid .bsp file (optional)
     
     // Differential correction settings
     int max_iterations = 10;                 ///< Maximum DC iterations
@@ -99,52 +98,24 @@ struct OrbitDeterminationResult {
  * @brief Apparent position results for occultations
  */
 struct ApparentPlace {
-    double ra;              ///< Right Ascension [rad]
-    double dec;             ///< Declination [rad]
-    double distance;        ///< Topocentric distance [m]
-    double light_time;      ///< Light time correction [days]
+    time::EpochTDB epoch;
+    double ra;      ///< Topocentric RA [rad]
+    double dec;     ///< Topocentric Dec [rad]
+    double dist;    ///< Distance to observer [AU]
 };
 
 /**
- * @brief Main OrbFit engine class
- * 
- * This class provides the complete OrbFit workflow:
- * 1. Load observations from MPC format
- * 2. Initial orbit determination (IOD)
- * 3. Differential correction (DC) to improve orbit
- * 4. Propagate orbit to generate ephemeris
- * 5. Analyze close approaches to planets
- * 
- * Example usage:
- * @code
- *   AstDynEngine engine;
- *   
- *   // Load observations
- *   engine.load_observations("observations.txt");
- *   
- *   // Set initial orbit guess
- *   KeplerianElements initial_orbit = ...;
- *   engine.set_initial_orbit(initial_orbit);
- *   
- *   // Run orbit determination
- *   auto result = engine.fit_orbit();
- *   
- *   // Generate ephemeris
- *   auto ephemeris = engine.compute_ephemeris(start_mjd, end_mjd, step_days);
- *   
- *   // Check close approaches
- *   auto close_approaches = engine.find_close_approaches();
- * @endcode
+ * @brief Main engine class for high-level orbit operations
  */
 class AstDynEngine {
 public:
     /**
-     * @brief Construct OrbFit engine with default configuration
+     * @brief Construct engine with default configuration
      */
     AstDynEngine();
     
     /**
-     * @brief Construct OrbFit engine with custom configuration
+     * @brief Construct engine with specific configuration
      */
     explicit AstDynEngine(const AstDynConfig& config);
     
@@ -154,9 +125,6 @@ public:
     
     /**
      * @brief Load observations from file (MPC format)
-     * 
-     * @param filename Path to observations file
-     * @return Number of observations loaded
      */
     int load_observations(const std::string& filename);
     
@@ -169,14 +137,14 @@ public:
      * @brief Get all loaded observations
      */
     const std::vector<observations::OpticalObservation>& observations() const {
-        return observations_;
+        return obs_context_.observations();
     }
     
     /**
      * @brief Clear all observations
      */
     void clear_observations() {
-        observations_.clear();
+        obs_context_.clear();
     }
     
     // ========================================================================
@@ -185,14 +153,12 @@ public:
     
     /**
      * @brief Set the initial orbit for propagation
-     * @tparam Frame Reference frame of the elements (GCRF, ECLIPJ2000, etc.)
      */
     template <typename Frame>
     void set_initial_orbit(const physics::KeplerianStateTyped<Frame>& elements) {
         if constexpr (std::is_same_v<Frame, core::ECLIPJ2000>) {
             set_initial_orbit_ecl(elements);
         } else {
-            // Automatic transformation to Ecliptic for internal engine consistency
             auto cart = propagation::keplerian_to_cartesian(elements);
             auto pos_ecl = coordinates::ReferenceFrame::transform_pos<Frame, core::ECLIPJ2000>(cart.position);
             auto vel_ecl = coordinates::ReferenceFrame::transform_vel<Frame, core::ECLIPJ2000>(cart.position, cart.velocity);
@@ -203,22 +169,11 @@ public:
     
     /**
      * @brief Perform initial orbit determination (IOD) from observations
-     * 
-     * Determines initial orbit using Gauss method (minimum 3 observations).
-     * 
-     * @return Initial orbital elements
-     * @throws std::runtime_error if insufficient observations
      */
     physics::KeplerianStateTyped<core::ECLIPJ2000> initial_orbit_determination();
     
     /**
      * @brief Fit orbit to observations using differential correction
-     * 
-     * Performs iterative least-squares fit to refine orbit.
-     * Requires initial orbit (from IOD or set_initial_orbit).
-     * 
-     * @return Orbit determination result with fitted orbit and statistics
-     * @throws std::runtime_error if no initial orbit available
      */
     OrbitDeterminationResult fit_orbit();
     
@@ -240,105 +195,45 @@ public:
     // Ephemeris Generation
     // ========================================================================
     
-    /**
-     * @brief Compute ephemeris at multiple epochs
-     * 
-     * @param start_mjd Start epoch [MJD TDB]
-     * @param end_mjd End epoch [MJD TDB]
-     * @param step_days Step size [days]
-     * @return Vector of Cartesian states at each epoch
-     * @throws std::runtime_error if no orbit available
-     */
     std::vector<physics::CartesianStateTyped<core::GCRF>> compute_ephemeris(
         time::EpochTDB start_time,
         time::EpochTDB end_time,
         double step_days);
     
-    /**
-     * @brief Propagate orbit to single epoch
-     * 
-     * @param target_mjd Target epoch [MJD TDB]
-     * @return Orbital elements at target epoch
-     */
     physics::KeplerianStateTyped<core::ECLIPJ2000> propagate_to(time::EpochTDB target_time);
     
     // ========================================================================
     // Close Approach Analysis
     // ========================================================================
     
-    /**
-     * @brief Find close approaches to planets
-     * 
-     * Searches for close approaches between start and end epochs.
-     * 
-     * @param start_mjd Start epoch [MJD TDB]
-     * @param end_mjd End epoch [MJD TDB]
-     * @return Vector of detected close approaches
-     */
     std::vector<close_approach::CloseApproach> find_close_approaches(
         time::EpochTDB start_time,
         time::EpochTDB end_time);
     
-    /**
-     * @brief Compute the topocentric apparent position of the asteroid
-     * 
-     * @param t_occult Time of occultation [MJD TDB]
-     * @param observatory_code MPC code
-     * @return Apparent position
-     */
     ApparentPlace compute_asteroid_apparent_place(time::EpochTDB t_occult, const std::string& observatory_code);
 
-    /**
-     * @brief Compute the topocentric apparent position of a star
-     * 
-     * @param ra_j2000 Star RA at J2000 [rad]
-     * @param dec_j2000 Star Dec at J2000 [rad]
-     * @param pm_ra Proper motion in RA [rad/yr] (optional)
-     * @param pm_dec Proper motion in Dec [rad/yr] (optional)
-     * @param t_occult Time of occultation [MJD TDB]
-     * @param observatory_code MPC code
-     * @return Apparent position
-     */
     ApparentPlace compute_star_apparent_place(
         double ra_j2000, double dec_j2000,
         double pm_ra, double pm_dec,
         time::EpochTDB t_occult, const std::string& observatory_code);
     
-    /**
-     * @brief Compute MOID (Minimum Orbital Intersection Distance) with planet
-     * 
-     * @param planet Target planet
-     * @return MOID [AU]
-     */
     double compute_moid(ephemeris::CelestialBody planet);
     
     // ========================================================================
     // Configuration and Settings
     // ========================================================================
     
-    /**
-     * @brief Update configuration
-     */
     void set_config(const AstDynConfig& config) {
         config_ = config;
         update_propagator();
     }
     
-    /**
-     * @brief Load configuration from .oop file
-     */
     void load_config(const std::string& oop_file);
     
-    /**
-     * @brief Get current configuration
-     */
     const AstDynConfig& config() const {
         return config_;
     }
     
-    /**
-     * @brief Enable/disable verbose output
-     */
     void set_verbose(bool verbose) {
         config_.verbose = verbose;
     }
@@ -347,67 +242,105 @@ public:
     // Statistics and Diagnostics
     // ========================================================================
     
-    /**
-     * @brief Get last orbit determination result
-     */
     const OrbitDeterminationResult& last_result() const {
         return last_result_;
     }
     
-    /**
-     * @brief Print orbit summary
-     */
     void print_orbit_summary(std::ostream& os = std::cout) const;
-    
-    /**
-     * @brief Print residuals summary
-     */
     void print_residuals_summary(std::ostream& os = std::cout) const;
-    
-    /**
-     * @brief Export orbit to file (various formats)
-     * 
-     * @param filename Output filename
-     * @param format Format: "mpc", "oef", "json"
-     */
-    void export_orbit(const std::string& filename, 
-                     const std::string& format = "oef");
+    void export_orbit(const std::string& filename, const std::string& format = "oef");
 
 private:
-    // Update propagator with current configuration
     void update_propagator();
     
-    // Validate observations (check timing, observatory codes, etc.)
-    void validate_observations();
-    
-    // Configuration
+    // Unified fit dispatcher
+    template <typename Frame>
+    OrbitDeterminationResult run_fit_in_frame();
+
     AstDynConfig config_;
+    observations::ObservationManager obs_context_;
     
-    // Observations
-    std::vector<observations::OpticalObservation> observations_;
-    
-    // Current orbit
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
+    std::shared_ptr<propagation::Propagator> propagator_;
+    std::unique_ptr<close_approach::CloseApproachDetector> ca_detector_;
+
     physics::KeplerianStateTyped<core::ECLIPJ2000> current_orbit_;
     bool has_orbit_ = false;
-    
-    // Last orbit determination result
     OrbitDeterminationResult last_result_;
-    
-    // Components
-    std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
-    std::shared_ptr<propagation::Propagator> propagator_;  // Shared because used by multiple components
-    std::unique_ptr<orbit_determination::DifferentialCorrector<core::ECLIPJ2000>> corrector_;
-    std::unique_ptr<close_approach::CloseApproachDetector> ca_detector_;
-    
-    // Catalog Biases
-    std::map<std::string, std::pair<double, double>> catalog_biases_; // Code -> {RA, Dec} arcsec
-    void load_catalog_biases(const std::string& filename);
-    void set_initial_orbit_ecl(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
 
-    // Ephemeris Management Flags (to avoid redundant loading)
     std::string loaded_ephemeris_file_ = "";
     bool ephemeris_loaded_ = false;
+
+    void set_initial_orbit_ecl(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
 };
+
+// ============================================================================
+// Template Implementations
+// ============================================================================
+
+template <typename Frame>
+OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
+    using namespace orbit_determination;
+    
+    OrbitFitter<Frame> fitter(ephemeris_, propagator_);
+    fitter.set_corrections(config_.aberration_correction, config_.light_time_correction);
+    
+    DifferentialCorrectorSettings dc_settings;
+    dc_settings.max_iterations = config_.max_iterations;
+    dc_settings.convergence_tolerance = config_.convergence_threshold;
+    dc_settings.outlier_sigma = config_.outlier_sigma;
+    dc_settings.outlier_max_sigma = std::max(100.0, config_.outlier_sigma * 10.0); 
+    dc_settings.outlier_min_sigma = config_.outlier_sigma;
+    dc_settings.reject_outliers = true;
+    dc_settings.verbose = config_.verbose;
+
+    // Build initial state in Target Frame
+    auto cart_legacy = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_);
+    physics::CartesianStateTyped<Frame> initial_state;
+    
+    if constexpr (std::is_same_v<Frame, core::ECLIPJ2000>) {
+        initial_state = cart_legacy;
+    } else {
+        auto pos_f = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, Frame>(cart_legacy.position, cart_legacy.epoch);
+        auto vel_f = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, Frame>(cart_legacy.position, cart_legacy.velocity, cart_legacy.epoch);
+        initial_state = physics::CartesianStateTyped<Frame>(cart_legacy.epoch, pos_f, vel_f, cart_legacy.gm);
+    }
+
+    auto result_dc = fitter.fit(obs_context_.observations(), initial_state, dc_settings);
+    
+    // Convert back to Ecliptic for storage
+    physics::CartesianStateTyped<core::ECLIPJ2000> final_ecl;
+    if constexpr (std::is_same_v<Frame, core::ECLIPJ2000>) {
+        final_ecl = result_dc.final_state;
+    } else {
+        auto pos_e = coordinates::ReferenceFrame::transform_pos<Frame, core::ECLIPJ2000>(result_dc.final_state.position, result_dc.final_state.epoch);
+        auto vel_e = coordinates::ReferenceFrame::transform_vel<Frame, core::ECLIPJ2000>(result_dc.final_state.position, result_dc.final_state.velocity, result_dc.final_state.epoch);
+        final_ecl = physics::CartesianStateTyped<core::ECLIPJ2000>(result_dc.final_state.epoch, pos_e, vel_e, result_dc.final_state.gm);
+    }
+
+    current_orbit_ = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(final_ecl);
+    
+    OrbitDeterminationResult result;
+    result.orbit = current_orbit_;
+    result.converged = result_dc.converged;
+    result.rms_ra = result_dc.statistics.rms_ra.to_arcsec();
+    result.rms_dec = result_dc.statistics.rms_dec.to_arcsec();
+    result.rms_total_arcsec = result_dc.statistics.rms_total.to_arcsec();
+    result.num_observations = result_dc.statistics.num_observations;
+    result.num_iterations = result_dc.iterations;
+    result.covariance = result_dc.covariance;
+    result.chi_squared = result_dc.statistics.chi_squared;
+    result.num_rejected = result_dc.statistics.num_outliers;
+    
+    for (const auto& res : result_dc.residuals) {
+        if (!res.outlier) {
+            result.residuals_ra.push_back(res.residual_ra.to_arcsec());
+            result.residuals_dec.push_back(res.residual_dec.to_arcsec());
+        }
+    }
+    
+    return result;
+}
 
 } // namespace astdyn
 

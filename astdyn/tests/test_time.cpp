@@ -77,7 +77,3 @@ TEST(TimeScaleTest, LeapYears) {
     EXPECT_NEAR(calendar_to_mjd(2004, 2, 29, 0.0), 53064.0, 1e-10); // 2004 is leap year
 }
 
-int main(int argc, char** argv) {
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
