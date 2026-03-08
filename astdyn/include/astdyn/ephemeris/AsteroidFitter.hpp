@@ -47,8 +47,8 @@ struct AsteroidFitResult {
     double rms_dec;
     // Number of observations used after outlier rejection
     int num_observations;
-    // Full list of heliocentric positions (m) for each observation epoch
-    std::vector<types::Vector3<core::GCRF, core::Meter>> fitted_positions;
+    // Full list of heliocentric positions for each observation epoch
+    std::vector<math::Vector3<core::GCRF, physics::Distance>> fitted_positions;
 };
 
 /**

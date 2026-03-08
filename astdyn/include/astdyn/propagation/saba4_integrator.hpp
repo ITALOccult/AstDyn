@@ -15,14 +15,6 @@ namespace astdyn::propagation {
 
 class SABA4Integrator : public Integrator {
 public:
-    struct Statistics {
-        int num_steps = 0;
-        int num_rejected = 0;
-        int num_accepted = 0;
-        int num_function_evals = 0;
-        double energy_drift = 0.0;
-        double final_time = 0.0;
-    };
 
     SABA4Integrator(double initial_step = 1.0,
                     double tolerance = 1e-6,
@@ -39,8 +31,7 @@ public:
                          std::vector<double>& t_out,
                          std::vector<Eigen::VectorXd>& y_out) override;
 
-    Statistics stats() const { return stats_; }
-    void reset_stats() { stats_ = Statistics(); }
+    // Use base class statistics() and reset_statistics()
 
 private:
     static constexpr int num_stages_ = 7;
@@ -56,14 +47,14 @@ private:
                                double t, double h);
 
     void split_state(const Eigen::VectorXd& y,
-                     Eigen::Vector3d& q, Eigen::Vector3d& p) const;
-    Eigen::VectorXd join_state(const Eigen::Vector3d& q,
-                               const Eigen::Vector3d& p) const;
+                     Eigen::VectorXd& q, Eigen::VectorXd& p) const;
+    Eigen::VectorXd join_state(const Eigen::VectorXd& q,
+                               const Eigen::VectorXd& p) const;
 
-    Eigen::Vector3d compute_force(const DerivativeFunction& f,
+    Eigen::VectorXd compute_force(const DerivativeFunction& f,
                                   double t,
-                                  const Eigen::Vector3d& q,
-                                  const Eigen::Vector3d& p) const;
+                                  const Eigen::VectorXd& q,
+                                  const Eigen::VectorXd& p) const;
 
     double adapt_step_size(double h_current,
                           double error_estimate,
@@ -76,7 +67,6 @@ private:
     double h_min_;
     double h_max_;
 
-    Statistics stats_;
     double initial_energy_ = 0.0;
 };
 

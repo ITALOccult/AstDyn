@@ -25,7 +25,8 @@
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/time/epoch.hpp"
-#include "src/types/vectors.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include "src/core/frame_tags.hpp"
 #include <vector>
 #include <memory>
@@ -78,14 +79,14 @@ struct CloseApproach {
     // Geometric quantities at closest approach
     double distance;                    ///< Distance from body center [m]
     double relative_velocity_mag;       ///< |v_rel| [m/s]
-    types::Vector3<core::GCRF, core::Meter> position_object;   ///< Object heliocentric position [m]
-    types::Vector3<core::GCRF, core::Meter> velocity_object;   ///< Object heliocentric velocity [m/s]
-    types::Vector3<core::GCRF, core::Meter> position_body;     ///< Body heliocentric position [m]
-    types::Vector3<core::GCRF, core::Meter> velocity_body;     ///< Body heliocentric velocity [m/s]
+    math::Vector3<core::GCRF, physics::Distance> position_object;   ///< Object heliocentric position [m]
+    math::Vector3<core::GCRF, physics::Velocity> velocity_object;   ///< Object heliocentric velocity [m/s]
+    math::Vector3<core::GCRF, physics::Distance> position_body;     ///< Body heliocentric position [m]
+    math::Vector3<core::GCRF, physics::Velocity> velocity_body;     ///< Body heliocentric velocity [m/s]
     
     // Relative coordinates
-    types::Vector3<core::GCRF, core::Meter> rel_position;      ///< Object position relative to body [m]
-    types::Vector3<core::GCRF, core::Meter> rel_velocity;      ///< Object velocity relative to body [m/s]
+    math::Vector3<core::GCRF, physics::Distance> rel_position;      ///< Object position relative to body [m]
+    math::Vector3<core::GCRF, physics::Velocity> rel_velocity;      ///< Object velocity relative to body [m/s]
     
     // B-plane analysis
     std::optional<BPlaneCoordinates> b_plane; ///< Target plane coordinates

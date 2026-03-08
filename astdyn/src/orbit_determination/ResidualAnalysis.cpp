@@ -38,7 +38,7 @@ OrbitValidationSummary ResidualAnalysis::analyze_orbit(
         auto earth_pos = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::EARTH, t_obs);
         
         // Calculate Line of Sight (relative to observer)
-        Eigen::Vector3d rho_vec = state_at_t.position.to_eigen_si() - Eigen::Vector3d(earth_pos.x, earth_pos.y, earth_pos.z);
+        Eigen::Vector3d rho_vec = state_at_t.position.to_eigen_si() - earth_pos.to_eigen_si();
 
         double rho = rho_vec.norm();
         double ra_calc = std::atan2(rho_vec.y(), rho_vec.x());

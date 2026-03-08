@@ -14,9 +14,10 @@
 
 #include "astdyn/ephemeris/CelestialBody.hpp"
 #include "astdyn/time/epoch.hpp"
-#include "src/types/vectors.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include <Eigen/Dense>
 #include <string>
 
@@ -34,18 +35,18 @@ public:
      * 
      * @param body Celestial body
      * @param t Time
-     * @return Position vector [m] in J2000 equatorial frame (ICRF)
+     * @return Position vector in J2000 equatorial frame (ICRF)
      */
-    virtual types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, time::EpochTDB t) = 0;
+    virtual math::Vector3<core::GCRF, physics::Distance> getPosition(CelestialBody body, time::EpochTDB t) = 0;
     
     /**
      * @brief Get velocity of celestial body
      * 
      * @param body Celestial body
      * @param t Time
-     * @return Velocity vector [m/s] in J2000 equatorial frame (ICRF)
+     * @return Velocity vector in J2000 equatorial frame (ICRF)
      */
-    virtual types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, time::EpochTDB t) = 0;
+    virtual math::Vector3<core::GCRF, physics::Velocity> getVelocity(CelestialBody body, time::EpochTDB t) = 0;
     
     /**
      * @brief Get full state (position + velocity)
@@ -58,7 +59,7 @@ public:
         Eigen::Matrix<double, 6, 1> state;
         const auto pos = getPosition(body, t);
         const auto vel = getVelocity(body, t);
-        state << pos.x, pos.y, pos.z, vel.x, vel.y, vel.z;
+        state << pos.x_si(), pos.y_si(), pos.z_si(), vel.x_si(), vel.y_si(), vel.z_si();
         return state;
     }
     

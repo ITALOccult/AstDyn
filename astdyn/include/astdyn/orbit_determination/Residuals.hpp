@@ -99,9 +99,9 @@ struct ResidualStatistics {
 /**
  * @brief Residual calculator for orbit determination
  * 
- * Computes O-C residuals for optical observations given an orbital state.
- * Handles light-time correction, aberration, and topocentric parallax.
+ * @tparam Frame Reference frame for integration
  */
+template <typename Frame>
 class ResidualCalculator {
 public:
     /**
@@ -122,7 +122,7 @@ public:
      */
     std::vector<ObservationResidual> compute_residuals(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
-        const physics::CartesianStateTyped<core::GCRF>& state) const;
+        const physics::CartesianStateTyped<Frame>& state) const;
     
     /**
      * @brief Compute residual for single observation
@@ -133,7 +133,7 @@ public:
      */
     std::optional<ObservationResidual> compute_residual(
         const astdyn::observations::OpticalObservation& obs,
-        const physics::CartesianStateTyped<core::GCRF>& state) const;
+        const physics::CartesianStateTyped<Frame>& state) const;
     
     /**
      * @brief Compute statistics from residuals

@@ -21,7 +21,7 @@ using ephemeris::CelestialBody;
 // Propagator Implementation
 // ============================================================================
 
-Propagator::Propagator(std::unique_ptr<Integrator> integrator,
+Propagator::Propagator(std::shared_ptr<Integrator> integrator,
                       std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
                       const PropagatorSettings& settings)
     : integrator_(std::move(integrator)),
@@ -43,7 +43,7 @@ Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::V
     
     // Get Sun Barycentric Position (KM -> AU and rotate if needed)
     auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
-    Eigen::Vector3d sun_pos_bary_vec = sun_pos_bary.to_eigen() / (constants::AU * 1000.0);
+    Eigen::Vector3d sun_pos_bary_vec = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
     
     // Rotate to Ecliptic if needed
     if (settings_.integrate_in_ecliptic) {
@@ -101,7 +101,7 @@ Eigen::Vector3d Propagator::planetary_perturbations(const Eigen::Vector3d& posit
 
     auto add_planet_perturbation = [&]( CelestialBody planet, double planet_gm_au) {
         auto planet_state_bary = ephemeris_->getPosition(planet, t);
-        Eigen::Vector3d p_pos_bary_au = planet_state_bary.to_eigen() / (constants::AU * 1000.0);
+        Eigen::Vector3d p_pos_bary_au = planet_state_bary.to_eigen_si() / (constants::AU * 1000.0);
         
         if (settings_.integrate_in_ecliptic) {
             p_pos_bary_au = mat_ecl * p_pos_bary_au;

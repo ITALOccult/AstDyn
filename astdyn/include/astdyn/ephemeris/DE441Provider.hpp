@@ -48,8 +48,9 @@ public:
     
     ~DE441Provider() override;
     
-    types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, time::EpochTDB t) override;
-    types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, time::EpochTDB t) override;
+    math::Vector3<core::GCRF, physics::Distance> getPosition(CelestialBody body, time::EpochTDB t) override;
+    math::Vector3<core::GCRF, physics::Velocity> getVelocity(CelestialBody body, time::EpochTDB t) override;
+    Eigen::Matrix<double, 6, 1> getState(CelestialBody body, time::EpochTDB t) override;
     
     std::string getName() const override { return "JPL DE441 (Native)"; }
     double getAccuracy() const override { return 0.001; } // ~1 mas
@@ -66,14 +67,9 @@ private:
     int bodyToNAIFId(CelestialBody body) const;
     
     /**
-     * @brief Convert JD (TDB) to ET (ephemeris time)
+     * @brief Read full state from SPK (Single access)
      */
-    double jdToET(time::EpochTDB t) const;
-    
-    /**
-     * @brief Rotate from J2000 equatorial to ecliptic
-     */
-    Eigen::Vector3d equatorialToEcliptic(const Eigen::Vector3d& vec) const;
+    Eigen::VectorXd readState(CelestialBody body, time::EpochTDB t) const;
 };
 
 } // namespace astdyn::ephemeris

@@ -56,13 +56,16 @@ double KeplerianElements::aphelion_distance() const {
 // ============================================================================
 
 double CartesianElements::energy() const {
-    double v2 = velocity.squaredNorm();
-    double r = position.norm();
-    return 0.5 * v2 - gravitational_parameter / r;
+    double v = velocity.norm().to_au_d();
+    double r = position.norm().to_au();
+    double mu = gravitational_parameter * std::pow(86400.0, 2) / std::pow(constants::AU * 1000.0, 3);
+    return 0.5 * v * v - mu / r;
 }
 
 Eigen::Vector3d CartesianElements::angular_momentum() const {
-    return position.to_eigen().cross(velocity.to_eigen());
+    auto r_au = position.to_eigen_si() / (constants::AU * 1000.0);
+    auto v_aud = velocity.to_eigen_si() * (86400.0 / (constants::AU * 1000.0));
+    return r_au.cross(v_aud);
 }
 
 // ============================================================================
@@ -138,8 +141,8 @@ CartesianElements keplerian_to_cartesian(const KeplerianElements& kep) {
     cart.gravitational_parameter = kep.gravitational_parameter * AU3d2_TO_M3s2; // m³/s² (SI)
 
     const auto& raw = state_cart.raw_values();
-    cart.position = types::Vector3<core::GCRF, core::Meter>(raw[0] * AU_TO_M,  raw[1] * AU_TO_M,  raw[2] * AU_TO_M);
-    cart.velocity = types::Vector3<core::GCRF, core::Meter>(raw[3] * AUd_TO_MS, raw[4] * AUd_TO_MS, raw[5] * AUd_TO_MS);
+    cart.position = math::Vector3<core::GCRF, physics::Distance>::from_si(raw[0] * AU_TO_M,  raw[1] * AU_TO_M,  raw[2] * AU_TO_M);
+    cart.velocity = math::Vector3<core::GCRF, physics::Velocity>::from_si(raw[3] * AUd_TO_MS, raw[4] * AUd_TO_MS, raw[5] * AUd_TO_MS);
     
     return cart;
 }
@@ -156,8 +159,8 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     double mu = cart.gravitational_parameter; // m³/s²
 
     // CartesianElements is always in SI (m, m/s, m³/s²) — no heuristic needed.
-    Eigen::Vector3d r(cart.position.x, cart.position.y, cart.position.z); // [m]
-    Eigen::Vector3d v(cart.velocity.x, cart.velocity.y, cart.velocity.z); // [m/s]
+    Eigen::Vector3d r(cart.position.x_si(), cart.position.y_si(), cart.position.z_si()); // [m]
+    Eigen::Vector3d v(cart.velocity.x_si(), cart.velocity.y_si(), cart.velocity.z_si()); // [m/s]
     
     double r_mag = r.norm();
     double v_mag = v.norm();

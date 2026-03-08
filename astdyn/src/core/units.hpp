@@ -48,6 +48,15 @@ struct MilliArcSecond {
     constexpr MilliArcSecond() : value(0.0) {}
 };
 
+/**
+ * @brief Strong type for MeterPerSecond.
+ */
+struct MeterPerSecond {
+    double value;
+    explicit constexpr MeterPerSecond(const double v) : value(v) {}
+    constexpr MeterPerSecond() : value(0.0) {}
+};
+
 } // namespace astdyn::core
 
 #endif // ASTDYN_CORE_UNITS_HPP

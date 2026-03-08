@@ -8,6 +8,7 @@
 #include "astdyn/close_approach/CloseApproach.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>
@@ -204,26 +205,14 @@ std::vector<CloseApproach> CloseApproachDetector::find_approaches(
     time::EpochTDB t_start,
     time::EpochTDB t_end)
 {
-    // Bridge to un-typed format for conversion math
-    KeplerianElements kep_old;
-    kep_old.epoch = initial_orbit.epoch;
-    kep_old.semi_major_axis = initial_orbit.a.to_au();
-    kep_old.eccentricity = initial_orbit.e;
-    kep_old.inclination = initial_orbit.i.to_rad();
-    kep_old.longitude_ascending_node = initial_orbit.node.to_rad();
-    kep_old.argument_perihelion = initial_orbit.omega.to_rad();
-    kep_old.mean_anomaly = initial_orbit.M.to_rad();
-    kep_old.gravitational_parameter = initial_orbit.gm.to_au3_d2();
+    // Convert orbit to Cartesian GCRF using typed converters
+    auto initial_ecl = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(initial_orbit);
     
-    // Convert to un-typed Cartesian (which returns SI internally!)
-    CartesianElements cart_old = keplerian_to_cartesian(kep_old);
+    auto pos_gcrf = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(initial_ecl.position, initial_orbit.epoch);
+    auto vel_gcrf = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, core::GCRF>(initial_ecl.position, initial_ecl.velocity, initial_orbit.epoch);
     
-    // Bring into AstDyn 3.0 Type Safety
-    auto cart_typed = physics::CartesianStateTyped<core::GCRF>::from_si(
-        initial_orbit.epoch,
-        cart_old.position.x, cart_old.position.y, cart_old.position.z,
-        cart_old.velocity.x, cart_old.velocity.y, cart_old.velocity.z,
-        constants::GM_SUN * 1e9
+    auto cart_typed = physics::CartesianStateTyped<core::GCRF>(
+        initial_orbit.epoch, pos_gcrf, vel_gcrf, initial_orbit.gm
     );
     
     return find_approaches(cart_typed, t_start, t_end);
@@ -236,8 +225,7 @@ double CloseApproachDetector::compute_distance(
 {
     CelestialBody cb = to_celestial_body(body);
     auto planet_pos = PlanetaryEphemeris::getPosition(cb, t);
-    Vector3d rel_pos = state.position.to_eigen_si() - planet_pos.to_eigen();
-    return rel_pos.norm();
+    return (state.position.to_eigen_si() - planet_pos.to_eigen_si()).norm();
 }
 
 time::EpochTDB CloseApproachDetector::refine_approach_time(
@@ -300,18 +288,18 @@ CloseApproach CloseApproachDetector::build_approach(
     ca.time = t;
     ca.body = body;
     
-    ca.position_object = types::Vector3<core::GCRF, core::Meter>(state.position.to_eigen_si());
-    ca.velocity_object = types::Vector3<core::GCRF, core::Meter>(state.velocity.to_eigen_si());
+    ca.position_object = state.position;
+    ca.velocity_object = state.velocity;
     
     CelestialBody cb = to_celestial_body(body);
     ca.position_body = PlanetaryEphemeris::getPosition(cb, t);
     ca.velocity_body = PlanetaryEphemeris::getVelocity(cb, t);
     
-    ca.rel_position = types::Vector3<core::GCRF, core::Meter>(ca.position_object.to_eigen() - ca.position_body.to_eigen());
-    ca.rel_velocity = types::Vector3<core::GCRF, core::Meter>(ca.velocity_object.to_eigen() - ca.velocity_body.to_eigen());
+    ca.rel_position = ca.position_object - ca.position_body;
+    ca.rel_velocity = ca.velocity_object - ca.velocity_body;
     
-    ca.distance = ca.rel_position.norm();
-    ca.relative_velocity_mag = ca.rel_velocity.norm();
+    ca.distance = ca.rel_position.norm().to_m();
+    ca.relative_velocity_mag = ca.rel_velocity.norm().to_ms();
     
     if (settings_.compute_b_plane && ca.distance > settings_.min_distance) {
         ca.b_plane = compute_b_plane(ca);
@@ -322,8 +310,8 @@ CloseApproach CloseApproachDetector::build_approach(
 
 BPlaneCoordinates CloseApproachDetector::compute_b_plane(const CloseApproach& ca) const {
     BPlaneCoordinates b_plane;
-    Vector3d v_rel = ca.rel_velocity.to_eigen();
-    Vector3d r_rel = ca.rel_position.to_eigen();
+    Vector3d v_rel = ca.rel_velocity.to_eigen_si();
+    Vector3d r_rel = ca.rel_position.to_eigen_si();
     
     double v_norm = v_rel.norm();
     if (v_norm < 1e-10) {

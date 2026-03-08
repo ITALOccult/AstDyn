@@ -82,14 +82,14 @@ OrbitFitAPI::prepare_initial_state(const propagation::EquinoctialElements& mean_
     
     // 3. Rotate Cartesian: Ecliptic -> Equatorial (GCRF)
     auto mat = coordinates::ReferenceFrame::ecliptic_to_j2000();
-    auto final_pos = mat * cart_ecl.position.to_eigen();
-    auto final_vel = mat * cart_ecl.velocity.to_eigen();
+    auto final_pos = mat * cart_ecl.position.to_eigen_si();
+    auto final_vel = mat * cart_ecl.velocity.to_eigen_si();
     
     // 4. Create a legacy Cartesian state in Equatorial frame to use existing conversion logic
     propagation::CartesianElements cart_eq;
     cart_eq.epoch = mean_equ.epoch;
-    cart_eq.position = types::Vector3<core::GCRF, core::Meter>(final_pos);
-    cart_eq.velocity = types::Vector3<core::GCRF, core::Meter>(final_vel);
+    cart_eq.position = math::Vector3<core::GCRF, physics::Distance>::from_si(final_pos.x(), final_pos.y(), final_pos.z());
+    cart_eq.velocity = math::Vector3<core::GCRF, physics::Velocity>::from_si(final_vel.x(), final_vel.y(), final_vel.z());
     cart_eq.gravitational_parameter = kep_ecl.gravitational_parameter;
     
     // 5. Convert back to Keplerian (Equatorial / GCRF)

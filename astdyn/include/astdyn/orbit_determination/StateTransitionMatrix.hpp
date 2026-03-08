@@ -27,9 +27,10 @@ namespace astdyn::orbit_determination {
 /**
  * @brief State transition matrix result
  */
+template <typename Frame>
 struct STMResult {
     astdyn::Matrix6d phi;                        ///< Φ(t,t₀) - 6x6 state transition matrix
-    physics::CartesianStateTyped<core::GCRF> final_state;       ///< Propagated state at time t
+    physics::CartesianStateTyped<Frame> final_state;       ///< Propagated state at time t
     
     /**
      * @brief Map covariance from t₀ to t
@@ -47,15 +48,9 @@ struct STMResult {
 /**
  * @brief Computes state transition matrix via variational equations
  * 
- * Integrates both the state equations and variational equations:
- * 
- * dx/dt = f(x, t)
- * dΦ/dt = A(t) * Φ
- * 
- * where A(t) = ∂f/∂x is the Jacobian of the dynamics.
- * 
- * Initial condition: Φ(t₀,t₀) = I (identity matrix)
+ * @tparam Frame Reference frame for integration
  */
+template <typename Frame>
 class StateTransitionMatrix {
 public:
     /**
@@ -72,8 +67,8 @@ public:
      * @param target_mjd_tdb Target time t
      * @return STM result with Φ(t,t₀) and final state
      */
-    STMResult compute(
-        const physics::CartesianStateTyped<core::GCRF>& initial,
+    STMResult<Frame> compute(
+        const physics::CartesianStateTyped<Frame>& initial,
         time::EpochTDB target_time);
     
     /**
@@ -91,11 +86,11 @@ public:
     struct ObservationPartials {
         astdyn::Matrix6d phi;                    ///< State transition matrix
         Eigen::Matrix<double, 2, 6> partial_radec; ///< ∂(RA,Dec)/∂x
-        physics::CartesianStateTyped<core::GCRF> final_state;
+        physics::CartesianStateTyped<Frame> final_state;
     };
     
     ObservationPartials compute_with_partials(
-        const physics::CartesianStateTyped<core::GCRF>& initial,
+        const physics::CartesianStateTyped<Frame>& initial,
         time::EpochTDB target_time,
         const math::Vector3<core::GCRF, physics::Distance>& observer_pos);
     
@@ -156,8 +151,8 @@ private:
      * @param target_mjd Target time
      * @return Final state and STM
      */
-    STMResult propagate_with_stm(
-        const physics::CartesianStateTyped<core::GCRF>& initial,
+    STMResult<Frame> propagate_with_stm(
+        const physics::CartesianStateTyped<Frame>& initial,
         time::EpochTDB target_time);
     
     /**
@@ -170,7 +165,7 @@ private:
      * @return 2x6 matrix of partials
      */
     Eigen::Matrix<double, 2, 6> compute_observation_partials(
-        const physics::CartesianStateTyped<core::GCRF>& state,
+        const physics::CartesianStateTyped<Frame>& state,
         const math::Vector3<core::GCRF, physics::Distance>& observer_pos) const;
 
 private:

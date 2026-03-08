@@ -36,9 +36,9 @@ EKFResult ExtendedKalmanFilter::update(
     // Get Earth position (observer)
     auto earth_pos_si = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::EARTH, t_obs);
     auto R_obs = math::Vector3<core::GCRF, physics::Distance>::from_si(
-        earth_pos_si.x / (constants::AU * 1000.0),
-        earth_pos_si.y / (constants::AU * 1000.0),
-        earth_pos_si.z / (constants::AU * 1000.0)
+        earth_pos_si.x_si(),
+        earth_pos_si.y_si(),
+        earth_pos_si.z_si()
     );
 
     auto partials_res = stm_engine_.compute_with_partials(prev_state, t_obs, R_obs);

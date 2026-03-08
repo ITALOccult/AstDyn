@@ -87,9 +87,13 @@ public:
     
     /**
      * @brief Compute total perturbation acceleration from all loaded asteroids
-     * @param position Helper position of target body (Heliocentric) [AU]
+     * 
+     * @param position Heliocentric state of interest [AU]
      * @param mjd_tdb Time [MJD TDB]
      * @param sun_pos_bary Position of Sun relative to SSB [AU]
+     * 
+     * @note Input position and output acceleration are in AU and AU/day^2.
+     * @note Coordinate frame: J2000 Heliocentric Ecliptic (Internal context: untyped).
      * @return Acceleration vector [AU/d^2]
      */
     Eigen::Vector3d computePerturbation(const Eigen::Vector3d& position, double mjd_tdb, const Eigen::Vector3d& sun_pos_bary = Eigen::Vector3d::Zero()) const;

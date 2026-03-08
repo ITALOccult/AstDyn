@@ -44,6 +44,7 @@ struct AstDynConfig {
     std::string integrator_type = "RK4";    ///< Integrator type: RK4, RKF78
     double initial_step_size = 0.1;         ///< Initial step size [days]
     double tolerance = 1e-12;                ///< Integration tolerance
+    double aas_precision = 1e-4;             ///< Precision metric for AAS integrator (step size control)
 
         // Ephemeris Configuration
         std::string ephemeris_type = "Analytical"; // "Analytical", "DE441"
@@ -86,11 +87,22 @@ struct OrbitDeterminationResult {
     std::vector<double> residuals_dec;       ///< Dec residuals [arcsec]
     double rms_ra;                           ///< RMS of RA residuals [arcsec]
     double rms_dec;                          ///< RMS of Dec residuals [arcsec]
+    double rms_total_arcsec;                 ///< Total RMS [arcsec]
     double chi_squared;                      ///< Chi-squared statistic
     int num_observations;                    ///< Number of observations used
     int num_rejected;                        ///< Number of rejected outliers
     int num_iterations;                      ///< Number of DC iterations
     bool converged;                          ///< Convergence flag
+};
+
+/**
+ * @brief Apparent position results for occultations
+ */
+struct ApparentPlace {
+    double ra;              ///< Right Ascension [rad]
+    double dec;             ///< Declination [rad]
+    double distance;        ///< Topocentric distance [m]
+    double light_time;      ///< Light time correction [days]
 };
 
 /**
@@ -268,6 +280,31 @@ public:
         time::EpochTDB end_time);
     
     /**
+     * @brief Compute the topocentric apparent position of the asteroid
+     * 
+     * @param t_occult Time of occultation [MJD TDB]
+     * @param observatory_code MPC code
+     * @return Apparent position
+     */
+    ApparentPlace compute_asteroid_apparent_place(time::EpochTDB t_occult, const std::string& observatory_code);
+
+    /**
+     * @brief Compute the topocentric apparent position of a star
+     * 
+     * @param ra_j2000 Star RA at J2000 [rad]
+     * @param dec_j2000 Star Dec at J2000 [rad]
+     * @param pm_ra Proper motion in RA [rad/yr] (optional)
+     * @param pm_dec Proper motion in Dec [rad/yr] (optional)
+     * @param t_occult Time of occultation [MJD TDB]
+     * @param observatory_code MPC code
+     * @return Apparent position
+     */
+    ApparentPlace compute_star_apparent_place(
+        double ra_j2000, double dec_j2000,
+        double pm_ra, double pm_dec,
+        time::EpochTDB t_occult, const std::string& observatory_code);
+    
+    /**
      * @brief Compute MOID (Minimum Orbital Intersection Distance) with planet
      * 
      * @param planet Target planet
@@ -359,13 +396,17 @@ private:
     // Components
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
     std::shared_ptr<propagation::Propagator> propagator_;  // Shared because used by multiple components
-    std::unique_ptr<orbit_determination::DifferentialCorrector> corrector_;
+    std::unique_ptr<orbit_determination::DifferentialCorrector<core::ECLIPJ2000>> corrector_;
     std::unique_ptr<close_approach::CloseApproachDetector> ca_detector_;
     
     // Catalog Biases
     std::map<std::string, std::pair<double, double>> catalog_biases_; // Code -> {RA, Dec} arcsec
     void load_catalog_biases(const std::string& filename);
     void set_initial_orbit_ecl(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
+
+    // Ephemeris Management Flags (to avoid redundant loading)
+    std::string loaded_ephemeris_file_ = "";
+    bool ephemeris_loaded_ = false;
 };
 
 } // namespace astdyn

@@ -2,7 +2,7 @@
 #define ASTDYN_TYPES_MATRICES_HPP
 
 #include <array>
-#include "vectors.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 
 namespace astdyn::types {
 
@@ -19,11 +19,11 @@ struct Matrix3x3 {
 
     /** @brief Matrix-Vector multiplication. */
     template <typename Frame, typename Unit>
-    [[nodiscard]] constexpr Vector3<Frame, Unit> multiply(const Vector3<Frame, Unit>& vec) const noexcept {
-        const double x = elements[0] * vec.x + elements[1] * vec.y + elements[2] * vec.z;
-        const double y = elements[3] * vec.x + elements[4] * vec.y + elements[5] * vec.z;
-        const double z = elements[6] * vec.x + elements[7] * vec.y + elements[8] * vec.z;
-        return Vector3<Frame, Unit>(x, y, z);
+    [[nodiscard]] constexpr math::Vector3<Frame, Unit> multiply(const math::Vector3<Frame, Unit>& vec) const noexcept {
+        const double x = elements[0] * vec.x_si() + elements[1] * vec.y_si() + elements[2] * vec.z_si();
+        const double y = elements[3] * vec.x_si() + elements[4] * vec.y_si() + elements[5] * vec.z_si();
+        const double z = elements[6] * vec.x_si() + elements[7] * vec.y_si() + elements[8] * vec.z_si();
+        return math::Vector3<Frame, Unit>::from_si(x, y, z);
     }
 
     /** @brief Matrix-Matrix multiplication. */

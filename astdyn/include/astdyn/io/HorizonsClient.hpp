@@ -48,7 +48,7 @@ public:
      * @return Strongly-typed CartesianState in GCRF/ICRF frame.
      */
     std::expected<physics::CartesianStateTyped<core::GCRF>, HorizonsError> 
-    query_vectors(const std::string& target, const time::EpochTDB& epoch, const std::string& center = "500@0");
+    query_vectors(const std::string& target, const time::EpochTDB& epoch, const std::string& center = "500@10");
 
     /**
      * @brief Query observed position (RA/Dec) for a specific target and epoch

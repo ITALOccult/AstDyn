@@ -6,6 +6,8 @@
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
+#include "astdyn/orbit_determination/DifferentialCorrector.hpp"
+#include "astdyn/orbit_determination/Residuals.hpp"
 #include "astdyn/orbit_determination/GaussIOD.hpp"
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/observations/MPCReader.hpp"
@@ -17,6 +19,7 @@
 #include "astdyn/propagation/GaussIntegrator.hpp"
 #include "astdyn/propagation/RadauIntegrator.hpp"
 #include "astdyn/propagation/saba4_integrator.hpp"
+#include "astdyn/propagation/AASIntegrator.hpp"
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <iomanip>
@@ -40,9 +43,6 @@ AstDynEngine::AstDynEngine()
 {
     ephemeris_ = std::make_shared<ephemeris::PlanetaryEphemeris>();
     update_propagator();
-    
-    // CloseApproachDetector requires propagator, not just ephemeris
-    ca_detector_ = std::make_unique<CloseApproachDetector>(propagator_, config_.ca_settings);
 }
 
 AstDynEngine::AstDynEngine(const AstDynConfig& config)
@@ -50,9 +50,6 @@ AstDynEngine::AstDynEngine(const AstDynConfig& config)
 {
     ephemeris_ = std::make_shared<ephemeris::PlanetaryEphemeris>();
     update_propagator();
-    
-    // CloseApproachDetector requires propagator, not just ephemeris
-    ca_detector_ = std::make_unique<CloseApproachDetector>(propagator_, config_.ca_settings);
 }
 
 void AstDynEngine::update_propagator() {
@@ -80,6 +77,13 @@ void AstDynEngine::update_propagator() {
         integrator = std::make_unique<RadauIntegrator>(
             config_.initial_step_size,
             config_.tolerance);
+    } else if (config_.integrator_type == "AAS") {
+        // AstDyn-Adaptive Symplectic (Precision-based)
+        // Ensure MU matches propagator units (AU/day)
+        double mu_val = config_.propagator_settings.central_body_gm;
+        integrator = std::make_unique<AASIntegrator>(
+            config_.aas_precision, 
+            mu_val);
     } else {
         // Default to RK4
         if (config_.verbose) {
@@ -93,32 +97,27 @@ void AstDynEngine::update_propagator() {
     
     // Update Ephemeris Provider based on config
     if (config_.ephemeris_type == "DE441" && !config_.ephemeris_file.empty()) {
-        static std::string loaded_file = "";
-        static bool is_loaded = false;
-        
         // Avoid reloading if same file
-        if (!is_loaded || loaded_file != config_.ephemeris_file) {
+        if (!ephemeris_loaded_ || loaded_ephemeris_file_ != config_.ephemeris_file) {
             try {
                 if (config_.verbose) std::cout << "Loading DE441 Ephemeris: " << config_.ephemeris_file << "...\n";
                 auto provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
                 ephemeris::PlanetaryEphemeris::setProvider(provider);
-                loaded_file = config_.ephemeris_file;
-                is_loaded = true;
+                loaded_ephemeris_file_ = config_.ephemeris_file;
+                ephemeris_loaded_ = true;
                 if (config_.verbose) std::cout << "DE441 Loaded successfully.\n";
             } catch (const std::exception& e) {
                 std::cerr << "Error loading DE441: " << e.what() << ". Using analytical ephemeris.\n";
                 // Fallback
                 ephemeris::PlanetaryEphemeris::setProvider(nullptr);
-                is_loaded = false;
+                ephemeris_loaded_ = false;
             }
         }
     } else {
         // Default / Analytical
-        // ephemeris::PlanetaryEphemeris::setProvider(nullptr); 
-        // Note: we don't reset to nullptr automatically to preserve "manual" setting if user did it elsewhere? 
-        // No, config should rule.
         if (config_.ephemeris_type == "Analytical") {
              ephemeris::PlanetaryEphemeris::setProvider(nullptr);
+             ephemeris_loaded_ = false;
         }
     }
 
@@ -132,6 +131,9 @@ void AstDynEngine::update_propagator() {
         std::move(integrator),
         ephemeris_,
         config_.propagator_settings);
+    
+    // Update CloseApproachDetector with the new propagator and settings
+    ca_detector_ = std::make_unique<CloseApproachDetector>(propagator_, config_.ca_settings);
 }
 
 void AstDynEngine::load_config(const std::string& config_file) {
@@ -170,11 +172,13 @@ void AstDynEngine::load_config(const std::string& config_file) {
         config_.integrator_type = ji.value("type", "RK4");
         config_.initial_step_size = ji.value("step_size", 0.1);
         config_.tolerance = ji.value("tolerance", 1e-12);
+        config_.aas_precision = ji.value("aas_precision", 1e-4);
     } else {
         // Flat fallback or EngineConfig structure (AsteroidFitConfig style)
         config_.integrator_type = j.value("integrator_type", "RK4");
         config_.initial_step_size = j.value("initial_step_size", 0.1);
         config_.tolerance = j.value("tolerance", 1e-12);
+        config_.aas_precision = j.value("aas_precision", 1e-4);
     }
     
     // Load Perturbation settings
@@ -203,6 +207,7 @@ void AstDynEngine::load_config(const std::string& config_file) {
     } else {
         // Fallback to top-level keys (matching AsteroidFitConfig::EngineConfig)
         config_.propagator_settings.include_planets = j.value("include_planets", true);
+        config_.propagator_settings.include_asteroids = j.value("include_asteroids", false);
         config_.propagator_settings.include_relativity = j.value("include_relativity", false);
         config_.propagator_settings.include_moon = j.value("include_moon", true);
         
@@ -284,6 +289,25 @@ void AstDynEngine::load_config(const std::string& config_file) {
         config_.light_time_correction = jr.value("light_time", true);
     }
     
+    // Close Approach settings
+    if (j.contains("close_approach")) {
+        auto& jc = j["close_approach"];
+        config_.ca_settings.detection_distance = jc.value("detection_distance", 0.05 * constants::AU);
+        config_.ca_settings.min_distance = jc.value("min_distance", 1e-6 * constants::AU);
+        config_.ca_settings.compute_b_plane = jc.value("compute_b_plane", true);
+        config_.ca_settings.refine_time = jc.value("refine_time", true);
+        config_.ca_settings.time_tolerance = jc.value("time_tolerance", 1e-6);
+        config_.ca_settings.max_refinement_iter = jc.value("max_iter", 10);
+    } else {
+        // Flat fallback
+        config_.ca_settings.detection_distance = j.value("ca_detection_distance", 0.05 * constants::AU);
+        config_.ca_settings.min_distance = j.value("ca_min_distance", 1e-6 * constants::AU);
+        config_.ca_settings.compute_b_plane = j.value("ca_compute_b_plane", true);
+        config_.ca_settings.refine_time = j.value("ca_refine_time", true);
+        config_.ca_settings.time_tolerance = j.value("ca_time_tolerance", 1e-6);
+        config_.ca_settings.max_refinement_iter = j.value("ca_max_iter", 10);
+    }
+
     // General
     config_.verbose = j.value("verbose", true);
 
@@ -382,15 +406,15 @@ void AstDynEngine::add_observation(const observations::OpticalObservation& obs) 
         // Usually catalogs have systematic errors. 
         // If star catalog is shifted by +0.1", obs is +0.1". 
         // to correct, we subtract 0.1".
-        // So Corrected = Observed - Bias.
+        // Corrected = Observed - Bias.
         // Bias units: arcsec.
-        // RA/Dec units: degrees (in OpticalObservation structure).
+        // RA/Dec units: radians (in OpticalObservation structure).
         
-        double ra_bias_deg = it->second.first / 3600.0;
-        double dec_bias_deg = it->second.second / 3600.0;
+        double ra_bias_rad = it->second.first * constants::ARCSEC_TO_RAD;
+        double dec_bias_rad = it->second.second * constants::ARCSEC_TO_RAD;
         
-        corrected_obs.ra -= ra_bias_deg;
-        corrected_obs.dec -= dec_bias_deg;
+        corrected_obs.ra -= ra_bias_rad;
+        corrected_obs.dec -= dec_bias_rad;
     }
 
     observations_.push_back(corrected_obs);
@@ -461,8 +485,8 @@ physics::KeplerianStateTyped<core::ECLIPJ2000> AstDynEngine::initial_orbit_deter
         opt_obs.time = obs.time;
         opt_obs.ra = obs.ra;
         opt_obs.dec = obs.dec;
-        opt_obs.sigma_ra = 1.0 / 206265.0;  // ~1 arcsec default
-        opt_obs.sigma_dec = 1.0 / 206265.0;
+        opt_obs.sigma_ra = obs.sigma_ra;
+        opt_obs.sigma_dec = obs.sigma_dec;
         // Copy observatory code
         opt_obs.observatory_code = obs.observatory_code;
         optical_obs.push_back(opt_obs);
@@ -487,37 +511,17 @@ physics::KeplerianStateTyped<core::ECLIPJ2000> AstDynEngine::initial_orbit_deter
         result.print_summary();
     }
     
-    // 4. Bring into AstDyn 3.0 Type Safety
-    auto cart_typed = result.state; // GaussIODResult::state is already CartesianStateTyped<core::GCRF>
+    // 4. Bring into AstDyn 3.0 Type Safety (Ecliptic J2000)
+    // Convert GCRF result to Ecliptic J2000
+    auto cart_gcrf = result.state;
+    auto pos_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(cart_gcrf.position, cart_gcrf.epoch);
+    auto vel_ecl = coordinates::ReferenceFrame::transform_vel<core::GCRF, core::ECLIPJ2000>(cart_gcrf.position, cart_gcrf.velocity, cart_gcrf.epoch);
     
-    // Convert to Keplerian (Ecliptic J2000)
-    // Bridge back to un-typed for returning to Keplerian
-    CartesianElements cart_old;
-    cart_old.epoch = cart_typed.epoch;
-    
-    // Rotate back to Ecliptic
-    auto pos_eq = cart_typed.position.to_eigen_si();
-    auto vel_eq = cart_typed.velocity.to_eigen_si();
-    auto mat_ecl_to_eq = coordinates::ReferenceFrame::ecliptic_to_j2000();
-    auto pos_ecl = mat_ecl_to_eq.transpose() * pos_eq;
-    auto vel_ecl = mat_ecl_to_eq.transpose() * vel_eq;
-    
-    cart_old.position = types::Vector3<core::GCRF, core::Meter>(pos_ecl);
-    cart_old.velocity = types::Vector3<core::GCRF, core::Meter>(vel_ecl);
-    cart_old.gravitational_parameter = constants::GM_SUN * 1e9;
-    
-    KeplerianElements kep_old = cartesian_to_keplerian(cart_old);
-    
-    current_orbit_ = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-        cart_typed.epoch,
-        kep_old.semi_major_axis, kep_old.eccentricity,
-        kep_old.inclination * constants::RAD_TO_DEG,
-        kep_old.longitude_ascending_node * constants::RAD_TO_DEG,
-        kep_old.argument_perihelion * constants::RAD_TO_DEG,
-        kep_old.mean_anomaly * constants::RAD_TO_DEG,
-        physics::GravitationalParameter::from_si(cart_old.gravitational_parameter)
+    auto cart_ecl = physics::CartesianStateTyped<core::ECLIPJ2000>(
+        cart_gcrf.epoch, pos_ecl, vel_ecl, cart_gcrf.gm
     );
     
+    current_orbit_ = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(cart_ecl);
     has_orbit_ = true;
     return current_orbit_;
 }
@@ -537,113 +541,95 @@ OrbitDeterminationResult AstDynEngine::fit_orbit() {
     if (config_.verbose) {
         std::cout << "\n=== Differential Correction ===\n";
         std::cout << "Observations: " << observations_.size() << "\n";
-        std::cout << "Max iterations: " << config_.max_iterations << "\n";
-        std::cout << "Convergence threshold: " << config_.convergence_threshold << "\n";
     }
     
-    // Create residual calculator and STM computer (both need propagator)
-    auto residual_calc = std::make_shared<orbit_determination::ResidualCalculator>(ephemeris_, propagator_);
-    residual_calc->set_aberration_correction(config_.aberration_correction);
-    residual_calc->set_light_time_correction(config_.light_time_correction);
-    
-    auto stm_computer = std::make_shared<orbit_determination::StateTransitionMatrix>(propagator_);
-    
-    // Create differential corrector
-    auto corrector = std::make_unique<orbit_determination::DifferentialCorrector>(
-        residual_calc, stm_computer);
-    
-    // Convert initial orbit to Cartesian at reference epoch
-    // 1. Bridge to un-typed format for conversion math
-    KeplerianElements kep_start_old;
-    kep_start_old.epoch = current_orbit_.epoch;
-    kep_start_old.semi_major_axis = current_orbit_.a.to_au();
-    kep_start_old.eccentricity = current_orbit_.e;
-    kep_start_old.inclination = current_orbit_.i.to_rad();
-    kep_start_old.longitude_ascending_node = current_orbit_.node.to_rad();
-    kep_start_old.argument_perihelion = current_orbit_.omega.to_rad();
-    kep_start_old.mean_anomaly = current_orbit_.M.to_rad();
-    kep_start_old.gravitational_parameter = current_orbit_.gm.to_au3_d2();
-    
-    // 2. Convert to un-typed Cartesian (SI internally)
-    CartesianElements cart_start_old = keplerian_to_cartesian(kep_start_old);
-    
-    // 3. Rotate to ICRF
-    auto pos_ecl_start = cart_start_old.position.to_eigen();
-    auto vel_ecl_start = cart_start_old.velocity.to_eigen();
-    auto pos_eq_start = coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl_start;
-    auto vel_eq_start = coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl_start;
-    
-    // 4. Bring into AstDyn 3.0 Type Safety
-    auto initial_state = physics::CartesianStateTyped<core::GCRF>::from_si(
-        current_orbit_.epoch,
-        pos_eq_start.x(), pos_eq_start.y(), pos_eq_start.z(),
-        vel_eq_start.x(), vel_eq_start.y(), vel_eq_start.z(),
-        current_orbit_.gm.to_m3_s2()
-    );
+    bool in_ecl = propagator_->settings().integrate_in_ecliptic;
     
     // Setup differential corrector settings
     orbit_determination::DifferentialCorrectorSettings dc_settings;
     dc_settings.max_iterations = config_.max_iterations;
     dc_settings.convergence_tolerance = config_.convergence_threshold;
-    
-    // Outlier strategy: if initial guess is poor, use a very large threshold for the first step
     dc_settings.outlier_sigma = config_.outlier_sigma;
     dc_settings.outlier_max_sigma = std::max(100.0, config_.outlier_sigma * 10.0); 
     dc_settings.outlier_min_sigma = config_.outlier_sigma;
     dc_settings.reject_outliers = true;
-    
     dc_settings.verbose = config_.verbose;
-    
-    // Perform differential correction using fit() method
-    auto result_dc = corrector->fit(observations_, initial_state, dc_settings);
-    
-    // Convert final state back to Keplerian (Ecliptic J2000)
-    auto cart_final = result_dc.final_state;
-    auto pos_eq_final = cart_final.position.to_eigen_si();
-    auto vel_eq_final = cart_final.velocity.to_eigen_si();
-    auto mat_ecl_to_eq_final = coordinates::ReferenceFrame::ecliptic_to_j2000();
-    auto pos_ecl_final = mat_ecl_to_eq_final.transpose() * pos_eq_final;
-    auto vel_ecl_final = mat_ecl_to_eq_final.transpose() * vel_eq_final;
-    
-    CartesianElements cart_final_old;
-    cart_final_old.epoch = cart_final.epoch;
-    cart_final_old.position = types::Vector3<core::GCRF, core::Meter>(pos_ecl_final);
-    cart_final_old.velocity = types::Vector3<core::GCRF, core::Meter>(vel_ecl_final);
-    cart_final_old.gravitational_parameter = cart_final.gm.to_m3_s2();
-    
-    KeplerianElements kep_final_old = cartesian_to_keplerian(cart_final_old);
-    
-    current_orbit_ = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-        cart_final.epoch,
-        kep_final_old.semi_major_axis, kep_final_old.eccentricity,
-        kep_final_old.inclination * constants::RAD_TO_DEG,
-        kep_final_old.longitude_ascending_node * constants::RAD_TO_DEG,
-        kep_final_old.argument_perihelion * constants::RAD_TO_DEG,
-        kep_final_old.mean_anomaly * constants::RAD_TO_DEG,
-        cart_final.gm
-    );
-    
-    // Build result structure
+
     OrbitDeterminationResult result;
-    result.orbit = current_orbit_;
-    result.covariance = result_dc.covariance;
-    result.rms_ra = result_dc.statistics.rms_ra;  
-    result.rms_dec = result_dc.statistics.rms_dec;
-    result.chi_squared = result_dc.statistics.chi_squared;
-    result.num_observations = result_dc.statistics.num_observations;
-    result.num_rejected = result_dc.statistics.num_outliers;
-    result.num_iterations = result_dc.iterations;
-    result.converged = result_dc.converged;
     
-    // Extract residuals (convert rad to arcsec)
-    for (const auto& res : result_dc.residuals) {
-        if (!res.outlier) {
-            result.residuals_ra.push_back(res.residual_ra * 3600.0 * constants::RAD_TO_DEG);
-            result.residuals_dec.push_back(res.residual_dec * 3600.0 * constants::RAD_TO_DEG);
+    if (in_ecl) {
+        auto residual_calc = std::make_shared<orbit_determination::ResidualCalculator<core::ECLIPJ2000>>(ephemeris_, propagator_);
+        residual_calc->set_aberration_correction(config_.aberration_correction);
+        residual_calc->set_light_time_correction(config_.light_time_correction);
+        
+        auto stm_computer = std::make_shared<orbit_determination::StateTransitionMatrix<core::ECLIPJ2000>>(propagator_);
+        auto corrector = std::make_unique<orbit_determination::DifferentialCorrector<core::ECLIPJ2000>>(residual_calc, stm_computer);
+        
+        auto initial_state_ecl = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_);
+        auto result_dc = corrector->fit(observations_, initial_state_ecl, dc_settings);
+        
+        current_orbit_ = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(result_dc.final_state);
+        
+        result.orbit = current_orbit_;
+        result.converged = result_dc.converged;
+        result.rms_ra = result_dc.statistics.rms_ra;
+        result.rms_dec = result_dc.statistics.rms_dec;
+        result.rms_total_arcsec = result_dc.statistics.rms_total;
+        result.num_observations = result_dc.statistics.num_observations;
+        result.num_iterations = result_dc.iterations;
+        result.covariance = result_dc.covariance;
+        result.chi_squared = result_dc.statistics.chi_squared;
+        result.num_rejected = result_dc.statistics.num_outliers;
+        
+        for (const auto& res : result_dc.residuals) {
+            if (!res.outlier) {
+                result.residuals_ra.push_back(res.residual_ra * 3600.0 * constants::RAD_TO_DEG);
+                result.residuals_dec.push_back(res.residual_dec * 3600.0 * constants::RAD_TO_DEG);
+            }
+        }
+    } else {
+        auto residual_calc = std::make_shared<orbit_determination::ResidualCalculator<core::GCRF>>(ephemeris_, propagator_);
+        residual_calc->set_aberration_correction(config_.aberration_correction);
+        residual_calc->set_light_time_correction(config_.light_time_correction);
+        
+        auto stm_computer = std::make_shared<orbit_determination::StateTransitionMatrix<core::GCRF>>(propagator_);
+        auto corrector = std::make_unique<orbit_determination::DifferentialCorrector<core::GCRF>>(residual_calc, stm_computer);
+        
+        auto initial_state_ecl = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_);
+        auto pos_g = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(initial_state_ecl.position, initial_state_ecl.epoch);
+        auto vel_g = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, core::GCRF>(initial_state_ecl.position, initial_state_ecl.velocity, initial_state_ecl.epoch);
+        auto initial_gcrf = physics::CartesianStateTyped<core::GCRF>(initial_state_ecl.epoch, pos_g, vel_g, initial_state_ecl.gm);
+        
+        auto result_dc = corrector->fit(observations_, initial_gcrf, dc_settings);
+        
+        auto final_gcrf = result_dc.final_state;
+        auto pos_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(final_gcrf.position, final_gcrf.epoch);
+        auto vel_ecl = coordinates::ReferenceFrame::transform_vel<core::GCRF, core::ECLIPJ2000>(final_gcrf.position, final_gcrf.velocity, final_gcrf.epoch);
+        auto final_ecl = physics::CartesianStateTyped<core::ECLIPJ2000>(final_gcrf.epoch, pos_ecl, vel_ecl, final_gcrf.gm);
+        
+        current_orbit_ = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(final_ecl);
+        
+        result.orbit = current_orbit_;
+        result.converged = result_dc.converged;
+        result.rms_ra = result_dc.statistics.rms_ra;
+        result.rms_dec = result_dc.statistics.rms_dec;
+        result.rms_total_arcsec = result_dc.statistics.rms_total;
+        result.num_observations = result_dc.statistics.num_observations;
+        result.num_iterations = result_dc.iterations;
+        result.covariance = result_dc.covariance;
+        result.chi_squared = result_dc.statistics.chi_squared;
+        result.num_rejected = result_dc.statistics.num_outliers;
+        
+        for (const auto& res : result_dc.residuals) {
+            if (!res.outlier) {
+                result.residuals_ra.push_back(res.residual_ra * 3600.0 * constants::RAD_TO_DEG);
+                result.residuals_dec.push_back(res.residual_dec * 3600.0 * constants::RAD_TO_DEG);
+            }
         }
     }
     
     last_result_ = result;
+    has_orbit_ = true;
     
     if (config_.verbose) {
         std::cout << "\n=== Final Orbit ===\n";
@@ -676,47 +662,47 @@ std::vector<physics::CartesianStateTyped<core::GCRF>> AstDynEngine::compute_ephe
     
     // Generate epoch list
     std::vector<time::EpochTDB> epochs;
-    for (double mjd = start_time.mjd(); mjd <= end_time.mjd(); mjd += step_days) {
-        epochs.push_back(time::EpochTDB::from_mjd(mjd));
+    if (step_days <= 0) {
+        epochs.push_back(start_time);
+    } else {
+        for (double mjd = start_time.mjd(); mjd <= end_time.mjd(); mjd += step_days) {
+            epochs.push_back(time::EpochTDB::from_mjd(mjd));
+        }
+        if (epochs.empty() || std::abs(epochs.back().mjd() - end_time.mjd()) > 1e-8) {
+            epochs.push_back(end_time);
+        }
     }
-    if (epochs.back().mjd() < end_time.mjd()) {
-        epochs.push_back(end_time);
+    
+    bool in_ecl = propagator_->settings().integrate_in_ecliptic;
+    std::vector<physics::CartesianStateTyped<core::GCRF>> results_gcrf;
+    results_gcrf.reserve(epochs.size());
+
+    if (in_ecl) {
+        // Correct bridge: Start and stay in Ecliptic J2000
+        auto initial_ecl = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_);
+        auto ephemeris_ecl = propagator_->propagate_ephemeris(initial_ecl, epochs);
+        
+        // Final bridge: Convert results to GCRF for return type
+        for (const auto& state : ephemeris_ecl) {
+            auto pos_g = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(state.position, state.epoch);
+            auto vel_g = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, core::GCRF>(state.position, state.velocity, state.epoch);
+            results_gcrf.push_back(physics::CartesianStateTyped<core::GCRF>(state.epoch, pos_g, vel_g, state.gm));
+        }
+    } else {
+        // Classical GCRF propagation
+        auto initial_ecl = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_);
+        auto pos_g = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(initial_ecl.position, initial_ecl.epoch);
+        auto vel_g = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, core::GCRF>(initial_ecl.position, initial_ecl.velocity, initial_ecl.epoch);
+        auto initial_gcrf = physics::CartesianStateTyped<core::GCRF>(initial_ecl.epoch, pos_g, vel_g, initial_ecl.gm);
+        
+        results_gcrf = propagator_->propagate_ephemeris(initial_gcrf, epochs);
     }
-    
-    // Convert orbit to Cartesian J2000 Equatorial
-    // 1. Bridge to un-typed format
-    KeplerianElements kep_old;
-    kep_old.epoch = current_orbit_.epoch;
-    kep_old.semi_major_axis = current_orbit_.a.to_au();
-    kep_old.eccentricity = current_orbit_.e;
-    kep_old.inclination = current_orbit_.i.to_rad();
-    kep_old.longitude_ascending_node = current_orbit_.node.to_rad();
-    kep_old.argument_perihelion = current_orbit_.omega.to_rad();
-    kep_old.mean_anomaly = current_orbit_.M.to_rad();
-    kep_old.gravitational_parameter = current_orbit_.gm.to_au3_d2();
-    
-    CartesianElements cart_old = keplerian_to_cartesian(kep_old);
-    
-    auto pos_ecl = cart_old.position.to_eigen();
-    auto vel_ecl = cart_old.velocity.to_eigen();
-    auto pos_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl;
-    auto vel_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl;
-    
-    auto initial = physics::CartesianStateTyped<core::GCRF>::from_si(
-        current_orbit_.epoch,
-        pos_eq.x(), pos_eq.y(), pos_eq.z(),
-        vel_eq.x(), vel_eq.y(), vel_eq.z(),
-        current_orbit_.gm.to_m3_s2()
-    );
-    
-    // Propagate to all epochs
-    auto ephemeris = propagator_->propagate_ephemeris(initial, epochs);
     
     if (config_.verbose) {
-        std::cout << "Generated " << ephemeris.size() << " ephemeris points\n";
+        std::cout << "Generated " << results_gcrf.size() << " ephemeris points\n";
     }
     
-    return ephemeris;
+    return results_gcrf;
 }
 
 physics::KeplerianStateTyped<core::ECLIPJ2000> AstDynEngine::propagate_to(time::EpochTDB target_time) {
@@ -745,29 +731,12 @@ std::vector<CloseApproach> AstDynEngine::find_close_approaches(
     }
     
     // Convert orbit to Cartesian J2000 Equatorial
-    // 1. Bridge to un-typed format
-    KeplerianElements kep_old;
-    kep_old.epoch = current_orbit_.epoch;
-    kep_old.semi_major_axis = current_orbit_.a.to_au();
-    kep_old.eccentricity = current_orbit_.e;
-    kep_old.inclination = current_orbit_.i.to_rad();
-    kep_old.longitude_ascending_node = current_orbit_.node.to_rad();
-    kep_old.argument_perihelion = current_orbit_.omega.to_rad();
-    kep_old.mean_anomaly = current_orbit_.M.to_rad();
-    kep_old.gravitational_parameter = current_orbit_.gm.to_au3_d2();
+    auto initial_ecl = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_);
+    auto pos_gcrf = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(initial_ecl.position, initial_ecl.epoch);
+    auto vel_gcrf = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, core::GCRF>(initial_ecl.position, initial_ecl.velocity, initial_ecl.epoch);
     
-    CartesianElements cart_old = keplerian_to_cartesian(kep_old);
-    
-    auto pos_ecl = cart_old.position.to_eigen();
-    auto vel_ecl = cart_old.velocity.to_eigen();
-    auto pos_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * pos_ecl;
-    auto vel_eq = astdyn::coordinates::ReferenceFrame::ecliptic_to_j2000() * vel_ecl;
-    
-    auto initial = physics::CartesianStateTyped<core::GCRF>::from_si(
-        current_orbit_.epoch,
-        pos_eq.x(), pos_eq.y(), pos_eq.z(),
-        vel_eq.x(), vel_eq.y(), vel_eq.z(),
-        current_orbit_.gm.to_m3_s2()
+    auto initial = physics::CartesianStateTyped<core::GCRF>(
+        initial_ecl.epoch, pos_gcrf, vel_gcrf, initial_ecl.gm
     );
     
     // Search for close approaches
@@ -809,6 +778,88 @@ double AstDynEngine::compute_moid(ephemeris::CelestialBody planet) {
     }
     
     return moid;
+}
+
+ApparentPlace AstDynEngine::compute_asteroid_apparent_place(time::EpochTDB t_occult, const std::string& observatory_code) {
+    if (!has_orbit_) throw std::runtime_error("Orbit must be fitted or set before computing apparent place.");
+    
+    // 1. Propagate orbit to occultation time
+    auto state_ecl = propagator_->propagate_cartesian(propagation::keplerian_to_cartesian(current_orbit_), t_occult);
+    
+    // 2. Setup residual calculator for precise geometry
+    auto calculator = orbit_determination::ResidualCalculator<core::ECLIPJ2000>(ephemeris_, propagator_);
+    calculator.set_aberration_correction(config_.aberration_correction);
+    calculator.set_light_time_correction(config_.light_time_correction);
+    
+    observations::OpticalObservation obs;
+    obs.time = time::to_utc(t_occult);
+    obs.observatory_code = observatory_code;
+    
+    auto res_opt = calculator.compute_residual(obs, state_ecl);
+    if (!res_opt) throw std::runtime_error("Failed to compute asteroid apparent place.");
+    
+    ApparentPlace result;
+    result.ra = res_opt->computed_ra;
+    result.dec = res_opt->computed_dec;
+    result.distance = res_opt->range;
+    result.light_time = res_opt->range / (constants::C_LIGHT * 86400.0);
+    
+    return result;
+}
+
+ApparentPlace AstDynEngine::compute_star_apparent_place(
+    double ra_j2000, double dec_j2000,
+    double pm_ra, double pm_dec,
+    time::EpochTDB t_occult, const std::string& observatory_code) {
+    
+    // 1. Proper motion to occultation epoch
+    double dt_yr = (t_occult.mjd() - constants::MJD2000) / constants::DAYS_PER_YEAR; // Julian years
+    double ra_epoch = ra_j2000 + pm_ra * dt_yr;
+    double dec_epoch = dec_j2000 + pm_dec * dt_yr;
+    
+    // 2. Build direction vector in GCRF (Ecliptic logic handles GCRF transformation)
+    Eigen::Vector3d u_gcrf;
+    u_gcrf << std::cos(dec_epoch) * std::cos(ra_epoch),
+              std::cos(dec_epoch) * std::sin(ra_epoch),
+              std::sin(dec_epoch);
+               
+    // 3. Setup calculator
+    auto calculator = orbit_determination::ResidualCalculator<core::ECLIPJ2000>(ephemeris_);
+    calculator.set_aberration_correction(config_.aberration_correction);
+    
+    observations::OpticalObservation obs;
+    obs.time = time::to_utc(t_occult);
+    obs.observatory_code = observatory_code;
+    
+    // 4. Place star dummy state far away (100,000 AU) in GCRF
+    auto obs_pos_opt = calculator.get_observer_position(obs);
+    if (!obs_pos_opt) throw std::runtime_error("Failed to get observer state for star apparent place.");
+    
+    math::Vector3<core::GCRF, physics::Distance> u_vec = math::Vector3<core::GCRF, physics::Distance>::from_si(u_gcrf[0], u_gcrf[1], u_gcrf[2]);
+    math::Vector3<core::GCRF, physics::Distance> rho_star = u_vec * (100000.0 * constants::AU * 1000.0);
+    
+    physics::CartesianStateTyped<core::GCRF> star_state;
+    star_state.epoch = t_occult;
+    star_state.position = *obs_pos_opt + rho_star;
+    star_state.velocity = math::Vector3<core::GCRF, physics::Velocity>::from_si(0.0, 0.0, 0.0);
+    star_state.gm = physics::GravitationalParameter::from_si(1.32712440018e20); // Dummy SUN GM
+    
+    // 5. Compute 'residual' to get topocentric apparent RA/Dec (includes aberration, light bending)
+    auto pos_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(star_state.position, star_state.epoch);
+    auto vel_ecl = coordinates::ReferenceFrame::transform_vel<core::GCRF, core::ECLIPJ2000>(star_state.position, star_state.velocity, star_state.epoch);
+    physics::CartesianStateTyped<core::ECLIPJ2000> star_state_ecl(star_state.epoch, pos_ecl, vel_ecl, star_state.gm);
+    
+    auto star_res_opt = calculator.compute_residual(obs, star_state_ecl);
+    
+    if (!star_res_opt) throw std::runtime_error("Failed to compute star apparent place.");
+    
+    ApparentPlace result;
+    result.ra = star_res_opt->computed_ra;
+    result.dec = star_res_opt->computed_dec;
+    result.distance = star_res_opt->range;
+    result.light_time = 0.0;
+    
+    return result;
 }
 
 // ============================================================================

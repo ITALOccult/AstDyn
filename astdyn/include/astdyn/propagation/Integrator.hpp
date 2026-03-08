@@ -40,6 +40,8 @@ struct IntegrationStatistics {
     double min_step_size = 0.0;  ///< Minimum step size used
     double max_step_size = 0.0;  ///< Maximum step size used
     double final_time = 0.0;     ///< Actual final time reached
+    double hamiltonian_drift = 0.0;         ///< drift di H reale (oscilla)
+    double shadow_hamiltonian_drift = 0.0;  ///< drift di H̃ (quasi-conservato)
     
     void reset() {
         num_steps = 0;
@@ -48,6 +50,8 @@ struct IntegrationStatistics {
         min_step_size = 0.0;
         max_step_size = 0.0;
         final_time = 0.0;
+        hamiltonian_drift = 0.0;
+        shadow_hamiltonian_drift = 0.0;
     }
 };
 

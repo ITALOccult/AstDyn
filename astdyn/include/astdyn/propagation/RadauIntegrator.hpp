@@ -16,7 +16,7 @@
  * 
  * RECOMMENDED ALTERNATIVES:
  * - For general propagation: RKF78 (fast, accurate, adaptive)
- * - For orbit determination: RKF78 + STMPropagator
+ * - For orbit determination: RKF78 + StateTransitionMatrix
  * - For long-term: Gauss (symplectic, energy-conserving)
  * 
  * USE RADAU15 ONLY IF:

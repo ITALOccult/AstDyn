@@ -54,7 +54,7 @@ struct PropagatorSettings {
     std::string asteroid_ephemeris_file = "";
 
     // Frame Settings
-    bool integrate_in_ecliptic = true; ///< If true, rotate all perturbations to Ecliptic J2000.
+    bool integrate_in_ecliptic = false; ///< If true, rotate all perturbations to Ecliptic J2000.
     
     // Non-Gravitational Forces (Yarkovsky)
     bool include_yarkovsky = false;
@@ -90,7 +90,7 @@ public:
      * @param ephemeris Planetary ephemeris for perturbations
      * @param settings Propagation settings
      */
-    Propagator(std::unique_ptr<Integrator> integrator,
+    Propagator(std::shared_ptr<Integrator> integrator,
               std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
               const PropagatorSettings& settings = PropagatorSettings());
     
@@ -141,6 +141,11 @@ public:
     PropagatorSettings& settings() { return settings_; }
     
     /**
+     * @brief Get the underlying integrator
+     */
+    std::shared_ptr<Integrator> get_integrator() const { return integrator_; }
+    
+    /**
      * @brief Compute accelerations for equations of motion
      * 
      * Computes d²r/dt² from gravitational forces.
@@ -188,7 +193,7 @@ private:
     Eigen::Vector3d relativistic_correction(const Eigen::Vector3d& position, 
                                           const Eigen::Vector3d& velocity) const;
     
-    std::unique_ptr<Integrator> integrator_;
+    std::shared_ptr<Integrator> integrator_;
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
     std::shared_ptr<ephemeris::AsteroidPerturbations> asteroids_;
     PropagatorSettings settings_;
@@ -279,10 +284,21 @@ std::vector<physics::CartesianStateTyped<Frame>> Propagator::propagate_ephemeris
     const physics::CartesianStateTyped<Frame>& initial,
     const std::vector<time::EpochTDB>& target_times) 
 {
+    if (target_times.empty()) return {};
+
     std::vector<physics::CartesianStateTyped<Frame>> results;
     results.reserve(target_times.size());
+
+    // Sequential propagation for O(n) total integration time instead of O(n^2)
+    physics::CartesianStateTyped<Frame> current = initial;
+    
     for (const auto& t : target_times) {
-        results.push_back(propagate_cartesian(initial, t));
+        if (t.mjd() == current.epoch.mjd()) {
+            results.push_back(current);
+        } else {
+            current = propagate_cartesian(current, t);
+            results.push_back(current);
+        }
     }
     return results;
 }

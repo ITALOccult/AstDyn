@@ -6,11 +6,9 @@
  * 
  * Provides heliocentric positions and velocities for solar system planets.
  * 
- * Implementation uses simplified VSOP87 series expansions suitable for
- * accuracy of ~1 arcsec (Earth) to ~10 arcsec (outer planets) over
- * the period 1800-2050.
- * 
- * For higher accuracy, consider integrating SPICE toolkit (cspice).
+ * @warning Analytical VSOP87/Simon 1994 models are DEPRECATED and DISABLED for 
+ * precision reasons. High-precision orbit determination requires 
+ * external providers (SPICE/DE441).
  * 
  * References:
  * - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998)
@@ -23,9 +21,10 @@
 
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/epoch.hpp"
-#include "src/types/vectors.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
 #include "astdyn/ephemeris/PlanetaryData.hpp"
 #include "astdyn/ephemeris/EphemerisProvider.hpp"
@@ -36,21 +35,13 @@ namespace astdyn {
 namespace ephemeris {
 
 /**
- * @brief Planetary ephemeris calculator using analytical approximations
+ * @brief Planetary ephemeris gateway (DEPRECATED: internal analytical models)
  * 
- * Provides heliocentric positions and velocities in J2000 ecliptic frame.
+ * Provides heliocentric positions and velocities. 
  * 
- * Coordinate System:
- * - Reference frame: J2000.0 ecliptic (FK5)
- * - Origin: Solar System Barycenter (approximated as Sun center for planets)
- * - Units: AU for position, AU/day for velocity
- * 
- * Accuracy:
- * - Inner planets (Mercury-Mars): ~1-5 arcsec over 1800-2050
- * - Outer planets (Jupiter-Neptune): ~5-20 arcsec over 1800-2050
- * - Sufficient for asteroid orbit determination, preliminary trajectory design
- * 
- * For sub-arcsecond accuracy, use JPL SPICE kernels (DE440/441).
+ * @note This class no longer provides internal analytical approximations (VSOP87).
+ * It acts as a gateway for high-precision providers (DE441/Horizons).
+ * Call PlanetaryEphemeris::setProvider() before any query.
  */
 class PlanetaryEphemeris {
 public:
@@ -60,16 +51,16 @@ public:
     /**
      * @param body Celestial body
      * @param t Epoch (TDB)
-     * @return Position vector [m] in J2000 equatorial frame (ICRF)
+     * @return Position vector in J2000 equatorial frame (ICRF)
      */
-    static types::Vector3<core::GCRF, core::Meter> getPosition(CelestialBody body, time::EpochTDB t);
+    static math::Vector3<core::GCRF, physics::Distance> getPosition(CelestialBody body, time::EpochTDB t);
     
     /**
      * @param body Celestial body
      * @param t Epoch (TDB)
-     * @return Velocity vector [m/s] in J2000 equatorial frame (ICRF)
+     * @return Velocity vector in J2000 equatorial frame (ICRF)
      */
-    static types::Vector3<core::GCRF, core::Meter> getVelocity(CelestialBody body, time::EpochTDB t);
+    static math::Vector3<core::GCRF, physics::Velocity> getVelocity(CelestialBody body, time::EpochTDB t);
     
     /**
      * @param body Celestial body
@@ -80,12 +71,12 @@ public:
     
     /**
      * @param t Epoch (TDB)
-     * @return Position vector [m] of Sun relative to SSB
+     * @return Position vector of Sun relative to SSB
      * 
      * Computed as weighted sum of planetary positions.
      * Useful for high-precision orbit determination.
      */
-    static types::Vector3<core::GCRF, core::Meter> getSunBarycentricPosition(time::EpochTDB t);
+    static math::Vector3<core::GCRF, physics::Distance> getSunBarycentricPosition(time::EpochTDB t);
     
     /**
      * @brief Convert heliocentric to barycentric state
@@ -129,6 +120,7 @@ private:
      * Uses Simon et al. (1994) low-precision formulae.
      * L = mean longitude, omega_bar = longitude of perihelion
      */
+    [[deprecated("VSOP87 analytical elements are no longer supported. Use a provider.")]]
     static void computeOrbitalElements(
         CelestialBody body, 
         double T,

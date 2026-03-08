@@ -151,21 +151,21 @@ gtest_discover_tests(astdyn_propagation_tests)
 # gtest_discover_tests(astdyn_propagator_asteroids_tests)
 
 # ============================================================================
-# OrbFit Engine Tests (DISABLED - Deprecated Types)
+# OrbFit Engine Tests
 # ============================================================================
 
-# add_executable(astdyn_engine_tests
-#     test_astdyn_engine.cpp
-# )
-# 
-# target_link_libraries(astdyn_engine_tests
-#     PRIVATE
-#         astdyn
-#         GTest::gtest
-#         GTest::gtest_main
-# )
-# 
-# gtest_discover_tests(astdyn_engine_tests)
+add_executable(astdyn_engine_tests
+    test_astdyn_engine.cpp
+)
+
+target_link_libraries(astdyn_engine_tests
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_engine_tests)
 
 # Test executable for Asteroid Fitter Horizons comparison
 # add_executable(test_asteroid_fitter_horizons
@@ -491,12 +491,33 @@ target_link_libraries(astdyn_rigorous_validation
 
 gtest_discover_tests(astdyn_rigorous_validation)
 
-# Benchmark 79450 tool
-add_executable(benchmark_79450
-    benchmark_79450.cpp
+# Benchmark AAS tool [M3]
+add_executable(astdyn_benchmark_aas
+    ../tools/benchmark_aas.cpp
 )
 
-target_link_libraries(benchmark_79450
+target_link_libraries(astdyn_benchmark_aas
     PRIVATE
         astdyn
+)
+# Comparative Integrator Validation (M1-M4 validation)
+add_executable(astdyn_integrator_comparative
+    test_integrator_comparative.cpp
+)
+
+target_link_libraries(astdyn_integrator_comparative
+    PRIVATE
+        astdyn
+        GTest::gtest
+        GTest::gtest_main
+)
+
+gtest_discover_tests(astdyn_integrator_comparative)
+
+# Test Occultation Logic
+add_executable(astdyn_test_occultation
+    test_occultation.cpp
+)
+target_link_libraries(astdyn_test_occultation
+    PRIVATE astdyn
 )

@@ -9,9 +9,10 @@
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/time/epoch.hpp"
-#include "src/types/vectors.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include <Eigen/Dense>
 #include <cmath>
 #include <string>
@@ -37,7 +38,7 @@ struct KeplerianElements {
 class PositionCalculator {
 public:
     // Compute heliocentric position (m) at a given Epoch.
-    static types::Vector3<core::GCRF, core::Meter> computePosition(const KeplerianElements& elem,
+    static math::Vector3<core::GCRF, physics::Distance> computePosition(const KeplerianElements& elem,
                                            time::EpochTDB target_time,
                                            bool outputEquatorial = true) {
         // Time since epoch in days (not used for pure Keplerian propagation).
@@ -78,11 +79,11 @@ public:
         
         // Convert to meters
         using namespace astdyn::constants;
-        return types::Vector3<core::GCRF, core::Meter>(pos.x() * AU, pos.y() * AU, pos.z() * AU);
+        return math::Vector3<core::GCRF, physics::Distance>::from_si(pos.x() * AU, pos.y() * AU, pos.z() * AU);
     }
 
     // Compute position directly from a Cartesian state vector.
-    static types::Vector3<core::GCRF, core::Meter> computePositionFromState(const Eigen::VectorXd& state,
+    static math::Vector3<core::GCRF, physics::Distance> computePositionFromState(const Eigen::VectorXd& state,
                                                    bool outputEquatorial = true) {
         // Ensure the state has at least 3 components.
         assert(state.size() >= 3 && "State vector must contain at least 3 elements (x, y, z)");
@@ -93,7 +94,7 @@ public:
         }
         // Convert to meters (assuming input state was in AU)
         using namespace astdyn::constants;
-        return types::Vector3<core::GCRF, core::Meter>(pos.x() * AU, pos.y() * AU, pos.z() * AU);
+        return math::Vector3<core::GCRF, physics::Distance>::from_si(pos.x() * AU, pos.y() * AU, pos.z() * AU);
     }
 
 

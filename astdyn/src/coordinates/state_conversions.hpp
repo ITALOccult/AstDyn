@@ -5,6 +5,7 @@
 #include "src/math/kepler_solver.hpp"
 #include "src/math/anomaly_conversions.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "rotation_matrices.hpp"
 
 namespace astdyn::coordinates {
@@ -33,8 +34,8 @@ template <typename Frame>
     const double cos_n = std::cos(nu), sin_n = std::sin(nu);
     
     // Perifocal state (Planar)
-    types::Vector3<Frame, core::Meter> pos_p(r * cos_n, r * sin_n, 0.0);
-    types::Vector3<Frame, core::Meter> vel_p(-v_f * std::sin(E), v_f * std::sqrt(1.0 - e * e) * std::cos(E), 0.0);
+    math::Vector3<Frame, core::Meter> pos_p = math::Vector3<Frame, core::Meter>::from_si(r * cos_n, r * sin_n, 0.0);
+    math::Vector3<Frame, core::Meter> vel_p = math::Vector3<Frame, core::Meter>::from_si(-v_f * std::sin(E), v_f * std::sqrt(1.0 - e * e) * std::cos(E), 0.0);
 
     // Rotation: Perifocal -> Local Frame
     const auto rot = rotation_z(Radian(-state.raan()))
@@ -45,8 +46,8 @@ template <typename Frame>
     const auto final_vel = rot.multiply(vel_p);
     
     return OrbitalState<Frame, CartesianTag, AuDayTag>({
-        final_pos.x, final_pos.y, final_pos.z, 
-        final_vel.x, final_vel.y, final_vel.z
+        final_pos.x_si(), final_pos.y_si(), final_pos.z_si(), 
+        final_vel.x_si(), final_vel.y_si(), final_vel.z_si()
     });
 }
 

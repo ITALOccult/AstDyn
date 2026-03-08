@@ -59,7 +59,7 @@ public:
 
 private:
     std::shared_ptr<propagation::Propagator> propagator_;
-    StateTransitionMatrix stm_engine_;
+    StateTransitionMatrix<core::GCRF> stm_engine_;
     Settings settings_;
 };
 

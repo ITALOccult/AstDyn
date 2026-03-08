@@ -24,7 +24,7 @@ protected:
 TEST_F(AstDynEngineTest, Construction) {
     EXPECT_TRUE(engine != nullptr);
     EXPECT_FALSE(engine->has_orbit());
-    EXPECT_EQ(engine->observations().size(), 0);
+    EXPECT_EQ(engine->observations().size(), static_cast<size_t>(0));
 }
 
 // Test 2: Configuration
@@ -66,7 +66,7 @@ TEST_F(AstDynEngineTest, AddObservations) {
     
     engine->add_observation(obs);
     
-    EXPECT_EQ(engine->observations().size(), 1);
+    EXPECT_EQ(engine->observations().size(), 1UL);
     EXPECT_EQ(engine->observations()[0].object_designation, "TEST001");
 }
 
@@ -80,10 +80,10 @@ TEST_F(AstDynEngineTest, ClearObservations) {
     obs.observatory_code = "500";
     
     engine->add_observation(obs);
-    EXPECT_EQ(engine->observations().size(), 1);
+    EXPECT_EQ(engine->observations().size(), 1UL);
     
     engine->clear_observations();
-    EXPECT_EQ(engine->observations().size(), 0);
+    EXPECT_EQ(engine->observations().size(), static_cast<size_t>(0));
 }
 
 // Test 6: Propagate orbit
@@ -123,7 +123,7 @@ TEST_F(AstDynEngineTest, ComputeEphemeris) {
     
     auto ephemeris = engine->compute_ephemeris(start_time, end_time, step);
     
-    EXPECT_EQ(ephemeris.size(), 11);  // 0, 1, 2, ..., 10 days
+    EXPECT_EQ(ephemeris.size(), 11UL);  // 0, 1, 2, ..., 10 days
     EXPECT_DOUBLE_EQ(ephemeris[0].epoch.mjd(), start_time.mjd());
     EXPECT_DOUBLE_EQ(ephemeris.back().epoch.mjd(), end_time.mjd());
 }
@@ -218,7 +218,7 @@ TEST_F(AstDynEngineTest, LongEphemeris) {
     auto ephemeris = engine->compute_ephemeris(time::EpochTDB::from_mjd(60000.0), 
                                                time::EpochTDB::from_mjd(60365.0), 10.0);
     
-    EXPECT_EQ(ephemeris.size(), 38);  // 365/10 + 1 (including both endpoints)
+    EXPECT_EQ(ephemeris.size(), 38UL);  // 365/10 + 1 (including both endpoints)
     
     // Check all epochs are in order
     for (size_t i = 1; i < ephemeris.size(); ++i) {
@@ -228,25 +228,15 @@ TEST_F(AstDynEngineTest, LongEphemeris) {
 
 // Test 15: Integration with different tolerances
 TEST_F(AstDynEngineTest, DifferentTolerances) {
-    KeplerianElements orbit;
-    orbit.epoch_mjd_tdb = 60000.0;
-    orbit.semi_major_axis = 2.5;
-    orbit.eccentricity = 0.1;
-    orbit.inclination = 0.1;
-    orbit.longitude_ascending_node = 0.5;
-    orbit.argument_perihelion = 1.0;
-    orbit.mean_anomaly = 0.0;
-    orbit.gravitational_parameter = constants::GMS;
+    auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60000.0),
+        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
+    );
     
     // Test with tight tolerance
     AstDynConfig config;
     config.tolerance = 1e-14;
     engine->set_config(config);
-    
-    auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-        time::EpochTDB::from_mjd(60000.0),
-        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
-    );
     engine->set_initial_orbit(orbit);
     
     auto result1 = engine->propagate_to(time::EpochTDB::from_mjd(60100.0));

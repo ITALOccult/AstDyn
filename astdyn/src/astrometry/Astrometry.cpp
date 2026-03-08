@@ -46,21 +46,14 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     ephemeris::PlanetaryEphemeris::setProvider(de441);
 
     // Get Earth state in GCRF and transform to Ecliptic J2000
-    auto earth_p_eq_types = de441->getPosition(ephemeris::CelestialBody::EARTH, t_obs);
-    auto earth_v_eq_types = de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs);
+    auto earth_p_eq = de441->getPosition(ephemeris::CelestialBody::EARTH, t_obs);
+    auto earth_v_eq = de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs);
     
-    // Explicitly convert types::Vector3 to math::Vector3 (required by transform_pos)
-    math::Vector3<core::GCRF, core::Meter> earth_p_eq_math = math::Vector3<core::GCRF, core::Meter>::from_si(
-        earth_p_eq_types.x, earth_p_eq_types.y, earth_p_eq_types.z);
-    
-    auto earth_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(earth_p_eq_math);
+    auto earth_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(earth_p_eq);
     
     // 2. SUN position
-    auto sun_p_eq_types = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::SUN, t_obs);
-    math::Vector3<core::GCRF, core::Meter> sun_p_eq_math = math::Vector3<core::GCRF, core::Meter>::from_si(
-        sun_p_eq_types.x, sun_p_eq_types.y, sun_p_eq_types.z);
-    
-    auto sun_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(sun_p_eq_math);
+    auto sun_p_eq = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::SUN, t_obs);
+    auto sun_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(sun_p_eq);
     
     Eigen::Vector3d earth_pos_helio_ecl = earth_p_ecl.to_eigen_si() - sun_p_ecl.to_eigen_si();
 
@@ -82,7 +75,7 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     auto raw_rho_eq_math = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_ecl_math);
     auto raw_rho_eq = raw_rho_eq_math.to_eigen_si();
     
-    auto earth_v_gcrf = earth_v_eq_types.to_eigen();
+    auto earth_v_gcrf = earth_v_eq.to_eigen_si();
     
     auto final_rho_eq = a_cfg.stellar_aberration ? apply_stellar_aberration(raw_rho_eq, earth_v_gcrf) : raw_rho_eq;
 
@@ -110,8 +103,8 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     // We'll use the proper typesafe bridge if we can or use the legacy conversion but with correct tags
     propagation::CartesianElements cart_ecl_old;
     cart_ecl_old.epoch = t_elements;
-    cart_ecl_old.position = types::Vector3<core::GCRF, core::Meter>(pos_ecl.to_eigen_si()); // Struct-enforced GCRF tag, but numbers are Ecliptic
-    cart_ecl_old.velocity = types::Vector3<core::GCRF, core::Meter>(vel_ecl.to_eigen_si());
+    cart_ecl_old.position = math::Vector3<core::GCRF, physics::Distance>::from_si(pos_ecl.x_si(), pos_ecl.y_si(), pos_ecl.z_si()); // Struct-enforced GCRF tag, but numbers are Ecliptic
+    cart_ecl_old.velocity = math::Vector3<core::GCRF, physics::Velocity>::from_si(vel_ecl.x_si(), vel_ecl.y_si(), vel_ecl.z_si());
     cart_ecl_old.gravitational_parameter = initial.gm.to_m3_s2();
     
     auto kep_ecl_legacy = propagation::cartesian_to_keplerian(cart_ecl_old);

@@ -2,7 +2,7 @@
 #define ASTDYN_COORDINATES_FRAME_TRANSFORMS_HPP
 
 #include "src/core/frame_tags.hpp"
-#include "src/types/vectors.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "astdyn/time/epoch.hpp"
 #include "rotation_matrices.hpp"
 
@@ -10,7 +10,7 @@ namespace astdyn::coordinates {
 
 using core::GCRF;
 using core::ITRF;
-using types::Vector3;
+using math::Vector3;
 
 /** 
  * @brief Computes Greenwhich Mean Sidereal Time (GMST) for a given Epoch.
@@ -32,10 +32,10 @@ template <typename Unit>
     const auto dcm = rotation_z(gmst);
     
     // Manual multiplication to preserve the new ITRF tag in return
-    const double x = dcm.elements[0] * vec.x + dcm.elements[1] * vec.y;
-    const double y = dcm.elements[3] * vec.x + dcm.elements[4] * vec.y;
+    const double x = dcm.elements[0] * vec.x_si() + dcm.elements[1] * vec.y_si();
+    const double y = dcm.elements[3] * vec.x_si() + dcm.elements[4] * vec.y_si();
     
-    return Vector3<ITRF, Unit>(x, y, vec.z);
+    return Vector3<ITRF, Unit>::from_si(x, y, vec.z_si());
 }
 
 } // namespace astdyn::coordinates

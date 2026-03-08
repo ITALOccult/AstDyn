@@ -10,6 +10,7 @@
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/time/TimeScale.hpp"
 #include "astdyn/propagation/Propagator.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 #include <cmath>
 #include <iomanip>
 #include <algorithm>
@@ -22,32 +23,29 @@ using namespace astdyn::observations;
 using namespace astdyn::propagation;
 using namespace astdyn::constants;
 
-// WGS84 ellipsoid parameters
-static constexpr double WGS84_A = 6378.137;        // Semi-major axis [km]
-
 // ============================================================================
 // ResidualCalculator Implementation
 // ============================================================================
 
-ResidualCalculator::ResidualCalculator(
+template <typename Frame>
+ResidualCalculator<Frame>::ResidualCalculator(
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
     std::shared_ptr<astdyn::propagation::Propagator> propagator)
     : ephemeris_(ephemeris),
       propagator_(propagator) {
 }
 
-std::vector<ObservationResidual> ResidualCalculator::compute_residuals(
+template <typename Frame>
+std::vector<ObservationResidual> ResidualCalculator<Frame>::compute_residuals(
     const std::vector<OpticalObservation>& observations,
-    const physics::CartesianStateTyped<core::GCRF>& state) const {
+    const physics::CartesianStateTyped<Frame>& state) const {
     
     std::vector<ObservationResidual> residuals;
     residuals.reserve(observations.size());
     
     for (const auto& obs : observations) {
-        // Convert to TDB
-    time::EpochTDB obs_time_tdb = astdyn::time::to_tdb(obs.time);
+        time::EpochTDB obs_time_tdb = astdyn::time::to_tdb(obs.time);
         
-        // Propagate state to observation epoch if propagator available
         auto state_at_obs = state;
         if (propagator_ && std::abs(obs_time_tdb.mjd() - state.epoch.mjd()) > 1e-10) {
             state_at_obs = propagator_->propagate_cartesian(state, obs_time_tdb);
@@ -62,89 +60,81 @@ std::vector<ObservationResidual> ResidualCalculator::compute_residuals(
     return residuals;
 }
 
-
-
-std::optional<ObservationResidual> ResidualCalculator::compute_residual(
+template <typename Frame>
+std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
     const OpticalObservation& obs,
-    const physics::CartesianStateTyped<core::GCRF>& state) const {
+    const physics::CartesianStateTyped<Frame>& state) const {
     
     ObservationResidual result;
     result.time = obs.time;
     result.observatory_code = obs.observatory_code;
     result.outlier = false;
     
-    // Get observer position (Heliocentric GCRF Meter)
+    // 1. Get observer position (Always GCRF for RA/Dec matching)
     auto observer_pos_opt = get_observer_position(obs);
-    if (!observer_pos_opt) {
-        return std::nullopt;
-    }
-    math::Vector3<core::GCRF, physics::Distance> observer_pos = *observer_pos_opt;
+    if (!observer_pos_opt) return std::nullopt;
+    math::Vector3<core::GCRF, physics::Distance> observer_pos_gcrf = *observer_pos_opt;
     
-    // Get observer velocity (Heliocentric GCRF Meter/Second)
     auto observer_vel_opt = get_observer_velocity(obs);
-    if (!observer_vel_opt) {
-        return std::nullopt;
-    }
-    math::Vector3<core::GCRF, physics::Velocity> observer_vel = *observer_vel_opt;
+    if (!observer_vel_opt) return std::nullopt;
+    math::Vector3<core::GCRF, physics::Velocity> observer_vel_gcrf = *observer_vel_opt;
     
-    // Object state
-    math::Vector3<core::GCRF, physics::Distance> object_pos = math::Vector3<core::GCRF, physics::Distance>::from_si(state.position.x_si(), state.position.y_si(), state.position.z_si());
-    math::Vector3<core::GCRF, physics::Velocity> object_vel = math::Vector3<core::GCRF, physics::Velocity>::from_si(state.velocity.x_si(), state.velocity.y_si(), state.velocity.z_si());
+    // 2. Object state in integration frame
+    math::Vector3<Frame, physics::Distance> object_pos_frame = state.position;
+    math::Vector3<Frame, physics::Velocity> object_vel_frame = state.velocity;
     
-    // Light-time correction
+    // 3. Transform object to GCRF for light-time and matching
+    auto object_pos_gcrf = coordinates::ReferenceFrame::transform_pos<Frame, core::GCRF>(object_pos_frame, state.epoch);
+    auto object_vel_gcrf = coordinates::ReferenceFrame::transform_vel<Frame, core::GCRF>(object_pos_frame, object_vel_frame, state.epoch);
+    
+    // 4. Light-time correction
     if (light_time_correction_) {
-        double tau = 0.0; // Light travel time [days]
+        double tau = 0.0;
         constexpr int max_iter = 3;
         constexpr double tau_tol = 1e-10; 
         
         for (int iter = 0; iter < max_iter; ++iter) {
-            math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos - observer_pos;
-            // rho.norm() is in meters. SPEED_OF_LIGHT is in m/s.
-            double tau_new_sec = rho_vec.norm().to_m() / constants::C_LIGHT * 1000.0;
-            double tau_new_days = tau_new_sec / 86400.0;
+            math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos_gcrf - observer_pos_gcrf;
+            double tau_new_days = rho_vec.norm().to_m() / (constants::C_LIGHT * 86400.0);
             
-            if (iter > 0 && std::abs(tau_new_days - tau) < tau_tol) {
-                break;
-            }
+            if (iter > 0 && std::abs(tau_new_days - tau) < tau_tol) break;
             
             tau = tau_new_days;
-            // object_pos ≈ state.position - state.velocity * tau_sec
-            object_pos -= math::Vector3<core::GCRF, physics::Distance>::from_si(state.velocity.x_si() * (tau * 86400.0), state.velocity.y_si() * (tau * 86400.0), state.velocity.z_si() * (tau * 86400.0));
+            // Linear approximation for light-time (back-propagation)
+            auto pos_corr_si = object_pos_gcrf.to_eigen_si() - (object_vel_gcrf.to_eigen_si() * (tau * 86400.0));
+            object_pos_gcrf = math::Vector3<core::GCRF, physics::Distance>::from_si(pos_corr_si.x(), pos_corr_si.y(), pos_corr_si.z());
         }
     }
     
-    // Compute topocentric vector
-    double range, range_rate;
-    auto direction = compute_topocentric_direction(object_pos, observer_pos, observer_vel, range, range_rate);
+    // 5. Compute topocentric vector and direction
+    math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos_gcrf - observer_pos_gcrf;
+    double range = rho_vec.norm().to_m();
+    auto direction = math::Vector3<core::GCRF, physics::Distance>::from_si(rho_vec.x_si() / range, rho_vec.y_si() / range, rho_vec.z_si() / range);
     
-    // Re-calculate range rate properly with object velocity
-    math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos - observer_pos;
-    math::Vector3<core::GCRF, physics::Velocity> rho_dot = object_vel - observer_vel;
-    range_rate = rho_dot.to_eigen_si().dot(direction.to_eigen_si());
+    math::Vector3<core::GCRF, physics::Velocity> rho_dot = object_vel_gcrf - observer_vel_gcrf;
+    double range_rate = rho_dot.to_eigen_si().dot(direction.to_eigen_si());
     
     result.range = range;
     result.range_rate = range_rate;
     
-    // Convert to RA/Dec
+    // 6. Convert to RA/Dec (includes Aberration, Light Bending)
     double computed_ra_rad, computed_dec_rad;
-    cartesian_to_radec(direction, rho_vec, observer_pos, observer_vel, computed_ra_rad, computed_dec_rad);
+    cartesian_to_radec(direction, rho_vec, observer_pos_gcrf, observer_vel_gcrf, computed_ra_rad, computed_dec_rad);
     
     result.computed_ra = computed_ra_rad;
     result.computed_dec = computed_dec_rad;
     
-    // Compute residuals O-C (Radians)
+    // 7. Compute residuals O-C (Radians)
     double d_ra = obs.ra - computed_ra_rad;
-    while (d_ra > PI) d_ra -= TWO_PI;
-    while (d_ra < -PI) d_ra += TWO_PI;
+    while (d_ra > constants::PI) d_ra -= constants::TWO_PI;
+    while (d_ra < -constants::PI) d_ra += constants::TWO_PI;
     
     result.residual_ra = d_ra * std::cos(obs.dec);
     result.residual_dec = obs.dec - computed_dec_rad;
     
-    // Normalized residuals
     result.normalized_ra = result.residual_ra / obs.sigma_ra;
     result.normalized_dec = result.residual_dec / obs.sigma_dec;
     
-    // Weights
     double sig_ra = (obs.sigma_ra > 0.0) ? obs.sigma_ra : 1e-5;
     double sig_dec = (obs.sigma_dec > 0.0) ? obs.sigma_dec : 1e-5;
     result.weight_ra = 1.0 / (sig_ra * sig_ra);
@@ -156,21 +146,8 @@ std::optional<ObservationResidual> ResidualCalculator::compute_residual(
     return result;
 }
 
-math::Vector3<core::GCRF, physics::Distance> ResidualCalculator::compute_topocentric_direction(
-    const math::Vector3<core::GCRF, physics::Distance>& heliocentric_pos,
-    const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
-    const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
-    double& range,
-    double& range_rate) const {
-    
-    math::Vector3<core::GCRF, physics::Distance> rho = heliocentric_pos - observer_pos;
-    range = rho.norm().to_m();
-    auto direction = math::Vector3<core::GCRF, physics::Distance>::from_si(rho.x_si() / range, rho.y_si() / range, rho.z_si() / range);
-    range_rate = 0.0; // Placeholder
-    return direction;
-}
-
-void ResidualCalculator::cartesian_to_radec(
+template <typename Frame>
+void ResidualCalculator<Frame>::cartesian_to_radec(
     const math::Vector3<core::GCRF, physics::Distance>& direction_in,
     const math::Vector3<core::GCRF, physics::Distance>& rho_vec,
     const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
@@ -178,8 +155,6 @@ void ResidualCalculator::cartesian_to_radec(
     double& ra_rad,
     double& dec_rad) const {
     
-    auto direction = direction_in;
-
     auto eval_dir = direction_in.to_eigen_si();
     auto eval_obs = observer_pos.to_eigen_si();
     auto eval_vel = observer_vel.to_eigen_si();
@@ -191,7 +166,6 @@ void ResidualCalculator::cartesian_to_radec(
     double cos_elongation = u_sun.dot(eval_dir);
     
     if (d_sun > 1e6 && cos_elongation < 0.999) { 
-        // 2GM/c^2 in meters ≈ 2953 m
         constexpr double TWO_GM_C2 = 2953.36; 
         auto cross_prod = u_sun.cross(eval_dir);
         if (cross_prod.norm() > 1e-12) { 
@@ -202,7 +176,7 @@ void ResidualCalculator::cartesian_to_radec(
 
     // Stellar Aberration
     if (aberration_correction_) {
-        auto beta = eval_vel / constants::C_LIGHT * 1000.0;
+        auto beta = eval_vel / (constants::C_LIGHT);
         double beta_sq = beta.squaredNorm();
         if (beta_sq < 1.0) {
             double gamma = 1.0 / std::sqrt(1.0 - beta_sq);
@@ -216,19 +190,16 @@ void ResidualCalculator::cartesian_to_radec(
     
     dec_rad = std::asin(eval_dir.z());
     ra_rad = std::atan2(eval_dir.y(), eval_dir.x());
-    if (ra_rad < 0.0) ra_rad += TWO_PI;
+    if (ra_rad < 0.0) ra_rad += constants::TWO_PI;
 }
 
-std::optional<math::Vector3<core::GCRF, physics::Distance>> ResidualCalculator::get_observer_position(
+template <typename Frame>
+std::optional<math::Vector3<core::GCRF, physics::Distance>> ResidualCalculator<Frame>::get_observer_position(
     const OpticalObservation& obs) const {
     
     time::EpochTDB t_tdb = time::to_tdb(obs.time);
-    
-    // Get Earth state from ephemeris (PlanetaryEphemeris is static)
-    auto earth_state = ephemeris::PlanetaryEphemeris::getState(
-        ephemeris::CelestialBody::EARTH, t_tdb);
-    auto sun_state = ephemeris::PlanetaryEphemeris::getState(
-        ephemeris::CelestialBody::SUN, t_tdb);
+    auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_tdb);
+    auto sun_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, t_tdb);
     
     math::Vector3<core::GCRF, physics::Distance> earth_center_vec = math::Vector3<core::GCRF, physics::Distance>::from_si(
         earth_state.position().x() - sun_state.position().x(),
@@ -240,21 +211,17 @@ std::optional<math::Vector3<core::GCRF, physics::Distance>> ResidualCalculator::
     auto obs_info_opt = obs_db.getObservatory(obs.observatory_code);
     if (!obs_info_opt) return earth_center_vec;
     
-    // Simplified: getPositionGCRF handles ITRF -> GCRF
     auto obs_gcrf = obs_info_opt->getPositionGCRF(obs.time);
-    return earth_center_vec + math::Vector3<core::GCRF, physics::Distance>::from_si(obs_gcrf.x, obs_gcrf.y, obs_gcrf.z);
+    return earth_center_vec + math::Vector3<core::GCRF, physics::Distance>::from_si(obs_gcrf.x_si(), obs_gcrf.y_si(), obs_gcrf.z_si());
 }
 
-std::optional<math::Vector3<core::GCRF, physics::Velocity>> ResidualCalculator::get_observer_velocity(
+template <typename Frame>
+std::optional<math::Vector3<core::GCRF, physics::Velocity>> ResidualCalculator<Frame>::get_observer_velocity(
     const OpticalObservation& obs) const {
     
     time::EpochTDB t_tdb = time::to_tdb(obs.time);
+    auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_tdb);
     
-    auto earth_state = ephemeris::PlanetaryEphemeris::getState(
-        ephemeris::CelestialBody::EARTH, t_tdb);
-    
-    // For now, assume topocentric velocity is negligible or handled by ITRF conversion (not yet in Observatory)
-    // In a full implementation, we'd add Earth rotation velocity.
     return math::Vector3<core::GCRF, physics::Velocity>::from_si(
         earth_state.velocity().x(),
         earth_state.velocity().y(),
@@ -262,62 +229,88 @@ std::optional<math::Vector3<core::GCRF, physics::Velocity>> ResidualCalculator::
     );
 }
 
-ResidualStatistics ResidualCalculator::compute_statistics(
+template <typename Frame>
+ResidualStatistics ResidualCalculator<Frame>::compute_statistics(
     const std::vector<ObservationResidual>& residuals,
     int num_parameters) {
     
     ResidualStatistics stats;
-    int n_valid = 0;
-    for (const auto& r : residuals) if (!r.outlier) n_valid++;
-    
     stats.num_observations = residuals.size();
-    stats.num_outliers = stats.num_observations - n_valid;
-    stats.degrees_of_freedom = 2 * n_valid - num_parameters;
+    stats.num_outliers = 0;
     
-    if (n_valid == 0) return stats;
+    double sum_sq_ra = 0.0;
+    double sum_sq_dec = 0.0;
+    double chi_squared = 0.0;
+    int accepted_count = 0;
     
-    double sum_ra2 = 0.0, sum_dec2 = 0.0, sum_chi2 = 0.0;
-    double max_ra = 0.0, max_dec = 0.0;
+    stats.max_abs_ra = 0.0;
+    stats.max_abs_dec = 0.0;
     
-    for (const auto& r : residuals) {
-        if (r.outlier) continue;
-        sum_ra2 += r.residual_ra * r.residual_ra;
-        sum_dec2 += r.residual_dec * r.residual_dec;
-        sum_chi2 += r.chi_squared;
-        max_ra = std::max(max_ra, std::abs(r.residual_ra));
-        max_dec = std::max(max_dec, std::abs(r.residual_dec));
+    for (const auto& res : residuals) {
+        if (res.outlier) {
+            stats.num_outliers++;
+            continue;
+        }
+        
+        accepted_count++;
+        double res_ra_arcsec = res.residual_ra * constants::RAD_TO_ARCSEC;
+        double res_dec_arcsec = res.residual_dec * constants::RAD_TO_ARCSEC;
+        
+        sum_sq_ra += res_ra_arcsec * res_ra_arcsec;
+        sum_sq_dec += res_dec_arcsec * res_dec_arcsec;
+        chi_squared += res.chi_squared;
+        
+        stats.max_abs_ra = std::max(stats.max_abs_ra, std::abs(res_ra_arcsec));
+        stats.max_abs_dec = std::max(stats.max_abs_dec, std::abs(res_dec_arcsec));
     }
     
-    stats.rms_ra = std::sqrt(sum_ra2 / n_valid) * RAD_TO_ARCSEC;
-    stats.rms_dec = std::sqrt(sum_dec2 / n_valid) * RAD_TO_ARCSEC;
-    stats.rms_total = std::sqrt((sum_ra2 + sum_dec2) / (2.0 * n_valid)) * RAD_TO_ARCSEC;
-    stats.weighted_rms = std::sqrt(sum_chi2 / (2.0 * n_valid));
-    stats.chi_squared = sum_chi2;
-    stats.reduced_chi_squared = (stats.degrees_of_freedom > 0) ? stats.chi_squared / stats.degrees_of_freedom : 0.0;
-    stats.max_abs_ra = max_ra * RAD_TO_ARCSEC;
-    stats.max_abs_dec = max_dec * RAD_TO_ARCSEC;
+    if (accepted_count > 0) {
+        stats.rms_ra = std::sqrt(sum_sq_ra / accepted_count);
+        stats.rms_dec = std::sqrt(sum_sq_dec / accepted_count);
+        stats.rms_total = std::sqrt((sum_sq_ra + sum_sq_dec) / (2.0 * accepted_count));
+        
+        stats.chi_squared = chi_squared;
+        stats.degrees_of_freedom = 2 * accepted_count - num_parameters;
+        
+        if (stats.degrees_of_freedom > 0) {
+            stats.reduced_chi_squared = chi_squared / stats.degrees_of_freedom;
+            stats.weighted_rms = std::sqrt(stats.reduced_chi_squared);
+        } else {
+            stats.reduced_chi_squared = 0.0;
+            stats.weighted_rms = 0.0;
+        }
+    } else {
+        stats.rms_ra = 0.0;
+        stats.rms_dec = 0.0;
+        stats.rms_total = 0.0;
+        stats.chi_squared = 0.0;
+        stats.degrees_of_freedom = 0;
+        stats.reduced_chi_squared = 0.0;
+        stats.weighted_rms = 0.0;
+    }
     
     return stats;
 }
 
-int ResidualCalculator::identify_outliers(
+template <typename Frame>
+int ResidualCalculator<Frame>::identify_outliers(
     std::vector<ObservationResidual>& residuals,
     double sigma_threshold) {
     
-    int num_outliers = 0;
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        for (auto& r : residuals) {
-            if (r.outlier) continue;
-            if (r.is_outlier(sigma_threshold)) {
-                r.outlier = true;
-                changed = true;
-                num_outliers++;
+    int outliers_found = 0;
+    for (auto& res : residuals) {
+        if (!res.outlier) {
+            if (res.is_outlier(sigma_threshold)) {
+                res.outlier = true;
+                outliers_found++;
             }
         }
     }
-    return num_outliers;
+    return outliers_found;
 }
+
+// Explicit instantiations
+template class ResidualCalculator<core::GCRF>;
+template class ResidualCalculator<core::ECLIPJ2000>;
 
 } // namespace astdyn::orbit_determination

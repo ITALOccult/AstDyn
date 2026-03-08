@@ -46,9 +46,9 @@ GoodingIODResult GoodingIOD::compute(
     auto R2_si = astdyn::ephemeris::PlanetaryEphemeris::getPosition(astdyn::ephemeris::CelestialBody::EARTH, t2);
     auto R3_si = astdyn::ephemeris::PlanetaryEphemeris::getPosition(astdyn::ephemeris::CelestialBody::EARTH, t3);
     
-    auto R1 = math::Vector3<core::GCRF, physics::Distance>::from_si(R1_si.x / (constants::AU * 1000.0), R1_si.y / (constants::AU * 1000.0), R1_si.z / (constants::AU * 1000.0));
-    auto R2 = math::Vector3<core::GCRF, physics::Distance>::from_si(R2_si.x / (constants::AU * 1000.0), R2_si.y / (constants::AU * 1000.0), R2_si.z / (constants::AU * 1000.0));
-    auto R3 = math::Vector3<core::GCRF, physics::Distance>::from_si(R3_si.x / (constants::AU * 1000.0), R3_si.y / (constants::AU * 1000.0), R3_si.z / (constants::AU * 1000.0));
+    auto R1 = math::Vector3<core::GCRF, physics::Distance>::from_si(R1_si.x_si() / (constants::AU * 1000.0), R1_si.y_si() / (constants::AU * 1000.0), R1_si.z_si() / (constants::AU * 1000.0));
+    auto R2 = math::Vector3<core::GCRF, physics::Distance>::from_si(R2_si.x_si() / (constants::AU * 1000.0), R2_si.y_si() / (constants::AU * 1000.0), R2_si.z_si() / (constants::AU * 1000.0));
+    auto R3 = math::Vector3<core::GCRF, physics::Distance>::from_si(R3_si.x_si() / (constants::AU * 1000.0), R3_si.y_si() / (constants::AU * 1000.0), R3_si.z_si() / (constants::AU * 1000.0));
 
     // 3. Iteration
     double rho1 = rho1_guess;

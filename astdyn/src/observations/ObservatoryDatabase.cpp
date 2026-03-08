@@ -29,13 +29,13 @@ void Observatory::computeGeocentricPosition() {
     computeParallaxConstants(latitude, altitude, rho_cos_phi, rho_sin_phi);
 }
 
-types::Vector3<core::GCRF, core::Meter> Observatory::getPositionGCRF(time::EpochUTC t) const {
+math::Vector3<core::GCRF, physics::Distance> Observatory::getPositionGCRF(time::EpochUTC t) const {
     // Convert ITRF position to GCRF using Earth rotation
     // Uses rotation matrix directly (non-deprecated path)
-    Eigen::Vector3d pos_itrf(position.x, position.y, position.z);
+    Eigen::Vector3d pos_itrf(position.x_si(), position.y_si(), position.z_si());
     Eigen::Matrix3d R = coordinates::ReferenceFrame::itrf_to_j2000_simple(t);
     Eigen::Vector3d pos_gcrf = R * pos_itrf;
-    return types::Vector3<core::GCRF, core::Meter>(pos_gcrf.x(), pos_gcrf.y(), pos_gcrf.z());
+    return math::Vector3<core::GCRF, physics::Distance>::from_si(pos_gcrf.x(), pos_gcrf.y(), pos_gcrf.z());
 }
 
 // ============================================================================
@@ -203,7 +203,7 @@ std::vector<std::string> ObservatoryDatabase::getAllCodes() const {
 // Coordinate Conversion Functions
 // ============================================================================
 
-types::Vector3<core::ITRF, core::Meter> geodeticToGeocentric(
+math::Vector3<core::ITRF, physics::Distance> geodeticToGeocentric(
     double lon_geodetic,
     double lat_geodetic,
     double alt_meters)
@@ -223,7 +223,7 @@ types::Vector3<core::ITRF, core::Meter> geodeticToGeocentric(
     const double y = (N + alt_meters) * cos_lat * sin_lon;
     const double z = (N * (1.0 - e2) + alt_meters) * sin_lat;
     
-    return types::Vector3<core::ITRF, core::Meter>(x, y, z);
+    return math::Vector3<core::ITRF, physics::Distance>::from_si(x, y, z);
 }
 
 void computeParallaxConstants(

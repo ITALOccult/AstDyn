@@ -5,7 +5,6 @@
 #include <sstream>
 #include <iomanip>
 #include <regex>
-#include <iostream>
 
 namespace astdyn::io {
 
@@ -19,7 +18,12 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, void* us
 
 static std::string url_encode(const std::string& value) {
     CURL* curl = curl_easy_init();
+    if (!curl) return value;
     char* output = curl_easy_escape(curl, value.c_str(), value.length());
+    if (!output) {
+        curl_easy_cleanup(curl);
+        return value;
+    }
     std::string res(output);
     curl_free(output);
     curl_easy_cleanup(curl);
@@ -71,7 +75,7 @@ HorizonsClient::query_elements(const std::string& target, const time::EpochTDB& 
             return std::stod(result.substr(val_pos));
         };
 
-        double a_km = find_val("A =");
+        double a_au = find_val("A =");
         double e = find_val("EC=");
         double i = find_val("IN=");
         double om = find_val("OM=");
@@ -80,7 +84,7 @@ HorizonsClient::query_elements(const std::string& target, const time::EpochTDB& 
 
         return physics::KeplerianStateTyped<core::ECLIPJ2000>{
             epoch,
-            physics::Distance::from_au(a_km / constants::AU),
+            physics::Distance::from_au(a_au),
             e,
             astrometry::Angle::from_deg(i),
             astrometry::Angle::from_deg(om),
@@ -96,7 +100,6 @@ HorizonsClient::query_elements(const std::string& target, const time::EpochTDB& 
 std::expected<physics::CartesianStateTyped<core::GCRF>, HorizonsError> 
 HorizonsClient::query_vectors(const std::string& target, const time::EpochTDB& epoch, const std::string& center) {
     auto url = build_vectors_url(target, epoch, center);
-    std::cout << "  [DEBUG-HZN] VEC URL: " << url << std::endl << std::flush;
     auto raw = fetch_url(url);
     if (!raw) return std::unexpected(raw.error());
 
@@ -118,11 +121,18 @@ HorizonsClient::query_vectors(const std::string& target, const time::EpochTDB& e
 
         // Horizons VECTOR ephemeris returns positions in km, velocities in km/s.
         // Standardize to meters and m/s to match convention. Return type is MeterTag.
+        // Determine GM based on center (simplified)
+        double gm = constants::GM_SUN;
+        if (center.find("399") != std::string::npos || center.find("Earth") != std::string::npos) {
+            gm = constants::GM_EARTH;
+        }
+
         constexpr double KM_TO_M = 1000.0;
         return physics::CartesianStateTyped<core::GCRF>::from_si(
             epoch,
             find_coord(" X =") * KM_TO_M, find_coord(" Y =") * KM_TO_M, find_coord(" Z =") * KM_TO_M,
-            find_coord(" VX=") * KM_TO_M, find_coord(" VY=") * KM_TO_M, find_coord(" VZ=") * KM_TO_M
+            find_coord(" VX=") * KM_TO_M, find_coord(" VY=") * KM_TO_M, find_coord(" VZ=") * KM_TO_M,
+            gm * 1e9 // GM in m^3/s^2
         );
     } catch (...) {
         return std::unexpected(HorizonsError::ParsingError);
@@ -132,7 +142,6 @@ HorizonsClient::query_vectors(const std::string& target, const time::EpochTDB& e
 std::expected<astrometry::AstrometricObservation, HorizonsError> 
 HorizonsClient::query_observation(const std::string& target, const time::EpochTDB& epoch, const std::string& observer) {
     auto url = build_observer_url(target, epoch, observer);
-    std::cout << "  [DEBUG-HZN] OBS URL: " << url << std::endl << std::flush;
     auto raw = fetch_url(url);
     if (!raw) return std::unexpected(raw.error());
 
@@ -179,7 +188,7 @@ std::string HorizonsClient::build_elements_url(const std::string& target, const 
        << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='ELEMENTS'&CENTER='500@10'"
        << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.5) << "'"
        << "&STOP_TIME='JD" << (epoch.mjd() + 2400000.6) << "'"
-       << "&STEP_SIZE='1d'";
+       << "&STEP_SIZE='1d'&OUT_UNITS='AU-D'";
     return ss.str();
 }
 
@@ -189,7 +198,7 @@ std::string HorizonsClient::build_vectors_url(const std::string& target, const t
        << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='VECTORS'&CENTER='" << center << "'"
        << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.5) << "'"
        << "&STOP_TIME='JD" << (epoch.mjd() + 2400000.6) << "'"
-       << "&STEP_SIZE='1d'&CSV_FORMAT='NO'&REF_PLANE='FRAME'";
+       << "&STEP_SIZE='1d'&CSV_FORMAT='NO'&REF_PLANE='FRAME'&OUT_UNITS='KM-S'&VEC_TABLE='3'";
     return ss.str();
 }
 

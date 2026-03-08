@@ -13,7 +13,7 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
-#include "src/types/vectors.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
 #include <cmath>
@@ -56,12 +56,12 @@ public:
           mu_(mu) {}
 
     /** @brief Construct from strong-typed vectors. */
-    template<typename Frame, typename Unit>
-    CartesianState(const types::Vector3<Frame, Unit>& pos, 
-                   const types::Vector3<Frame, Unit>& vel,
+    template<typename Frame, typename Unit1, typename Unit2>
+    CartesianState(const math::Vector3<Frame, Unit1>& pos, 
+                   const math::Vector3<Frame, Unit2>& vel,
                    double mu = constants::GM_SUN)
-        : position_(pos.to_eigen()), 
-          velocity_(vel.to_eigen()),
+        : position_(pos.to_eigen_si()), 
+          velocity_(vel.to_eigen_si()),
           mu_(mu) {}
     
     /**
@@ -83,10 +83,10 @@ public:
     const Vector3d& velocity() const { return velocity_; }
 
     template<typename Frame = core::GCRF, typename Unit = core::Meter>
-    types::Vector3<Frame, Unit> position_strong() const { return types::Vector3<Frame, Unit>(position_); }
+    math::Vector3<Frame, Unit> position_strong() const { return math::Vector3<Frame, Unit>::from_si(position_.x(), position_.y(), position_.z()); }
 
     template<typename Frame = core::GCRF, typename Unit = core::Meter>
-    types::Vector3<Frame, Unit> velocity_strong() const { return types::Vector3<Frame, Unit>(velocity_); }
+    math::Vector3<Frame, Unit> velocity_strong() const { return math::Vector3<Frame, Unit>::from_si(velocity_.x(), velocity_.y(), velocity_.z()); }
     double mu() const { return mu_; }
     
     void set_position(const Vector3d& pos) { position_ = pos; }

@@ -104,8 +104,8 @@ struct KeplerianElements {
  */
 struct CartesianElements {
     time::EpochTDB epoch;              ///< Epoch (EpochTDB)
-    types::Vector3<core::GCRF, core::Meter> position; ///< Position vector [m]
-    types::Vector3<core::GCRF, core::Meter> velocity; ///< Velocity vector [m/s]
+    math::Vector3<core::GCRF, physics::Distance> position; ///< Position vector [m]
+    math::Vector3<core::GCRF, physics::Velocity> velocity; ///< Velocity vector [m/s]
     
     double gravitational_parameter = constants::GM_SUN * 1e9;  ///< GM [m³/s²] (default: solar)
     
@@ -130,13 +130,13 @@ struct CartesianElements {
      * @brief Compute distance from central body
      * @return |r| [AU]
      */
-    double distance() const { return position.norm(); }
+    double distance() const { return position.norm().to_au(); }
     
     /**
      * @brief Compute speed
      * @return |v| [AU/day]
      */
-    double speed() const { return velocity.norm(); }
+    double speed() const { return velocity.norm().to_au_d(); }
 };
 
 /**
@@ -240,8 +240,8 @@ physics::CartesianStateTyped<Frame> keplerian_to_cartesian(const physics::Kepler
     
     return physics::CartesianStateTyped<Frame>::from_si(
         kep.epoch,
-        cart_legacy.position.x, cart_legacy.position.y, cart_legacy.position.z,
-        cart_legacy.velocity.x, cart_legacy.velocity.y, cart_legacy.velocity.z,
+        cart_legacy.position.x_si(), cart_legacy.position.y_si(), cart_legacy.position.z_si(),
+        cart_legacy.velocity.x_si(), cart_legacy.velocity.y_si(), cart_legacy.velocity.z_si(),
         cart_legacy.gravitational_parameter
     );
 }
@@ -254,8 +254,8 @@ template <typename Frame>
 physics::KeplerianStateTyped<Frame> cartesian_to_keplerian(const physics::CartesianStateTyped<Frame>& cart) {
     CartesianElements legacy;
     legacy.epoch = cart.epoch;
-    legacy.position = types::Vector3<core::GCRF, core::Meter>(cart.position.to_eigen_si());
-    legacy.velocity = types::Vector3<core::GCRF, core::Meter>(cart.velocity.to_eigen_si());
+    legacy.position = math::Vector3<core::GCRF, physics::Distance>::from_si(cart.position.x_si(), cart.position.y_si(), cart.position.z_si());
+    legacy.velocity = math::Vector3<core::GCRF, physics::Velocity>::from_si(cart.velocity.x_si(), cart.velocity.y_si(), cart.velocity.z_si());
     legacy.gravitational_parameter = cart.gm.to_m3_s2();
 
     auto kep_legacy = cartesian_to_keplerian(legacy);
