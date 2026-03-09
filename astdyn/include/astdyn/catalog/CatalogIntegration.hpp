@@ -22,6 +22,8 @@
 #include "src/core/frame_tags.hpp"
 #include <vector>
 
+namespace astdyn { struct AstDynConfig; }
+
 namespace astdyn::catalog {
 
 // ============================================================================
@@ -137,7 +139,7 @@ namespace astdyn::catalog {
     const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
     time::EpochTDB center_epoch,
     double         duration_days,
-    const AstDynConfig& cfg,
+    const astdyn::AstDynConfig& cfg,
     int            degree = 12
 );
 
@@ -155,27 +157,6 @@ namespace astdyn::catalog {
     const ChebyshevSegment& segment,
     Angle          width,
     double         max_magnitude = 18.0
-);
-
-/**
- * @brief Generate a Chebyshev polynomial approximation for an orbit centered at a target epoch.
- *
- * Useful for high-performance interpolation of asteroid positions (geocentric RA/Dec).
- * Centered on a target epoch (e.g. midnight) with a specified duration and degree.
- *
- * @param initial_elements Orbit at some epoch (will be propagated to window)
- * @param center_epoch     Target epoch for the center of the segment (TDB)
- * @param duration_days    Total time window duration [days]
- * @param cfg              AstDyn configuration for propagation
- * @param degree           Chebyshev polynomial degree (default: 12)
- * @return Chebyshev coefficients for geocentric RA and Dec
- */
-[[nodiscard]] ChebyshevSegment fit_chebyshev(
-    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
-    time::EpochTDB center_epoch,
-    double         duration_days,
-    const AstDynConfig& cfg,
-    int            degree = 12
 );
 
 } // namespace astdyn::catalog

@@ -1,4 +1,5 @@
 #include "astdyn/astrometry/Astrometry.hpp"
+#include <expected>
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/time/TimeScale.hpp"

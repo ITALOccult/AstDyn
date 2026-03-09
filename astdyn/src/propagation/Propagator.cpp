@@ -43,7 +43,7 @@ Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::V
     
     // Get Sun Barycentric Position (KM -> AU and rotate if needed)
     auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
-    Eigen::Vector3d sun_pos_bary_vec = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
+    Eigen::Vector3d sun_pos_bary_vec = sun_pos_bary.to_eigen_si() / physics::Distance::from_au(1.0).to_m();
     
     // Rotate to Ecliptic if needed
     if (settings_.integrate_in_ecliptic) {
@@ -101,7 +101,7 @@ Eigen::Vector3d Propagator::planetary_perturbations(const Eigen::Vector3d& posit
 
     auto add_planet_perturbation = [&]( CelestialBody planet, double planet_gm_au) {
         auto planet_state_bary = ephemeris_->getPosition(planet, t);
-        Eigen::Vector3d p_pos_bary_au = planet_state_bary.to_eigen_si() / (constants::AU * 1000.0);
+        Eigen::Vector3d p_pos_bary_au = planet_state_bary.to_eigen_si() / physics::Distance::from_au(1.0).to_m();
         
         if (settings_.integrate_in_ecliptic) {
             p_pos_bary_au = mat_ecl * p_pos_bary_au;
@@ -128,7 +128,7 @@ Eigen::Vector3d Propagator::planetary_perturbations(const Eigen::Vector3d& posit
     if (settings_.perturb_neptune) add_planet_perturbation(CelestialBody::NEPTUNE, constants::GM_NEPTUNE_AU);
     
     if (settings_.include_moon) {
-        double moon_gm_au = constants::GM_MOON * 1e9 * std::pow(86400.0, 2) / std::pow(constants::AU * 1000.0, 3);
+        double moon_gm_au = physics::GravitationalParameter::from_km3_s2(constants::GM_MOON).to_au3_d2();
         add_planet_perturbation(CelestialBody::MOON, moon_gm_au);
     }
     
@@ -138,34 +138,16 @@ Eigen::Vector3d Propagator::planetary_perturbations(const Eigen::Vector3d& posit
 Eigen::Vector3d Propagator::asteroid_perturbations(const Eigen::Vector3d& position,
                                                  time::EpochTDB t,
                                                  const Eigen::Vector3d& sun_pos_bary) {
-    if (!asteroids_ || !settings_.include_asteroids) return Eigen::Vector3d::Zero();
-    
-    // The AsteroidPerturbations::computePerturbation expects SSB sun_pos and GCRF position.
-    // However, our internal 'position' might be Ecliptic.
-    // And asteroids_ internal ephemeris is GCRF.
-    
-    if (!settings_.integrate_in_ecliptic) {
-         return asteroids_->computePerturbation(position, t.mjd(), sun_pos_bary);
-    }
-    
-    // If in Ecliptic, rotate position back to Equatorial for the perturbation engine
-    auto mat_eq = coordinates::ReferenceFrame::ecliptic_to_j2000();
-    auto mat_ecl = coordinates::ReferenceFrame::j2000_to_ecliptic();
-    
-    Eigen::Vector3d pos_eq = mat_eq * position;
-    Eigen::Vector3d sun_eq = mat_eq * sun_pos_bary;
-    
-    Eigen::Vector3d acc_eq = asteroids_->computePerturbation(pos_eq, t.mjd(), sun_eq);
-    
-    // Rotate result back to Ecliptic
-    return mat_ecl * acc_eq;
+    // Asteroids library assumes AU and returns AU/day^2.
+    // Use the raw interface to avoid state creation overhead during integration.
+    return asteroids_->computePerturbationRaw(position, t.mjd(), sun_pos_bary, settings_.integrate_in_ecliptic);
 }
 
 Eigen::Vector3d Propagator::relativistic_correction(const Eigen::Vector3d& position,
                                                    const Eigen::Vector3d& velocity) const {
     double r = position.norm();
     double v2 = velocity.squaredNorm();
-    double c_au_d = (constants::C_LIGHT * 1000.0) * 86400.0 / (constants::AU * 1000.0);
+    double c_au_d = physics::SpeedOfLight::to_au_d();
     double c2 = c_au_d * c_au_d;
     double mu = settings_.central_body_gm;
     

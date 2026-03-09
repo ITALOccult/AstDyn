@@ -45,14 +45,14 @@ class GoodingIOD {
 public:
     struct Settings {
         int max_iterations;
-        double tolerance;
-        double mu;
+        double tolerance_rad;                ///< Convergence tolerance for topocentric residuals [rad]
+        physics::GravitationalParameter mu;  ///< Gravitational parameter of primary body
         bool verbose;
 
         Settings() : 
             max_iterations(80),
-            tolerance(1e-12),
-            mu(astdyn::constants::GMS),
+            tolerance_rad(1e-7),
+            mu(physics::GravitationalParameter::sun()),
             verbose(false) {}
     };
 

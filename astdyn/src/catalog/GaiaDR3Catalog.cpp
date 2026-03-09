@@ -125,7 +125,7 @@ SkyCoord<core::GCRF> Star::predict_at(time::EpochTDB target_time) const {
         rho *= d.to_m();
     }
 
-    return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho));
+    return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho.x(), rho.y(), rho.z()));
 }
 
 // ============================================================================

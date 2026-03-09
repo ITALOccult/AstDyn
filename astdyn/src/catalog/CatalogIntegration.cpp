@@ -42,10 +42,10 @@ SkyCoord<core::GCRF> heliocentric_to_skycoord(
     Distance rho = Distance::from_si(rho_vec.norm());
 
     if (rho.to_m() < 1.0) {
-        return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::zero());
+        return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>());
     }
 
-    return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho_vec));
+    return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho_vec.x(), rho_vec.y(), rho_vec.z()));
 }
 
 // ============================================================================

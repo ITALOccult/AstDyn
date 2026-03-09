@@ -106,10 +106,23 @@ GoodingIODResult GoodingIOD::compute(
     Eigen::Vector3d L2 = compute_los(obs2.ra, obs2.dec);
     Eigen::Vector3d L3 = compute_los(obs3.ra, obs3.dec);
 
-    // 2. Observer positions (heliocentric GCRF)
-    auto R1 = astdyn::ephemeris::PlanetaryEphemeris::getPosition(astdyn::ephemeris::CelestialBody::EARTH, t1);
-    auto R2 = astdyn::ephemeris::PlanetaryEphemeris::getPosition(astdyn::ephemeris::CelestialBody::EARTH, t2);
-    auto R3 = astdyn::ephemeris::PlanetaryEphemeris::getPosition(astdyn::ephemeris::CelestialBody::EARTH, t3);
+    // Get Earth positions
+    auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t1);
+    auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t2);
+    auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t3);
+
+    math::Vector3<core::GCRF, physics::Distance> R1 = earth1.position;
+    math::Vector3<core::GCRF, physics::Distance> R2 = earth2.position;
+    math::Vector3<core::GCRF, physics::Distance> R3 = earth3.position;
+
+    if (settings_.verbose) {
+        std::cout << "  [DEBUG] R1: " << R1.x_si()/1.495978707e11 << ", " << R1.y_si()/1.495978707e11 << ", " << R1.z_si()/1.495978707e11 << " AU" << std::endl;
+        std::cout << "  [DEBUG] R2: " << R2.x_si()/1.495978707e11 << ", " << R2.y_si()/1.495978707e11 << ", " << R2.z_si()/1.495978707e11 << " AU" << std::endl;
+        std::cout << "  [DEBUG] R3: " << R3.x_si()/1.495978707e11 << ", " << R3.y_si()/1.495978707e11 << ", " << R3.z_si()/1.495978707e11 << " AU" << std::endl;
+        std::cout << "  [DEBUG] L1: " << L1.transpose() << std::endl;
+        std::cout << "  [DEBUG] L2: " << L2.transpose() << std::endl;
+        std::cout << "  [DEBUG] L3: " << L3.transpose() << std::endl;
+    }
 
     // 3. Iteration
     double rho1_m = physics::Distance::from_au(rho1_guess_au).to_m();
@@ -144,36 +157,31 @@ bool GoodingIOD::solve_iteration(
     const double dt13_d = (t3 - t1).to_days();
     const double dt12_d = (t2 - t1).to_days();
 
-    // Work in SI for the iteration back-end
-    const Eigen::Vector3d R1e = R1.to_eigen_si();
-    const Eigen::Vector3d R2e = R2.to_eigen_si();
-    const Eigen::Vector3d R3e = R3.to_eigen_si();
+    // Work in AU for better numerical conditioning in the Jacobian
+    const double au_to_m = physics::Distance::from_au(1.0).to_m();
+    const Eigen::Vector3d R1_au = R1.to_eigen_si() / au_to_m;
+    const Eigen::Vector3d R2_au = R2.to_eigen_si() / au_to_m;
+    const Eigen::Vector3d R3_au = R3.to_eigen_si() / au_to_m;
     
-    // mu and constants in SI
-    const double mu_si = settings_.mu * (std::pow(constants::AU * 1000.0, 3) / std::pow(86400.0, 2));
+    double rho1_au = rho1_m / au_to_m;
+    double rho3_au = rho3_m / au_to_m;
 
     const double ra2_obs  = std::atan2(L2.y(), L2.x());
     const double dec2_obs = std::asin(std::max(-1.0, std::min(1.0, L2.z())));
 
-    auto angular_residuals = [&](double r1_m, double r3_m,
+    auto angular_residuals = [&](double r1_au, double r3_au,
                                   double& f_ra, double& f_dec) -> bool {
-        Eigen::Vector3d r1v = R1e + r1_m * L1;
-        Eigen::Vector3d r3v = R3e + r3_m * L3;
+        Eigen::Vector3d r1v = R1_au + r1_au * L1;
+        Eigen::Vector3d r3v = R3_au + r3_au * L3;
         
-        // solve uses AU internally, so convert back/forth if needed or fix Lambert to be typed
-        // For now, let's keep Lambert as is but scale correctly
-        const double m_to_au = 1.0 / (constants::AU * 1000.0);
-        Eigen::Vector3d v1_aupd = math::LambertSolver::solve(r1v * m_to_au, r3v * m_to_au, dt13_d, settings_.mu);
-        Eigen::Vector3d v1_si = v1_aupd * (constants::AU * 1000.0 / 86400.0);
+        Eigen::Vector3d v1_aupd = math::LambertSolver::solve(r1v, r3v, dt13_d, settings_.mu.to_au3_d2());
         
         Eigen::Vector3d r2p_au;
-        Eigen::Vector3d r1_au = r1v * m_to_au;
-        if (!kepler_prop(r1_au, v1_aupd, dt12_d, settings_.mu, r2p_au)) return false;
+        if (!kepler_prop(r1v, v1_aupd, dt12_d, settings_.mu.to_au3_d2(), r2p_au)) return false;
         
-        Eigen::Vector3d r2p_si = r2p_au * (constants::AU * 1000.0);
-        Eigen::Vector3d topo = r2p_si - R2e;
+        Eigen::Vector3d topo = r2p_au - R2_au;
         double rho2 = topo.norm();
-        if (rho2 < 1.0) return false;
+        if (rho2 < 1e-8) return false;
         
         double ra_pred  = std::atan2(topo.y(), topo.x());
         double dec_pred = std::asin(std::max(-1.0, std::min(1.0, topo.z() / rho2)));
@@ -186,54 +194,66 @@ bool GoodingIOD::solve_iteration(
         return true;
     };
 
-    constexpr double kGoodingTol = 1e-10; 
-    const double eps_m = 1000.0; // 1km perturbation
+    const double eps_au = 1e-4; // 15,000 km perturbation
 
+    bool converged = false;
     for (int outer = 0; outer < settings_.max_iterations; ++outer) {
         double f_ra, f_dec;
-        if (!angular_residuals(rho1_m, rho3_m, f_ra, f_dec)) break;
+        if (!angular_residuals(rho1_au, rho3_au, f_ra, f_dec)) break;
 
         double res_norm = std::sqrt(f_ra * f_ra + f_dec * f_dec);
-        if (res_norm < kGoodingTol) break;
+        if (res_norm < settings_.tolerance_rad) {
+            converged = true;
+            break;
+        }
 
         // Numerical Jacobian
         double f_ra_p1, f_dec_p1, f_ra_p3, f_dec_p3;
-        if (!angular_residuals(rho1_m + eps_m, rho3_m, f_ra_p1, f_dec_p1)) break;
-        if (!angular_residuals(rho1_m, rho3_m + eps_m, f_ra_p3, f_dec_p3)) break;
+        if (!angular_residuals(rho1_au + eps_au, rho3_au, f_ra_p1, f_dec_p1)) break;
+        if (!angular_residuals(rho1_au, rho3_au + eps_au, f_ra_p3, f_dec_p3)) break;
 
         Eigen::Matrix2d J;
-        J(0, 0) = (f_ra_p1  - f_ra)  / eps_m;
-        J(1, 0) = (f_dec_p1 - f_dec) / eps_m;
-        J(0, 1) = (f_ra_p3  - f_ra)  / eps_m;
-        J(1, 1) = (f_dec_p3 - f_dec) / eps_m;
+        J(0, 0) = (f_ra_p1  - f_ra)  / eps_au;
+        J(1, 0) = (f_dec_p1 - f_dec) / eps_au;
+        J(0, 1) = (f_ra_p3  - f_ra)  / eps_au;
+        J(1, 1) = (f_dec_p3 - f_dec) / eps_au;
 
         double det = J.determinant();
-        if (std::abs(det) < 1e-25) break;
+        if (std::abs(det) < 1e-15) break;
 
         Eigen::Vector2d y(f_ra, f_dec);
-        Eigen::Vector2d dx = -(J.inverse() * y);
+        Eigen::Vector2d dx = -(J.colPivHouseholderQr().solve(y));
         
         // Damped step
-        double max_step = 0.5 * std::max(rho1_m, rho3_m);
-        double step_scale = std::min(1.0, max_step / (dx.norm() + 1e-30));
-        rho1_m = std::max(1000.0, rho1_m + step_scale * dx[0]);
-        rho3_m = std::max(1000.0, rho3_m + step_scale * dx[1]);
+        double max_step = 0.5 * std::max(rho1_au, rho3_au);
+        double step_norm = dx.norm();
+        double step_scale = (step_norm > max_step) ? (max_step / step_norm) : 1.0;
+        
+        rho1_au += step_scale * dx[0];
+        rho3_au += step_scale * dx[1];
+        
+        // Safety: stay positive and within reasonable solar system bounds
+        rho1_au = std::max(1e-4, std::min(rho1_au, 100.0));
+        rho3_au = std::max(1e-4, std::min(rho3_au, 100.0));
     }
 
-    std::cerr << "[GoodingIOD] converged rho1=" << physics::Distance::from_si(rho1_m).to_au() 
-              << " AU, rho3=" << physics::Distance::from_si(rho3_m).to_au() << " AU\n";
+    if (!converged) return false;
+    
+    // Convert back to meters for output
+    rho1_m = rho1_au * au_to_m;
+    rho3_m = rho3_au * au_to_m;
               
-    Eigen::Vector3d r1v = R1e + rho1_m * L1;
-    Eigen::Vector3d r3v = R3e + rho3_m * L3;
-    const double m_to_au = 1.0 / (constants::AU * 1000.0);
-    Eigen::Vector3d v1_aupd = math::LambertSolver::solve(r1v * m_to_au, r3v * m_to_au, dt13_d, settings_.mu);
-    Eigen::Vector3d v1_si = v1_aupd * (constants::AU * 1000.0 / 86400.0);
+    Eigen::Vector3d r1v_au = R1_au + rho1_au * L1;
+    Eigen::Vector3d r3v_au = R3_au + rho3_au * L3;
+    
+    Eigen::Vector3d v1_aupd = math::LambertSolver::solve(r1v_au, r3v_au, dt13_d, settings_.mu.to_au3_d2());
+    Eigen::Vector3d v1_si = v1_aupd * physics::Velocity::from_au_d(1.0).to_ms();
 
     final_state = physics::CartesianStateTyped<core::GCRF>::from_si(
         t1,
-        r1v.x(), r1v.y(), r1v.z(),
+        r1v_au.x() * au_to_m, r1v_au.y() * au_to_m, r1v_au.z() * au_to_m,
         v1_si.x(), v1_si.y(), v1_si.z(),
-        constants::GM_SUN * 1e9
+        physics::GravitationalParameter::sun().to_m3_s2()
     );
 
     return true;
