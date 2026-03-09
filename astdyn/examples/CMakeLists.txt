@@ -58,9 +58,9 @@ target_link_libraries(horizons_query PRIVATE astdyn)
 add_executable(test_79518 test_79518.cpp)
 target_link_libraries(test_79518 PRIVATE astdyn)
 
-# Benchmark Integrators and Models
-add_executable(benchmark_integrators benchmark_integrators.cpp)
-target_link_libraries(benchmark_integrators PRIVATE astdyn)
+# Benchmark Integrators and Models (Moved to /benchmarks)
+# add_executable(benchmark_integrators benchmark_integrators.cpp)
+# target_link_libraries(benchmark_integrators PRIVATE astdyn)
 
 # Gaia Occultation Search Test
 add_executable(gaia_occultation_test gaia_occultation_test.cpp)
@@ -80,6 +80,10 @@ target_link_libraries(debug_engine PRIVATE astdyn curl Eigen3::Eigen)
 
 add_executable(scientific_validation scientific_validation.cpp)
 target_link_libraries(scientific_validation PRIVATE astdyn Eigen3::Eigen curl)
+
+# AAS Propagation Demo
+add_executable(aas_propagation_demo aas_propagation_demo.cpp)
+target_link_libraries(aas_propagation_demo PRIVATE astdyn Eigen3::Eigen)
 
 # Install examples (optional)
 install(TARGETS example_basic

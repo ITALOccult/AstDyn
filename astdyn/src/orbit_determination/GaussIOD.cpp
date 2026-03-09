@@ -102,15 +102,26 @@ GaussIODResult GaussIOD::compute_from_three(
     result.epoch = t2_tdb;
     // result.state is CartesianStateTyped<core::GCRF>, it will be initialized later via from_si
     
-    // Get Earth positions
+    // Get Earth positions (getState returns km and km/s)
     auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t1_tdb);
     auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t2_tdb);
     auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t3_tdb);
     
-    // State::position() returns Vector3d, we need math::Vector3
-    math::Vector3<core::GCRF, physics::Distance> R1 = math::Vector3<core::GCRF, physics::Distance>::from_si(earth1.position().x(), earth1.position().y(), earth1.position().z());
-    math::Vector3<core::GCRF, physics::Distance> R2 = math::Vector3<core::GCRF, physics::Distance>::from_si(earth2.position().x(), earth2.position().y(), earth2.position().z());
-    math::Vector3<core::GCRF, physics::Distance> R3 = math::Vector3<core::GCRF, physics::Distance>::from_si(earth3.position().x(), earth3.position().y(), earth3.position().z());
+    // Convert using typed methods
+    math::Vector3<core::GCRF, physics::Distance> R1 = math::Vector3<core::GCRF, physics::Distance>::from_si(
+          physics::Distance::from_km(earth1.position().x()).to_m(),
+          physics::Distance::from_km(earth1.position().y()).to_m(),
+          physics::Distance::from_km(earth1.position().z()).to_m());
+          
+    math::Vector3<core::GCRF, physics::Distance> R2 = math::Vector3<core::GCRF, physics::Distance>::from_si(
+          physics::Distance::from_km(earth2.position().x()).to_m(),
+          physics::Distance::from_km(earth2.position().y()).to_m(),
+          physics::Distance::from_km(earth2.position().z()).to_m());
+          
+    math::Vector3<core::GCRF, physics::Distance> R3 = math::Vector3<core::GCRF, physics::Distance>::from_si(
+          physics::Distance::from_km(earth3.position().x()).to_m(),
+          physics::Distance::from_km(earth3.position().y()).to_m(),
+          physics::Distance::from_km(earth3.position().z()).to_m());
     
     // Compute line-of-sight unit vectors
     auto los1 = compute_line_of_sight(obs1.ra, obs1.dec);
@@ -132,24 +143,20 @@ GaussIODResult GaussIOD::compute_from_three(
     result.slant_range_2 = rho2;
     result.slant_range_3 = rho3;
     result.iterations = iterations;
+
+    // Use physics::Distance for radius vectors
+    auto radius1 = R1 + (los1 * physics::Distance::from_au(rho1).to_m());
+    auto radius2 = R2 + (los2 * physics::Distance::from_au(rho2).to_m());
+    auto radius3 = R3 + (los3 * physics::Distance::from_au(rho3).to_m());
     
-    // rho is in AU, convert to meters
-    double au_to_m = constants::AU_TO_KM * 1000.0;
+    // Estimate velocity: v = dr/dt [m/s]
+    auto v2_vec = (radius3 - radius1) / (tau * 86400.0);
     
-    // Compute heliocentric position at middle observation
-    auto r2 = R2 + (los2 * (rho2 * au_to_m));
-    
-    // Estimate velocity
-    auto r1 = R1 + (los1 * (rho1 * au_to_m));
-    auto r3 = R3 + (los3 * (rho3 * au_to_m));
-    
-    auto v2 = (r3 - r1) / (tau * 86400.0);
-    
-    result.state = physics::CartesianStateTyped<core::GCRF>::from_si(
+    result.state = physics::CartesianStateTyped<core::GCRF>(
         t2_tdb,
-        r2.x_si(), r2.y_si(), r2.z_si(),
-        v2.x_si(), v2.y_si(), v2.z_si(),
-        constants::GM_SUN * 1e9
+        radius2,
+        astdyn::math::Vector3<core::GCRF, physics::Velocity>::from_si(v2_vec.x_si(), v2_vec.y_si(), v2_vec.z_si()),
+        physics::GravitationalParameter::sun()
     );
     result.success = true;
     
@@ -160,28 +167,47 @@ std::optional<std::array<int, 3>> GaussIOD::select_observations(
     const std::vector<observations::OpticalObservation>& observations) {
     
     int n = observations.size();
-    int idx2 = n / 2;
+    if (n < 3) return std::nullopt;
+
+    // We want three observations that satisfy:
+    // 1. Separation > min_separation_days
+    // 2. Total arc < max_separation_days
+    // 3. Middle observation should be roughly in the center of the triplet
     
-    int idx1 = -1;
-    for (int i = idx2 - 1; i >= 0; --i) {
-        double sep = observations[idx2].time.mjd() - observations[i].time.mjd();
-        if (sep >= settings_.min_separation_days) {
-            idx1 = i;
-            break;
+    // Strategy: Search for a triplet that fits the constraints, starting from the beginning
+    for (int i = 0; i < n - 2; ++i) {
+        for (int k = i + 2; k < n; ++k) {
+            double total_arc = observations[k].time.mjd() - observations[i].time.mjd();
+            
+            // For Gauss IOD, total arc > 30-60 days usually fails due to Taylor series divergence.
+            // Optimal arc is 5-20 days for most LEOS/NEOs.
+            if (total_arc >= 2.0 * settings_.min_separation_days && total_arc <= settings_.max_separation_days) {
+                // Find a middle observation close to center
+                double target_mjd = observations[i].time.mjd() + 0.5 * total_arc;
+                int j_best = -1;
+                double min_diff = 1e9;
+                
+                for (int j = i + 1; j < k; ++j) {
+                    double sep1 = observations[j].time.mjd() - observations[i].time.mjd();
+                    double sep2 = observations[k].time.mjd() - observations[j].time.mjd();
+                    
+                    if (sep1 >= settings_.min_separation_days && sep2 >= settings_.min_separation_days) {
+                        double diff = std::abs(observations[j].time.mjd() - target_mjd);
+                        if (diff < min_diff) {
+                            min_diff = diff;
+                            j_best = j;
+                        }
+                    }
+                }
+                
+                if (j_best != -1) {
+                    return std::array<int, 3>{i, j_best, k};
+                }
+            }
         }
     }
     
-    int idx3 = -1;
-    for (int i = idx2 + 1; i < n; ++i) {
-        double sep = observations[i].time.mjd() - observations[idx2].time.mjd();
-        if (sep >= settings_.min_separation_days) {
-            idx3 = i;
-            break;
-        }
-    }
-    
-    if (idx1 < 0 || idx3 < 0) return std::nullopt;
-    return std::array<int, 3>{idx1, idx2, idx3};
+    return std::nullopt;
 }
 
 math::Vector3<core::GCRF, physics::Distance> GaussIOD::compute_line_of_sight(astrometry::RightAscension ra, astrometry::Declination dec) const {
@@ -217,44 +243,54 @@ bool GaussIOD::solve_slant_ranges(
     rho2 = 1.0; 
     
     auto D0 = l1.dot(l2.cross(l3));
-    if (std::abs(D0) < 1e-10) return false;
+    if (std::abs(D0) < 1e-8) {
+        return false;
+    }
     
-    auto D11 = r1_au.dot(l2.cross(l3)) / D0;
-    auto D21 = r2_au.dot(l2.cross(l3)) / D0;
-    auto D31 = r3_au.dot(l2.cross(l3)) / D0;
-    auto D12 = r1_au.dot(l1.cross(l3)) / D0;
-    auto D22 = r2_au.dot(l1.cross(l3)) / D0;
-    auto D32 = r3_au.dot(l1.cross(l3)) / D0;
-    auto D13 = r1_au.dot(l1.cross(l2)) / D0;
-    auto D23 = r2_au.dot(l1.cross(l2)) / D0;
-    auto D33 = r3_au.dot(l1.cross(l2)) / D0;
-    
+    // D-matrix elements (raw, not divided by D0)
+    auto D11 = r1_au.dot(l2.cross(l3));
+    auto D21 = r2_au.dot(l2.cross(l3));
+    auto D31 = r3_au.dot(l2.cross(l3));
+    auto D12 = r1_au.dot(l1.cross(l3));
+    auto D22 = r2_au.dot(l1.cross(l3));
+    auto D32 = r3_au.dot(l1.cross(l3));
+    auto D13 = r1_au.dot(l1.cross(l2));
+    auto D23 = r2_au.dot(l1.cross(l2));
+    auto D33 = r3_au.dot(l1.cross(l2));
+
     for (iterations = 0; iterations < settings_.max_iterations; ++iterations) {
         auto r2_vec = r2_au + rho2 * l2;
         double r2_mag = r2_vec.norm();
         if (r2_mag < 0.01) return false;
-        
+
         double u = GMS / (r2_mag * r2_mag * r2_mag);
         double f1 = 1.0 - 0.5 * u * tau1 * tau1;
         double g1 = tau1 - (1.0/6.0) * u * tau1 * tau1 * tau1;
         double f3 = 1.0 - 0.5 * u * tau3 * tau3;
         double g3 = tau3 - (1.0/6.0) * u * tau3 * tau3 * tau3;
-        
+
         double det = f1 * g3 - f3 * g1;
         if (std::abs(det) < 1e-15) return false;
         double c1 = g3 / det;
         double c3 = -g1 / det;
-        
-        double rho1_new = (1.0/D0) * (D11 + c1 * D21 + c3 * D31);
-        double rho2_new = (1.0/D0) * (D12 + c1 * D22 + c3 * D32);
-        double rho3_new = (1.0/D0) * (D13 + c1 * D23 + c3 * D33);
-        
-        if (rho1_new < 0 || rho2_new < 0 || rho3_new < 0) return false;
-        
+
+        // Cramer's rule: [l1 | -l2 | l3] * [c1*rho1; rho2; c3*rho3]^T = R2 - c1*R1 - c3*R3
+        // det([l1|-l2|l3]) = -D0
+        // rho1: c1*rho1 = det([b|-l2|l3]) / (-D0) = (D21 - c1*D11 - c3*D31) / D0
+        // rho2:    rho2 = det([l1|b|l3])  / (-D0) = (D22 - c1*D12 - c3*D32) / D0
+        // rho3: c3*rho3 = det([l1|-l2|b]) / (-D0) = (D23 - c1*D13 - c3*D33) / D0
+        double rho1_new = (D21 - c1 * D11 - c3 * D31) / (c1 * D0);
+        double rho2_new = (-c1 * D12 + D22 - c3 * D32) / D0;
+        double rho3_new = (D23 - c1 * D13 - c3 * D33) / (c3 * D0);
+
         double delta = std::abs(rho2_new - rho2);
         rho1 = rho1_new; rho2 = rho2_new; rho3 = rho3_new;
-        
-        if (delta < settings_.tolerance) return true;
+
+        if (delta < settings_.tolerance) {
+            // Only reject unphysical solutions after convergence
+            if (rho1 < 0 || rho2 < 0 || rho3 < 0) return false;
+            return true;
+        }
     }
     
     return false;

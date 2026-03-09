@@ -25,12 +25,18 @@ target_link_libraries(astdyn_unit_tests
 
 gtest_discover_tests(astdyn_unit_tests)
 
-# Benchmark AAS tool (Keep separate as it's a CLI tool, not a unit test)
-add_executable(astdyn_benchmark_aas
-    ../tools/benchmark_aas.cpp
+# Benchmarks moved to /benchmarks directory
+# add_executable(astdyn_benchmark_aas ...)
+# add_executable(benchmark_multi_integrator ...)
+# add_executable(benchmark_extended ...)
+
+# Fetch Horizons Vectors Tool (Kept in tools, built here for convenience)
+add_executable(fetch_horizons_vectors
+    ../tools/fetch_horizons_vectors.cpp
 )
 
-target_link_libraries(astdyn_benchmark_aas
+target_link_libraries(fetch_horizons_vectors
     PRIVATE
         astdyn
+        curl
 )

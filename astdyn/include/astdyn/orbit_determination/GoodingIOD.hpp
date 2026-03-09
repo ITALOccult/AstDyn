@@ -81,13 +81,11 @@ private:
     /** @brief Newton iteration core. */
     bool solve_iteration(
         const time::EpochTDB& t1, const time::EpochTDB& t2, const time::EpochTDB& t3,
-        const math::Vector3<core::GCRF, physics::Distance>& L1,
-        const math::Vector3<core::GCRF, physics::Distance>& L2,
-        const math::Vector3<core::GCRF, physics::Distance>& L3,
+        const Eigen::Vector3d& L1, const Eigen::Vector3d& L2, const Eigen::Vector3d& L3,
         const math::Vector3<core::GCRF, physics::Distance>& R1,
         const math::Vector3<core::GCRF, physics::Distance>& R2,
         const math::Vector3<core::GCRF, physics::Distance>& R3,
-        double& rho1, double& rho3,
+        double& rho1_m, double& rho3_m,
         physics::CartesianStateTyped<core::GCRF>& final_state);
 };
 

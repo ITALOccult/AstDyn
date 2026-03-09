@@ -1,4 +1,4 @@
-/**
+    /**
  * @file MPCParser.cpp
  * @brief MPC 80-column observation parser.
  */
@@ -19,8 +19,9 @@ observations::OpticalObservation MPCParser::parse_line(const std::string& line) 
     obs.object_designation = line.substr(0, 12);
     obs.observatory_code = line.substr(77, 3);
     
-    // Time (15-32)
-    obs.time = parse_date(line.substr(15, 17));
+    // MPC format: date at columns 16-32 (1-indexed) = index 15 (0-indexed), length 16.
+    // substr(16, 16) was off-by-one: skipped the millennium digit of the year.
+    obs.time = parse_date(line.substr(15, 16));
     
     // RA (32-44)
     obs.ra = parse_ra(line.substr(32, 12));

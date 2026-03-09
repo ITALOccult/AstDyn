@@ -242,6 +242,16 @@ public:
     // Statistics and Diagnostics
     // ========================================================================
     
+    /**
+     * @brief Get shadow Hamiltonian drift from last AAS integration
+     */
+    double shadow_hamiltonian_drift() const;
+
+    /**
+     * @brief Get total number of force evaluations (NFE) from last integration
+     */
+    long total_force_evaluations() const;
+
     const OrbitDeterminationResult& last_result() const {
         return last_result_;
     }

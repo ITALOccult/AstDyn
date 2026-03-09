@@ -60,14 +60,23 @@ Eigen::VectorXd DE441Provider::readState(CelestialBody body, time::EpochTDB t) c
     Eigen::VectorXd state(6);
     try {
         if (target == 399) { // Earth (399 -> 3 -> 0)
-            Eigen::VectorXd s_earth_emb = reader_->getState(399, et);
-            Eigen::VectorXd s_emb_ssb = reader_->getState(3, et);
-            state = s_earth_emb + s_emb_ssb;
+            try {
+                Eigen::VectorXd s_earth_emb = reader_->getState(399, et);
+                Eigen::VectorXd s_emb_ssb = reader_->getState(3, et);
+                state = s_earth_emb + s_emb_ssb;
+            } catch (...) {
+                // Fallback: If 399 is not in file, use 3 (EMB) as Earth approximation
+                state = reader_->getState(3, et);
+            }
         }
         else if (target == 301) { // Moon (301 -> 3 -> 0)
-             Eigen::VectorXd s_moon_emb = reader_->getState(301, et);
-             Eigen::VectorXd s_emb_ssb = reader_->getState(3, et);
-             state = s_moon_emb + s_emb_ssb;
+             try {
+                 Eigen::VectorXd s_moon_emb = reader_->getState(301, et);
+                 Eigen::VectorXd s_emb_ssb = reader_->getState(3, et);
+                 state = s_moon_emb + s_emb_ssb;
+             } catch (...) {
+                 state = reader_->getState(3, et);
+             }
         }
         else {
              int seg_id = target;

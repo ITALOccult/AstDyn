@@ -17,7 +17,9 @@ ExtendedKalmanFilter::ExtendedKalmanFilter(
     const Settings& settings)
     : propagator_(propagator),
       stm_engine_(propagator),
-      settings_(settings) {}
+      settings_(settings) {
+    residual_calc_ = std::make_unique<ResidualCalculator<core::GCRF>>(propagator->get_ephemeris());
+}
 
 EKFResult ExtendedKalmanFilter::update(
     const physics::CartesianStateTyped<core::GCRF>& prev_state,
@@ -30,32 +32,29 @@ EKFResult ExtendedKalmanFilter::update(
     // 1. Prediction (Propagate state and covariance)
     auto stm_res = stm_engine_.compute(prev_state, t_obs);
     physics::CartesianStateTyped<core::GCRF> x_pred = stm_res.final_state;
-    Matrix6d P_pred = stm_res.map_covariance(prev_cov) + settings_.process_noise;
+    // Map covariance using ΦPΦᵀ + Q
+    Matrix6d P_pred = stm_res.phi * prev_cov * stm_res.phi.transpose() + settings_.process_noise;
 
-    // 2. Observation Partials (H) at observer location
-    // Get Earth position (observer)
-    auto earth_pos_si = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::EARTH, t_obs);
-    auto R_obs = math::Vector3<core::GCRF, physics::Distance>::from_si(
-        earth_pos_si.x_si(),
-        earth_pos_si.y_si(),
-        earth_pos_si.z_si()
-    );
-
-    auto partials_res = stm_engine_.compute_with_partials(prev_state, t_obs, R_obs);
+    // 2. Innovation and Partials using the ResidualCalculator
+    // This handles light-time, aberration, and GCRF frames correctly
+    auto res_res = residual_calc_->compute_residuals({obs}, x_pred);
+    if (res_res.empty()) return result; // Should not happen with valid input
+    
+    const auto& res = res_res[0];
+    
+    // Get Partials (H) at predicted state
+    auto obs_pos_opt = residual_calc_->get_observer_position(obs);
+    if (!obs_pos_opt) return result;
+    
+    // We need the partials at t_obs. Since stm_engine_.compute() already integrated to t_obs,
+    // we use a zero-duration call at t_obs to get local partials.
+    auto partials_res = stm_engine_.compute_with_partials(x_pred, t_obs, *obs_pos_opt);
     Eigen::Matrix<double, 2, 6> H = partials_res.partial_radec;
 
-    // 3. Innovation (O - C)
-    auto rho_vec = x_pred.position.to_eigen_si() - R_obs.to_eigen_si();
-    double rho = rho_vec.norm();
-    double ra_pred = std::atan2(rho_vec.y(), rho_vec.x());
-    double dec_pred = std::asin(rho_vec.z() / rho);
-
-    double d_ra = obs.ra.to_rad() - ra_pred;
-    while (d_ra > constants::PI) d_ra -= constants::TWO_PI;
-    while (d_ra < -constants::PI) d_ra += constants::TWO_PI;
-    double d_dec = obs.dec.to_rad() - dec_pred;
-
-    Eigen::Vector2d y(d_ra * std::cos(obs.dec.to_rad()), d_dec); // Innovation
+    // 3. Innovation Vector y = z - h(x)
+    // Residuals from ResidualCalculator are already O-C and projected: (O-C)*cos(dec)
+    Eigen::Vector2d y;
+    y << res.residual_ra.to_rad(), res.residual_dec.to_rad();
     result.innovation = y;
 
     // 4. Kalman Gain
@@ -68,17 +67,20 @@ EKFResult ExtendedKalmanFilter::update(
 
     // 5. Update state and covariance
     astdyn::Vector6d dx = K * y;
-    astdyn::Vector6d x_vec = x_pred.to_eigen_si() + dx;
-    Matrix6d P_new = (Matrix6d::Identity() - K * H) * P_pred;
-
+    
+    // Apply correction in SI meters/mps
     result.state = physics::CartesianStateTyped<core::GCRF>::from_si(
         t_obs, 
-        x_vec(0), x_vec(1), x_vec(2),
-        x_vec(3), x_vec(4), x_vec(5),
+        x_pred.position.x_si() + dx(0),
+        x_pred.position.y_si() + dx(1),
+        x_pred.position.z_si() + dx(2),
+        x_pred.velocity.x_si() + dx(3),
+        x_pred.velocity.y_si() + dx(4),
+        x_pred.velocity.z_si() + dx(5),
         x_pred.gm.to_m3_s2()
     );
-    result.covariance = P_new;
 
+    result.covariance = (Matrix6d::Identity() - K * H) * P_pred;
     return result;
 }
 

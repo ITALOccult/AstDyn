@@ -146,6 +146,11 @@ public:
     std::shared_ptr<Integrator> get_integrator() const { return integrator_; }
     
     /**
+     * @brief Get the ephemeris provider
+     */
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> get_ephemeris() const { return ephemeris_; }
+    
+    /**
      * @brief Compute accelerations for equations of motion
      * 
      * Computes d²r/dt² from gravitational forces.

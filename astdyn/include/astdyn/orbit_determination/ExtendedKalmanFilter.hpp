@@ -11,6 +11,7 @@
 #include "astdyn/observations/Observation.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
+#include "astdyn/orbit_determination/Residuals.hpp"
 #include <Eigen/Dense>
 
 namespace astdyn::orbit_determination {
@@ -60,6 +61,7 @@ public:
 private:
     std::shared_ptr<propagation::Propagator> propagator_;
     StateTransitionMatrix<core::GCRF> stm_engine_;
+    std::unique_ptr<ResidualCalculator<core::GCRF>> residual_calc_;
     Settings settings_;
 };
 

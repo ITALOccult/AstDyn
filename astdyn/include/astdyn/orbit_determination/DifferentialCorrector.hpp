@@ -9,6 +9,7 @@
 #define ASTDYN_ORBIT_DETERMINATION_DIFFERENTIAL_CORRECTOR_HPP
 
 #include "astdyn/core/Types.hpp"
+#include "astdyn/core/Constants.hpp"
 #include "astdyn/orbit_determination/Residuals.hpp"
 #include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
 #include "astdyn/core/physics_state.hpp"
@@ -22,6 +23,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <algorithm>
 
 namespace astdyn::orbit_determination {
 
@@ -30,7 +32,7 @@ namespace astdyn::orbit_determination {
  */
 struct DifferentialCorrectorSettings {
     int max_iterations = 20;             ///< Maximum iterations
-    double convergence_tolerance = 1e-6; ///< Convergence threshold [AU]
+    double convergence_tolerance = 1e-6; ///< Convergence threshold [AU] (position correction norm)
     double outlier_sigma = 3.0;          ///< Target Sigma threshold (default)
     
     // Carpentry Settings (Iterative Rejection)
@@ -40,6 +42,8 @@ struct DifferentialCorrectorSettings {
     bool reject_outliers = true;         ///< Automatically reject outliers
     bool compute_covariance = true;      ///< Compute covariance matrix
     bool verbose = false;                ///< Print iteration details
+    bool use_line_search = true;         ///< Backtracking line search to prevent divergence
+    double line_search_min_alpha = 1e-4; ///< Minimum step fraction before giving up
 };
 
 /**
@@ -116,6 +120,13 @@ public:
         result.final_state = initial_guess;
         result.converged = false;
         result.iterations = 0;
+        
+        // Ensure observations are sorted by time (structural requirement for sequential propagation)
+        std::vector<observations::OpticalObservation> sorted_obs = observations;
+        std::sort(sorted_obs.begin(), sorted_obs.end(), [](const auto& a, const auto& b) {
+            return a.time < b.time;
+        });
+        
         physics::CartesianStateTyped<Frame> current_state = initial_guess;
         
         if (settings.verbose) {
@@ -128,42 +139,115 @@ public:
         }
         
         double current_sigma = std::max(settings.outlier_sigma, settings.outlier_max_sigma);
-        
+        double prev_iter_rms = std::numeric_limits<double>::max();
+
         for (int iter = 0; iter < settings.max_iterations; ++iter) {
             result.iterations = iter + 1;
             Eigen::VectorXd correction;
             std::vector<ObservationResidual> residuals;
-            
-            bool iter_success = iteration(observations, current_state, correction, residuals);
+
+            bool iter_success = iteration(sorted_obs, current_state, correction, residuals);
             if (!iter_success) break;
             
             if (settings.reject_outliers && iter > 0) {
+                // Carpentry: progressively tighten sigma from max to min
+                double t = static_cast<double>(iter) / std::max(settings.max_iterations - 1, 1);
+                current_sigma = settings.outlier_max_sigma + t * (settings.outlier_min_sigma - settings.outlier_max_sigma);
                 ResidualCalculator<Frame>::identify_outliers(residuals, current_sigma);
             }
             
             auto stats = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
             result.rms_history.push_back(stats.rms_total.to_arcsec());
             result.correction_norm.push_back(correction.norm());
-            
+
+            double cur_rms = stats.rms_total.to_arcsec();
+
+            if (settings.verbose) {
+                std::cout << "  - Iteration " << std::setw(2) << (iter + 1)
+                          << ": RMS = " << std::setw(8) << std::fixed << std::setprecision(3) << cur_rms << "\""
+                          << " (used " << (stats.num_observations - stats.num_outliers) << " obs)" << std::endl;
+                std::cout.flush();
+            }
+
+            // RMS stagnation: if improvement is < 0.001% of previous, declare converged
+            if (iter > 0 && std::isfinite(cur_rms) && std::isfinite(prev_iter_rms) &&
+                prev_iter_rms > 0.0 &&
+                std::abs(prev_iter_rms - cur_rms) < 1e-5 * prev_iter_rms) {
+                result.converged = true;
+                result.final_state = current_state;
+                result.residuals = residuals;
+                result.statistics = stats;
+                if (settings.verbose) std::cout << "  → Converged (RMS stagnated)." << std::endl;
+                break;
+            }
+            prev_iter_rms = cur_rms;
+
             if (iteration_callback_) iteration_callback_(iter + 1, stats);
             
-            // Apply correction (AU -> SI)
-            current_state = physics::CartesianStateTyped<Frame>::from_si(
-                current_state.epoch,
-                current_state.position.x_si() + correction[0] * constants::AU * 1000.0,
-                current_state.position.y_si() + correction[1] * constants::AU * 1000.0,
-                current_state.position.z_si() + correction[2] * constants::AU * 1000.0,
-                current_state.velocity.x_si() + correction[3] * constants::AU * 1000.0 / 86400.0,
-                current_state.velocity.y_si() + correction[4] * constants::AU * 1000.0 / 86400.0,
-                current_state.velocity.z_si() + correction[5] * constants::AU * 1000.0 / 86400.0,
-                current_state.gm.to_m3_s2()
-            );
-            
-            if (check_convergence(correction, settings.convergence_tolerance)) {
+            // Apply correction: design matrix is now in [rad/m], so correction is in (m, m/s).
+            // This matches our SI-based state storage.
+            auto make_trial_state = [&](double alpha) {
+                return physics::CartesianStateTyped<Frame>(
+                    current_state.epoch,
+                    astdyn::math::Vector3<Frame, physics::Distance>::from_si(
+                        current_state.position.x_si() + alpha * correction[0],
+                        current_state.position.y_si() + alpha * correction[1],
+                        current_state.position.z_si() + alpha * correction[2]),
+                    astdyn::math::Vector3<Frame, physics::Velocity>::from_si(
+                        current_state.velocity.x_si() + alpha * correction[3],
+                        current_state.velocity.y_si() + alpha * correction[4],
+                        current_state.velocity.z_si() + alpha * correction[5]),
+                    current_state.gm
+                );
+            };
+
+            if (settings.use_line_search) {
+                double prev_rms = stats.rms_total.to_arcsec();
+                double alpha = 1.0;
+                bool step_accepted = false;
+                while (alpha >= settings.line_search_min_alpha) {
+                    auto trial = make_trial_state(alpha);
+                    auto trial_res = residual_calc_->compute_residuals(sorted_obs, trial);
+                    auto trial_stats = ResidualCalculator<Frame>::compute_statistics(trial_res, 6);
+                    double trial_rms = trial_stats.rms_total.to_arcsec();
+                    if (std::isfinite(trial_rms) && trial_rms < prev_rms) {
+                        current_state = trial;
+                        if (settings.verbose && alpha < 1.0) {
+                            std::cout << "    (line search: alpha=" << std::setprecision(4) << alpha
+                                      << ", rms " << prev_rms << "\" → " << trial_rms << "\")" << std::endl;
+                        }
+                        step_accepted = true;
+                        break;
+                    }
+                    alpha *= 0.5;
+                }
+                if (!step_accepted) {
+                    // Line search couldn't improve RMS — check if correction is negligible
+                    // Tolerance is in AU, so convert to meters
+                    auto tol_dist = physics::Distance::from_au(settings.convergence_tolerance);
+                    if (correction.head<3>().norm() < 10.0 * tol_dist.to_m()) {
+                        result.converged = true;
+                        result.final_state = current_state;
+                        result.residuals = residuals;
+                        result.statistics = stats;
+                        if (settings.verbose) std::cout << "  → Converged (stagnated)." << std::endl;
+                    } else {
+                        if (settings.verbose) std::cout << "  → Line search failed, stopping." << std::endl;
+                    }
+                    break;
+                }
+            } else {
+                current_state = make_trial_state(1.0);
+            }
+
+            // Convergence check: correction is in meters
+            auto tol_dist = physics::Distance::from_au(settings.convergence_tolerance);
+            if (correction.head<3>().norm() < tol_dist.to_m()) {
                  result.converged = true;
                  result.final_state = current_state;
                  result.residuals = residuals;
                  result.statistics = stats;
+                 if (settings.verbose) std::cout << "  → Converged!" << std::endl;
                  break;
             }
             result.final_state = current_state;
@@ -172,7 +256,7 @@ public:
         }
         
         if (settings.compute_covariance && result.converged) {
-            result.covariance = compute_covariance(observations, result.final_state, result.residuals);
+            result.covariance = compute_covariance(sorted_obs, result.final_state, result.residuals);
             result.formal_uncertainties.resize(6);
             for (int i = 0; i < 6; ++i) result.formal_uncertainties[i] = std::sqrt(result.covariance(i, i));
             result.correlation = compute_correlation(result.covariance);
@@ -258,6 +342,9 @@ private:
         result.weights.resize(n_equations);
         
         int row = 0;
+        physics::CartesianStateTyped<Frame> running_state = state;
+        astdyn::Matrix6d cumulative_phi = astdyn::Matrix6d::Identity();
+
         for (size_t idx : result.valid_indices) {
             const auto& obs = observations[idx];
             const auto& res = residuals[idx];
@@ -266,9 +353,27 @@ private:
             
             auto observer_pos = *obs_pos_opt;
             auto obs_time_tdb = astdyn::time::to_tdb(obs.time);
-            auto partials = stm_computer_->compute_with_partials(state, obs_time_tdb, observer_pos);
             
-            Eigen::Matrix<double, 2, 6> A_obs = partials.partial_radec * partials.phi;
+            // Sequential propagation of state and STM (STM comes in AU/Normal units)
+            auto partials = stm_computer_->compute_with_partials(running_state, obs_time_tdb, observer_pos);
+            cumulative_phi = partials.phi * cumulative_phi;
+            running_state = partials.final_state;
+
+            // Transform cumulative_phi (AU-based) to SI-based (meters, m/s)
+            // Phi_si = S * Phi_au * S_inv
+            // where S = diag(AU*1000, ..., (AU*1000)/86400, ...)
+            astdyn::Matrix6d phi_si = cumulative_phi;
+            // dr_si = au_m * dr_au
+            // dv_si = v_scale * dv_au
+            // d(dr_si)/d(dr0_si) = au_m/au_m * d(dr_au)/d(dr0_au) = phi_11 (dimensionless)
+            // d(dr_si)/d(dv0_si) = au_m/v_scale * d(dr_au)/d(dv0_au) = 86400 * phi_12 (seconds)
+            // d(dv_si)/d(dr0_si) = v_scale/au_m * d(dv_au)/d(dr0_au) = 1/86400 * phi_21 (1/seconds)
+            // d(dv_si)/d(dv0_si) = v_scale/v_scale * d(dv_au)/d(dv0_au) = phi_22 (dimensionless)
+            
+            phi_si.block<3, 3>(0, 3) *= 86400.0;
+            phi_si.block<3, 3>(3, 0) /= 86400.0;
+
+            Eigen::Matrix<double, 2, 6> A_obs = partials.partial_radec * phi_si;
             result.A.row(row) = A_obs.row(0);
             result.A.row(row + 1) = A_obs.row(1);
             result.b[row] = res.residual_ra.to_rad();

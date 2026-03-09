@@ -64,8 +64,9 @@ STMResult<Frame> StateTransitionMatrix<Frame>::propagate_with_stm(
     
     Eigen::VectorXd y0(42);
     
-    y0.segment<3>(0) = initial.position.to_eigen_si() / (constants::AU * 1000.0);
-    y0.segment<3>(3) = initial.velocity.to_eigen_si() * 86400.0 / (constants::AU * 1000.0);
+    // Convert to AU/Day for numeric stability during integration
+    y0.segment<3>(0) = initial.position.to_eigen_si() / physics::Distance::from_au(1.0).to_m();
+    y0.segment<3>(3) = initial.velocity.to_eigen_si() * 86400.0 / physics::Distance::from_au(1.0).to_m();
     
     for (int i = 0; i < 6; ++i) {
         for (int j = 0; j < 6; ++j) {
@@ -78,7 +79,6 @@ STMResult<Frame> StateTransitionMatrix<Frame>::propagate_with_stm(
         Eigen::VectorXd state = y.head<6>();
         
         if (y.size() < 42) {
-            // Internal integrator step (like AAS symplectic kick) only needs the state derivatives
             return propagator_->compute_derivatives(t_tdb, state);
         }
 
@@ -106,10 +106,12 @@ STMResult<Frame> StateTransitionMatrix<Frame>::propagate_with_stm(
     Eigen::VectorXd yf = integrator_->integrate(
         f_augmented, y0, initial.epoch.mjd(), target_time.mjd());
     
+    const double au_m = physics::Distance::from_au(1.0).to_m();
+
     auto final_state = physics::CartesianStateTyped<Frame>::from_si(
         target_time,
-        yf[0] * constants::AU * 1000.0, yf[1] * constants::AU * 1000.0, yf[2] * constants::AU * 1000.0,
-        yf[3] * constants::AU * 1000.0 / 86400.0, yf[4] * constants::AU * 1000.0 / 86400.0, yf[5] * constants::AU * 1000.0 / 86400.0,
+        yf[0] * au_m, yf[1] * au_m, yf[2] * au_m,
+        yf[3] * au_m / 86400.0, yf[4] * au_m / 86400.0, yf[5] * au_m / 86400.0,
         initial.gm.to_m3_s2()
     );
     
@@ -128,6 +130,7 @@ astdyn::Matrix6d StateTransitionMatrix<Frame>::compute_jacobian(time::EpochTDB t
     astdyn::Matrix6d A = astdyn::Matrix6d::Zero();
     A.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
     
+    // Numerical differentiation step (diff_step_ is relative or absolute AU)
     const double h = diff_step_;
     Eigen::VectorXd state_plus = state;
     Eigen::VectorXd state_minus = state;
@@ -171,26 +174,34 @@ Eigen::Matrix<double, 2, 6> StateTransitionMatrix<Frame>::compute_observation_pa
     // 1. Must use GCRF for RA/Dec partials
     auto pos_gcrf = coordinates::ReferenceFrame::transform_pos<Frame, core::GCRF>(state.position, state.epoch);
     
-    Eigen::Vector3d rho(pos_gcrf.x_si() - observer_pos.x_si(),
-                        pos_gcrf.y_si() - observer_pos.y_si(),
-                        pos_gcrf.z_si() - observer_pos.z_si());
-    double range = rho.norm();
+    // rho = r_obj - r_obs (Heliocentric vectors in GCRF)
+    Eigen::Vector3d rho_vec(pos_gcrf.x_si() - observer_pos.x_si(),
+                            pos_gcrf.y_si() - observer_pos.y_si(),
+                            pos_gcrf.z_si() - observer_pos.z_si());
     
-    double x = rho[0] / range;
-    double y = rho[1] / range;
-    double z = rho[2] / range;
+    double rho = rho_vec.norm();
+    double rho2 = rho * rho;
+    double rho_xy2 = rho_vec.x() * rho_vec.x() + rho_vec.y() * rho_vec.y();
+    double cos_dec = std::sqrt(rho_xy2) / rho;
+
+    // Handle singularity at poles
+    if (rho_xy2 < 1e-12) rho_xy2 = 1e-12;
+
+    Eigen::Matrix<double, 2, 3> d_radec_d_rho_gcrf;
     
-    double rho_xy2 = x * x + y * y;
-    double sqrt_1mz2 = std::sqrt(1.0 - z * z);
+    // Partially projected RA: d(alpha * cos(dec)) / d(rho)
+    // alpha = atan2(y, x) -> d(alpha)/dx = -y/(x^2+y^2), d(alpha)/dy = x/(x^2+y^2)
+    // d(alpha * cos(dec))/dx = (-y / rho_xy2) * cos(dec)
+    d_radec_d_rho_gcrf(0, 0) = -rho_vec.y() / rho_xy2 * cos_dec;
+    d_radec_d_rho_gcrf(0, 1) =  rho_vec.x() / rho_xy2 * cos_dec;
+    d_radec_d_rho_gcrf(0, 2) =  0.0;
     
-    Eigen::Matrix<double, 2, 3> partial_radec_rho_gcrf;
-    partial_radec_rho_gcrf(0, 0) = -y / (range * rho_xy2);
-    partial_radec_rho_gcrf(0, 1) = x / (range * rho_xy2);
-    partial_radec_rho_gcrf(0, 2) = 0.0;
-    
-    partial_radec_rho_gcrf(1, 0) = -x * z / (range * sqrt_1mz2);
-    partial_radec_rho_gcrf(1, 1) = -y * z / (range * sqrt_1mz2);
-    partial_radec_rho_gcrf(1, 2) = sqrt_1mz2 / range;
+    // Dec: sin(dec) = z/rho -> cos(dec) d(dec) = d(z/rho)
+    // d(dec)/dx = -x*z / (rho^2 * sqrt(rho^2 - z^2))
+    double sqrt_rho2_mz2 = std::max(1e-6, std::sqrt(rho2 - rho_vec.z() * rho_vec.z()));
+    d_radec_d_rho_gcrf(1, 0) = -rho_vec.x() * rho_vec.z() / (rho2 * sqrt_rho2_mz2);
+    d_radec_d_rho_gcrf(1, 1) = -rho_vec.y() * rho_vec.z() / (rho2 * sqrt_rho2_mz2);
+    d_radec_d_rho_gcrf(1, 2) = sqrt_rho2_mz2 / rho2;
     
     // 2. Chain rule: ∂obs/∂x_frame = ∂obs/∂x_gcrf * ∂x_gcrf/∂x_frame
     // ∂x_gcrf/∂x_frame = R (rotation matrix)
@@ -201,14 +212,34 @@ Eigen::Matrix<double, 2, 6> StateTransitionMatrix<Frame>::compute_observation_pa
         rotation = coordinates::ReferenceFrame::get_rotation<Frame, core::GCRF>(state.epoch).to_eigen();
     }
     
-    Eigen::Matrix<double, 2, 3> partial_radec_rho_frame = partial_radec_rho_gcrf * rotation;
+    Eigen::Matrix<double, 2, 3> d_radec_d_pos_frame = d_radec_d_rho_gcrf * rotation;
 
-    Eigen::Matrix<double, 2, 6> partial_radec_state_au;
-    // AU scaling
-    partial_radec_state_au.block<2, 3>(0, 0) = partial_radec_rho_frame * (constants::AU * 1000.0);
-    partial_radec_state_au.block<2, 3>(0, 3).setZero();
+    Eigen::Matrix<double, 2, 6> partial_radec_state_si;
+    // Position partials: [rad/m]
+    partial_radec_state_si.block<2, 3>(0, 0) = d_radec_d_pos_frame;
     
-    return partial_radec_state_au;
+    // Velocity partials: 
+    // The STM 'phi' is [dx_AU/dx0_AU, dx_AU/dv0_AUd, ...]
+    // We need d_radec / dv0_si.
+    // d_radec / dv0_si = (d_radec / dx_si) * (dx_si / dx_AU) * (dx_AU / dv0_AUd) * (dv0_AUd / dv0_si)
+    // dv0_AUd / dv0_si = 86400.0 / (constants::AU * 1000.0)
+    double au_to_m = constants::AU * 1000.0;
+    double v_scale = 86400.0 / au_to_m;
+    
+    // We don't have direct access to velocity partials of RA/Dec (they are zero at epsilon=0),
+    // but the chain rule for the STM velocity part is:
+    // A_vel = (d_radec / dx_si) * (au_to_m * phi_pos_vel) * v_scale 
+    //       = (d_radec / dx_si) * phi_pos_vel * 86400.0
+    // Actually, when we multiply A * Phi later in DifferentialCorrector,
+    // we just need to ensure A is consistent.
+    
+    // Let's simplify: DifferentialCorrector does: A_obs = partials.partial_radec * cumulative_phi;
+    // If we want correction in SI:
+    // partial_radec_state_si should be [ d_radec/dx_si, d_radec/dv_si ] at time t.
+    // Since RA/Dec only depends on position: d_radec/dv_si = 0.
+    partial_radec_state_si.block<2, 3>(0, 3).setZero();
+    
+    return partial_radec_state_si;
 }
 
 // Explicit instantiations

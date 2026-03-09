@@ -4,10 +4,13 @@
  */
 
 #include "astdyn/io/SPKReader.hpp"
+#include <vector>
+#include <fstream>
 #include <iostream>
-#include <algorithm>
-#include <stdexcept>
 #include <cstring>
+#include <algorithm>
+#include <unordered_set>
+#include <stdexcept>
 #include <cmath>
 
 namespace astdyn::io {
@@ -92,6 +95,7 @@ void SPKReader::readHeader() {
 void SPKReader::loadIndex() {
     file_.seekg(0, std::ios::beg);
     std::vector<char> record(RECORD_SIZE);
+    std::unordered_set<int> seen_ids;
     file_.read(record.data(), RECORD_SIZE);
     
     // DAF Record 1 layout checks
@@ -106,7 +110,7 @@ void SPKReader::loadIndex() {
     
     while (current_rec > 0) {
         seekToRecord(current_rec);
-        file_.read(record.data(), RECORD_SIZE);
+        if (!file_.read(record.data(), RECORD_SIZE)) break;
         
         double next_d_ptr, ns_d;
         std::memcpy(&next_d_ptr, record.data(), 8);
@@ -117,16 +121,40 @@ void SPKReader::loadIndex() {
             ns_d = swapEndian(ns_d);
         }
         
-        int next = (int)next_d_ptr;
-        int ns = (int)ns_d;
+        int next = static_cast<int>(next_d_ptr);
+        int ns = static_cast<int>(ns_d);
         
-        // Safety break
-        if (ns > 250 || ns < 0) break; 
+        // Safety check to avoid infinite loops if 'next' is same as current or invalid
+        if (next == current_rec || next < 0) {
+            std::cout << "  [!] SPK Index error: invalid next record " << next << " at current " << current_rec << std::endl;
+            break;
+        }
+
+        if (ns > 250 || ns < 0) {
+            std::cout << "  [!] SPK Index error: invalid NS " << ns << " at current " << current_rec << std::endl;
+            break; 
+        }
+        
+        std::cout << "  - Loading SPK Index record " << current_rec << " (" << ns << " segments)..." << std::endl;
         
         int sum_size = 2 * 8 + 6 * 4; // 40 bytes
         
         for (int i = 0; i < ns; ++i) {
-            int offset = 24 + i * sum_size;
+            // The segment descriptor starts at byte 24 (0-indexed) of the record.
+            // Within each segment descriptor, the 'ints' array starts at byte 16 (0-indexed)
+            // of the descriptor. The body_id is the first int (4 bytes).
+            int body_id_offset_in_record = 24 + i * sum_size + 16; 
+            int target;
+            std::memcpy(&target, record.data() + body_id_offset_in_record, 4);
+            if (big_endian_ != isSystemBigEndian()) target = swapEndian(target);
+            
+            // Log once per unique ID if possible or just print
+            if (seen_ids.find(target) == seen_ids.end()) {
+                std::cout << "    [SPK] Found body ID: " << target << std::endl;
+                seen_ids.insert(target);
+            }
+
+            int offset = 24 + i * sum_size; // Original offset for start_et
             
             double start_et, end_et;
             std::memcpy(&start_et, record.data() + offset, 8);

@@ -306,4 +306,18 @@ void AstDynEngine::export_orbit(const std::string& filename, const std::string& 
     // (Implementation omitted)
 }
 
+double AstDynEngine::shadow_hamiltonian_drift() const {
+    if (propagator_) {
+        return propagator_->statistics().shadow_hamiltonian_drift;
+    }
+    return 0.0;
+}
+
+long AstDynEngine::total_force_evaluations() const {
+    if (propagator_) {
+        return static_cast<long>(propagator_->statistics().num_function_evals);
+    }
+    return 0;
+}
+
 } // namespace astdyn

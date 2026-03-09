@@ -35,34 +35,47 @@ void PlanetaryEphemeris::setProvider(std::shared_ptr<EphemerisProvider> provider
 }
 
 math::Vector3<core::GCRF, physics::Distance> PlanetaryEphemeris::getPosition(CelestialBody body, time::EpochTDB t) {
-    if (global_provider_ && global_provider_->isAvailable()) {
-        return global_provider_->getPosition(body, t);
-    }
-
     if (body == CelestialBody::SUN) return math::Vector3<core::GCRF, physics::Distance>::from_si(0.0, 0.0, 0.0);
+
+    if (global_provider_ && global_provider_->isAvailable()) {
+        auto p_bary = global_provider_->getPosition(body, t);
+        auto s_bary = global_provider_->getPosition(CelestialBody::SUN, t);
+        return math::Vector3<core::GCRF, physics::Distance>::from_si(
+            p_bary.x_si() - s_bary.x_si(),
+            p_bary.y_si() - s_bary.y_si(),
+            p_bary.z_si() - s_bary.z_si()
+        );
+    }
     
     throw std::runtime_error("PlanetaryEphemeris: Analytical VSOP87 fallback is DEPRECATED and DISABLED. "
                              "Please use PlanetaryEphemeris::setProvider() to initialize a high-precision source (e.g. DE441).");
 }
 
 math::Vector3<core::GCRF, physics::Velocity> PlanetaryEphemeris::getVelocity(CelestialBody body, time::EpochTDB t) {
-    if (global_provider_ && global_provider_->isAvailable()) {
-        return global_provider_->getVelocity(body, t);
-    }
-
     if (body == CelestialBody::SUN) return math::Vector3<core::GCRF, physics::Velocity>::from_si(0.0, 0.0, 0.0);
+
+    if (global_provider_ && global_provider_->isAvailable()) {
+        auto v_bary = global_provider_->getVelocity(body, t);
+        auto vs_bary = global_provider_->getVelocity(CelestialBody::SUN, t);
+        return math::Vector3<core::GCRF, physics::Velocity>::from_si(
+            v_bary.x_si() - vs_bary.x_si(),
+            v_bary.y_si() - vs_bary.y_si(),
+            v_bary.z_si() - vs_bary.z_si()
+        );
+    }
     
     throw std::runtime_error("PlanetaryEphemeris: Analytical VSOP87 fallback is DEPRECATED and DISABLED.");
 }
 
 CartesianState PlanetaryEphemeris::getState(CelestialBody body, time::EpochTDB t) {
-    if (global_provider_ && global_provider_->isAvailable()) {
-        // Use provider's getState() directly — avoids two separate SPK reads.
-        auto sv = global_provider_->getState(body, t);
-        return CartesianState(sv.head<3>() / 1000.0, sv.tail<3>() / 1000.0);
-    }
-
     if (body == CelestialBody::SUN) return CartesianState(Vector3d::Zero(), Vector3d::Zero());
+
+    if (global_provider_ && global_provider_->isAvailable()) {
+        auto sv = global_provider_->getState(body, t);
+        auto ss = global_provider_->getState(CelestialBody::SUN, t);
+        return CartesianState((sv.head<3>() - ss.head<3>()) / 1000.0, 
+                             (sv.tail<3>() - ss.tail<3>()) / 1000.0);
+    }
 
     throw std::runtime_error("PlanetaryEphemeris: no provider set. Call setProvider() first.");
 }
