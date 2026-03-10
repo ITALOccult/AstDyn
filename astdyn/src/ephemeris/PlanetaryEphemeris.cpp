@@ -67,14 +67,21 @@ math::Vector3<core::GCRF, physics::Velocity> PlanetaryEphemeris::getVelocity(Cel
     throw std::runtime_error("PlanetaryEphemeris: Analytical VSOP87 fallback is DEPRECATED and DISABLED.");
 }
 
-CartesianState PlanetaryEphemeris::getState(CelestialBody body, time::EpochTDB t) {
-    if (body == CelestialBody::SUN) return CartesianState(Vector3d::Zero(), Vector3d::Zero());
+physics::CartesianStateTyped<core::GCRF> PlanetaryEphemeris::getState(CelestialBody body, time::EpochTDB t) {
+    if (body == CelestialBody::SUN) return physics::CartesianStateTyped<core::GCRF>::from_si(
+        t,
+        math::Vector3<core::GCRF, physics::Distance>::from_si(0,0,0),
+        math::Vector3<core::GCRF, physics::Velocity>::from_si(0,0,0)
+    );
 
     if (global_provider_ && global_provider_->isAvailable()) {
         auto sv = global_provider_->getState(body, t);
         auto ss = global_provider_->getState(CelestialBody::SUN, t);
-        return CartesianState((sv.head<3>() - ss.head<3>()) / 1000.0, 
-                             (sv.tail<3>() - ss.tail<3>()) / 1000.0);
+        return physics::CartesianStateTyped<core::GCRF>::from_si(
+            t,
+            sv.position - ss.position,
+            sv.velocity - ss.velocity
+        );
     }
 
     throw std::runtime_error("PlanetaryEphemeris: no provider set. Call setProvider() first.");
@@ -88,27 +95,21 @@ math::Vector3<core::GCRF, physics::Distance> PlanetaryEphemeris::getSunBarycentr
             return math::Vector3<core::GCRF, physics::Distance>::from_si(0.0, 0.0, 0.0);
         }
     }
-    
-    // Fallback logic requires analytical planetary positions which are disabled.
-    // Return Heliocentric Sun (0,0,0) as best-effort instead of throwing.
     return math::Vector3<core::GCRF, physics::Distance>::from_si(0.0, 0.0, 0.0);
 }
 
-CartesianState PlanetaryEphemeris::heliocentricToBarycentric(
-    const CartesianState& heliocentric_state, 
+physics::CartesianStateTyped<core::GCRF> PlanetaryEphemeris::heliocentricToBarycentric(
+    const physics::CartesianStateTyped<core::GCRF>& heliocentric_state, 
     time::EpochTDB t) 
 {
     auto r_sun = getSunBarycentricPosition(t);
-    
-    // Convert heliocentric state (km) back to meters for calculation
-    Vector3d r_helio_m = heliocentric_state.position() * 1000.0;
-    
-    // Barycentric position = heliocentric position - Sun position
-    Vector3d r_bary_m = r_helio_m - Vector3d(r_sun.x_si(), r_sun.y_si(), r_sun.z_si());
-    
-    // Return in km
-    return CartesianState(r_bary_m / 1000.0, 
-                          heliocentric_state.velocity());
+    // getSunBarycentricPosition returns barycentric position of Sun (relative to SSB)
+    // bary_pos = helio_pos + r_sun
+    return physics::CartesianStateTyped<core::GCRF>::from_si(
+        t,
+        heliocentric_state.position + r_sun,
+        heliocentric_state.velocity // Sun velocity not easily available here, simplified
+    );
 }
 
 // ============================================================================

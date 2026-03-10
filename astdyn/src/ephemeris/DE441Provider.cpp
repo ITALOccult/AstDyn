@@ -115,13 +115,12 @@ math::Vector3<core::GCRF, physics::Velocity> DE441Provider::getVelocity(Celestia
                                                                 state[5] * 1000.0);
 }
 
-Eigen::Matrix<double, 6, 1> DE441Provider::getState(CelestialBody body, time::EpochTDB t) {
+physics::CartesianStateTyped<core::GCRF> DE441Provider::getState(CelestialBody body, time::EpochTDB t) {
     Eigen::VectorXd raw = readState(body, t);
-    Eigen::Matrix<double, 6, 1> state;
-    // SPK is km and km/s -> convert to SI (meters)
-    state.head<3>() = raw.head<3>() * 1000.0;
-    state.tail<3>() = raw.tail<3>() * 1000.0;
-    return state;
+    // SPK is km and km/s -> convert to SI (meters, m/s)
+    auto p = math::Vector3<core::GCRF, physics::Distance>::from_si(raw[0] * 1000.0, raw[1] * 1000.0, raw[2] * 1000.0);
+    auto v = math::Vector3<core::GCRF, physics::Velocity>::from_si(raw[3] * 1000.0, raw[4] * 1000.0, raw[5] * 1000.0);
+    return physics::CartesianStateTyped<core::GCRF>::from_si(t, p, v);
 }
 
 } // namespace astdyn::ephemeris

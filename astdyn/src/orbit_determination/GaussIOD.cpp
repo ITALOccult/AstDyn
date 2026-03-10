@@ -10,6 +10,7 @@
 #include "astdyn/coordinates/KeplerianElements.hpp"
 #include "astdyn/time/TimeScale.hpp"
 #include "astdyn/orbit_determination/Residuals.hpp"
+#include "astdyn/observations/ObservatoryDatabase.hpp"
 #include <cmath>
 #include <iostream>
 #include <algorithm>
@@ -102,31 +103,49 @@ GaussIODResult GaussIOD::compute_from_three(
     result.epoch = t2_tdb;
     // result.state is CartesianStateTyped<core::GCRF>, it will be initialized later via from_si
     
-    // Get Earth positions (getState returns km and km/s)
+    // Get Earth position at each observation time (Heliocentric)
     auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t1_tdb);
     auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t2_tdb);
     auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t3_tdb);
+
+    // Apply topocentric correction: add the observatory displacement from Earth's
+    // center to each observer position vector. Without this, the IOD uses the
+    // geocenter (~6371 km error), which causes ~100 arcsec angular errors for
+    // close-approach NEOs.
+    math::Vector3<core::GCRF, physics::Distance> R1 = earth1.position;
+    math::Vector3<core::GCRF, physics::Distance> R2 = earth2.position;
+    math::Vector3<core::GCRF, physics::Distance> R3 = earth3.position;
+
+    const auto& obs_db = observations::ObservatoryDatabase::getInstance();
+    if (auto info1 = obs_db.getObservatory(obs1.observatory_code)) {
+        auto topo = info1->getPositionGCRF(obs1.time);
+        R1 = R1 + math::Vector3<core::GCRF, physics::Distance>::from_si(topo.x_si(), topo.y_si(), topo.z_si());
+    }
+    if (auto info2 = obs_db.getObservatory(obs2.observatory_code)) {
+        auto topo = info2->getPositionGCRF(obs2.time);
+        R2 = R2 + math::Vector3<core::GCRF, physics::Distance>::from_si(topo.x_si(), topo.y_si(), topo.z_si());
+    }
+    if (auto info3 = obs_db.getObservatory(obs3.observatory_code)) {
+        auto topo = info3->getPositionGCRF(obs3.time);
+        R3 = R3 + math::Vector3<core::GCRF, physics::Distance>::from_si(topo.x_si(), topo.y_si(), topo.z_si());
+    }
     
-    // Convert using typed methods
-    math::Vector3<core::GCRF, physics::Distance> R1 = math::Vector3<core::GCRF, physics::Distance>::from_si(
-          physics::Distance::from_km(earth1.position().x()).to_m(),
-          physics::Distance::from_km(earth1.position().y()).to_m(),
-          physics::Distance::from_km(earth1.position().z()).to_m());
-          
-    math::Vector3<core::GCRF, physics::Distance> R2 = math::Vector3<core::GCRF, physics::Distance>::from_si(
-          physics::Distance::from_km(earth2.position().x()).to_m(),
-          physics::Distance::from_km(earth2.position().y()).to_m(),
-          physics::Distance::from_km(earth2.position().z()).to_m());
-          
-    math::Vector3<core::GCRF, physics::Distance> R3 = math::Vector3<core::GCRF, physics::Distance>::from_si(
-          physics::Distance::from_km(earth3.position().x()).to_m(),
-          physics::Distance::from_km(earth3.position().y()).to_m(),
-          physics::Distance::from_km(earth3.position().z()).to_m());
+    if (settings_.verbose) {
+        std::cout << "  [DEBUG] R1: " << R1.x_si()/1.495978707e11 << ", " << R1.y_si()/1.495978707e11 << ", " << R1.z_si()/1.495978707e11 << " AU" << std::endl;
+        std::cout << "  [DEBUG] R2: " << R2.x_si()/1.495978707e11 << ", " << R2.y_si()/1.495978707e11 << ", " << R2.z_si()/1.495978707e11 << " AU" << std::endl;
+        std::cout << "  [DEBUG] R3: " << R3.x_si()/1.495978707e11 << ", " << R3.y_si()/1.495978707e11 << ", " << R3.z_si()/1.495978707e11 << " AU" << std::endl;
+    }
+
+    // Compute line-of-sight unit vectors (dimensionless)
+    Eigen::Vector3d los1 = compute_line_of_sight(obs1.ra, obs1.dec);
+    Eigen::Vector3d los2 = compute_line_of_sight(obs2.ra, obs2.dec);
+    Eigen::Vector3d los3 = compute_line_of_sight(obs3.ra, obs3.dec);
     
-    // Compute line-of-sight unit vectors
-    auto los1 = compute_line_of_sight(obs1.ra, obs1.dec);
-    auto los2 = compute_line_of_sight(obs2.ra, obs2.dec);
-    auto los3 = compute_line_of_sight(obs3.ra, obs3.dec);
+    if (settings_.verbose) {
+        std::cout << "  [DEBUG] L1: " << los1.transpose() << std::endl;
+        std::cout << "  [DEBUG] L2: " << los2.transpose() << std::endl;
+        std::cout << "  [DEBUG] L3: " << los3.transpose() << std::endl;
+    }
     
     // Solve for slant ranges (in AU)
     double rho1, rho2, rho3;
@@ -145,18 +164,35 @@ GaussIODResult GaussIOD::compute_from_three(
     result.iterations = iterations;
 
     // Use physics::Distance for radius vectors
-    auto radius1 = R1 + (los1 * physics::Distance::from_au(rho1).to_m());
-    auto radius2 = R2 + (los2 * physics::Distance::from_au(rho2).to_m());
-    auto radius3 = R3 + (los3 * physics::Distance::from_au(rho3).to_m());
+    double d1 = physics::Distance::from_au(rho1).to_m();
+    double d2 = physics::Distance::from_au(rho2).to_m();
+    double d3 = physics::Distance::from_au(rho3).to_m();
     
-    // Estimate velocity: v = dr/dt [m/s]
-    auto v2_vec = (radius3 - radius1) / (tau * 86400.0);
+    auto radius1 = R1 + math::Vector3<core::GCRF, physics::Distance>::from_si(los1.x() * d1, los1.y() * d1, los1.z() * d1);
+    auto radius2 = R2 + math::Vector3<core::GCRF, physics::Distance>::from_si(los2.x() * d2, los2.y() * d2, los2.z() * d2);
+    auto radius3 = R3 + math::Vector3<core::GCRF, physics::Distance>::from_si(los3.x() * d3, los3.y() * d3, los3.z() * d3);
     
-    result.state = physics::CartesianStateTyped<core::GCRF>(
+    // Estimate velocity: v2 = (f1*r3 - f3*r1) / (g1*f3 - g3*f1) [m/s]
+    // Use the values from the last iteration for best accuracy
+    double r2_mag_au = radius2.norm().to_au();
+    double mu_au = settings_.mu.to_au3_d2();
+    double u = mu_au / (r2_mag_au * r2_mag_au * r2_mag_au);
+    
+    double f1 = 1.0 - 0.5 * u * tau1 * tau1;
+    double g1 = tau1 - (1.0/6.0) * u * tau1 * tau1 * tau1;
+    double f3 = 1.0 - 0.5 * u * tau3 * tau3;
+    double g3 = tau3 - (1.0/6.0) * u * tau3 * tau3 * tau3;
+
+    double det = f1 * g3 - f3 * g1;
+    // Current radius1, radius3 are math::Vector3<GCRF, Distance> (m)
+    // Velocities must be in m per SECOND
+    auto v2_vec = (radius3 * f1 - radius1 * f3) / (det * 86400.0);
+    
+    result.state = physics::CartesianStateTyped<core::GCRF>::from_si(
         t2_tdb,
-        radius2,
-        astdyn::math::Vector3<core::GCRF, physics::Velocity>::from_si(v2_vec.x_si(), v2_vec.y_si(), v2_vec.z_si()),
-        physics::GravitationalParameter::sun()
+        radius2.x_si(), radius2.y_si(), radius2.z_si(),
+        v2_vec.x_si(), v2_vec.y_si(), v2_vec.z_si(),
+        physics::GravitationalParameter::sun().to_m3_s2()
     );
     result.success = true;
     
@@ -210,10 +246,10 @@ std::optional<std::array<int, 3>> GaussIOD::select_observations(
     return std::nullopt;
 }
 
-math::Vector3<core::GCRF, physics::Distance> GaussIOD::compute_line_of_sight(astrometry::RightAscension ra, astrometry::Declination dec) const {
+Eigen::Vector3d GaussIOD::compute_line_of_sight(astrometry::RightAscension ra, astrometry::Declination dec) const {
     double r = ra.to_rad();
     double d = dec.to_rad();
-    return math::Vector3<core::GCRF, physics::Distance>::from_si(
+    return Eigen::Vector3d(
         std::cos(d) * std::cos(r),
         std::cos(d) * std::sin(r),
         std::sin(d)
@@ -222,9 +258,9 @@ math::Vector3<core::GCRF, physics::Distance> GaussIOD::compute_line_of_sight(ast
 
 bool GaussIOD::solve_slant_ranges(
     double tau1, double tau3,
-    const math::Vector3<core::GCRF, physics::Distance>& los1, 
-    const math::Vector3<core::GCRF, physics::Distance>& los2, 
-    const math::Vector3<core::GCRF, physics::Distance>& los3,
+    const Eigen::Vector3d& l1, 
+    const Eigen::Vector3d& l2, 
+    const Eigen::Vector3d& l3,
     const math::Vector3<core::GCRF, physics::Distance>& R1, 
     const math::Vector3<core::GCRF, physics::Distance>& R2, 
     const math::Vector3<core::GCRF, physics::Distance>& R3,
@@ -232,10 +268,7 @@ bool GaussIOD::solve_slant_ranges(
     int& iterations) {
     
     // Everything here in AU for classical Gauss math
-    double au_m = constants::AU_TO_KM * 1000.0;
-    auto l1 = los1.to_eigen_si();
-    auto l2 = los2.to_eigen_si();
-    auto l3 = los3.to_eigen_si();
+    double au_m = physics::Distance::from_au(1.0).to_m();
     auto r1_au = R1.to_eigen_si() / au_m;
     auto r2_au = R2.to_eigen_si() / au_m;
     auto r3_au = R3.to_eigen_si() / au_m;
@@ -263,7 +296,8 @@ bool GaussIOD::solve_slant_ranges(
         double r2_mag = r2_vec.norm();
         if (r2_mag < 0.01) return false;
 
-        double u = GMS / (r2_mag * r2_mag * r2_mag);
+        double mu_au = settings_.mu.to_au3_d2();
+        double u = mu_au / (r2_mag * r2_mag * r2_mag);
         double f1 = 1.0 - 0.5 * u * tau1 * tau1;
         double g1 = tau1 - (1.0/6.0) * u * tau1 * tau1 * tau1;
         double f3 = 1.0 - 0.5 * u * tau3 * tau3;
@@ -279,14 +313,16 @@ bool GaussIOD::solve_slant_ranges(
         // rho1: c1*rho1 = det([b|-l2|l3]) / (-D0) = (D21 - c1*D11 - c3*D31) / D0
         // rho2:    rho2 = det([l1|b|l3])  / (-D0) = (D22 - c1*D12 - c3*D32) / D0
         // rho3: c3*rho3 = det([l1|-l2|b]) / (-D0) = (D23 - c1*D13 - c3*D33) / D0
+        if (std::abs(c1) < 1e-15 || std::abs(c3) < 1e-15) return false;
+
         double rho1_new = (D21 - c1 * D11 - c3 * D31) / (c1 * D0);
-        double rho2_new = (-c1 * D12 + D22 - c3 * D32) / D0;
+        double rho2_new = (c1 * D12 - D22 + c3 * D32) / D0;
         double rho3_new = (D23 - c1 * D13 - c3 * D33) / (c3 * D0);
 
         double delta = std::abs(rho2_new - rho2);
         rho1 = rho1_new; rho2 = rho2_new; rho3 = rho3_new;
 
-        if (delta < settings_.tolerance) {
+        if (delta < settings_.tolerance.to_au()) {
             // Only reject unphysical solutions after convergence
             if (rho1 < 0 || rho2 < 0 || rho3 < 0) return false;
             return true;

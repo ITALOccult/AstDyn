@@ -17,72 +17,74 @@ LeastSquaresFitter::LeastSquaresFitter() {}
 
 Eigen::MatrixXd LeastSquaresFitter::build_design_matrix(
     const std::vector<ObservationResidual>& residuals,
-    const Eigen::Vector<double, 6>& state,
+    const physics::CartesianStateTyped<core::GCRF>& state,
     time::EpochTDB epoch,
     STMFunction stm_func
 ) {
-    // Design matrix A: each observation contributes 2 rows (RA, Dec)
     int n_obs = residuals.size();
     Eigen::MatrixXd A(2 * n_obs, 6);
     
-    // For each observation, compute: A_i = (∂ρ/∂x) × Φ(t_i, t_0)
-    // where ∂ρ/∂x is partial of RA/Dec w.r.t. state at obs time
-    // and Φ is STM from epoch to obs time
-    
-    // State is already in Equatorial Frame (Standard for Propagator)
-    // We compute partial derivatives of RA/Dec w.r.t Equatorial State.
-    
-    constexpr double rad_to_arcsec = 206265.04606;
-
     for (int i = 0; i < n_obs; ++i) {
-        time::EpochTDB t_obs = astdyn::time::to_tdb(residuals[i].time);
+        const auto& res = residuals[i];
+        time::EpochTDB t_obs = astdyn::time::to_tdb(res.time);
         
         // Get STM from epoch to observation time
         auto [state_at_obs, stm] = stm_func(state, epoch, t_obs);
         
-        // Calculate Topocentric position if possible? 
-        // For partial derivatives, using Heliocentric/Barycentric State at obs time 
-        // is the standard approximation for the design matrix (H matrix).
-        // The residuals themselves (O-C) MUST use topocentric, but H can be geocentric/heliocentric approximate.
+        // MUST use topocentric vector for RA/Dec partials!
+        // We can reconstruct it from range and computed angles in the residual
+        double cra = std::cos(res.computed_ra.to_rad());
+        double sra = std::sin(res.computed_ra.to_rad());
+        double cdc = std::cos(res.computed_dec.to_rad());
+        double sdc = std::sin(res.computed_dec.to_rad());
+        double rho = res.range.to_m();
         
-        // state_at_obs is [x, y, z, vx, vy, vz] in Equatorial Frame
-        Eigen::Vector3d r = state_at_obs.template head<3>();
+        double x_topo = rho * cdc * cra;
+        double y_topo = rho * cdc * sra;
+        double z_topo = rho * sdc;
         
-        double x = r(0), y = r(1), z = r(2);
-        double r_norm = r.norm();
-        double rho_xy = std::sqrt(x*x + y*y);
+        double rho_xy2 = x_topo * x_topo + y_topo * y_topo;
+        double rho2 = rho * rho;
         
-        // ∂RA/∂r (Equatorial)
-        Eigen::Vector3d dRA_dr; 
-        if (rho_xy > 1e-10) {
-            dRA_dr(0) = -y / (rho_xy * rho_xy);
-            dRA_dr(1) =  x / (rho_xy * rho_xy);
-            dRA_dr(2) =  0.0;
+        // ∂RA/∂r (rad/m) projected: ∂(RA*cos(dec))/∂r
+        Eigen::Vector3d dRA_drho; 
+        if (rho_xy2 > 1e-6) { 
+            // The residual is projected: res_ra = delta_ra * cos(dec)
+            // So the design matrix must also be projected to match.
+            dRA_drho(0) = (-y_topo / rho_xy2) * cdc;
+            dRA_drho(1) = ( x_topo / rho_xy2) * cdc;
+            dRA_drho(2) =  0.0;
         } else {
-            dRA_dr.setZero();
+            dRA_drho.setZero();
         }
         
-        // ∂Dec/∂r (Equatorial)
-        Eigen::Vector3d dDec_dr;
-        if (r_norm > 1e-10) {
-            dDec_dr(0) = -x * z / (r_norm * r_norm * rho_xy);
-            dDec_dr(1) = -y * z / (r_norm * r_norm * rho_xy);
-            dDec_dr(2) =  rho_xy / (r_norm * r_norm);
+        // ∂Dec/∂r (rad/m)
+        Eigen::Vector3d dDec_drho;
+        double rho_xy = std::sqrt(rho_xy2);
+        if (rho2 > 1e-6 && rho_xy > 1e-6) {
+            dDec_drho(0) = -x_topo * z_topo / (rho2 * rho_xy);
+            dDec_drho(1) = -y_topo * z_topo / (rho2 * rho_xy);
+            dDec_drho(2) =  rho_xy / rho2;
         } else {
-            dDec_dr.setZero();
+            dDec_drho.setZero();
         }
         
-        // Convert radian gradients to arcsec gradients
-        dRA_dr *= rad_to_arcsec;
-        dDec_dr *= rad_to_arcsec;
-        
-        // Design matrix row H_i = [dRA/dr, 0_v]
+        // Design matrix row H_i = [dRA/drho, 0_v]
         Eigen::Matrix<double, 2, 6> dRho_dx_state;
-        dRho_dx_state.row(0) << dRA_dr.transpose(), 0, 0, 0;   // ∂RA/∂x
-        dRho_dx_state.row(1) << dDec_dr.transpose(), 0, 0, 0;  // ∂Dec/∂x
+        dRho_dx_state.row(0) << dRA_drho.transpose(), 0, 0, 0;
+        dRho_dx_state.row(1) << dDec_drho.transpose(), 0, 0, 0;
+
+        // Normalization: STM comes from integrator in AU/days. 
+        // Convert to SI (m, m/s).
+        astdyn::Matrix6d phi_si = stm;
+        const double au_m = physics::Distance::from_au(1.0).to_m();
+        const double aud_ms = physics::Velocity::from_au_d(1.0).to_ms();
         
-        // Map to initial epoch: A_i = H_i * STM
-        Eigen::Matrix<double, 2, 6> A_i = dRho_dx_state * stm;
+        phi_si.block<3, 3>(0, 3) *= (au_m / aud_ms);
+        phi_si.block<3, 3>(3, 0) *= (aud_ms / au_m);
+        
+        // Map to initial epoch: A_i = H_i * STM_si
+        Eigen::Matrix<double, 2, 6> A_i = dRho_dx_state * phi_si;
         
         A.row(2*i) = A_i.row(0);
         A.row(2*i+1) = A_i.row(1);
@@ -95,21 +97,14 @@ Eigen::Vector<double, 6> LeastSquaresFitter::solve_normal_equations(
     const Eigen::MatrixXd& A,
     const Eigen::VectorXd& residuals,
     const Eigen::VectorXd& weights,
-    Eigen::Matrix<double, 6, 6>& covariance
+    astdyn::Matrix6d& covariance
 ) {
-    // Weight matrix W = diag(weights)
     Eigen::MatrixXd W = weights.asDiagonal();
-    
-    // Normal equations: (A^T W A) δx = A^T W Δρ
-    Eigen::Matrix<double, 6, 6> N = A.transpose() * W * A;
+    astdyn::Matrix6d N = A.transpose() * W * A;
     Eigen::Vector<double, 6> b = A.transpose() * W * residuals;
     
-    // Solve using LU decomposition
     Eigen::Vector<double, 6> dx = N.ldlt().solve(b);
-    
-    // Covariance: (A^T W A)^{-1}
     covariance = N.inverse();
-    
     return dx;
 }
 
@@ -127,6 +122,8 @@ int LeastSquaresFitter::reject_outliers(std::vector<ObservationResidual>& residu
             count += 2;
         }
     }
+    
+    if (count == 0) return 0;
     
     double rms = std::sqrt(sum_sq / count);
     
@@ -168,10 +165,13 @@ void LeastSquaresFitter::compute_statistics(
     double sum_dec_sq = 0.0;
     int count = 0;
     
+    result.chi_squared = 0.0;
     for (const auto& res : residuals) {
         if (!res.outlier) {
             sum_ra_sq += res.residual_ra.to_arcsec() * res.residual_ra.to_arcsec();
             sum_dec_sq += res.residual_dec.to_arcsec() * res.residual_dec.to_arcsec();
+            // Chi-squared is sum of normalized residuals squared
+            result.chi_squared += res.chi_squared;
             count++;
         }
     }
@@ -184,17 +184,21 @@ void LeastSquaresFitter::compute_statistics(
         result.rms_ra_arcsec = std::sqrt(sum_ra_sq / count);
         result.rms_dec_arcsec = std::sqrt(sum_dec_sq / count);
         result.rms_total_arcsec = std::sqrt((sum_ra_sq + sum_dec_sq) / (2 * count));
+        
+        // Reduced chi-squared
+        if (2 * count > 6) {
+           result.chi_squared /= (2 * count - 6);
+        }
     } else {
         result.rms_ra_arcsec = 0.0;
         result.rms_dec_arcsec = 0.0;
         result.rms_total_arcsec = 0.0;
+        result.chi_squared = 0.0;
     }
-    
-    result.chi_squared = (sum_ra_sq + sum_dec_sq) / (2 * count - 6);  // DOF = 2*n - 6
 }
 
 FitResult LeastSquaresFitter::fit(
-    const Eigen::Vector<double, 6>& initial_state,
+    const physics::CartesianStateTyped<core::GCRF>& initial_state,
     time::EpochTDB epoch,
     ResidualFunction residual_func,
     STMFunction stm_func
@@ -204,49 +208,42 @@ FitResult LeastSquaresFitter::fit(
     result.converged = false;
     result.num_iterations = 0;
     
-    // Helper to calc RMS
     auto calc_rms = [](const std::vector<ObservationResidual>& res) -> double {
         double sum = 0.0;
         int count = 0;
         for (const auto& r : res) {
             if (!r.outlier) {
-                sum += r.residual_ra.to_arcsec() * r.residual_ra.to_arcsec() + 
-                       r.residual_dec.to_arcsec() * r.residual_dec.to_arcsec();
+                sum += std::pow(r.residual_ra.to_arcsec(), 2) + 
+                       std::pow(r.residual_dec.to_arcsec(), 2);
                 count += 2;
             }
         }
         return (count > 0) ? std::sqrt(sum / count) : 0.0;
     };
 
-    // Initial residuals
     auto current_residuals = residual_func(result.state, epoch);
     double current_rms = calc_rms(current_residuals);
     
     for (int iter = 0; iter < max_iterations_; ++iter) {
         result.num_iterations = iter + 1;
         
-        // Outlier Rejection (on accepted state)
         if (iter > 0) {
             reject_outliers(current_residuals);
-            // Re-calc RMS after rejection might change "current_rms", but let's keep it consistent
             current_rms = calc_rms(current_residuals); 
         }
         
-        // Build Design Matrix (A) and Normal Equations
         auto A = build_design_matrix(current_residuals, result.state, epoch, stm_func);
         
-        // Pack residuals
         int n_obs = current_residuals.size();
         Eigen::VectorXd res_vec(2 * n_obs);
         Eigen::VectorXd weights(2 * n_obs);
         
         for (int i = 0; i < n_obs; ++i) {
             if (!current_residuals[i].outlier) {
-                // IMPORTANT: Normal Equation is A^T * W * (y - y_model)
-                // residuals vector here contains (Observed - Computed) = y - f(x)
-                res_vec(2*i) = current_residuals[i].residual_ra.to_arcsec();
-                res_vec(2*i+1) = current_residuals[i].residual_dec.to_arcsec();
-                weights(2*i) = current_residuals[i].weight_ra;
+                // IMPORTANT: A is in [rad/m], so res_vec MUST be in [rad]
+                res_vec(2*i) = current_residuals[i].residual_ra.to_rad();
+                res_vec(2*i+1) = current_residuals[i].residual_dec.to_rad();
+                weights(2*i) = current_residuals[i].weight_ra; // weight is in 1/rad^2 ? check Residuals.hpp
                 weights(2*i+1) = current_residuals[i].weight_dec;
             } else {
                 res_vec(2*i) = 0; res_vec(2*i+1) = 0;
@@ -254,75 +251,52 @@ FitResult LeastSquaresFitter::fit(
             }
         }
         
-        // Solve for full step dx
+        // Solve for dx in SI (m, m/s)
         Eigen::Vector<double, 6> dx_full = solve_normal_equations(A, res_vec, weights, result.covariance);
         
-        // Safety: Limit step size to avoid divergence (Trust Region)
-        // Especially for position components [0,1,2] (AU)
-        double pos_step_norm = dx_full.template head<3>().norm();
-        constexpr double MAX_STEP_AU = 0.1; // Max 0.1 AU correction per step
-        
-        if (pos_step_norm > MAX_STEP_AU) {
-            double scale_factor = MAX_STEP_AU / pos_step_norm;
-            dx_full *= scale_factor;
-            // std::cout << "Step limited: " << pos_step_norm << " AU -> " << MAX_STEP_AU << " AU\n";
-        }
-        
-        // --- LINE SEARCH (Step Halving) ---
+        // --- LINE SEARCH ---
         double scale = 1.0;
         bool step_accepted = false;
-        Eigen::Vector<double, 6> candidate_state;
+        physics::CartesianStateTyped<core::GCRF> candidate_state;
         std::vector<ObservationResidual> candidate_residuals;
         double candidate_rms = 0.0;
 
-        // Try reducing step size: 1.0, 0.5, 0.25 ... 
         for (int k = 0; k < 8; ++k) { 
-            candidate_state = result.state + dx_full * scale;
+            Eigen::Vector<double, 6> candidate_vec = result.state.to_eigen_si();
+            candidate_vec.head<6>() += dx_full * scale;
+
+            candidate_state = physics::CartesianStateTyped<core::GCRF>::from_si(
+                result.state.epoch,
+                candidate_vec[0], candidate_vec[1], candidate_vec[2],
+                candidate_vec[3], candidate_vec[4], candidate_vec[5],
+                result.state.gm.to_m3_s2()
+            );
             
-            // Compute residuals at candidate
             candidate_residuals = residual_func(candidate_state, epoch);
-            
-            // Apply SAME rejection mask as baseline to compare apples to apples?
-            // Or re-eval rejection? Usually re-eval happens next iter.
-            // Let's assume rejection mask is fixed for the step calculation.
             for(size_t i=0; i<candidate_residuals.size(); ++i) {
                 candidate_residuals[i].outlier = current_residuals[i].outlier;
             }
             
             candidate_rms = calc_rms(candidate_residuals);
-            
             if (candidate_rms < current_rms) {
-                // Improvement found!
                 step_accepted = true;
                 break;
             }
-            
-            // If RMS increased (or is NaN), reduce step
             scale *= 0.5;
         }
         
-        // If even small step fails, check if we are already precise enough
         if (!step_accepted) {
             if (dx_full.norm() < tolerance_) {
-                // Actually converged locally
                 result.converged = true;
                 break;
-            } else {
-                // Stuck in local minimum or divergence
-                // Accept the smallest step anyway? Or stop? 
-                // Let's accept smallest step to see if it escapes next time, or break.
-                // Usually break.
-                // std::cerr << "Line search failed. Stopping.\n";
-                break;
             }
+            break;
         }
         
-        // Apply Step
         result.state = candidate_state;
         current_residuals = candidate_residuals;
         current_rms = candidate_rms;
         
-        // Check Convergence (on the accepted scaled step)
         if ((dx_full * scale).norm() < tolerance_) {
             result.converged = true;
             break;

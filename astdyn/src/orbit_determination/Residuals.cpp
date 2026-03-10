@@ -69,6 +69,14 @@ std::vector<ObservationResidual> ResidualCalculator<Frame>::compute_residuals(
     
     return residuals;
 }
+template <typename Frame>
+std::vector<ObservationResidual> ResidualCalculator<Frame>::batch_compute(
+    const std::vector<OpticalObservation>& observations,
+    const physics::CartesianStateTyped<Frame>& state) const {
+    // Current implementation of compute_residuals already uses sequential propagation
+    // which is the "batch" optimized path.
+    return compute_residuals(observations, state);
+}
 
 template <typename Frame>
 std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
