@@ -74,14 +74,14 @@ Eigen::MatrixXd LeastSquaresFitter::build_design_matrix(
         dRho_dx_state.row(0) << dRA_drho.transpose(), 0, 0, 0;
         dRho_dx_state.row(1) << dDec_drho.transpose(), 0, 0, 0;
 
-        // Normalization: STM comes from integrator in AU/days. 
-        // Convert to SI (m, m/s).
+        // STM scaling: The STM (phi) is integrated in internal units [AU, AU/day].
+        // To build the design matrix in SI [meters, meters/second], we scale the 
+        // time units in the cross-blocks (day -> seconds):
+        //  - Position/Velocity block: [AU] / [AU/day] = [day] -> convert to [s]
+        //  - Velocity/Position block: [AU/day] / [AU] = [1/day] -> convert to [1/s]
         astdyn::Matrix6d phi_si = stm;
-        const double au_m = physics::Distance::from_au(1.0).to_m();
-        const double aud_ms = physics::Velocity::from_au_d(1.0).to_ms();
-        
-        phi_si.block<3, 3>(0, 3) *= (au_m / aud_ms);
-        phi_si.block<3, 3>(3, 0) *= (aud_ms / au_m);
+        phi_si.block<3, 3>(0, 3) *= 86400.0;
+        phi_si.block<3, 3>(3, 0) /= 86400.0;
         
         // Map to initial epoch: A_i = H_i * STM_si
         Eigen::Matrix<double, 2, 6> A_i = dRho_dx_state * phi_si;

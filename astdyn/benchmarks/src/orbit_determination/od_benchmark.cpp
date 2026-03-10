@@ -15,7 +15,7 @@
 #include <astdyn/orbit_determination/CovariancePropagator.hpp>
 #include <astdyn/orbit_determination/Residuals.hpp>
 #include <astdyn/orbit_determination/StateTransitionMatrix.hpp>
-#include <astdyn/propagation/AdamsIntegrator.hpp>
+#include <astdyn/propagation/Integrator.hpp>
 #include <astdyn/io/MPCParser.hpp>
 #include <astdyn/ephemeris/DE441Provider.hpp>
 #include <astdyn/coordinates/ReferenceFrame.hpp>
@@ -122,11 +122,11 @@ int main() {
     base_settings.include_relativity = true;
     base_settings.include_moon     = true;
 
-    // Factory: creates an Adams-based propagator (Multi-step), optionally with Yarkovsky.
+    // Factory: creates a RK4-based propagator (Fixed step).
     auto make_propagator = [&](double yarkovsky_a2 = 0.0) {
-        auto integr = std::make_shared<AdamsIntegrator<StateAU, DerivativeAU>>(
+        auto integr = std::make_shared<RKF78Integrator>(
             0.5,    // initial step [days]
-            4       // order 4
+            1e-12   // tolerance
         );
         PropagatorSettings s = base_settings;
         s.include_yarkovsky = (std::abs(yarkovsky_a2) > 0.0);
@@ -146,13 +146,12 @@ int main() {
         targets.push_back({"Apophis_99942",
             "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/apophis_mpc_full.txt",
             "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/apophis_iod_3obs.txt",
-            1.1, 1.0, true,
-            transform_state_typed<core::GCRF, core::ECLIPJ2000>(
-                CartesianStateTyped<core::GCRF>::from_si(time::EpochTDB::from_mjd(58872.0),
-                    r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
-                    v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0)),
-            40000.0, 70000.0,
-            80, true, -2.901e-13 /* Yarkovsky A2 [AU/d²] */});
+            1.1, 1.0, true, // r1, r3, gooding
+            CartesianStateTyped<core::ECLIPJ2000>::from_si(time::EpochTDB::from_mjd(58872.0),
+                r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
+                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0),
+            40000.0, 70000.0, // obs_min_mjd, obs_max_mjd
+            80, true, -2.901e-13 /* Yarkovsky A2 [AU/d²] */}); // gooding_max_iter, warm_start, yarkovsky_a2
     }
 
     // Vesta — full arc
@@ -164,10 +163,9 @@ int main() {
         targets.push_back({"Vesta_4",
             "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/vesta_mpc_full.txt",
             "", 2.4, 2.3, true,
-            transform_state_typed<core::GCRF, core::ECLIPJ2000>(
-                CartesianStateTyped<core::GCRF>::from_si(time::EpochTDB::from_mjd(57448.0),
-                    r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
-                    v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0)),
+            CartesianStateTyped<core::ECLIPJ2000>::from_si(time::EpochTDB::from_mjd(57448.0),
+                r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
+                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0),
             40000.0, 70000.0,
             80, false});
     }
@@ -181,10 +179,9 @@ int main() {
         targets.push_back({"Phaethon_3200",
             "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/phaethon_mpc_full.txt",
             "", 1.2, 1.1, true,
-            transform_state_typed<core::GCRF, core::ECLIPJ2000>(
-                CartesianStateTyped<core::GCRF>::from_si(time::EpochTDB::from_mjd(58011.0),
-                    r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
-                    v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0)),
+            CartesianStateTyped<core::ECLIPJ2000>::from_si(time::EpochTDB::from_mjd(58011.0),
+                r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
+                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0),
             40000.0, 70000.0,
             80, false, -6.142920483398e-15 /* Yarkovsky A2 */});
     }
@@ -211,7 +208,16 @@ int main() {
                 });
             full.erase(it, full.end());
             
-            std::cout << "  - Total arc loaded: " << full.size() << " observations." << std::endl;
+            // Optimization: sample 1 out of 10 observations for faster benchmark turnaround
+            if (full.size() > 1000) {
+                std::vector<OpticalObservation> sampled;
+                for (size_t i = 0; i < full.size(); i += 100) {
+                    sampled.push_back(full[i]);
+                }
+                full = std::move(sampled);
+            }
+            
+            std::cout << "  - Total arc loaded: " << full.size() << " observations (sampled 1/10)." << std::endl;
         }
         
         std::vector<OpticalObservation> iod_obs;
@@ -222,19 +228,29 @@ int main() {
         }
 
         double t_start = wall_sec();
-        CartesianStateTyped<ECLIPJ2000> iod_state;
         CartesianStateTyped<GCRF> iod_state_gcrf;
         bool iod_ok = false;
         std::string iod_name;
+        CartesianStateTyped<ECLIPJ2000> iod_state;
+
+        auto first_epoch = time::to_tdb(full.front().time);
 
         if (tgt.warm_start) {
-            iod_name = "WarmStart";
+            std::cout << "  - Warm start: propagating reference from MJD " << tgt.ref.epoch.mjd() << std::endl;
+            auto el_ref = ODPolicyEngine::compute_keplerian(tgt.ref.template cast_frame<core::GCRF>());
+            std::cout << "  - Ref SMA: " << el_ref.a_au << " AU, e: " << el_ref.e << " mu: " << tgt.ref.gm.to_m3_s2() << std::endl;
+            
             try {
-                auto first_epoch = time::to_tdb(full.front().time);
                 iod_state = prop->propagate_cartesian(tgt.ref, first_epoch);
-                iod_state_gcrf = transform_state_typed<ECLIPJ2000, GCRF>(iod_state);
+                iod_state_gcrf = iod_state.template cast_frame<core::GCRF>();
+                auto el_iod = ODPolicyEngine::compute_keplerian(iod_state_gcrf);
+                std::cout << "  - IOD SMA: " << el_iod.a_au << " AU, e: " << el_iod.e << std::endl;
                 iod_ok = true;
-            } catch (...) {}
+                iod_name = "WarmStart";
+            } catch (const std::exception& e) {
+                std::cerr << "Propagation failed: " << e.what() << std::endl;
+                continue;
+            }
         } else {
             std::cout << "  - Starting IOD..." << std::flush;
             if (!tgt.gooding) {
@@ -262,42 +278,21 @@ int main() {
         if (iod_ok) {
             std::cout << " OK (" << iod_name << ") [dt: " << dt_iod << "s]" << std::endl;
 
-            // --- DIAGNOSTIC BLOCK ---
-            auto iod_el = ODPolicyEngine::compute_keplerian(iod_state_gcrf);
-            auto ref_at_iod = prop->propagate_cartesian(tgt.ref, iod_state.epoch);
-            auto ref_gcrf = transform_state_typed<ECLIPJ2000, GCRF>(ref_at_iod);
-            auto ref_el = ODPolicyEngine::compute_keplerian(ref_gcrf);
 
-            std::cout << "[DIAG] IOD Elements: a=" << iod_el.a_au << " e=" << iod_el.e << " i=" << iod_el.i_deg << " deg" << std::endl;
-            std::cout << "[DIAG] REF Elements: a=" << ref_el.a_au << " e=" << ref_el.e << " i=" << ref_el.i_deg << " deg" << std::endl;
-            
-            // Test Residuals with REF state
-            auto res_calc_test = std::make_shared<ResidualCalculator<ECLIPJ2000>>(ephem, prop);
-
-            // Deep diagnostic for first observation
-            if (!full.empty()) {
-                const auto& o = full.front();
-                // ONLY propagate the 6-element cartesian state, avoid the 42-element STM for diagnosis
-                auto s_ref = prop->propagate_cartesian(tgt.ref, time::to_tdb(o.time));
-                auto r_topo_opt = res_calc_test->compute_residual(o, s_ref);
-                if (r_topo_opt) {
-                    std::cout << "[DEEP-DIAG] Epoch (MJD UTC): " << o.time.mjd() << std::endl;
-                    std::cout << "[DEEP-DIAG] Observed: RA=" << o.ra.to_deg() << " Dec=" << o.dec.to_deg() << " deg" << std::endl;
-                    std::cout << "[DEEP-DIAG] Computed: RA=" << r_topo_opt->computed_ra.to_deg() << " Dec=" << r_topo_opt->computed_dec.to_deg() << " deg" << std::endl;
-                    std::cout << "[DEEP-DIAG] Residual: dRA=" << r_topo_opt->residual_ra.to_arcsec() << "\" dDec=" << r_topo_opt->residual_dec.to_arcsec() << "\"" << std::endl;
-                    std::cout << "[DEEP-DIAG] Range: " << r_topo_opt->range.to_au() << " AU" << std::endl;
-                }
-            }
-
-            auto ref_residuals = res_calc_test->compute_residuals(full, ref_at_iod);
-            auto ref_stats = ResidualCalculator<ECLIPJ2000>::compute_statistics(ref_residuals);
-            std::cout << "[DIAG] JPL REF RMS: " << ref_stats.rms_total.to_arcsec() << " arcsec" << std::endl;
-            // ------------------------
 
             ODPolicyEngine::apply_auto_weights(full);
             
             auto policy = ODPolicyEngine::analyze(iod_state_gcrf, full, base_settings);
             policy.print();
+
+            // --- DIAGNOSTIC: Initial RMS check ---
+            {
+                auto init_calc = std::make_shared<ResidualCalculator<ECLIPJ2000>>(ephem, prop);
+                auto init_res = init_calc->compute_residuals(full, iod_state);
+                auto init_stats = ResidualCalculator<ECLIPJ2000>::compute_statistics(init_res);
+                std::cout << "  - Initial O-C RMS: " << init_stats.rms_total.to_arcsec() << "\"" << std::endl;
+            }
+            // ------------------------------------
 
             // LSQ
             std::cout << "  - Starting LSQ (Differential Corrector)..." << std::endl;
@@ -307,7 +302,7 @@ int main() {
             
             DifferentialCorrectorSettings ds;
             ds.max_iterations = 50;
-            ds.convergence_tol = 1.0e-9; 
+            ds.convergence_tolerance = Distance::from_au(1.0e-9); 
             ds.verbose = true;
             
             try {
@@ -315,17 +310,17 @@ int main() {
                 double dt_dc = wall_sec() - t_start;
                 
                 if (dc_res.converged) {
-                    auto final_ref = prop->propagate_cartesian(dc_res.fitted_state, tgt.ref.epoch);
+                    auto final_ref = prop->propagate_cartesian(dc_res.final_state, tgt.ref.epoch);
                     double dr = delta_r_km(final_ref, tgt.ref);
                     double dv = delta_v_ms(final_ref, tgt.ref);
                     
-                    std::cout << "  → Converged [dt: " << dt_dc << "s | dr: " << dr << " km | RMS: " << dc_res.final_rms << "\"]" << std::endl;
-                    write_csv_row(csv, tgt.name, "LSQ", "DiffCorr", dr, dv, dc_res.final_rms, 0, dc_res.iterations, sigma_r_km(dc_res.covariance), dt_dc);
+                    std::cout << "  → Converged [dt: " << dt_dc << "s | dr: " << dr << " km | RMS: " << dc_res.statistics.rms_total.to_arcsec() << "\"]" << std::endl;
+                    write_csv_row(csv, tgt.name, "LSQ", "DiffCorr", dr, dv, dc_res.statistics.rms_total.to_arcsec(), 0, dc_res.iterations, sigma_r_km(dc_res.covariance), dt_dc);
                     
                     // EKF (Note: EKF currently works in GCRF in this library version)
                     std::cout << "  - Starting EKF/Smoothing..." << std::flush;
                     ExtendedKalmanFilter ekf(prop, ExtendedKalmanFilter::Settings());
-                    CartesianStateTyped<GCRF> ekf_state = transform_state_typed<ECLIPJ2000, GCRF>(dc_res.fitted_state);
+                    CartesianStateTyped<GCRF> ekf_state = transform_state_typed<ECLIPJ2000, GCRF>(dc_res.final_state);
                     Matrix6d ekf_cov = dc_res.covariance;
                     for (const auto& obs : full) {
                         try {

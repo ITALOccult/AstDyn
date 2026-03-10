@@ -123,6 +123,16 @@ public:
     std::vector<ObservationResidual> compute_residuals(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
         const physics::CartesianStateTyped<Frame>& state) const;
+
+    /**
+     * @brief Batch compute residuals using internal propagator efficiency.
+     * 
+     * If a propagator is available, it uses the optimized propagate_ephemeris
+     * path which is much faster than individual compute_residual calls.
+     */
+    std::vector<ObservationResidual> batch_compute(
+        const std::vector<astdyn::observations::OpticalObservation>& observations,
+        const physics::CartesianStateTyped<Frame>& state) const;
     
     /**
      * @brief Compute residual for single observation

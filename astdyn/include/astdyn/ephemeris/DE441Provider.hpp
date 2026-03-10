@@ -50,7 +50,7 @@ public:
     
     math::Vector3<core::GCRF, physics::Distance> getPosition(CelestialBody body, time::EpochTDB t) override;
     math::Vector3<core::GCRF, physics::Velocity> getVelocity(CelestialBody body, time::EpochTDB t) override;
-    Eigen::Matrix<double, 6, 1> getState(CelestialBody body, time::EpochTDB t) override;
+    physics::CartesianStateTyped<core::GCRF> getState(CelestialBody body, time::EpochTDB t) override;
     
     std::string getName() const override { return "JPL DE441 (Native)"; }
     double getAccuracy() const override { return 0.001; } // ~1 mas

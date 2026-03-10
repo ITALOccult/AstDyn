@@ -36,12 +36,13 @@ namespace astdyn::orbit_determination {
  * @brief Settings for Gauss IOD
  */
 struct GaussIODSettings {
-    int max_iterations = 50;             ///< Maximum iterations for slant range
-    double tolerance = 1e-8;             ///< Convergence tolerance [AU]
-    double min_separation_days = 1.0;    ///< Minimum separation between obs [days]
-    double max_separation_days = 60.0;   ///< Maximum separation between obs [days]
-    bool use_light_time = true;          ///< Apply light-time correction
-    bool verbose = false;                ///< Print debug information
+    int max_iterations = 50;
+    physics::Distance tolerance = physics::Distance::from_au(1e-8);
+    double min_separation_days = 1.0;
+    double max_separation_days = 60.0;
+    physics::GravitationalParameter mu = physics::GravitationalParameter::sun();
+    bool use_light_time = true;
+    bool verbose = false;
 };
 
 /**
@@ -136,7 +137,7 @@ private:
      * @param dec Declination [rad]
      * @return Unit vector in equatorial frame
      */
-    math::Vector3<core::GCRF, physics::Distance> compute_line_of_sight(astrometry::RightAscension ra, astrometry::Declination dec) const;
+    Eigen::Vector3d compute_line_of_sight(astrometry::RightAscension ra, astrometry::Declination dec) const;
     
     /**
      * @brief Solve Gauss polynomial for slant ranges
@@ -145,9 +146,9 @@ private:
      * 
      * @param tau1 Time interval t2-t1 [days]
      * @param tau3 Time interval t3-t2 [days]
-     * @param los1 Line of sight vector at obs 1
-     * @param los2 Line of sight vector at obs 2
-     * @param los3 Line of sight vector at obs 3
+     * @param l1 Line of sight vector at obs 1
+     * @param l2 Line of sight vector at obs 2
+     * @param l3 Line of sight vector at obs 3
      * @param R1 Earth position at obs 1 [AU]
      * @param R2 Earth position at obs 2 [AU]
      * @param R3 Earth position at obs 3 [AU]
@@ -159,9 +160,9 @@ private:
      */
     bool solve_slant_ranges(
         double tau1, double tau3,
-        const math::Vector3<core::GCRF, physics::Distance>& los1, 
-        const math::Vector3<core::GCRF, physics::Distance>& los2, 
-        const math::Vector3<core::GCRF, physics::Distance>& los3,
+        const Eigen::Vector3d& l1, 
+        const Eigen::Vector3d& l2, 
+        const Eigen::Vector3d& l3,
         const math::Vector3<core::GCRF, physics::Distance>& R1, 
         const math::Vector3<core::GCRF, physics::Distance>& R2, 
         const math::Vector3<core::GCRF, physics::Distance>& R3,

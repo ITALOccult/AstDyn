@@ -123,43 +123,41 @@ public:
     // Rule 1+2 — Orbital analysis
     // -----------------------------------------------------------------------
 
-    /// Compute Keplerian elements from a heliocentric Cartesian state.
+    /// Compute Keplerian elements from a heliocentric Cartesian state in unified AU/day units.
     static KeplerianElements compute_keplerian(
         const physics::CartesianStateTyped<core::GCRF>& state)
     {
-        const double au_m = physics::Distance::from_au(1.0).to_m();
-        const double mu   = state.gm.to_m3_s2(); // [m³/s²]
+        const Eigen::Matrix<double, 6, 1> y = state.to_eigen_au_aud();
+        const Eigen::Vector3d r_vec = y.head<3>();
+        const Eigen::Vector3d v_vec = y.segment<3>(3);
+        const double mu = state.gm.to_au3_d2();
 
-        Eigen::Vector3d r_si = state.position.to_eigen_si();
-        Eigen::Vector3d v_si = state.velocity.to_eigen_si();
-
-        double r  = r_si.norm();
-        double v2 = v_si.squaredNorm();
-        double energy = 0.5 * v2 - mu / r;
+        const double r = r_vec.norm();
+        const double v2 = v_vec.squaredNorm();
+        const double energy = 0.5 * v2 - mu / r;
 
         KeplerianElements el;
         // Parabolic / hyperbolic safeguard
-        if (energy >= 0.0) {
-            el.e = 1.0 + (r * v2 / mu - 2.0) * 1e-9; // treat as near-parabolic
-            el.a_au = 1e6; // unbounded
+        if (energy >= -1e-15) {
+            el.e = 1.0; 
+            el.a_au = 1e8; // quasi-unbounded
             el.is_comet = true;
             return el;
         }
-        el.a_au = (-mu / (2.0 * energy)) / au_m;
 
-        // Eccentricity vector
-        Eigen::Vector3d ecc_vec = (v_si.cross(v_si.cross(r_si)) / mu) - r_si / r;
-        // Correct formula: e_vec = ((v²/μ - 1/r) r - (r·v/μ) v)
-        double rdotv = r_si.dot(v_si);
-        ecc_vec = (v2 / mu - 1.0 / r) * r_si - (rdotv / mu) * v_si;
+        el.a_au = -mu / (2.0 * energy);
+
+        // Eccentricity vector and value
+        const double rdotv = r_vec.dot(v_vec);
+        const Eigen::Vector3d ecc_vec = (v2 / mu - 1.0 / r) * r_vec - (rdotv / mu) * v_vec;
         el.e = ecc_vec.norm();
 
         el.q_au = el.a_au * (1.0 - el.e);
         el.Q_au = el.a_au * (1.0 + el.e);
 
         // Inclination
-        Eigen::Vector3d h = r_si.cross(v_si);
-        el.i_deg = std::acos(std::clamp(h.z() / h.norm(), -1.0, 1.0)) * 180.0 / M_PI;
+        const Eigen::Vector3d h_vec = r_vec.cross(v_vec);
+        el.i_deg = std::acos(std::clamp(h_vec.z() / h_vec.norm(), -1.0, 1.0)) * 180.0 / M_PI;
 
         el.is_neo   = (el.q_au < 1.3);
         el.is_mba   = (el.a_au > 2.0 && el.a_au < 3.3);
@@ -170,13 +168,14 @@ public:
 
     /// Compute semi-major axis [AU] from a state (fast path for energy barrier).
     static double compute_sma_au(const physics::CartesianStateTyped<core::GCRF>& state) {
-        const double au_m = physics::Distance::from_au(1.0).to_m();
-        double r  = state.position.to_eigen_si().norm();
-        double v2 = state.velocity.to_eigen_si().squaredNorm();
-        double mu = state.gm.to_m3_s2();
-        double energy = 0.5 * v2 - mu / r;
-        if (energy >= 0.0) return 1e6;
-        return (-mu / (2.0 * energy)) / au_m;
+        const Eigen::Matrix<double, 6, 1> y = state.to_eigen_au_aud();
+        const double r = y.head<3>().norm();
+        const double v2 = y.segment<3>(3).squaredNorm();
+        const double mu = state.gm.to_au3_d2();
+        
+        const double energy = 0.5 * v2 - mu / r;
+        if (energy >= -1e-15) return 1e8;
+        return -mu / (2.0 * energy);
     }
 
     /// Analyze the observational arc geometry.

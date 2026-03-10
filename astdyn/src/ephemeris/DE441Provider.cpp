@@ -80,10 +80,8 @@ Eigen::VectorXd DE441Provider::readState(CelestialBody body, time::EpochTDB t) c
         }
         else {
              int seg_id = target;
-             // Remap body codes to barycenters if needed (Simplified mapping for DE441)
-             if (target < 10 && target > 0) {
-                 // Already barycenter IDs 1-9
-             } else {
+             // Remap body codes to barycenters if needed
+             if (target > 10) {
                  if (target == 199) seg_id = 1;
                  else if (target == 299) seg_id = 2;
                  else if (target == 499) seg_id = 4;

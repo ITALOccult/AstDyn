@@ -29,8 +29,8 @@ namespace astdyn::orbit_determination {
  * @brief Least squares fit result
  */
 struct FitResult {
-    Eigen::Vector<double, 6> state;     ///< Fitted state [r, v]
-    Eigen::Matrix<double, 6, 6> covariance; ///< Covariance matrix
+    physics::CartesianStateTyped<core::GCRF> state;     ///< Fitted state [r, v]
+    astdyn::Matrix6d covariance;                        ///< Covariance matrix (SI units: m^2, m^2/s, etc.)
     std::vector<ObservationResidual> residuals;
     
     int num_iterations;
@@ -52,22 +52,17 @@ class LeastSquaresFitter {
 public:
     /**
      * @brief Residual function signature
-     * 
-     * Given state at epoch, returns vector of residuals
-     * Format: [ra1, dec1, ra2, dec2, ...] in arcsec
      */
     using ResidualFunction = std::function<std::vector<ObservationResidual>(
-        const Eigen::Vector<double, 6>&, time::EpochTDB)>;
+        const physics::CartesianStateTyped<core::GCRF>&, time::EpochTDB)>;
     
     /**
      * @brief STM function signature
-     * 
-     * Returns state and STM at target epoch
      */
     using STMFunction = std::function<std::pair<
-        Eigen::Vector<double, 6>,
-        Eigen::Matrix<double, 6, 6>
-    >(const Eigen::Vector<double, 6>&, time::EpochTDB, time::EpochTDB)>;
+        physics::CartesianStateTyped<core::GCRF>,
+        astdyn::Matrix6d
+    >(const physics::CartesianStateTyped<core::GCRF>&, time::EpochTDB, time::EpochTDB)>;
     
     /**
      * @brief Construct fitter
@@ -76,15 +71,9 @@ public:
     
     /**
      * @brief Fit orbit to observations
-     * 
-     * @param initial_state Initial guess [r, v]
-     * @param epoch_mjd Epoch of initial state
-     * @param residual_func Function to compute residuals
-     * @param stm_func Function to propagate with STM
-     * @return Fit result
      */
     FitResult fit(
-        const Eigen::Vector<double, 6>& initial_state,
+        const physics::CartesianStateTyped<core::GCRF>& initial_state,
         time::EpochTDB epoch,
         ResidualFunction residual_func,
         STMFunction stm_func
@@ -126,21 +115,16 @@ private:
      */
     Eigen::MatrixXd build_design_matrix(
         const std::vector<ObservationResidual>& residuals,
-        const Eigen::Vector<double, 6>& state,
+        const physics::CartesianStateTyped<core::GCRF>& state,
         time::EpochTDB epoch,
         STMFunction stm_func
     );
     
-    /**
-     * @brief Solve normal equations
-     * 
-     * (AᵀWA)δx = AᵀWΔρ
-     */
     Eigen::Vector<double, 6> solve_normal_equations(
         const Eigen::MatrixXd& A,
         const Eigen::VectorXd& residuals,
         const Eigen::VectorXd& weights,
-        Eigen::Matrix<double, 6, 6>& covariance
+        astdyn::Matrix6d& covariance
     );
     
     /**

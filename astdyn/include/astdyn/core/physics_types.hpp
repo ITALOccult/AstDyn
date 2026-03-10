@@ -49,6 +49,34 @@ private:
     double value_m_; // Internal representation is always meters (SI)
 };
 
+/**
+ * @brief Distance in Astronomical Units (AU)
+ * Specialized for numerically stable orbital integration.
+ */
+class DistanceAU {
+public:
+    constexpr DistanceAU() noexcept : value_au_(0.0) {}
+    [[nodiscard]] static constexpr DistanceAU from_au(double au) noexcept { return DistanceAU(au); }
+    [[nodiscard]] static constexpr DistanceAU from_si(Distance dist) noexcept { return DistanceAU(dist.to_au()); }
+    
+    [[nodiscard]] constexpr double to_au() const noexcept { return value_au_; }
+    [[nodiscard]] constexpr Distance to_si() const noexcept { return Distance::from_au(value_au_); }
+    
+    [[nodiscard]] constexpr DistanceAU operator+(const DistanceAU& other) const noexcept { return DistanceAU(value_au_ + other.value_au_); }
+    [[nodiscard]] constexpr DistanceAU operator-(const DistanceAU& other) const noexcept { return DistanceAU(value_au_ - other.value_au_); }
+    [[nodiscard]] constexpr DistanceAU operator*(double scalar) const noexcept { return DistanceAU(value_au_ * scalar); }
+    [[nodiscard]] constexpr DistanceAU operator/(double scalar) const noexcept { return DistanceAU(value_au_ / scalar); }
+    
+    constexpr DistanceAU& operator+=(const DistanceAU& other) noexcept { value_au_ += other.value_au_; return *this; }
+    
+    [[nodiscard]] constexpr bool operator<(const DistanceAU& other) const noexcept { return value_au_ < other.value_au_; }
+    [[nodiscard]] constexpr bool operator>(const DistanceAU& other) const noexcept { return value_au_ > other.value_au_; }
+
+private:
+    explicit constexpr DistanceAU(double au) noexcept : value_au_(au) {}
+    double value_au_;
+};
+
 // ============================================================================
 // Velocity
 // ============================================================================
@@ -82,6 +110,27 @@ private:
     double value_ms_; // Internal representation is always m/s (SI)
 };
 
+/**
+ * @brief Velocity in AU per day (AUD)
+ */
+class VelocityAUD {
+public:
+    constexpr VelocityAUD() noexcept : value_aud_(0.0) {}
+    [[nodiscard]] static constexpr VelocityAUD from_au_d(double aud) noexcept { return VelocityAUD(aud); }
+    [[nodiscard]] static constexpr VelocityAUD from_si(Velocity v) noexcept { return VelocityAUD(v.to_au_d()); }
+    
+    [[nodiscard]] constexpr double to_au_d() const noexcept { return value_aud_; }
+    [[nodiscard]] constexpr Velocity to_si() const noexcept { return Velocity::from_au_d(value_aud_); }
+    
+    [[nodiscard]] constexpr VelocityAUD operator+(const VelocityAUD& other) const noexcept { return VelocityAUD(value_aud_ + other.value_aud_); }
+    [[nodiscard]] constexpr VelocityAUD operator-(const VelocityAUD& other) const noexcept { return VelocityAUD(value_aud_ - other.value_aud_); }
+    [[nodiscard]] constexpr VelocityAUD operator*(double scalar) const noexcept { return VelocityAUD(value_aud_ * scalar); }
+
+private:
+    explicit constexpr VelocityAUD(double aud) noexcept : value_aud_(aud) {}
+    double value_aud_;
+};
+
 // ============================================================================
 // Acceleration
 // ============================================================================
@@ -113,6 +162,26 @@ public:
 private:
     explicit constexpr Acceleration(double ms2) noexcept : value_ms2_(ms2) {}
     double value_ms2_; // Internal representation is always m/s² (SI)
+};
+
+/**
+ * @brief Acceleration in AU per day^2
+ */
+class AccelerationAUD2 {
+public:
+    constexpr AccelerationAUD2() noexcept : value_aud2_(0.0) {}
+    [[nodiscard]] static constexpr AccelerationAUD2 from_au_d2(double aud2) noexcept { return AccelerationAUD2(aud2); }
+    
+    [[nodiscard]] constexpr double to_au_d2() const noexcept { return value_aud2_; }
+    [[nodiscard]] constexpr Acceleration to_si() const noexcept { return Acceleration::from_au_d2(value_aud2_); }
+    
+    [[nodiscard]] constexpr AccelerationAUD2 operator+(const AccelerationAUD2& other) const noexcept { return AccelerationAUD2(value_aud2_ + other.value_aud2_); }
+    [[nodiscard]] constexpr AccelerationAUD2 operator-(const AccelerationAUD2& other) const noexcept { return AccelerationAUD2(value_aud2_ - other.value_aud2_); }
+    [[nodiscard]] constexpr AccelerationAUD2 operator*(double scalar) const noexcept { return AccelerationAUD2(value_aud2_ * scalar); }
+
+private:
+    explicit constexpr AccelerationAUD2(double aud2) noexcept : value_aud2_(aud2) {}
+    double value_aud2_;
 };
 
 // ============================================================================

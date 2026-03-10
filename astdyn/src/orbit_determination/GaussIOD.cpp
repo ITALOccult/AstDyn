@@ -93,7 +93,6 @@ GaussIODResult GaussIOD::compute_from_three(
     
     double tau1 = t1 - t2; 
     double tau3 = t3 - t2; 
-    double tau = tau3 - tau1;
     
     // Convert to TDB
     auto t1_tdb = astdyn::time::to_tdb(obs1.time);
@@ -185,8 +184,8 @@ GaussIODResult GaussIOD::compute_from_three(
 
     double det = f1 * g3 - f3 * g1;
     // Current radius1, radius3 are math::Vector3<GCRF, Distance> (m)
-    // Velocities must be in m per SECOND
-    auto v2_vec = (radius3 * f1 - radius1 * f3) / (det * 86400.0);
+    // Velocities must be in m per SECOND. Here det is in DAYS.
+    auto v2_vec = (radius3 * f1 - radius1 * f3) / det / 86400.0;
     
     result.state = physics::CartesianStateTyped<core::GCRF>::from_si(
         t2_tdb,
@@ -316,7 +315,7 @@ bool GaussIOD::solve_slant_ranges(
         if (std::abs(c1) < 1e-15 || std::abs(c3) < 1e-15) return false;
 
         double rho1_new = (D21 - c1 * D11 - c3 * D31) / (c1 * D0);
-        double rho2_new = (c1 * D12 - D22 + c3 * D32) / D0;
+        double rho2_new = -(c1 * D12 - D22 + c3 * D32) / D0; // Bug fix: sign of Cramer determinant
         double rho3_new = (D23 - c1 * D13 - c3 * D33) / (c3 * D0);
 
         double delta = std::abs(rho2_new - rho2);

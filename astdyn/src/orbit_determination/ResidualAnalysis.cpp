@@ -63,7 +63,7 @@ OrbitValidationSummary ResidualAnalysis::analyze_orbit(
         double d_dec = o.dec.to_rad() - dec_calc;
 
         // Convert to arcseconds (Projected RA)
-        double dra_arcsec = d_ra * std::cos(o.dec.to_rad()) * constants::RAD_TO_ARCSEC;
+        double dra_arcsec = d_ra * std::cos(dec_calc) * constants::RAD_TO_ARCSEC;
         double ddec_arcsec = d_dec * constants::RAD_TO_ARCSEC;
 
         ss << std::setw(3) << i << "  " << t_obs.mjd() << "  " 

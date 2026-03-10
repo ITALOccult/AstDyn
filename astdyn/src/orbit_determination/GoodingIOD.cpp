@@ -7,6 +7,7 @@
 #include "astdyn/math/LambertSolver.hpp"
 #include "astdyn/time/TimeScale.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/observations/ObservatoryDatabase.hpp"
 #include <cmath>
 #include <iostream>
 
@@ -115,6 +116,20 @@ GoodingIODResult GoodingIOD::compute(
     math::Vector3<core::GCRF, physics::Distance> R2 = earth2.position;
     math::Vector3<core::GCRF, physics::Distance> R3 = earth3.position;
 
+    const auto& obs_db = observations::ObservatoryDatabase::getInstance();
+    if (auto info1 = obs_db.getObservatory(obs1.observatory_code)) {
+        auto topo = info1->getPositionGCRF(obs1.time);
+        R1 = R1 + math::Vector3<core::GCRF, physics::Distance>::from_si(topo.x_si(), topo.y_si(), topo.z_si());
+    }
+    if (auto info2 = obs_db.getObservatory(obs2.observatory_code)) {
+        auto topo = info2->getPositionGCRF(obs2.time);
+        R2 = R2 + math::Vector3<core::GCRF, physics::Distance>::from_si(topo.x_si(), topo.y_si(), topo.z_si());
+    }
+    if (auto info3 = obs_db.getObservatory(obs3.observatory_code)) {
+        auto topo = info3->getPositionGCRF(obs3.time);
+        R3 = R3 + math::Vector3<core::GCRF, physics::Distance>::from_si(topo.x_si(), topo.y_si(), topo.z_si());
+    }
+
     if (settings_.verbose) {
         std::cout << "  [DEBUG] R1: " << R1.x_si()/1.495978707e11 << ", " << R1.y_si()/1.495978707e11 << ", " << R1.z_si()/1.495978707e11 << " AU" << std::endl;
         std::cout << "  [DEBUG] R2: " << R2.x_si()/1.495978707e11 << ", " << R2.y_si()/1.495978707e11 << ", " << R2.z_si()/1.495978707e11 << " AU" << std::endl;
@@ -136,6 +151,15 @@ GoodingIODResult GoodingIOD::compute(
         sol.epoch = t1;
         sol.rho1 = physics::Distance::from_si(rho1_m).to_au();
         sol.rho3 = physics::Distance::from_si(rho3_m).to_au();
+        
+        // Calculate rho2 from the solution state
+        Eigen::Vector3d r1v = R1.to_eigen_si() + rho1_m * L1;
+        Eigen::Vector3d v1v = sol_state.velocity.to_eigen_si();
+        Eigen::Vector3d r2v;
+        const double au_m = physics::Distance::from_au(1.0).to_m();
+        kepler_prop(r1v / au_m, v1v / (au_m / 86400.0), (t2 - t1).to_days(), settings_.mu.to_au3_d2(), r2v);
+        sol.rho2 = (r2v * au_m - R2.to_eigen_si()).norm() / au_m;
+
         sol.rms_error = 0.0; 
         result.solutions.push_back(sol);
     } else {

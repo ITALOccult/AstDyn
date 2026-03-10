@@ -168,7 +168,7 @@ public:
             Eigen::VectorXd correction;
             std::vector<ObservationResidual> residuals;
 
-            bool iter_success = iteration(sorted_obs, current_state, correction, residuals);
+            bool iter_success = iteration(sorted_obs, current_state, correction, residuals, settings.verbose);
             if (!iter_success) break;
             
             if (settings.reject_outliers) {
@@ -337,12 +337,13 @@ public:
         const std::vector<astdyn::observations::OpticalObservation>& observations,
         const physics::CartesianStateTyped<Frame>& current_state,
         Eigen::VectorXd& correction,
-        std::vector<ObservationResidual>& residuals) 
+        std::vector<ObservationResidual>& residuals,
+        bool verbose = false) 
     {
         residuals = residual_calc_->compute_residuals(observations, current_state);
         if (residuals.empty()) return false;
         
-        auto design_result = build_design_matrix(observations, current_state, residuals);
+        auto design_result = build_design_matrix(observations, current_state, residuals, verbose);
         if (design_result.valid_indices.empty()) return false;
         
         astdyn::Matrix6d normal_matrix, normal_inv;
@@ -360,7 +361,7 @@ public:
         const physics::CartesianStateTyped<Frame>& final_state,
         const std::vector<ObservationResidual>& residuals) 
     {
-        auto design_result = build_design_matrix(observations, final_state, residuals);
+        auto design_result = build_design_matrix(observations, final_state, residuals, false);
         astdyn::Matrix6d normal_matrix, normal_inv;
         auto solution = solve_normal_equations(
             design_result.A, design_result.b, design_result.weights,
@@ -392,7 +393,8 @@ private:
     DesignMatrixResult build_design_matrix(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
         const physics::CartesianStateTyped<Frame>& state,
-        const std::vector<ObservationResidual>& residuals) 
+        const std::vector<ObservationResidual>& residuals,
+        bool verbose = false) 
     {
         DesignMatrixResult result;
         result.valid_indices.reserve(observations.size());
@@ -417,6 +419,7 @@ private:
         for (size_t idx : result.valid_indices) {
             const auto& obs = observations[idx];
             const auto& res = residuals[idx];
+
             auto obs_pos_opt = residual_calc_->get_observer_position(obs);
             if (!obs_pos_opt) continue;
             

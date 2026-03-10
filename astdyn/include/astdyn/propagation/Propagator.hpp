@@ -16,14 +16,11 @@
 #define ASTDYN_PROPAGATOR_HPP
 
 #include "astdyn/propagation/OrbitalElements.hpp"
-#include "astdyn/coordinates/ReferenceFrame.hpp"
-#include "astdyn/core/physics_state_au.hpp"
 #include "astdyn/propagation/Integrator.hpp"
-#include "astdyn/propagation/AdamsIntegrator.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/AsteroidPerturbations.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include <memory>
-#include <vector>
 
 namespace astdyn::propagation {
 
@@ -84,112 +81,242 @@ struct PropagatorSettings {
  *   KeplerianElements final = prop.propagate_keplerian(initial, target_mjd);
  * @endcode
  */
-using StateAU = physics::CartesianStateAU<core::ECLIPJ2000>;
-using DerivativeAU = physics::DerivativeAU;
-
-/**
- * @brief High-precision orbital propagator class using Type-Safe AU units.
- * 
- * All internal dynamics are computed in AU and AU/day to ensure 
- * numerical stability and prevent unit scaling errors.
- */
 class Propagator {
 public:
-    Propagator(std::shared_ptr<Integrator<StateAU, DerivativeAU>> integrator,
-               std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
-               const PropagatorSettings& settings = PropagatorSettings());
-
     /**
-     * @brief Propagate Cartesian state to target epoch.
-     * PUBLIC SI INTERFACE: Converters to/from AU are handled internally.
+     * @brief Construct propagator
+     * 
+     * @param integrator Numerical integrator (RK4, RKF78, etc.)
+     * @param ephemeris Planetary ephemeris for perturbations
+     * @param settings Propagation settings
      */
-    template <typename Frame>
-    physics::CartesianStateTyped<Frame> propagate_cartesian(
-        const physics::CartesianStateTyped<Frame>& state,
-        time::EpochTDB target_epoch) 
-    {
-        // 1. SI -> AU (Always forced to ECLIPJ2000 for integration)
-        auto state_au = StateAU::from_si(state.template cast_frame<core::ECLIPJ2000>()); 
-        
-        // 2. Integration
-        integrator_->reset_statistics();
-        auto final_state_au = integrator_->integrate(
-            [this](time::EpochTDB t, const StateAU& y) { return this->compute_derivatives_au(t, y); },
-            state_au,
-            state.epoch.mjd(),
-            target_epoch.mjd()
-        );
-        
-        // 3. AU -> SI (Back to user's Frame)
-        return final_state_au.to_si().template cast_frame<Frame>();
-    }
-
+    Propagator(std::shared_ptr<Integrator> integrator,
+              std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
+              const PropagatorSettings& settings = PropagatorSettings());
+    
+    /**
+     * @brief Propagate Keplerian state
+     * 
+     * @param initial Initial Keplerian state (strongly-typed)
+     * @param target_time Target epoch (time::EpochTDB)
+     * @return Keplerian state at target epoch in the same reference frame
+     */
     template <typename Frame>
     physics::KeplerianStateTyped<Frame> propagate_keplerian(
         const physics::KeplerianStateTyped<Frame>& initial,
-        time::EpochTDB target_time) 
-    {
-        auto cart_initial = keplerian_to_cartesian(initial);
-        auto cart_final = propagate_cartesian(cart_initial, target_time);
-        return cartesian_to_keplerian<Frame>(cart_final);
-    }
-
+        time::EpochTDB target_time);
+    
+    /**
+     * @brief Propagate Cartesian state to target epoch
+     * 
+     * @param initial Initial Cartesian state (strongly-typed, SI units internally)
+     * @param target_time Target epoch (time::EpochTDB)
+     * @return Cartesian state at target epoch
+     */
+    template <typename Frame>
+    physics::CartesianStateTyped<Frame> propagate_cartesian(
+        const physics::CartesianStateTyped<Frame>& initial,
+        time::EpochTDB target_time);
+    
     template <typename Frame>
     std::vector<physics::CartesianStateTyped<Frame>> propagate_ephemeris(
         const physics::CartesianStateTyped<Frame>& initial,
-        const std::vector<time::EpochTDB>& target_times) 
-    {
-        std::vector<physics::CartesianStateTyped<Frame>> results;
-        results.reserve(target_times.size());
-        physics::CartesianStateTyped<Frame> current = initial;
-        for (const auto& t : target_times) {
-            current = (t.mjd() == current.epoch.mjd()) ? current : propagate_cartesian(current, t);
-            results.push_back(current);
-        }
-        return results;
-    }
-
+        const std::vector<time::EpochTDB>& target_times);
+    
     /**
-     * @brief THE PHYSICS KERNEL: Compute state derivative in AU/day and AU/day^2.
+     * @brief Get integrator statistics from last propagation
      */
-    DerivativeAU compute_derivatives_au(time::EpochTDB t, const StateAU& state);
-
-    const IntegrationStatistics& statistics() const { return integrator_->statistics(); }
-    void set_settings(const PropagatorSettings& s) { settings_ = s; }
+    const IntegrationStatistics& statistics() const {
+        return integrator_->statistics();
+    }
+    
+    /**
+     * @brief Update propagation settings
+     */
+    void set_settings(const PropagatorSettings& settings) {
+        settings_ = settings;
+    }
+    
     const PropagatorSettings& settings() const { return settings_; }
     PropagatorSettings& settings() { return settings_; }
     
+    /**
+     * @brief Get the underlying integrator
+     */
+    std::shared_ptr<Integrator> get_integrator() const { return integrator_; }
+    
+    /**
+     * @brief Get the ephemeris provider
+     */
     std::shared_ptr<ephemeris::PlanetaryEphemeris> get_ephemeris() const { return ephemeris_; }
-
+    
+    /**
+     * @brief Compute accelerations for equations of motion
+     * 
+     * Computes d²r/dt² from gravitational forces.
+     * Exposed for use in State Transition Matrix calculations.
+     * 
+     * @param t Time (MJD TDB)
+     * @param state State vector [x, y, z, vx, vy, vz] in AU, AU/day
+     * @return Derivative [vx, vy, vz, ax, ay, az]
+     */
+    Eigen::VectorXd compute_derivatives(time::EpochTDB t, const Eigen::VectorXd& state);
+    
+    /**
+     * @brief Raw core integration using untyped Eigen arrays.
+     * 
+     * State is strictly maintained in AU and AU/day to ensure integrator
+     * precision and preventing floating point tolerance blowups seen with meters.
+     */
+    Eigen::VectorXd integrate_raw_au(const Eigen::VectorXd& y0_au, double t0_mjd, double tf_mjd);
+    
 private:
-    std::shared_ptr<Integrator<StateAU, DerivativeAU>> integrator_;
+    
+    /**
+     * @brief Compute two-body acceleration (central body only)
+     * 
+     * @param position Position vector [AU]
+     * @return Acceleration vector [AU/day²]
+     */
+    Eigen::Vector3d two_body_acceleration(const Eigen::Vector3d& position) const;
+    
+    /**
+     * @brief Compute planetary perturbations (Heliocentric frame corrected)
+     */
+    Eigen::Vector3d planetary_perturbations(const Eigen::Vector3d& position, 
+                                          time::EpochTDB t,
+                                          const Eigen::Vector3d& sun_pos_bary);
+                                          
+    /**
+     * @brief Compute asteroid perturbations (Heliocentric frame corrected)
+     */
+    Eigen::Vector3d asteroid_perturbations(const Eigen::Vector3d& position, 
+                                         time::EpochTDB t,
+                                         const Eigen::Vector3d& sun_pos_bary);
+                                         
+    // Relativistic correction (PPN)
+    Eigen::Vector3d relativistic_correction(const Eigen::Vector3d& position, 
+                                          const Eigen::Vector3d& velocity) const;
+    
+    std::shared_ptr<Integrator> integrator_;
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
     std::shared_ptr<ephemeris::AsteroidPerturbations> asteroids_;
     PropagatorSettings settings_;
-
-    Eigen::Vector3d two_body_acceleration_au(const StateAU& state) const;
-    Eigen::Vector3d planetary_perturbations_au(const StateAU& state, time::EpochTDB t);
+    Eigen::Matrix3d mat_ecl_; ///< Cached rotation matrix J2000 -> Ecliptic
 };
 
-/**
- * @brief Analytical 2-body propagation (Typed)
- */
 class TwoBodyPropagator {
 public:
+    /**
+     * @brief Propagate using Keplerian motion
+     * 
+     * @param initial Initial Keplerian elements (typed)
+     * @param target_time Target epoch
+     * @return Keplerian elements at target (only M changes)
+     */
     template <typename Frame>
     static physics::KeplerianStateTyped<Frame> propagate(
-        const physics::KeplerianStateTyped<Frame>& initial, time::EpochTDB target_time) {
+        const physics::KeplerianStateTyped<Frame>& initial,
+        time::EpochTDB target_time)
+    {
         double dt_days = target_time.mjd() - initial.epoch.mjd();
         double a_au = initial.a.to_au();
-        double n = std::sqrt(initial.gm.to_au3_d2() / (a_au * a_au * a_au));
-        double m_new = std::fmod(initial.M.to_rad() + n * dt_days, constants::TWO_PI);
+        double mu_au_d2 = initial.gm.to_au3_d2();
+        
+        // n = sqrt(mu / a^3) in rad/day
+        double n = std::sqrt(mu_au_d2 / (a_au * a_au * a_au));
+        
+        double m_new = initial.M.to_rad() + n * dt_days;
+        
+        // Normalize M to [0, 2pi]
+        m_new = std::fmod(m_new, constants::TWO_PI);
         if (m_new < 0) m_new += constants::TWO_PI;
-        auto res = initial;
-        res.epoch = target_time;
-        res.M = astrometry::Angle::from_rad(m_new);
-        return res;
+        
+        auto result = initial;
+        result.epoch = target_time;
+        result.M = astrometry::Angle::from_rad(m_new);
+        return result;
+    }
+    
+    /**
+     * @brief Compute mean anomaly at epoch from initial state
+     * 
+     * @param initial Initial elements (typed)
+     * @param target_time Target epoch
+     * @return Mean anomaly at target epoch [rad]
+     */
+    template <typename Frame>
+    static double mean_anomaly_at_epoch(
+        const physics::KeplerianStateTyped<Frame>& initial,
+        time::EpochTDB target_time)
+    {
+        return propagate(initial, target_time).M.to_rad();
     }
 };
+
+// ============================================================================
+// Template Implementations (AstDyn 3.0 wrappers)
+// ============================================================================
+
+template <typename Frame>
+physics::CartesianStateTyped<Frame> Propagator::propagate_cartesian(
+    const physics::CartesianStateTyped<Frame>& initial,
+    time::EpochTDB target_time) 
+{
+    // === ENTRY POINT SI/AnyFrame -> AU/ECLIPJ2000 ===
+    // 1. Transform to ECLIPJ2000 and AU/day for numeric stability
+    auto initial_ecl = initial.template cast_frame<core::ECLIPJ2000>();
+    Eigen::VectorXd y0_au = initial_ecl.to_eigen_au_aud();
+    
+    // 2. Perform raw integration in AU/day/Ecliptic/MJD
+    Eigen::VectorXd yf_au = integrate_raw_au(y0_au, initial.epoch.mjd(), target_time.mjd());
+    
+    // === EXIT POINT AU/ECLIPJ2000 -> SI/AnyFrame ===
+    // 3. Transform back to SI and the requested Frame
+    auto final_ecl = physics::CartesianStateTyped<core::ECLIPJ2000>::from_au_aud(
+        target_time, yf_au, initial.gm);
+    
+    return final_ecl.template cast_frame<Frame>();
+}
+
+template <typename Frame>
+std::vector<physics::CartesianStateTyped<Frame>> Propagator::propagate_ephemeris(
+    const physics::CartesianStateTyped<Frame>& initial,
+    const std::vector<time::EpochTDB>& target_times) 
+{
+    if (target_times.empty()) return {};
+
+    std::vector<physics::CartesianStateTyped<Frame>> results;
+    results.reserve(target_times.size());
+
+    // Sequential propagation for O(n) total integration time instead of O(n^2)
+    physics::CartesianStateTyped<Frame> current = initial;
+    
+    for (const auto& t : target_times) {
+        if (t.mjd() == current.epoch.mjd()) {
+            results.push_back(current);
+        } else {
+            current = propagate_cartesian(current, t);
+            results.push_back(current);
+        }
+    }
+    return results;
+}
+
+template <typename Frame>
+physics::KeplerianStateTyped<Frame> Propagator::propagate_keplerian(
+    const physics::KeplerianStateTyped<Frame>& initial,
+    time::EpochTDB target_time) 
+{
+    // 1. Convert to Cartesian (Type Safe)
+    auto cart_initial = keplerian_to_cartesian(initial);
+    
+    // 2. Propagate Cartesian
+    auto cart_final = propagate_cartesian(cart_initial, target_time);
+    
+    // 3. Convert back to Keplerian (Type Safe)
+    return cartesian_to_keplerian<Frame>(cart_final);
+}
 
 } // namespace astdyn::propagation
 

@@ -91,6 +91,9 @@ constexpr double K_GAUSS = 0.01720209895;
 /// Solar radius [km] (IAU 2015)
 constexpr double R_SUN = 695700.0;
 
+/// Solar radius [AU]
+constexpr double R_SUN_AU = R_SUN / AU;
+
 /// Earth equatorial radius [km] (WGS84)
 constexpr double R_EARTH = 6378.137;
 

@@ -517,14 +517,15 @@ math::RotationMatrix<core::ITRF, core::ITRF> ReferenceFrame::get_rotation<core::
 
 // --- ECLIPJ2000 ↔ GCRF ---
 template<> inline
-math::RotationMatrix<core::ECLIPJ2000, core::GCRF> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::GCRF>(time::EpochTDB t) {
+math::RotationMatrix<core::ECLIPJ2000, core::GCRF> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::GCRF>(time::EpochTDB) {
+    // ECLIPJ2000 is the Mean Ecliptic of J2000.0. It MUST NOT depend on the current epoch t.
     return math::RotationMatrix<core::ECLIPJ2000, core::GCRF>::from_eigen(
-        j2000_to_icrs() * ecliptic_to_j2000(t));
+        j2000_to_icrs() * ecliptic_to_j2000()); // Uses default J2000 epoch inside
 }
 template<> inline
-math::RotationMatrix<core::GCRF, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>(time::EpochTDB t) {
+math::RotationMatrix<core::GCRF, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>(time::EpochTDB) {
     return math::RotationMatrix<core::GCRF, core::ECLIPJ2000>::from_eigen(
-        j2000_to_ecliptic(t) * icrs_to_j2000());
+        j2000_to_ecliptic() * icrs_to_j2000()); // Uses default J2000 epoch inside
 }
 
 // --- GCRF ↔ ITRF ---

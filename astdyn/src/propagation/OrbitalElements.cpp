@@ -58,13 +58,13 @@ double KeplerianElements::aphelion_distance() const {
 double CartesianElements::energy() const {
     double v = velocity.norm().to_au_d();
     double r = position.norm().to_au();
-    double mu = physics::GravitationalParameter::from_si(gravitational_parameter).to_au3_d2();
+    double mu = gravitational_parameter * std::pow(86400.0, 2) / std::pow(constants::AU * 1000.0, 3);
     return 0.5 * v * v - mu / r;
 }
 
 Eigen::Vector3d CartesianElements::angular_momentum() const {
-    auto r_au = position.to_eigen_si() / physics::Distance::from_au(1.0).to_m();
-    auto v_aud = velocity.to_eigen_si() / physics::Velocity::from_au_d(1.0).to_ms();
+    auto r_au = position.to_eigen_si() / (constants::AU * 1000.0);
+    auto v_aud = velocity.to_eigen_si() * (86400.0 / (constants::AU * 1000.0));
     return r_au.cross(v_aud);
 }
 
@@ -130,9 +130,11 @@ CartesianElements keplerian_to_cartesian(const KeplerianElements& kep) {
     // state_cart is AuDayTag: raw values in AU and AU/day
 
     // 3. Convert AU/AU·day → m/m·s for CartesianElements (always SI)
-    const double AU_TO_M = physics::Distance::from_au(1.0).to_m();
-    const double AUd_TO_MS = physics::Velocity::from_au_d(1.0).to_ms();
-    const double AU3d2_TO_M3s2 = physics::GravitationalParameter::from_au3_d2(1.0).to_m3_s2();
+    constexpr double AU_TO_M   = AU * 1000.0;        // AU → m
+    constexpr double AUd_TO_MS = AU_TO_M / 86400.0;  // AU/day → m/s
+
+    // Convert GM: AU³/day² → m³/s²
+    constexpr double AU3d2_TO_M3s2 = (AU_TO_M * AU_TO_M * AU_TO_M) / (86400.0 * 86400.0);
 
     CartesianElements cart;
     cart.epoch = kep.epoch;
@@ -150,7 +152,9 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     kep.epoch = cart.epoch;
     // CartesianElements.gravitational_parameter is in m³/s² (SI).
     // KeplerianElements.gravitational_parameter is in AU³/day².
-    kep.gravitational_parameter = physics::GravitationalParameter::from_si(cart.gravitational_parameter).to_au3_d2();
+    constexpr double AU_M = AU * 1000.0;
+    constexpr double M3s2_TO_AU3d2 = (86400.0 * 86400.0) / (AU_M * AU_M * AU_M);
+    kep.gravitational_parameter = cart.gravitational_parameter * M3s2_TO_AU3d2;
 
     double mu = cart.gravitational_parameter; // m³/s²
 
@@ -174,7 +178,9 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     // ε = v²/2 - μ/r = -μ/(2a)  =>  a = -μ/(2ε)
     double specific_energy = 0.5 * v_mag * v_mag - mu / r_mag;
     double a = -mu / (2.0 * specific_energy);
-    double a_au = a / physics::Distance::from_au(1.0).to_m();
+    // CartesianElements is always SI (m, m/s, m³/s²), so 'a' is in meters.
+    // KeplerianElements.semi_major_axis is always in AU. AU_M defined above.
+    double a_au = a / AU_M;
     
     kep.semi_major_axis = a_au;
     kep.eccentricity = e;

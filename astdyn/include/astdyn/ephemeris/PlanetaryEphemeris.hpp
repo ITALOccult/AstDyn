@@ -65,9 +65,9 @@ public:
     /**
      * @param body Celestial body
      * @param t Epoch (TDB)
-     * @return CartesianState in J2000 equatorial frame [m, m/s]
+     * @return CartesianState in J2000 equatorial frame (GCRF)
      */
-    static coordinates::CartesianState getState(CelestialBody body, time::EpochTDB t);
+    static physics::CartesianStateTyped<core::GCRF> getState(CelestialBody body, time::EpochTDB t);
     
     /**
      * @param t Epoch (TDB)
@@ -84,8 +84,8 @@ public:
      * @param t Epoch (TDB)
      * @return State relative to Solar System Barycenter
      */
-    static coordinates::CartesianState heliocentricToBarycentric(
-        const coordinates::CartesianState& heliocentric_state, 
+    static physics::CartesianStateTyped<core::GCRF> heliocentricToBarycentric(
+        const physics::CartesianStateTyped<core::GCRF>& heliocentric_state, 
         time::EpochTDB t
     );
 
@@ -98,6 +98,11 @@ public:
      * @param provider Shared pointer to provider (can be null to reset to default)
      */
     static void setProvider(std::shared_ptr<EphemerisProvider> provider);
+    
+    /**
+     * @return Current ephemeris provider (usually DE441)
+     */
+    static std::shared_ptr<EphemerisProvider> getProvider() { return global_provider_; }
 
 private:
     static std::shared_ptr<EphemerisProvider> global_provider_;

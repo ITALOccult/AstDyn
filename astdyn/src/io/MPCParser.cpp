@@ -38,13 +38,6 @@ observations::OpticalObservation MPCParser::parse_line(const std::string& line) 
         } catch (...) {}
     }
     
-    // Diagnostic: print first few rows parsed
-    static int p_count = 0;
-    if (p_count++ < 2) {
-        std::cout << "[PARSER-DIAG] Line: " << line.substr(0, 70) << "...\n";
-        std::cout << "              RA=" << obs.ra.to_deg() << " deg, Dec=" << obs.dec.to_deg() << " deg" << std::endl;
-    }
-
     return obs;
 }
 

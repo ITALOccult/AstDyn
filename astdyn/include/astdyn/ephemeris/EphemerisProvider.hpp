@@ -18,6 +18,7 @@
 #include "src/core/frame_tags.hpp"
 #include "src/core/units.hpp"
 #include "astdyn/core/physics_types.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include <Eigen/Dense>
 #include <string>
 
@@ -52,15 +53,11 @@ public:
      * @brief Get full state (position + velocity)
      * 
      * @param body Celestial body
-     * @param jd_tdb Julian Date (TDB time scale)
-     * @return State vector [pos (AU), vel (AU/day)] in J2000 ecliptic frame
+     * @param t Time
+     * @return State in J2000 equatorial frame (GCRF)
      */
-    virtual Eigen::Matrix<double, 6, 1> getState(CelestialBody body, time::EpochTDB t) {
-        Eigen::Matrix<double, 6, 1> state;
-        const auto pos = getPosition(body, t);
-        const auto vel = getVelocity(body, t);
-        state << pos.x_si(), pos.y_si(), pos.z_si(), vel.x_si(), vel.y_si(), vel.z_si();
-        return state;
+    virtual physics::CartesianStateTyped<core::GCRF> getState(CelestialBody body, time::EpochTDB t) {
+        return physics::CartesianStateTyped<core::GCRF>::from_si(t, getPosition(body, t), getVelocity(body, t));
     }
     
     /**

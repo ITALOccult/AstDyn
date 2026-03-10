@@ -14,17 +14,20 @@ namespace astdyn::orbit_determination {
 
 using namespace astdyn::propagation;
 
+// ============================================================================
+// StateTransitionMatrix Implementation
+// ============================================================================
+
 template <typename Frame>
 StateTransitionMatrix<Frame>::StateTransitionMatrix(
     std::shared_ptr<propagation::Propagator> propagator)
     : propagator_(propagator) {
     
-    // Always use an explicit RKF78 integrator for the augmented ODE (6 state + 36 STM = 42
-    // components).
-    integrator_ = std::make_shared<RKF78Integrator<Eigen::VectorXd>>(
-        0.05,    // initial step: 0.05 day
-        1e-12,   // relative tolerance
-        1e-12    // absolute tolerance (min_step)
+    // STM always uses a dedicated high-precision RKF78 integrator
+    // to avoid interference with the propagator's integrator and ensure stability
+    integrator_ = std::make_shared<RKF78Integrator>(
+        0.1,      // initial step [days]
+        1e-13     // high precision for variational equations
     );
 }
 
@@ -55,46 +58,37 @@ STMResult<Frame> StateTransitionMatrix<Frame>::propagate_with_stm(
     const physics::CartesianStateTyped<Frame>& initial,
     time::EpochTDB target_time) {
     
+    // Unified Strategy: Always integrate in ECLIPJ2000 AU/day internally
+    // if propagator is configured for Ecliptic.
+    const bool use_ecl = (propagator_ && propagator_->settings().integrate_in_ecliptic);
+    
     Eigen::VectorXd y0(42);
     
-    // Convert to AU/Day for numeric stability during integration
-    y0.segment<3>(0) = initial.position.to_eigen_si() / physics::Distance::from_au(1.0).to_m();
-    y0.segment<3>(3) = initial.velocity.to_eigen_si() / physics::Velocity::from_au_d(1.0).to_ms();
+    if (use_ecl) {
+        auto initial_ecl = initial.template cast_frame<core::ECLIPJ2000>();
+        y0.head<6>() = initial_ecl.to_eigen_au_aud();
+    } else {
+        y0.head<6>() = initial.to_eigen_au_aud();
+    }
     
+    // Initial identity for STM
     for (int i = 0; i < 6; ++i) {
         for (int j = 0; j < 6; ++j) {
             y0[6 + i * 6 + j] = (i == j) ? 1.0 : 0.0;
         }
     }
     
-    auto f_augmented = [this](time::EpochTDB t_tdb, const Eigen::VectorXd& y) -> Eigen::VectorXd {
-        StateAU state_au;
-        state_au.epoch = t_tdb;
-        state_au.x = y[0]; state_au.y = y[1]; state_au.z = y[2];
-        state_au.vx = y[3]; state_au.vy = y[4]; state_au.vz = y[5];
-        state_au.gm = physics::GravitationalParameter::from_au3_d2(propagator_->settings().central_body_gm);
-
-        if (y.size() < 42) {
-            auto dot = propagator_->compute_derivatives_au(t_tdb, state_au);
-            Eigen::VectorXd res(6);
-            res << dot.dx.to_au_d(), dot.dy.to_au_d(), dot.dz.to_au_d(),
-                   dot.dvx.to_au_d2(), dot.dvy.to_au_d2(), dot.dvz.to_au_d2();
-            return res;
-        }
-
+    auto f_augmented = [this](double t_val, const Eigen::VectorXd& y) -> Eigen::VectorXd {
+        const auto t_tdb = time::EpochTDB::from_mjd(t_val);
+        const Eigen::VectorXd state = y.head<6>();
+        
         astdyn::Matrix6d phi;
         for (int i = 0; i < 6; ++i) {
-            for (int j = 0; j < 6; ++j) {
-                phi(i, j) = y[6 + i * 6 + j];
-            }
+            for (int j = 0; j < 6; ++j) phi(i, j) = y[6 + i * 6 + j];
         }
         
-        auto dot = propagator_->compute_derivatives_au(t_tdb, state_au);
-        Eigen::VectorXd f_state(6);
-        f_state << dot.dx.to_au_d(), dot.dy.to_au_d(), dot.dz.to_au_d(),
-                   dot.dvx.to_au_d2(), dot.dvy.to_au_d2(), dot.dvz.to_au_d2();
-                   
-        astdyn::Matrix6d A = compute_jacobian(t_tdb, y.head<6>());
+        Eigen::VectorXd f_state = propagator_->compute_derivatives(t_tdb, state);
+        astdyn::Matrix6d A = compute_jacobian(t_tdb, state);
         astdyn::Matrix6d phi_dot = A * phi;
         
         Eigen::VectorXd dy(42);
@@ -110,15 +104,15 @@ STMResult<Frame> StateTransitionMatrix<Frame>::propagate_with_stm(
     Eigen::VectorXd yf = integrator_->integrate(
         f_augmented, y0, initial.epoch.mjd(), target_time.mjd());
     
-    const double au_m = constants::AU * 1000.0;
-    const double aud_ms = au_m / 86400.0;
-    
-    auto final_state = physics::CartesianStateTyped<Frame>::from_si(
-        target_time,
-        yf[0] * au_m, yf[1] * au_m, yf[2] * au_m,
-        yf[3] * aud_ms, yf[4] * aud_ms, yf[5] * aud_ms,
-        initial.gm.to_m3_s2()
-    );
+    physics::CartesianStateTyped<Frame> final_state;
+    if (use_ecl) {
+        auto final_ecl = physics::CartesianStateTyped<core::ECLIPJ2000>::from_au_aud(
+            target_time, yf.head<6>(), initial.gm);
+        final_state = final_ecl.template cast_frame<Frame>();
+    } else {
+        final_state = physics::CartesianStateTyped<Frame>::from_au_aud(
+            target_time, yf.head<6>(), initial.gm);
+    }
     
     astdyn::Matrix6d phi;
     for (int i = 0; i < 6; ++i) {
@@ -133,17 +127,54 @@ STMResult<Frame> StateTransitionMatrix<Frame>::propagate_with_stm(
 template <typename Frame>
 astdyn::Matrix6d StateTransitionMatrix<Frame>::compute_jacobian(time::EpochTDB t, const Eigen::VectorXd& state) {
     astdyn::Matrix6d A = astdyn::Matrix6d::Zero();
-    
-    // Top-right 3x3: Velocity identity
     A.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
     
-    // Bottom-left 3x3: Acceleration-Position partials (Analytical for Central Body)
-    Eigen::Vector3d r = state.head<3>();
-    double r_mag = r.norm();
-    double mu = propagator_->settings().central_body_gm;
+    const Eigen::Vector3d r_ast = state.head<3>();
+    const double mu_sun = propagator_->settings().central_body_gm;
     
-    // Grad(a) = -mu/r^3 * [I - 3(r*r^T)/r^2]
-    A.block<3, 3>(3, 0) = compute_acceleration_position_partial(r, mu);
+    // 1. Central body (Sun) partials
+    A.block<3, 3>(3, 0) = compute_acceleration_position_partial(r_ast, mu_sun);
+    
+    // 2. Planetary perturbations partials (Analytical)
+    if (propagator_->settings().include_planets) {
+        auto provider = ephemeris::PlanetaryEphemeris::getProvider();
+        auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
+        Eigen::Vector3d sun_pos_bary_au = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
+        
+        static const math::RotationMatrix<core::GCRF, core::ECLIPJ2000> rot_ecl = 
+            coordinates::ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>();
+
+        if (propagator_->settings().integrate_in_ecliptic) {
+            sun_pos_bary_au = rot_ecl.to_eigen() * sun_pos_bary_au;
+        }
+
+        auto add_planetary_jacobian = [&](ephemeris::CelestialBody body, double gm_au) {
+            auto p_pos_bary = provider->getPosition(body, t);
+            Eigen::Vector3d p_pos_bary_au = p_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
+            
+            if (propagator_->settings().integrate_in_ecliptic) {
+                p_pos_bary_au = rot_ecl.to_eigen() * p_pos_bary_au;
+            }
+            
+            Eigen::Vector3d r_planet_helio = p_pos_bary_au - sun_pos_bary_au;
+            // Analytical gradient of GM * (r_p - r) / |r_p - r|^3 w.r.t r
+            // This is exactly compute_acceleration_position_partial with relative vector (r - r_p)
+            A.block<3, 3>(3, 0) += compute_acceleration_position_partial(r_ast - r_planet_helio, gm_au);
+        };
+
+        const auto& s = propagator_->settings();
+        if (s.perturb_mercury) add_planetary_jacobian(ephemeris::CelestialBody::MERCURY, constants::GM_MERCURY_AU);
+        if (s.perturb_venus)   add_planetary_jacobian(ephemeris::CelestialBody::VENUS,   constants::GM_VENUS_AU);
+        if (s.perturb_earth)   add_planetary_jacobian(ephemeris::CelestialBody::EARTH,   constants::GM_EARTH_AU);
+        if (s.perturb_mars)    add_planetary_jacobian(ephemeris::CelestialBody::MARS,    constants::GM_MARS_AU);
+        if (s.perturb_jupiter) add_planetary_jacobian(ephemeris::CelestialBody::JUPITER, constants::GM_JUPITER_AU);
+        if (s.perturb_saturn)  add_planetary_jacobian(ephemeris::CelestialBody::SATURN,  constants::GM_SATURN_AU);
+        if (s.perturb_uranus)  add_planetary_jacobian(ephemeris::CelestialBody::URANUS,  constants::GM_URANUS_AU);
+        if (s.perturb_neptune) add_planetary_jacobian(ephemeris::CelestialBody::NEPTUNE, constants::GM_NEPTUNE_AU);
+    }
+    
+    // Note: Relativity and Non-gravitational partials (Yarkovsky) are tiny and neglected in Jacobian
+    // for performance. They will be captured by the residuals but not the STM geometry.
 
     return A;
 }
@@ -171,34 +202,34 @@ Eigen::Matrix<double, 2, 6> StateTransitionMatrix<Frame>::compute_observation_pa
     // 1. Must use GCRF for RA/Dec partials
     auto pos_gcrf = coordinates::ReferenceFrame::transform_pos<Frame, core::GCRF>(state.position, state.epoch);
     
-    // rho = r_obj - r_obs (Heliocentric vectors in GCRF, in AU)
-    const double au_m = constants::AU * 1000.0;
-    Eigen::Vector3d rho_vec(pos_gcrf.x_si() / au_m - observer_pos.x_si() / au_m,
-                            pos_gcrf.y_si() / au_m - observer_pos.y_si() / au_m,
-                            pos_gcrf.z_si() / au_m - observer_pos.z_si() / au_m);
+    // rho = r_obj - r_obs (Heliocentric vectors in GCRF)
+    Eigen::Vector3d rho_vec(pos_gcrf.x_si() - observer_pos.x_si(),
+                            pos_gcrf.y_si() - observer_pos.y_si(),
+                            pos_gcrf.z_si() - observer_pos.z_si());
     
-    double rho2 = rho_vec.squaredNorm();
-    double rho = std::sqrt(rho2);
+    double rho = rho_vec.norm();
+    double rho2 = rho * rho;
     double rho_xy2 = rho_vec.x() * rho_vec.x() + rho_vec.y() * rho_vec.y();
     double cos_dec = std::sqrt(rho_xy2) / rho;
 
     // Handle singularity at poles
     if (rho_xy2 < 1e-12) rho_xy2 = 1e-12;
 
-    double rho_xy = std::sqrt(rho_xy2);
-    
     Eigen::Matrix<double, 2, 3> d_radec_d_rho_gcrf;
     
-    // RA: ra = atan2(y, x).  d(ra) = (x dy - y dx) / (x^2 + y^2) [rad/AU]
-    // Properly project RA partial with cos(dec) to match residuals: d(RA*cos(dec))/dx
-    d_radec_d_rho_gcrf(0, 0) = (-rho_vec.y() / rho_xy2) * cos_dec;
-    d_radec_d_rho_gcrf(0, 1) = ( rho_vec.x() / rho_xy2) * cos_dec;
+    // Partially projected RA: d(alpha * cos(dec)) / d(rho)
+    // alpha = atan2(y, x) -> d(alpha)/dx = -y/(x^2+y^2), d(alpha)/dy = x/(x^2+y^2)
+    // d(alpha * cos(dec))/dx = (-y / rho_xy2) * cos(dec)
+    d_radec_d_rho_gcrf(0, 0) = -rho_vec.y() / rho_xy2 * cos_dec;
+    d_radec_d_rho_gcrf(0, 1) =  rho_vec.x() / rho_xy2 * cos_dec;
     d_radec_d_rho_gcrf(0, 2) =  0.0;
     
-    // Dec: dec = asin(z/rho). d(dec) = [ (x^2+y^2).dz - z(x.dx + y.dy) ] / [ rho^2 * sqrt(x^2+y^2) ]
-    d_radec_d_rho_gcrf(1, 0) = -rho_vec.x() * rho_vec.z() / (rho2 * rho_xy);
-    d_radec_d_rho_gcrf(1, 1) = -rho_vec.y() * rho_vec.z() / (rho2 * rho_xy);
-    d_radec_d_rho_gcrf(1, 2) = rho_xy / rho2;
+    // Dec: sin(dec) = z/rho -> cos(dec) d(dec) = d(z/rho)
+    // d(dec)/dx = -x*z / (rho^2 * sqrt(rho^2 - z^2))
+    double sqrt_rho2_mz2 = std::max(1e-6, std::sqrt(rho2 - rho_vec.z() * rho_vec.z()));
+    d_radec_d_rho_gcrf(1, 0) = -rho_vec.x() * rho_vec.z() / (rho2 * sqrt_rho2_mz2);
+    d_radec_d_rho_gcrf(1, 1) = -rho_vec.y() * rho_vec.z() / (rho2 * sqrt_rho2_mz2);
+    d_radec_d_rho_gcrf(1, 2) = sqrt_rho2_mz2 / rho2;
     
     // 2. Chain rule: ∂obs/∂x_frame = ∂obs/∂x_gcrf * ∂x_gcrf/∂x_frame
     // ∂x_gcrf/∂x_frame = R (rotation matrix)
@@ -211,115 +242,32 @@ Eigen::Matrix<double, 2, 6> StateTransitionMatrix<Frame>::compute_observation_pa
     
     Eigen::Matrix<double, 2, 3> d_radec_d_pos_frame = d_radec_d_rho_gcrf * rotation;
 
-    Eigen::Matrix<double, 2, 6> partial_radec_state_au;
-    // Position partials: [rad/AU]
-    // rotation is [AU_frame/AU_gcrf], d_radec_d_rho_gcrf is [rad/AU] if we use AU distances
-    partial_radec_state_au.block<2, 3>(0, 0) = d_radec_d_pos_frame;
+    Eigen::Matrix<double, 2, 6> partial_radec_state_si;
+    // Position partials: [rad/m]
+    partial_radec_state_si.block<2, 3>(0, 0) = d_radec_d_pos_frame;
     
-    // Velocity partials: zero for pure geometric RA/Dec
-    partial_radec_state_au.block<2, 3>(0, 3).setZero();
+    // Velocity partials: 
+    // The STM 'phi' is [dx_AU/dx0_AU, dx_AU/dv0_AUd, ...]
+    // We need d_radec / dv0_si.
+    // d_radec / dv0_si = (d_radec / dx_si) * (dx_si / dx_AU) * (dx_AU / dv0_AUd) * (dv0_AUd / dv0_si)
+    // dv0_AUd / dv0_si = 86400.0 / (constants::AU * 1000.0)
+    double au_to_m = constants::AU * 1000.0;
+    double v_scale = 86400.0 / au_to_m;
     
-    return partial_radec_state_au;
-}
-
-template <typename Frame>
-std::vector<typename StateTransitionMatrix<Frame>::ObservationPartials> StateTransitionMatrix<Frame>::compute_batch(
-    const physics::CartesianStateTyped<Frame>& initial,
-    const std::vector<std::pair<time::EpochTDB, math::Vector3<core::GCRF, physics::Distance>>>& observations) 
-{
-    std::vector<ObservationPartials> results;
-    results.reserve(observations.size());
-
-    if (observations.empty()) return results;
-
-    // 1. Initial augmented state [x(6), phi(36)]
-    // Integration is done in AU and AU/day for numerical stability
-    Eigen::VectorXd y = Eigen::VectorXd::Zero(42);
+    // We don't have direct access to velocity partials of RA/Dec (they are zero at epsilon=0),
+    // but the chain rule for the STM velocity part is:
+    // A_vel = (d_radec / dx_si) * (au_to_m * phi_pos_vel) * v_scale 
+    //       = (d_radec / dx_si) * phi_pos_vel * 86400.0
+    // Actually, when we multiply A * Phi later in DifferentialCorrector,
+    // we just need to ensure A is consistent.
     
-    // Explicit conversion from SI to AU/day
-    const double au_m = constants::AU * 1000.0;
-    const double aud_ms = au_m / 86400.0;
+    // Let's simplify: DifferentialCorrector does: A_obs = partials.partial_radec * cumulative_phi;
+    // If we want correction in SI:
+    // partial_radec_state_si should be [ d_radec/dx_si, d_radec/dv_si ] at time t.
+    // Since RA/Dec only depends on position: d_radec/dv_si = 0.
+    partial_radec_state_si.block<2, 3>(0, 3).setZero();
     
-    auto state_si = initial.to_eigen_si();
-    y.template head<3>() = state_si.template head<3>() / au_m;
-    y.template segment<3>(3) = state_si.template tail<3>() / aud_ms;
-    
-    // Identity mapping for I(t0)
-    for (int i = 0; i < 6; ++i) y[6 + i * 6 + i] = 1.0;
-
-    double t_current = initial.epoch.mjd();
-
-    // Augmented ODE system: dy/dt = [v, a, dPhi/dt]
-    auto f_augmented = [&](time::EpochTDB t, const Eigen::VectorXd& y_aug) -> Eigen::VectorXd {
-        Eigen::VectorXd dy = Eigen::VectorXd::Zero(42);
-        
-        StateAU state_au;
-        state_au.epoch = t;
-        state_au.x = y_aug[0]; state_au.y = y_aug[1]; state_au.z = y_aug[2];
-        state_au.vx = y_aug[3]; state_au.vy = y_aug[4]; state_au.vz = y_aug[5];
-        state_au.gm = physics::GravitationalParameter::from_au3_d2(propagator_->settings().central_body_gm);
-
-        // State derivatives [v, a]
-        auto dot = propagator_->compute_derivatives_au(t, state_au);
-        dy[0] = dot.dx.to_au_d(); dy[1] = dot.dy.to_au_d(); dy[2] = dot.dz.to_au_d();
-        dy[3] = dot.dvx.to_au_d2(); dy[4] = dot.dvy.to_au_d2(); dy[5] = dot.dvz.to_au_d2();
-        
-        // Phi derivatives: dPhi/dt = A(t) * Phi
-        astdyn::Matrix6d Phi;
-        for (int i = 0; i < 6; ++i) {
-            for (int j = 0; j < 6; ++j) Phi(i, j) = y_aug[6 + i * 6 + j];
-        }
-        
-        astdyn::Matrix6d A = compute_jacobian(t, y_aug.template head<6>());
-        astdyn::Matrix6d Phi_dot = A * Phi;
-        
-        for (int i = 0; i < 6; ++i) {
-            for (int j = 0; j < 6; ++j) dy[6 + i * 6 + j] = Phi_dot(i, j);
-        }
-        
-        return dy;
-    };
-
-    // 2. Continuous Propagation through all sorted observations
-    std::vector<double> target_times;
-    target_times.reserve(observations.size());
-    for (const auto& obs : observations) {
-        target_times.push_back(obs.first.mjd());
-    }
-
-    // Single batch integration call - allows the integrator (e.g. Adams) 
-    // to maintain internal state/history across all points.
-    auto states_batch = integrator_->integrate_batch(f_augmented, y, t_current, target_times);
-
-    // 3. Extract results
-    for (size_t i = 0; i < observations.size(); ++i) {
-        const auto& obs = observations[i];
-        const auto& y_res = states_batch[i];
-        
-        ObservationPartials res;
-        
-        // 5. Final state in SI: Position [m], Velocity [m/s]
-        const double au_m = constants::AU * 1000.0;
-        const double aud_ms = au_m / 86400.0;
-        
-        res.final_state = physics::CartesianStateTyped<Frame>::from_si(
-            obs.first,
-            y_res[0] * au_m, y_res[1] * au_m, y_res[2] * au_m,
-            y_res[3] * aud_ms, y_res[4] * aud_ms, y_res[5] * aud_ms,
-            initial.gm.to_m3_s2());
-        
-        // STM Units: The integrator works in AU and AU/day.
-        // res.phi is used directly in AU units for normalized design matrix
-        for (int r = 0; r < 6; ++r) {
-            for (int r2 = 0; r2 < 6; ++r2) res.phi(r, r2) = y_res[6 + r * 6 + r2];
-        }
-        
-        // RA/Dec partials w.r.t integration frame (now specifically in rad/AU)
-        res.partial_radec = compute_observation_partials(res.final_state, obs.second);
-        results.push_back(res);
-    }
-
-    return results;
+    return partial_radec_state_si;
 }
 
 // Explicit instantiations

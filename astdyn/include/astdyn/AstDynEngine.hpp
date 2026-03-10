@@ -297,7 +297,7 @@ OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
     
     DifferentialCorrectorSettings dc_settings;
     dc_settings.max_iterations = config_.max_iterations;
-    dc_settings.convergence_tolerance = config_.convergence_threshold;
+    dc_settings.convergence_tolerance = physics::Distance::from_au(config_.convergence_threshold);
     dc_settings.outlier_sigma = config_.outlier_sigma;
     dc_settings.outlier_max_sigma = std::max(100.0, config_.outlier_sigma * 10.0); 
     dc_settings.outlier_min_sigma = config_.outlier_sigma;

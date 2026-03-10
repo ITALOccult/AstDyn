@@ -54,50 +54,48 @@ AstDynEngine::AstDynEngine(const AstDynConfig& config)
 
 void AstDynEngine::update_propagator() {
     // Create integrator based on configuration
-    std::shared_ptr<Integrator<StateAU, DerivativeAU>> integrator;
+    std::unique_ptr<Integrator> integrator;
     
     switch (config_.integrator_type) {
         case IntegratorType::RKF78:
-            integrator = std::make_shared<RKF78Integrator<StateAU, DerivativeAU>>(
+            integrator = std::make_unique<RKF78Integrator>(
                 config_.initial_step_size,
                 config_.tolerance);
             break;
         case IntegratorType::RK4:
-            integrator = std::make_shared<RK4Integrator<StateAU, DerivativeAU>>(
+            integrator = std::make_unique<RK4Integrator>(
                 config_.initial_step_size);
             break;
         case IntegratorType::SABA4: {
             double saba_step = std::max(0.5, config_.initial_step_size);
-            integrator = std::make_shared<SABA4Integrator<StateAU, DerivativeAU>>(
+            integrator = std::make_unique<SABA4Integrator>(
                 saba_step,
                 config_.tolerance);
             break;
         }
         case IntegratorType::GAUSS:
-            integrator = std::make_shared<GaussIntegrator<StateAU, DerivativeAU>>(
+            integrator = std::make_unique<GaussIntegrator>(
                 config_.initial_step_size,
                 config_.tolerance);
             break;
         case IntegratorType::RADAU:
-            // Placeholder: Use RKF78 if template not ready
-            integrator = std::make_shared<RKF78Integrator<StateAU, DerivativeAU>>(
+            integrator = std::make_unique<RadauIntegrator>(
                 config_.initial_step_size,
                 config_.tolerance);
             break;
         case IntegratorType::AAS: {
-            // Placeholder: Use RKF78 if template not ready
-            integrator = std::make_shared<RKF78Integrator<StateAU, DerivativeAU>>(
-                config_.initial_step_size,
-                config_.tolerance);
+            double mu_val = config_.propagator_settings.central_body_gm;
+            integrator = std::make_unique<AASIntegrator>(
+                config_.aas_precision, 
+                mu_val);
             break;
         }
         default:
-            integrator = std::make_shared<RK4Integrator<StateAU, DerivativeAU>>(config_.initial_step_size);
+            integrator = std::make_unique<RK4Integrator>(config_.initial_step_size);
             break;
     }
     
-    // Update propagator member (expects shared_ptr)
-    propagator_ = std::make_shared<propagation::Propagator>(integrator, ephemeris_, config_.propagator_settings);
+    // Update Ephemeris Provider based on config
     if (config_.ephemeris_type == EphemerisType::DE441 && !config_.ephemeris_file.empty()) {
         if (!ephemeris_loaded_ || loaded_ephemeris_file_ != config_.ephemeris_file) {
             try {
@@ -310,7 +308,7 @@ void AstDynEngine::export_orbit(const std::string& filename, const std::string& 
 
 double AstDynEngine::shadow_hamiltonian_drift() const {
     if (propagator_) {
-        return propagator_->statistics().hamiltonian_drift;
+        return propagator_->statistics().shadow_hamiltonian_drift;
     }
     return 0.0;
 }
