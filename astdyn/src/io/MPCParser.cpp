@@ -1,4 +1,4 @@
-    /**
+/**
  * @file MPCParser.cpp
  * @brief MPC 80-column observation parser.
  */
@@ -7,36 +7,44 @@
 #include <sstream>
 #include <iomanip>
 #include <cmath>
+#include <iostream>
 
 namespace astdyn::io {
 
 observations::OpticalObservation MPCParser::parse_line(const std::string& line) {
-    if (line.size() < 80) return {};
+    observations::OpticalObservation obs = {};
+    if (line.size() < 80) return obs;
 
-    observations::OpticalObservation obs;
-    
     // Identification
     obs.object_designation = line.substr(0, 12);
     obs.observatory_code = line.substr(77, 3);
     
-    // MPC format: date at columns 16-32 (1-indexed) = index 15 (0-indexed), length 16.
-    // substr(16, 16) was off-by-one: skipped the millennium digit of the year.
-    obs.time = parse_date(line.substr(15, 16));
+    std::string date_part = line.substr(15, 17); // Correctly 17 chars for precision
+    obs.time = parse_date(date_part);
     
     // RA (32-44)
-    obs.ra = parse_ra(line.substr(32, 12));
+    std::string ra_part = line.substr(32, 12);
+    obs.ra = parse_ra(ra_part);
     
     // Dec (44-56)
-    obs.dec = parse_dec(line.substr(44, 12));
+    std::string dec_part = line.substr(44, 12);
+    obs.dec = parse_dec(dec_part);
     
-    // Magnitude (65-70)
-    std::string mag_str = line.substr(65, 5);
-    if (!mag_str.empty() && mag_str != "     ") {
+    // Magnitude (65-71)
+    std::string mag_str = line.substr(65, 6);
+    if (!mag_str.empty() && mag_str != "      ") {
         try {
             obs.magnitude = std::stod(mag_str);
         } catch (...) {}
     }
     
+    // Diagnostic: print first few rows parsed
+    static int p_count = 0;
+    if (p_count++ < 2) {
+        std::cout << "[PARSER-DIAG] Line: " << line.substr(0, 70) << "...\n";
+        std::cout << "              RA=" << obs.ra.to_deg() << " deg, Dec=" << obs.dec.to_deg() << " deg" << std::endl;
+    }
+
     return obs;
 }
 
@@ -45,21 +53,44 @@ std::vector<observations::OpticalObservation> MPCParser::parse_file(const std::s
     std::stringstream ss(content);
     std::string line;
     while (std::getline(ss, line)) {
-        if (line.size() >= 80) {
-            results.push_back(parse_line(line));
-        }
+        if (line.size() < 80) continue;
+        // Skip auxiliary satellite-offset records (MPC column 15 == 's').
+        // These encode the observer spacecraft position in km, not RA/Dec.
+        if (line[14] == 's') continue;
+        results.push_back(parse_line(line));
     }
     return results;
 }
 
 time::EpochUTC MPCParser::parse_date(const std::string& date_str) {
-    int y, m;
-    double d;
-    std::stringstream ss(date_str);
-    ss >> y >> m >> d;
+    if (date_str.empty()) return {};
+
+    int y = 0, m = 0;
+    double d = 0.0;
+
+    // MPC Dates usually start at column 16. Substring is 16 chars.
+    // Examples: "2004 03 15.12" or "K04 03 15.12"
+    if (std::isdigit(date_str[0])) {
+        // Numeric year (e.g., "2004")
+        std::stringstream ss(date_str);
+        if (!(ss >> y >> m >> d)) return {};
+    } else {
+        // Packed year (e.g., "K04")
+        char c = date_str[0];
+        int century = 0;
+        if (c == 'I') century = 1800;
+        else if (c == 'J') century = 1900;
+        else if (c == 'K') century = 2000;
+        else return {};
+
+        try {
+            y = century + std::stoi(date_str.substr(1, 2));
+            m = std::stoi(date_str.substr(4, 2)); // Month at index 4 (packed format: "KYY MM DD.ddddd")
+            d = std::stod(date_str.substr(7));   // Day starts after second space
+        } catch(...) { return {}; }
+    }
     
-    // Convert Y/M/D to MJD
-    // Formula from Meeus
+    // Julian Date conversion (Meeus formula)
     if (m <= 2) {
         y -= 1;
         m += 12;
@@ -72,19 +103,36 @@ time::EpochUTC MPCParser::parse_date(const std::string& date_str) {
 
 astrometry::RightAscension MPCParser::parse_ra(const std::string& ra_str) {
     std::stringstream ss(ra_str);
-    double h, m, s;
-    if (!(ss >> h >> m >> s)) return astrometry::RightAscension();
+    double h = 0, m = 0, s = 0;
+    if (!(ss >> h >> m >> s)) {
+        // Fallback for cases with weird formatting (e.g. trailing characters)
+        return astrometry::RightAscension();
+    }
     double deg = (h + m / 60.0 + s / 3600.0) * 15.0; // hrs -> deg
     return astrometry::RightAscension(astrometry::Angle::from_deg(deg));
 }
 
 astrometry::Declination MPCParser::parse_dec(const std::string& dec_str) {
-    std::stringstream ss(dec_str);
-    double d, m, s;
-    char sign;
-    if (!(ss >> std::skipws >> sign >> d >> m >> s)) return astrometry::Declination();
-    double deg = d + m / 60.0 + s / 3600.0;
-    if (sign == '-') deg = -deg;
+    // MPC Dec: "+DD MM SS.ss" or "-DD MM SS.ss"
+    // Use manual sign check to avoid stream confusion with internal spaces
+    double d = 0, m = 0, s = 0;
+    double sign = 1.0;
+    
+    size_t first_non_space = dec_str.find_first_not_of(' ');
+    if (first_non_space == std::string::npos) return astrometry::Declination();
+    
+    if (dec_str[first_non_space] == '-') sign = -1.0;
+    
+    // Clean string for streaming (replace sign with space)
+    std::string clean = dec_str;
+    if (clean[first_non_space] == '+' || clean[first_non_space] == '-') {
+        clean[first_non_space] = ' ';
+    }
+    
+    std::stringstream ss(clean);
+    if (!(ss >> d >> m >> s)) return astrometry::Declination();
+    
+    double deg = sign * (d + m / 60.0 + s / 3600.0);
     return astrometry::Declination(astrometry::Angle::from_deg(deg));
 }
 

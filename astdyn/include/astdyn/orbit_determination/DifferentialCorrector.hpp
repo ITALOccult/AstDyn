@@ -17,6 +17,7 @@
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/math/frame_algebra.hpp"
 #include "astdyn/time/TimeScale.hpp"
+#include "astdyn/orbit_determination/ODSmartPolicy.hpp"
 #include <memory>
 #include <functional>
 #include <vector>
@@ -32,7 +33,7 @@ namespace astdyn::orbit_determination {
  */
 struct DifferentialCorrectorSettings {
     int max_iterations = 20;             ///< Maximum iterations
-    double convergence_tolerance = 1e-6; ///< Convergence threshold [AU] (position correction norm)
+    physics::Distance convergence_tolerance = physics::Distance::from_au(1e-6); ///< Convergence threshold
     double outlier_sigma = 3.0;          ///< Target Sigma threshold (default)
     
     // Carpentry Settings (Iterative Rejection)
@@ -44,6 +45,11 @@ struct DifferentialCorrectorSettings {
     bool verbose = false;                ///< Print iteration details
     bool use_line_search = true;         ///< Backtracking line search to prevent divergence
     double line_search_min_alpha = 1e-4; ///< Minimum step fraction before giving up
+    double rms_tolerance_arcsec  = 0.001; ///< Absolute ΔRMS convergence threshold [arcsec]
+
+    // Rule 2 — Energy barrier (OrbFit-style non-physical solution rejection)
+    bool  check_energy_barrier    = true;  ///< Reject solution if SMA drifts > threshold
+    double energy_barrier_fraction = 0.5;  ///< Max allowed |Δa|/a₀ before rejection (0.5 = 50%)
 };
 
 /**
@@ -73,6 +79,9 @@ struct DifferentialCorrectorResult {
     // Convergence history
     std::vector<double> rms_history;     ///< RMS at each iteration
     std::vector<double> correction_norm; ///< ||Δx|| at each iteration
+
+    // Rule 2 — Energy barrier
+    std::string rejection_reason;        ///< Set if convergence blocked by energy barrier
     
     /**
      * @brief Get 1-sigma uncertainty for parameter
@@ -128,14 +137,27 @@ public:
         });
         
         physics::CartesianStateTyped<Frame> current_state = initial_guess;
-        
+
+        // Rule 2 — Energy barrier: record initial semi-major axis (AU)
+        // Only meaningful for GCRF frames; for other frames compute_sma_au still
+        // works because the speed/distance magnitudes are identical.
+        double a0_au = 0.0;
+        if (settings.check_energy_barrier) {
+            a0_au = ODPolicyEngine::compute_sma_au(
+                physics::CartesianStateTyped<core::GCRF>::from_si(
+                    initial_guess.epoch,
+                    initial_guess.position.x_si(), initial_guess.position.y_si(), initial_guess.position.z_si(),
+                    initial_guess.velocity.x_si(), initial_guess.velocity.y_si(), initial_guess.velocity.z_si(),
+                    initial_guess.gm.to_m3_s2()));
+        }
+
         if (settings.verbose) {
             std::cout << "\n========================================\n";
             std::cout << "Differential Corrections\n";
             std::cout << "========================================\n";
             std::cout << "Observations: " << observations.size() << "\n";
             std::cout << "Max iterations: " << settings.max_iterations << "\n";
-            std::cout << "Convergence: " << settings.convergence_tolerance << " AU\n\n";
+            std::cout << "Convergence: " << settings.convergence_tolerance.to_au() << " AU\n\n";
         }
         
         double current_sigma = std::max(settings.outlier_sigma, settings.outlier_max_sigma);
@@ -149,11 +171,35 @@ public:
             bool iter_success = iteration(sorted_obs, current_state, correction, residuals);
             if (!iter_success) break;
             
-            if (settings.reject_outliers && iter > 0) {
-                // Carpentry: progressively tighten sigma from max to min
-                double t = static_cast<double>(iter) / std::max(settings.max_iterations - 1, 1);
-                current_sigma = settings.outlier_max_sigma + t * (settings.outlier_min_sigma - settings.outlier_max_sigma);
-                ResidualCalculator<Frame>::identify_outliers(residuals, current_sigma);
+            if (settings.reject_outliers) {
+                if (iter == 0) {
+                    // Rule 3 — After iteration 1, if RMS > 3" reject the single worst outlier.
+                    // This prevents one bad observation from biasing the normal equations.
+                    auto stats0 = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
+                    if (stats0.rms_total.to_arcsec() > 3.0) {
+                        size_t worst_idx = 0;
+                        double worst_chi2 = -1.0;
+                        for (size_t i = 0; i < residuals.size(); ++i) {
+                            if (!residuals[i].outlier && residuals[i].chi_squared > worst_chi2) {
+                                worst_chi2 = residuals[i].chi_squared;
+                                worst_idx = i;
+                            }
+                        }
+                        if (worst_chi2 > 0.0) {
+                            residuals[worst_idx].outlier = true;
+                            if (settings.verbose) {
+                                std::cout << "  [Rule3] RMS=" << stats0.rms_total.to_arcsec()
+                                          << "\" > 3\": rejected worst obs (chi²="
+                                          << worst_chi2 << ")\n";
+                            }
+                        }
+                    }
+                } else {
+                    // Carpentry: progressively tighten sigma from max to min
+                    double t = static_cast<double>(iter) / std::max(settings.max_iterations - 1, 1);
+                    current_sigma = settings.outlier_max_sigma + t * (settings.outlier_min_sigma - settings.outlier_max_sigma);
+                    ResidualCalculator<Frame>::identify_outliers(residuals, current_sigma);
+                }
             }
             
             auto stats = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
@@ -169,15 +215,18 @@ public:
                 std::cout.flush();
             }
 
-            // RMS stagnation: if improvement is < 0.001% of previous, declare converged
+            // RMS stagnation: converge when |ΔRMS| < rms_tolerance_arcsec (absolute)
             if (iter > 0 && std::isfinite(cur_rms) && std::isfinite(prev_iter_rms) &&
-                prev_iter_rms > 0.0 &&
-                std::abs(prev_iter_rms - cur_rms) < 1e-5 * prev_iter_rms) {
+                std::abs(prev_iter_rms - cur_rms) < settings.rms_tolerance_arcsec) {
                 result.converged = true;
                 result.final_state = current_state;
                 result.residuals = residuals;
                 result.statistics = stats;
-                if (settings.verbose) std::cout << "  → Converged (RMS stagnated)." << std::endl;
+                if (settings.verbose) {
+                    std::cout << "  → Converged (ΔRMS=" << std::fixed << std::setprecision(4)
+                              << std::abs(prev_iter_rms - cur_rms)
+                              << "\" < " << settings.rms_tolerance_arcsec << "\")." << std::endl;
+                }
                 break;
             }
             prev_iter_rms = cur_rms;
@@ -224,8 +273,7 @@ public:
                 if (!step_accepted) {
                     // Line search couldn't improve RMS — check if correction is negligible
                     // Tolerance is in AU, so convert to meters
-                    auto tol_dist = physics::Distance::from_au(settings.convergence_tolerance);
-                    if (correction.head<3>().norm() < 10.0 * tol_dist.to_m()) {
+                    if (correction.head<3>().norm() < 10.0 * settings.convergence_tolerance.to_m()) {
                         result.converged = true;
                         result.final_state = current_state;
                         result.residuals = residuals;
@@ -240,9 +288,30 @@ public:
                 current_state = make_trial_state(1.0);
             }
 
+            // Rule 2 — Energy barrier: reject if SMA drifts > 50% from initial value
+            if (settings.check_energy_barrier && a0_au > 0.0) {
+                double a_now = ODPolicyEngine::compute_sma_au(
+                    physics::CartesianStateTyped<core::GCRF>::from_si(
+                        current_state.epoch,
+                        current_state.position.x_si(), current_state.position.y_si(), current_state.position.z_si(),
+                        current_state.velocity.x_si(), current_state.velocity.y_si(), current_state.velocity.z_si(),
+                        current_state.gm.to_m3_s2()));
+                double drift = std::abs(a_now - a0_au) / a0_au;
+                if (drift > settings.energy_barrier_fraction) {
+                    result.converged = false;
+                    result.rejection_reason = "energy_barrier: a drifted " +
+                        std::to_string(static_cast<int>(drift * 100)) + "% (>" +
+                        std::to_string(static_cast<int>(settings.energy_barrier_fraction * 100)) + "%)";
+                    if (settings.verbose) {
+                        std::cout << "  → [EnergyBarrier] Non-physical solution rejected: "
+                                  << result.rejection_reason << "\n";
+                    }
+                    break;
+                }
+            }
+
             // Convergence check: correction is in meters
-            auto tol_dist = physics::Distance::from_au(settings.convergence_tolerance);
-            if (correction.head<3>().norm() < tol_dist.to_m()) {
+            if (correction.head<3>().norm() < settings.convergence_tolerance.to_m()) {
                  result.converged = true;
                  result.final_state = current_state;
                  result.residuals = residuals;
@@ -360,26 +429,31 @@ private:
             running_state = partials.final_state;
 
             // Transform cumulative_phi (AU-based) to SI-based (meters, m/s)
-            // Phi_si = S * Phi_au * S_inv
-            // where S = diag(AU*1000, ..., (AU*1000)/86400, ...)
             astdyn::Matrix6d phi_si = cumulative_phi;
             // dr_si = au_m * dr_au
             // dv_si = v_scale * dv_au
-            // d(dr_si)/d(dr0_si) = au_m/au_m * d(dr_au)/d(dr0_au) = phi_11 (dimensionless)
-            // d(dr_si)/d(dv0_si) = au_m/v_scale * d(dr_au)/d(dv0_au) = 86400 * phi_12 (seconds)
-            // d(dv_si)/d(dr0_si) = v_scale/au_m * d(dv_au)/d(dr0_au) = 1/86400 * phi_21 (1/seconds)
-            // d(dv_si)/d(dv0_si) = v_scale/v_scale * d(dv_au)/d(dv0_au) = phi_22 (dimensionless)
+            // d(dr_si)/d(dv0_si) = phi_12 * (dx_si/dx_au) * (dv0_au_d/dv0_si)
             
-            phi_si.block<3, 3>(0, 3) *= 86400.0;
-            phi_si.block<3, 3>(3, 0) /= 86400.0;
+            const double v_scale_phi = physics::Velocity::from_au_d(1.0).to_ms(); // (AU*1000)/86400
+            const double au_m = physics::Distance::from_au(1.0).to_m();
+            
+            // d(pos_si)/d(vel0_si) = d(pos_au*au_m) / d(vel0_ms) 
+            // = au_m * d(pos_au)/d(vel0_aud) * d(vel0_aud)/d(vel0_ms)
+            // = au_m * phi_12 * (1.0 / v_scale_phi)
+            // = phi_12 * (au_m / v_scale_phi) = phi_12 * 86400
+            
+            phi_si.block<3, 3>(0, 3) *= (au_m / v_scale_phi);
+            phi_si.block<3, 3>(3, 0) *= (v_scale_phi / au_m);
 
             Eigen::Matrix<double, 2, 6> A_obs = partials.partial_radec * phi_si;
             result.A.row(row) = A_obs.row(0);
             result.A.row(row + 1) = A_obs.row(1);
             result.b[row] = res.residual_ra.to_rad();
             result.b[row + 1] = res.residual_dec.to_rad();
-            result.weights[row] = 1.0 / (obs.sigma_ra.to_rad() * obs.sigma_ra.to_rad());
-            result.weights[row + 1] = 1.0 / (obs.sigma_dec.to_rad() * obs.sigma_dec.to_rad());
+            // Use the weights pre-computed in ResidualCalculator, which already account
+            // for the cos(dec) projection of the RA sigma (projected sigma).
+            result.weights[row]     = res.weight_ra;
+            result.weights[row + 1] = res.weight_dec;
             row += 2;
         }
         return result;

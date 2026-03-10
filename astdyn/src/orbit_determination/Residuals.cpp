@@ -49,11 +49,16 @@ std::vector<ObservationResidual> ResidualCalculator<Frame>::compute_residuals(
         time::EpochTDB obs_time_tdb = astdyn::time::to_tdb(obs.time);
         
         // Sequential propagation
-        if (propagator_ && (obs_time_tdb.mjd() - running_state.epoch.mjd()) > 1e-12) {
-            running_state = propagator_->propagate_cartesian(running_state, obs_time_tdb);
-        } else if (propagator_ && (obs_time_tdb.mjd() - running_state.epoch.mjd()) < -1e-12) {
-             // If for some reason observations are not perfectly sorted or we have multiple passes
-             running_state = propagator_->propagate_cartesian(state, obs_time_tdb);
+        if (propagator_) {
+            double dt = obs_time_tdb.mjd() - running_state.epoch.mjd();
+            if (dt > 1e-12) {
+                // Future point: continue from current running_state
+                running_state = propagator_->propagate_cartesian(running_state, obs_time_tdb);
+            } else if (dt < -1e-12) {
+                 // Out of order: restart from the original base state
+                 running_state = propagator_->propagate_cartesian(state, obs_time_tdb);
+            }
+            // If |dt| < 1e-12, keep running_state as is (already at the right epoch)
         }
         
         auto residual = compute_residual(obs, running_state);
@@ -144,31 +149,28 @@ std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
     // 7. Compute residuals O-C
     astrometry::Angle d_ra = obs.ra - computed_ra;
     d_ra = d_ra.wrap_pi();
-    
-    // Residual for RA is projected: delta_ra * cos(dec)
-    result.residual_ra = d_ra * std::cos(obs.dec.to_rad());
+
+    // Residual for RA is projected using COMPUTED dec (consistent with the design matrix
+    // partial d(RA*cos(dec))/dx which is also evaluated at the computed position).
+    const double cos_comp_dec = std::cos(computed_dec.to_rad());
+    result.residual_ra = d_ra * cos_comp_dec;
     result.residual_dec = obs.dec - computed_dec;
-    
-    // Diagnostic (disabled)
-    /*
-    static int diag_count = 0;
-    if (diag_count++ < 3) {
-        std::cout << "  [DIAG] Obs: RA=" << obs.ra.to_rad()*180/M_PI << "deg, Dec=" << obs.dec.to_rad()*180/M_PI << "deg\n";
-        std::cout << "  [DIAG] Cal: RA=" << computed_ra.to_rad()*180/M_PI << "deg, Dec=" << computed_dec.to_rad()*180/M_PI << "deg\n";
-        std::cout << "  [DIAG] Dist: " << range / (constants::AU * 1000.0) << " AU | Res: " << result.residual_ra.to_arcsec() << "\", " << result.residual_dec.to_arcsec() << "\"" << std::endl;
-    }
-    */
-    
-    result.normalized_ra = result.residual_ra.to_rad() / obs.sigma_ra.to_rad();
-    result.normalized_dec = result.residual_dec.to_rad() / obs.sigma_dec.to_rad();
-    
+
     double sig_ra_rad = obs.sigma_ra.to_rad();
     double sig_dec_rad = obs.sigma_dec.to_rad();
     if (sig_ra_rad <= 0.0) sig_ra_rad = 1e-10;
     if (sig_dec_rad <= 0.0) sig_dec_rad = 1e-10;
-    
-    result.weight_ra = 1.0 / (sig_ra_rad * sig_ra_rad);
-    result.weight_dec = 1.0 / (sig_dec_rad * sig_dec_rad);
+
+    // Weight for projected RA residual: sigma must also be projected so that
+    // chi_sq = residual_ra^2 * weight_ra = (d_ra*cos(dec))^2 / (sigma_ra*cos(dec))^2
+    //        = d_ra^2 / sigma_ra^2  (correct unprojected chi-squared contribution).
+    const double sig_ra_proj = sig_ra_rad * std::max(cos_comp_dec, 1e-6);
+    result.weight_ra  = 1.0 / (sig_ra_proj  * sig_ra_proj);
+    result.weight_dec = 1.0 / (sig_dec_rad  * sig_dec_rad);
+
+    // Normalised residuals: divide projected residual by projected sigma → ratio = d_ra / sigma_ra
+    result.normalized_ra  = result.residual_ra.to_rad()  / sig_ra_proj;
+    result.normalized_dec = result.residual_dec.to_rad() / sig_dec_rad;
     
     result.chi_squared = result.normalized_ra * result.normalized_ra +
                         result.normalized_dec * result.normalized_dec;
@@ -196,7 +198,9 @@ void ResidualCalculator<Frame>::cartesian_to_radec(
     double cos_elongation = u_sun.dot(eval_dir);
     
     if (d_sun > 1e6 && cos_elongation < 0.999) { 
-        constexpr double TWO_GM_C2 = 2953.36; 
+        // BUG-13: Use derived constant for 2GM/c^2 instead of magic number
+        const double TWO_GM_C2 = 2.0 * physics::GravitationalParameter::sun().to_m3_s2() / 
+                                (physics::SpeedOfLight::to_ms() * physics::SpeedOfLight::to_ms());
         auto cross_prod = u_sun.cross(eval_dir);
         if (cross_prod.norm() > 1e-12) { 
             auto delta_dir = (TWO_GM_C2 / d_sun) * (cross_prod.cross(eval_dir)) / (1.0 + cos_elongation);
@@ -205,8 +209,9 @@ void ResidualCalculator<Frame>::cartesian_to_radec(
     }
 
     // Stellar Aberration
+    // eval_vel is in m/s; C_LIGHT constant is in km/s, so use SpeedOfLight::to_ms() to stay in SI.
     if (aberration_correction_) {
-        auto beta = eval_vel / (constants::C_LIGHT);
+        auto beta = eval_vel / (physics::SpeedOfLight::to_ms());
         double beta_sq = beta.squaredNorm();
         if (beta_sq < 1.0) {
             double gamma = 1.0 / std::sqrt(1.0 - beta_sq);
@@ -231,13 +236,9 @@ std::optional<math::Vector3<core::GCRF, physics::Distance>> ResidualCalculator<F
     
     time::EpochTDB t_tdb = time::to_tdb(obs.time);
     auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_tdb);
-    auto sun_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, t_tdb);
     
-    math::Vector3<core::GCRF, physics::Distance> earth_center_vec = math::Vector3<core::GCRF, physics::Distance>::from_si(
-        (earth_state.position().x() - sun_state.position().x()) * 1000.0,
-        (earth_state.position().y() - sun_state.position().y()) * 1000.0,
-        (earth_state.position().z() - sun_state.position().z()) * 1000.0
-    );
+    // earth_state is heliocentric GCRF
+    math::Vector3<core::GCRF, physics::Distance> earth_center_vec = earth_state.position;
     
     const auto& obs_db = observations::ObservatoryDatabase::getInstance();
     auto obs_info_opt = obs_db.getObservatory(obs.observatory_code);
@@ -254,11 +255,7 @@ std::optional<math::Vector3<core::GCRF, physics::Velocity>> ResidualCalculator<F
     time::EpochTDB t_tdb = time::to_tdb(obs.time);
     auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_tdb);
     
-    return math::Vector3<core::GCRF, physics::Velocity>::from_si(
-        earth_state.velocity().x() * 1000.0,
-        earth_state.velocity().y() * 1000.0,
-        earth_state.velocity().z() * 1000.0
-    );
+    return earth_state.velocity;
 }
 
 template <typename Frame>
