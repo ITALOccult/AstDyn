@@ -24,6 +24,7 @@
 #include <astdyn/orbit_determination/ODSmartPolicy.hpp>
 #include <astdyn/orbit_determination/GaussIOD.hpp>
 #include <astdyn/orbit_determination/OrbFitIOD.hpp>
+#include <astdyn/propagation/OrbFitIntegrator.hpp>
 
 #include <cmath>
 #include <chrono>
@@ -143,9 +144,11 @@ int main(int argc, char** argv) {
 
     // Factory: creates a RK4-based propagator (Fixed step).
     auto make_propagator = [&](double yarkovsky_a2 = 0.0) {
-        auto integr = std::make_shared<RKF78Integrator>(
+        auto integr = std::make_shared<OrbFitDPIntegrator>(
             0.1,    // initial step [days]
-            1e-15   // high precision tolerance
+            1e-12,  // tolerance
+            1e-6,   // min step
+            5.0     // max step
         );
         PropagatorSettings s = base_settings;
         s.include_yarkovsky = (std::abs(yarkovsky_a2) > 0.0);

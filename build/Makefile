@@ -459,6 +459,30 @@ astdyn/src/coordinates/KeplerianElements.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/coordinates/KeplerianElements.cpp.s
 .PHONY : astdyn/src/coordinates/KeplerianElements.cpp.s
 
+astdyn/src/core/Configurator.o: astdyn/src/core/Configurator.cpp.o
+.PHONY : astdyn/src/core/Configurator.o
+
+# target to build an object file
+astdyn/src/core/Configurator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/core/Configurator.cpp.o
+.PHONY : astdyn/src/core/Configurator.cpp.o
+
+astdyn/src/core/Configurator.i: astdyn/src/core/Configurator.cpp.i
+.PHONY : astdyn/src/core/Configurator.i
+
+# target to preprocess a source file
+astdyn/src/core/Configurator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/core/Configurator.cpp.i
+.PHONY : astdyn/src/core/Configurator.cpp.i
+
+astdyn/src/core/Configurator.s: astdyn/src/core/Configurator.cpp.s
+.PHONY : astdyn/src/core/Configurator.s
+
+# target to generate assembly for a file
+astdyn/src/core/Configurator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/core/Configurator.cpp.s
+.PHONY : astdyn/src/core/Configurator.cpp.s
+
 astdyn/src/ephemeris/AsteroidPerturbations.o: astdyn/src/ephemeris/AsteroidPerturbations.cpp.o
 .PHONY : astdyn/src/ephemeris/AsteroidPerturbations.o
 
@@ -1392,6 +1416,9 @@ help:
 	@echo "... astdyn/src/coordinates/KeplerianElements.o"
 	@echo "... astdyn/src/coordinates/KeplerianElements.i"
 	@echo "... astdyn/src/coordinates/KeplerianElements.s"
+	@echo "... astdyn/src/core/Configurator.o"
+	@echo "... astdyn/src/core/Configurator.i"
+	@echo "... astdyn/src/core/Configurator.s"
 	@echo "... astdyn/src/ephemeris/AsteroidPerturbations.o"
 	@echo "... astdyn/src/ephemeris/AsteroidPerturbations.i"
 	@echo "... astdyn/src/ephemeris/AsteroidPerturbations.s"
