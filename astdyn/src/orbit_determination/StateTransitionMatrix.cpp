@@ -54,6 +54,32 @@ StateTransitionMatrix<Frame>::compute_with_partials(
 }
 
 template <typename Frame>
+std::vector<typename StateTransitionMatrix<Frame>::ObservationPartials> 
+StateTransitionMatrix<Frame>::compute_batch(
+    const physics::CartesianStateTyped<Frame>& initial,
+    const std::vector<time::EpochTDB>& target_times,
+    const std::vector<math::Vector3<core::GCRF, physics::Distance>>& observer_positions) {
+    
+    if (target_times.empty()) return {};
+    
+    // 1. Bulk propagate STM (Φ(t_i, t_0))
+    auto stm_results = propagate_with_stm_batch(initial, target_times);
+    
+    // 2. Compute observation partials at each point
+    std::vector<ObservationPartials> results;
+    results.reserve(target_times.size());
+    
+    for (size_t i = 0; i < target_times.size(); ++i) {
+        auto obs_partials = compute_observation_partials(
+            stm_results[i].final_state, observer_positions[i]);
+        
+        results.push_back({stm_results[i].phi, obs_partials, stm_results[i].final_state});
+    }
+    
+    return results;
+}
+
+template <typename Frame>
 STMResult<Frame> StateTransitionMatrix<Frame>::propagate_with_stm(
     const physics::CartesianStateTyped<Frame>& initial,
     time::EpochTDB target_time) {
@@ -114,14 +140,135 @@ STMResult<Frame> StateTransitionMatrix<Frame>::propagate_with_stm(
             target_time, yf.head<6>(), initial.gm);
     }
     
-    astdyn::Matrix6d phi;
+    astdyn::Matrix6d phi_integrated;
     for (int i = 0; i < 6; ++i) {
         for (int j = 0; j < 6; ++j) {
-            phi(i, j) = yf[6 + i * 6 + j];
+            phi_integrated(i, j) = yf[6 + i * 6 + j];
         }
     }
     
+    astdyn::Matrix6d phi = phi_integrated;
+    if (use_ecl && !std::is_same_v<Frame, core::ECLIPJ2000>) {
+        // STM was integrated in ECLIPJ2000. Frame is GCRF (typically).
+        // Phi_GCRF = R_E2G * Phi_ECL * R_G2E
+        auto rot_g2e = coordinates::ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>().to_eigen();
+        auto rot_e2g = rot_g2e.transpose();
+        
+        astdyn::Matrix6d R6 = astdyn::Matrix6d::Zero();
+        R6.block<3,3>(0,0) = rot_g2e;
+        R6.block<3,3>(3,3) = rot_g2e;
+        
+        astdyn::Matrix6d R6_inv = astdyn::Matrix6d::Zero();
+        R6_inv.block<3,3>(0,0) = rot_e2g;
+        R6_inv.block<3,3>(3,3) = rot_e2g;
+        
+        phi = R6_inv * phi_integrated * R6;
+    }
+    
     return {phi, final_state};
+}
+
+template <typename Frame>
+std::vector<STMResult<Frame>> StateTransitionMatrix<Frame>::propagate_with_stm_batch(
+    const physics::CartesianStateTyped<Frame>& initial,
+    const std::vector<time::EpochTDB>& target_times) {
+    
+    const bool use_ecl = (propagator_ && propagator_->settings().integrate_in_ecliptic);
+    
+    Eigen::VectorXd y0(42);
+    if (use_ecl) {
+        auto initial_ecl = initial.template cast_frame<core::ECLIPJ2000>();
+        y0.head<6>() = initial_ecl.to_eigen_au_aud();
+    } else {
+        y0.head<6>() = initial.to_eigen_au_aud();
+    }
+    
+    // Initial identity for STM
+    for (int i = 0; i < 6; ++i) {
+        for (int j = 0; j < 6; ++j) {
+            y0[6 + i * 6 + j] = (i == j) ? 1.0 : 0.0;
+        }
+    }
+    
+    // Shared augmented derivative function
+    auto f_augmented = [this](double t_val, const Eigen::VectorXd& y) -> Eigen::VectorXd {
+        const auto t_tdb = time::EpochTDB::from_mjd(t_val);
+        const Eigen::VectorXd state = y.head<6>();
+        
+        astdyn::Matrix6d phi;
+        for (int i = 0; i < 6; ++i) {
+            for (int j = 0; j < 6; ++j) phi(i, j) = y[6 + i * 6 + j];
+        }
+        
+        Eigen::VectorXd f_state = propagator_->compute_derivatives(t_tdb, state);
+        astdyn::Matrix6d A = compute_jacobian(t_tdb, state);
+        astdyn::Matrix6d phi_dot = A * phi;
+        
+        Eigen::VectorXd dy(42);
+        dy.segment<6>(0) = f_state;
+        for (int i = 0; i < 6; ++i) {
+            for (int j = 0; j < 6; ++j) {
+                dy[6 + i * 6 + j] = phi_dot(i, j);
+            }
+        }
+        return dy;
+    };
+    
+    std::vector<double> mjd_targets;
+    mjd_targets.reserve(target_times.size());
+    for (const auto& t : target_times) mjd_targets.push_back(t.mjd());
+    
+    std::vector<Eigen::VectorXd> y_results = integrator_->integrate_at(
+        f_augmented, y0, initial.epoch.mjd(), mjd_targets);
+    
+    std::vector<STMResult<Frame>> results;
+    results.reserve(y_results.size());
+    
+    const bool needs_rotation = (use_ecl && !std::is_same_v<Frame, core::ECLIPJ2000>);
+    Eigen::Matrix3d rot_g2e, rot_e2g;
+    astdyn::Matrix6d R6, R6_inv;
+    
+    if (needs_rotation) {
+        rot_g2e = coordinates::ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>().to_eigen();
+        rot_e2g = rot_g2e.transpose();
+        R6.setZero();
+        R6.block<3,3>(0,0) = rot_g2e;
+        R6.block<3,3>(3,3) = rot_g2e;
+        R6_inv.setZero();
+        R6_inv.block<3,3>(0,0) = rot_e2g;
+        R6_inv.block<3,3>(3,3) = rot_e2g;
+    }
+    
+    for (size_t i = 0; i < y_results.size(); ++i) {
+        const auto& y_f = y_results[i];
+        const auto& t_f = target_times[i];
+        
+        physics::CartesianStateTyped<Frame> final_state;
+        if (use_ecl) {
+            auto final_ecl = physics::CartesianStateTyped<core::ECLIPJ2000>::from_au_aud(
+                t_f, y_f.head<6>(), initial.gm);
+            final_state = final_ecl.template cast_frame<Frame>();
+        } else {
+            final_state = physics::CartesianStateTyped<Frame>::from_au_aud(
+                t_f, y_f.head<6>(), initial.gm);
+        }
+        
+        astdyn::Matrix6d phi_integrated;
+        for (int row = 0; row < 6; ++row) {
+            for (int col = 0; col < 6; ++col) {
+                phi_integrated(row, col) = y_f[6 + row * 6 + col];
+            }
+        }
+        
+        astdyn::Matrix6d phi = phi_integrated;
+        if (needs_rotation) {
+            phi = R6_inv * phi_integrated * R6;
+        }
+
+        results.push_back({phi, final_state});
+    }
+    
+    return results;
 }
 
 template <typename Frame>
@@ -242,32 +389,17 @@ Eigen::Matrix<double, 2, 6> StateTransitionMatrix<Frame>::compute_observation_pa
     
     Eigen::Matrix<double, 2, 3> d_radec_d_pos_frame = d_radec_d_rho_gcrf * rotation;
 
-    Eigen::Matrix<double, 2, 6> partial_radec_state_si;
-    // Position partials: [rad/m]
-    partial_radec_state_si.block<2, 3>(0, 0) = d_radec_d_pos_frame;
+    Eigen::Matrix<double, 2, 6> partial_radec_state_au;
     
-    // Velocity partials: 
-    // The STM 'phi' is [dx_AU/dx0_AU, dx_AU/dv0_AUd, ...]
-    // We need d_radec / dv0_si.
-    // d_radec / dv0_si = (d_radec / dx_si) * (dx_si / dx_AU) * (dx_AU / dv0_AUd) * (dv0_AUd / dv0_si)
-    // dv0_AUd / dv0_si = 86400.0 / (constants::AU * 1000.0)
     double au_to_m = constants::AU * 1000.0;
-    double v_scale = 86400.0 / au_to_m;
+
+    // Position partials: [rad/m] * [m/AU] = [rad/AU]
+    partial_radec_state_au.block<2, 3>(0, 0) = d_radec_d_pos_frame * au_to_m;
     
-    // We don't have direct access to velocity partials of RA/Dec (they are zero at epsilon=0),
-    // but the chain rule for the STM velocity part is:
-    // A_vel = (d_radec / dx_si) * (au_to_m * phi_pos_vel) * v_scale 
-    //       = (d_radec / dx_si) * phi_pos_vel * 86400.0
-    // Actually, when we multiply A * Phi later in DifferentialCorrector,
-    // we just need to ensure A is consistent.
+    // Velocity partials are identically zero at epsilon=0 for geometric observation
+    partial_radec_state_au.block<2, 3>(0, 3).setZero();
     
-    // Let's simplify: DifferentialCorrector does: A_obs = partials.partial_radec * cumulative_phi;
-    // If we want correction in SI:
-    // partial_radec_state_si should be [ d_radec/dx_si, d_radec/dv_si ] at time t.
-    // Since RA/Dec only depends on position: d_radec/dv_si = 0.
-    partial_radec_state_si.block<2, 3>(0, 3).setZero();
-    
-    return partial_radec_state_si;
+    return partial_radec_state_au;
 }
 
 // Explicit instantiations

@@ -41,12 +41,16 @@ using namespace astdyn::core;
 
 // Utility functions
 
-static double delta_r_km(const CartesianStateTyped<ECLIPJ2000>& a, const CartesianStateTyped<ECLIPJ2000>& b) {
-    return (a.position - b.position).norm().to_km();
+template <typename F1, typename F2>
+static double delta_r_km(const CartesianStateTyped<F1>& a, const CartesianStateTyped<F2>& b) {
+    auto b_cast = b.template cast_frame<F1>();
+    return (a.position.to_eigen_si() - b_cast.position.to_eigen_si()).norm() / 1000.0;
 }
 
-static double delta_v_ms(const CartesianStateTyped<ECLIPJ2000>& a, const CartesianStateTyped<ECLIPJ2000>& b) {
-    return (a.velocity - b.velocity).norm().to_ms();
+template <typename F1, typename F2>
+static double delta_v_ms(const CartesianStateTyped<F1>& a, const CartesianStateTyped<F2>& b) {
+    auto b_cast = b.template cast_frame<F1>();
+    return (a.velocity.to_eigen_si() - b_cast.velocity.to_eigen_si()).norm();
 }
 
 // Covariance P is in [m², m·m/s, (m/s)²] (SI units from DC).
@@ -81,12 +85,12 @@ struct Target {
     std::string mpc_iod;
     double r1, r3;
     bool gooding;
-    CartesianStateTyped<ECLIPJ2000> ref;
-    double obs_min_mjd = 51544.0; ///< Minimum MJD for full observations (default: year 2000)
-    double obs_max_mjd = 99999.0; ///< Maximum MJD for full observations (default: no limit)
-    int gooding_max_iter = 80;    ///< GoodingIOD max iterations (0 = single Lambert, no Newton)
-    bool warm_start = false;      ///< If true, skip IOD and use ref state back-propagated to arc start
-    double yarkovsky_a2 = 0.0;   ///< Yarkovsky transverse parameter [AU/d²], 0 = disabled
+    CartesianStateTyped<GCRF> ref; // Ref states from Horizons are usually GCRF (J2000 Equatorial)
+    double obs_min_mjd = 51544.0;
+    double obs_max_mjd = 99999.0;
+    int gooding_max_iter = 80;
+    bool warm_start = false;
+    double yarkovsky_a2 = 0.0;
 };
 
 static void write_csv_row(std::ostream& f, const std::string& t, const std::string& m, const std::string& s,
@@ -95,8 +99,21 @@ static void write_csv_row(std::ostream& f, const std::string& t, const std::stri
       << rms << "," << chi2 << "," << iter << "," << sigma << "," << wall << "\n" << std::flush;
 }
 
-int main() {
-    std::cout << "=== AstDyn 3.0  OD Benchmark (JPL DE440) ===" << std::endl;
+int main(int argc, char** argv) {
+    std::string filter = "";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg.find("--target=") == 0) {
+            filter = arg.substr(9);
+        } else if (arg == "-t" && i + 1 < argc) {
+            filter = argv[++i];
+        }
+    }
+    
+    std::cout << "=== AstDyn 3.0  OD Benchmark (Build 1130) ===" << std::endl;
+    if (!filter.empty()) {
+        std::cout << "Target Filter Active: [" << filter << "]" << std::endl;
+    }
 
     // Initialize high-precision ephemeris
     const std::string de441_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de440s.bsp";
@@ -125,13 +142,13 @@ int main() {
     // Factory: creates a RK4-based propagator (Fixed step).
     auto make_propagator = [&](double yarkovsky_a2 = 0.0) {
         auto integr = std::make_shared<RKF78Integrator>(
-            0.5,    // initial step [days]
-            1e-12   // tolerance
+            0.1,    // initial step [days]
+            1e-15   // high precision tolerance
         );
         PropagatorSettings s = base_settings;
         s.include_yarkovsky = (std::abs(yarkovsky_a2) > 0.0);
         s.yarkovsky_a2      = yarkovsky_a2;
-        s.integrate_in_ecliptic = true; // Essential for asteroid precision
+        s.integrate_in_ecliptic = true; // RESTORE: Essential for asteroid precision
         return std::make_shared<Propagator>(integr, ephem, s);
     };
 
@@ -139,51 +156,58 @@ int main() {
 
     // Apophis — full arc 2004-2024
     {
-        // Reference: JPL Horizons heliocentric ECLIPTIC J2000, 2020-Jan-24 00:00 TDB (MJD 58872.0)
+        // Reference: JPL Horizons heliocentric J2000 EQUATORIAL, 2020-Jan-24 00:00 TDB (MJD 58872.0)
         Eigen::Vector3d r_km(-1.541414301798325E+07,  1.394708232005084E+08,  5.145546099858084E+07);
         Eigen::Vector3d v_kms(-2.845748009596083E+01,  2.125072123515800E+00,  6.954818026860536E-02);
 
-        targets.push_back({"Apophis_99942",
-            "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/apophis_mpc_full.txt",
-            "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/apophis_iod_3obs.txt",
-            1.1, 1.0, true, // r1, r3, gooding
-            CartesianStateTyped<core::ECLIPJ2000>::from_si(time::EpochTDB::from_mjd(58872.0),
+        Target t;
+        t.name = "Apophis_99942";
+        t.mpc_full = "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/apophis_mpc_full.txt";
+        t.r1 = 1.1; t.r3 = 1.0; t.gooding = true;
+        t.ref = CartesianStateTyped<GCRF>::from_si(time::EpochTDB::from_mjd(58872.0),
                 r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
-                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0),
-            40000.0, 70000.0, // obs_min_mjd, obs_max_mjd
-            80, true, -2.901e-13 /* Yarkovsky A2 [AU/d²] */}); // gooding_max_iter, warm_start, yarkovsky_a2
+                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0);
+        t.obs_min_mjd = 40000.0; t.obs_max_mjd = 70000.0;
+        t.gooding_max_iter = 80; t.warm_start = true;
+        t.yarkovsky_a2 = -2.89e-14;
+        targets.push_back(t);
     }
 
     // Vesta — full arc
     {
-        // Reference: JPL Horizons heliocentric ECLIPTIC J2000, 2016-Mar-01 00:00 TDB (MJD 57448.0)
+        // Reference: JPL Horizons heliocentric J2000 EQUATORIAL, 2016-Mar-01 00:00 TDB (MJD 57448.0)
         Eigen::Vector3d r_km( 2.737877963027807E+08,  2.540494479148592E+08,  6.538351637650730E+07);
         Eigen::Vector3d v_kms(-1.159539810770006E+01,  1.221289828462967E+01,  6.383069804659519E+00);
 
-        targets.push_back({"Vesta_4",
-            "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/vesta_mpc_full.txt",
-            "", 2.4, 2.3, true,
-            CartesianStateTyped<core::ECLIPJ2000>::from_si(time::EpochTDB::from_mjd(57448.0),
+        Target t;
+        t.name = "Vesta_4";
+        t.mpc_full = "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/vesta_mpc_full.txt";
+        t.r1 = 2.4; t.r3 = 2.3; t.gooding = true;
+        t.ref = CartesianStateTyped<GCRF>::from_si(time::EpochTDB::from_mjd(57448.0),
                 r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
-                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0),
-            40000.0, 70000.0,
-            80, false});
+                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0);
+        t.obs_min_mjd = 40000.0; t.obs_max_mjd = 70000.0;
+        t.warm_start = true;
+        targets.push_back(t);
     }
 
     // Phaethon — full arc
     {
-        // Reference: JPL Horizons heliocentric ECLIPTIC J2000, 2017-Sep-15 00:00 TDB (MJD 58011.0)
+        // Reference: JPL Horizons heliocentric J2000 EQUATORIAL, 2017-Sep-15 00:00 TDB (MJD 58011.0)
         Eigen::Vector3d r_km(1.405553641753041E+08, 1.956799516664952E+08, 1.777977457782163E+08);
         Eigen::Vector3d v_kms(-1.145826169909928E+01, -3.917012727493627E+00, -6.560664426417666E+00);
 
-        targets.push_back({"Phaethon_3200",
-            "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/phaethon_mpc_full.txt",
-            "", 1.2, 1.1, true,
-            CartesianStateTyped<core::ECLIPJ2000>::from_si(time::EpochTDB::from_mjd(58011.0),
+        Target t;
+        t.name = "Phaethon_3200";
+        t.mpc_full = "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/data/phaethon_mpc_full.txt";
+        t.r1 = 1.2; t.r3 = 1.1; t.gooding = true;
+        t.ref = CartesianStateTyped<GCRF>::from_si(time::EpochTDB::from_mjd(58011.0),
                 r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0,
-                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0),
-            40000.0, 70000.0,
-            80, false, -6.142920483398e-15 /* Yarkovsky A2 */});
+                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0);
+        t.obs_min_mjd = 40000.0; t.obs_max_mjd = 70000.0;
+        t.warm_start = true;
+        t.yarkovsky_a2 = -1.1e-14;
+        targets.push_back(t);
     }
 
     std::ofstream csv("/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/benchmarks/results/orbit_determination/results.csv");
@@ -193,12 +217,25 @@ int main() {
     int total_targets = targets.size();
 
     for (const auto& tgt : targets) {
+        if (!filter.empty()) {
+            // Case-insensitive/fuzzy match
+            std::string name_lower = tgt.name;
+            std::string filter_lower = filter;
+            std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+            std::transform(filter_lower.begin(), filter_lower.end(), filter_lower.begin(), ::tolower);
+            if (name_lower.find(filter_lower) == std::string::npos) continue;
+        }
         target_idx++;
         std::cout << "\n[" << target_idx << "/" << total_targets << "] Processing target: " << tgt.name << "..." << std::endl;
 
         auto prop = make_propagator(tgt.yarkovsky_a2);
         auto full = load_mpc_obs(tgt.mpc_full);
         if (full.empty()) continue;
+
+        // Chronological sort is essential for EKF
+        std::sort(full.begin(), full.end(), [](const auto& a, const auto& b) {
+            return a.time < b.time;
+        });
 
         // Filter arc
         {
@@ -208,16 +245,16 @@ int main() {
                 });
             full.erase(it, full.end());
             
-            // Optimization: sample 1 out of 10 observations for faster benchmark turnaround
-            if (full.size() > 1000) {
+            // Optimization: sample 1 out of 3 observations for faster benchmark turnaround
+            if (full.size() > 3) {
                 std::vector<OpticalObservation> sampled;
-                for (size_t i = 0; i < full.size(); i += 100) {
+                for (size_t i = 0; i < full.size(); i += 3) {
                     sampled.push_back(full[i]);
                 }
                 full = std::move(sampled);
             }
             
-            std::cout << "  - Total arc loaded: " << full.size() << " observations (sampled 1/10)." << std::endl;
+            std::cout << "  - Total arc loaded: " << full.size() << " observations (1/3 sampling)." << std::endl;
         }
         
         std::vector<OpticalObservation> iod_obs;
@@ -241,7 +278,7 @@ int main() {
             std::cout << "  - Ref SMA: " << el_ref.a_au << " AU, e: " << el_ref.e << " mu: " << tgt.ref.gm.to_m3_s2() << std::endl;
             
             try {
-                iod_state = prop->propagate_cartesian(tgt.ref, first_epoch);
+                iod_state = prop->propagate_cartesian(tgt.ref, first_epoch).template cast_frame<core::ECLIPJ2000>();
                 iod_state_gcrf = iod_state.template cast_frame<core::GCRF>();
                 auto el_iod = ODPolicyEngine::compute_keplerian(iod_state_gcrf);
                 std::cout << "  - IOD SMA: " << el_iod.a_au << " AU, e: " << el_iod.e << std::endl;
@@ -285,28 +322,96 @@ int main() {
             auto policy = ODPolicyEngine::analyze(iod_state_gcrf, full, base_settings);
             policy.print();
 
+            // --- PRE-CONDITIONING: Shift epoch to arc start ---
+            std::cout << "  - Shifting guess epoch to arc start (" << full[0].time.mjd() << ")..." << std::flush;
+            auto start_epoch = time::EpochTDB::from_mjd(full[0].time.mjd());
+            auto start_state = prop->propagate_cartesian(iod_state, start_epoch);
+            std::cout << " Done." << std::endl;
+
             // --- DIAGNOSTIC: Initial RMS check ---
             {
                 auto init_calc = std::make_shared<ResidualCalculator<ECLIPJ2000>>(ephem, prop);
-                auto init_res = init_calc->compute_residuals(full, iod_state);
+                auto init_res = init_calc->compute_residuals(full, start_state);
                 auto init_stats = ResidualCalculator<ECLIPJ2000>::compute_statistics(init_res);
-                std::cout << "  - Initial O-C RMS: " << init_stats.rms_total.to_arcsec() << "\"" << std::endl;
+                std::cout << "  - Initial O-C RMS at start epoch: " << init_stats.rms_total.to_arcsec() << "\"" << std::endl;
+                if (!init_res.empty()) {
+                    std::cout << "  - First obs innovation: RA=" << init_res[0].residual_ra.to_arcsec() 
+                              << "\" Dec=" << init_res[0].residual_dec.to_arcsec() << "\"" << std::endl;
+                }
             }
             // ------------------------------------
 
-            // LSQ
-            std::cout << "  - Starting LSQ (Differential Corrector)..." << std::endl;
+            auto res_calc = std::make_shared<ResidualCalculator<GCRF>>(ephem, prop);
+            auto stm_comp = std::make_shared<StateTransitionMatrix<GCRF>>(prop);
+
+            CartesianStateTyped<GCRF> pre_ekf_state = transform_state_typed<ECLIPJ2000, GCRF>(start_state);
+            pre_ekf_state.gm = physics::GravitationalParameter::from_au3_d2(constants::GMS);
+
+            if (tgt.warm_start) {
+                std::vector<OpticalObservation> short_arc;
+                size_t req_obs = std::min(size_t(30), full.size());
+                for (size_t i = 0; i < req_obs; ++i) {
+                    short_arc.push_back(full[i]);
+                }
+
+                double timespan = short_arc.empty() ? 0 : (short_arc.back().time.mjd() - short_arc.front().time.mjd());
+                std::cout << "  - [Mini-LSQ] Refining short arc (" << short_arc.size() << " obs spanning " 
+                          << timespan << " days) for stable EKF init..." << std::endl;
+                DifferentialCorrectorSettings short_lsq_settings;
+                short_lsq_settings.verbose = true;
+                short_lsq_settings.max_iterations = 30;
+                short_lsq_settings.use_line_search = true;
+                short_lsq_settings.outlier_sigma = 10.0;
+                short_lsq_settings.outlier_max_sigma = 1000.0;
+                short_lsq_settings.outlier_min_sigma = 5.0;
+                auto dc_short = DifferentialCorrector<GCRF>(res_calc, stm_comp).fit(short_arc, pre_ekf_state, short_lsq_settings);
+                if (dc_short.converged) {
+                    pre_ekf_state = dc_short.final_state;
+                    std::cout << "    ...Mini-LSQ Converged: RMS " << dc_short.statistics.rms_total.to_arcsec() << "\"" << std::endl;
+                } else {
+                    std::cout << "    ...Mini-LSQ Failed to converge. Fallback to raw state. (Final RMS: " << dc_short.statistics.rms_total.to_arcsec() << "\")" << std::endl;
+                }
+            }
+
+            // --- STAGE 1: EKF Recursive Acquisition ---
+            CartesianStateTyped<GCRF> stage2_input_state;
+            std::cout << "  - [Stage 1] EKF recursive acquisition (" << full.size() << " obs)..." << std::endl;
+            ExtendedKalmanFilter::Settings ekf_settings;
+            ekf_settings.process_noise = Matrix6d::Identity() * 1e-12; 
+            Matrix6d ekf_cov = Matrix6d::Identity() * 1e10;  // reduced covariance because state is already good
+            
+            ExtendedKalmanFilter ekf(prop, ekf_settings);
+            CartesianStateTyped<GCRF> ekf_state = pre_ekf_state;
+            
+            int ekf_processed = 0;
+            for (const auto& obs : full) {
+                try {
+                    auto res = ekf.update(ekf_state, ekf_cov, obs);
+                    ekf_state = res.state;
+                    ekf_cov = res.covariance;
+                    ekf_processed++;
+                    if (ekf_processed % 100 == 0 || ekf_processed < 20) {
+                        std::cout << "    ...processed " << ekf_processed << " obs, current innovation: " 
+                                  << res.innovation.norm() * constants::RAD_TO_ARCSEC << "\"" << std::endl;
+                    }
+                } catch (...) { break; }
+            }
+            stage2_input_state = ekf_state;
+
+            // --- STAGE 2: Final LSQ refinement ---
+            std::cout << "  - [Stage 2] Final LSQ refinement..." << std::endl;
+            DifferentialCorrectorSettings lsq_settings;
+            lsq_settings.verbose = true;
+            lsq_settings.max_iterations = 30;
+            lsq_settings.outlier_sigma = 5.0;      
+            lsq_settings.outlier_max_sigma = 100.0; // Very loose at start to avoid killing good data
+            lsq_settings.outlier_min_sigma = 3.0;   // Tight at the end
+            lsq_settings.reject_outliers = true;
+            lsq_settings.convergence_tolerance = Distance::from_au(1.0e-9); 
+            
             t_start = wall_sec();
-            auto res_calc = std::make_shared<ResidualCalculator<ECLIPJ2000>>(ephem, prop);
-            auto stm_comp = std::make_shared<StateTransitionMatrix<ECLIPJ2000>>(prop);
-            
-            DifferentialCorrectorSettings ds;
-            ds.max_iterations = 50;
-            ds.convergence_tolerance = Distance::from_au(1.0e-9); 
-            ds.verbose = true;
-            
             try {
-                auto dc_res = DifferentialCorrector<ECLIPJ2000>(res_calc, stm_comp).fit(full, iod_state, ds);
+                auto dc_res = DifferentialCorrector<GCRF>(res_calc, stm_comp).fit(full, stage2_input_state, lsq_settings);
                 double dt_dc = wall_sec() - t_start;
                 
                 if (dc_res.converged) {
@@ -315,23 +420,12 @@ int main() {
                     double dv = delta_v_ms(final_ref, tgt.ref);
                     
                     std::cout << "  → Converged [dt: " << dt_dc << "s | dr: " << dr << " km | RMS: " << dc_res.statistics.rms_total.to_arcsec() << "\"]" << std::endl;
-                    write_csv_row(csv, tgt.name, "LSQ", "DiffCorr", dr, dv, dc_res.statistics.rms_total.to_arcsec(), 0, dc_res.iterations, sigma_r_km(dc_res.covariance), dt_dc);
-                    
-                    // EKF (Note: EKF currently works in GCRF in this library version)
-                    std::cout << "  - Starting EKF/Smoothing..." << std::flush;
-                    ExtendedKalmanFilter ekf(prop, ExtendedKalmanFilter::Settings());
-                    CartesianStateTyped<GCRF> ekf_state = transform_state_typed<ECLIPJ2000, GCRF>(dc_res.final_state);
-                    Matrix6d ekf_cov = dc_res.covariance;
-                    for (const auto& obs : full) {
-                        try {
-                            auto up = ekf.update(ekf_state, ekf_cov, obs);
-                            ekf_state = up.state; ekf_cov = up.covariance;
-                        } catch (...) {}
-                    }
-                    std::cout << " Done." << std::endl;
+                    write_csv_row(csv, tgt.name, "Hybrid", "EKF+LSQ", dr, dv, dc_res.statistics.rms_total.to_arcsec(), 0, dc_res.iterations, sigma_r_km(dc_res.covariance), dt_dc);
+                } else {
+                    std::cout << "  → FAILED to converge in Stage 2." << std::endl;
                 }
             } catch (const std::exception& e) {
-                std::cout << "  → FAILED: " << e.what() << std::endl;
+                std::cout << "  → ERROR: " << e.what() << std::endl;
             }
         }
     }
