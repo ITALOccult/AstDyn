@@ -43,27 +43,23 @@ std::vector<ObservationResidual> ResidualCalculator<Frame>::compute_residuals(
     std::vector<ObservationResidual> residuals;
     residuals.reserve(observations.size());
     
-    physics::CartesianStateTyped<Frame> running_state = state;
-    
-    for (const auto& obs : observations) {
-        time::EpochTDB obs_time_tdb = astdyn::time::to_tdb(obs.time);
+    // Optimized Path: Use propagate_ephemeris for batch efficiency
+    if (propagator_) {
+        std::vector<time::EpochTDB> target_times;
+        target_times.reserve(observations.size());
+        for (const auto& obs : observations) target_times.push_back(time::to_tdb(obs.time));
         
-        // Sequential propagation
-        if (propagator_) {
-            double dt = obs_time_tdb.mjd() - running_state.epoch.mjd();
-            if (dt > 1e-12) {
-                // Future point: continue from current running_state
-                running_state = propagator_->propagate_cartesian(running_state, obs_time_tdb);
-            } else if (dt < -1e-12) {
-                 // Out of order: restart from the original base state
-                 running_state = propagator_->propagate_cartesian(state, obs_time_tdb);
-            }
-            // If |dt| < 1e-12, keep running_state as is (already at the right epoch)
+        auto states = propagator_->propagate_ephemeris(state, target_times);
+        
+        for (size_t i = 0; i < observations.size(); ++i) {
+            auto residual = compute_residual(observations[i], states[i]);
+            if (residual) residuals.push_back(*residual);
         }
-        
-        auto residual = compute_residual(obs, running_state);
-        if (residual) {
-            residuals.push_back(*residual);
+    } else {
+        // Fallback for Two-body (could also be optimized if needed)
+        for (const auto& obs : observations) {
+            auto residual = compute_residual(obs, state);
+            if (residual) residuals.push_back(*residual);
         }
     }
     

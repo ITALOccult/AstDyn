@@ -178,6 +178,60 @@ void GaussIntegrator::integrate_steps(const DerivativeFunction& f,
     stats_.final_time = t;
 }
 
+std::vector<Eigen::VectorXd> GaussIntegrator::integrate_at(const DerivativeFunction& f,
+                                                       const Eigen::VectorXd& y0,
+                                                       double t0,
+                                                       const std::vector<double>& t_targets) {
+    stats_.reset();
+    std::vector<Eigen::VectorXd> results;
+    results.reserve(t_targets.size());
+    
+    double t = t0;
+    Eigen::VectorXd y = y0;
+    double h = h_min_ * 100.0;
+    
+    for (double tf : t_targets) {
+        if (std::abs(tf - t) < 1e-14) {
+            results.push_back(y);
+            continue;
+        }
+        
+        double direction = (tf > t) ? 1.0 : -1.0;
+        if (direction * h < 0) h = -h;
+
+        while (std::abs(tf - t) > 1e-14) {
+            if (std::abs(tf - t) < std::abs(h)) {
+                h = tf - t;
+            }
+            
+            std::vector<Eigen::VectorXd> k(num_stages_, Eigen::VectorXd::Zero(y.size()));
+            bool converged = solve_implicit_system(f, t, y, h, k);
+            
+            if (!converged) {
+                if (std::abs(h) <= h_min_) {
+                     throw std::runtime_error("GaussIntegrator: Implicit system failed to converge at h_min in integrate_at");
+                }
+                h *= 0.5;
+                if (std::abs(h) < h_min_) h = direction * h_min_;
+                stats_.num_rejected_steps++;
+                continue;
+            }
+            
+            for (int i = 0; i < num_stages_; ++i) {
+                y += h * b_[i] * k[i];
+            }
+            t += h;
+            stats_.num_steps++;
+            
+            if (std::abs(h) < 1.0) h *= 1.1; 
+        }
+        results.push_back(y);
+    }
+    
+    stats_.final_time = t;
+    return results;
+}
+
 bool GaussIntegrator::solve_implicit_system(const DerivativeFunction& f,
                                             double t,
                                             const Eigen::VectorXd& y,

@@ -94,6 +94,20 @@ public:
                                  std::vector<Eigen::VectorXd>& y_out) = 0;
     
     /**
+     * @brief Integrate and return states at specific times
+     * 
+     * @param f Derivative function
+     * @param y0 Initial state at t0
+     * @param t0 Initial time
+     * @param t_targets Sorted list of target times
+     * @return States at each target time
+     */
+    virtual std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                                      const Eigen::VectorXd& y0,
+                                                      double t0,
+                                                      const std::vector<double>& t_targets) = 0;
+    
+    /**
      * @brief Get integration statistics
      */
     const IntegrationStatistics& statistics() const { return stats_; }
@@ -140,6 +154,11 @@ public:
                         double tf,
                         std::vector<double>& t_out,
                         std::vector<Eigen::VectorXd>& y_out) override;
+
+    std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                             const Eigen::VectorXd& y0,
+                                             double t0,
+                                             const std::vector<double>& t_targets) override;
     
     /**
      * @brief Single RK4 step
@@ -201,6 +220,11 @@ public:
                         double tf,
                         std::vector<double>& t_out,
                         std::vector<Eigen::VectorXd>& y_out) override;
+
+    std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                             const Eigen::VectorXd& y0,
+                                             double t0,
+                                             const std::vector<double>& t_targets) override;
     
     /**
      * @brief Adaptive RKF78 step with error control

@@ -240,4 +240,48 @@ void SABA4Integrator::integrate_steps(const DerivativeFunction& f,
     stats_.final_time = t;
 }
 
+std::vector<Eigen::VectorXd> SABA4Integrator::integrate_at(const DerivativeFunction& f,
+                                                       const Eigen::VectorXd& y0,
+                                                       double t0,
+                                                       const std::vector<double>& t_targets) {
+    Integrator::reset_statistics();
+    std::vector<Eigen::VectorXd> results;
+    results.reserve(t_targets.size());
+    
+    double t = t0;
+    Eigen::VectorXd y = y0;
+    double h = h_initial_;
+    
+    initial_energy_ = compute_energy(y0);
+    
+    for (double tf : t_targets) {
+        if (std::abs(tf - t) < 1e-14) {
+            results.push_back(y);
+            continue;
+        }
+        
+        while (std::abs(tf - t) > 1e-14) {
+            if (std::abs(tf - t) < std::abs(h)) h = tf - t;
+            
+            Eigen::VectorXd y_saba4 = saba4_step(f, y, t, h);
+            Eigen::VectorXd y_saba2 = saba2_step(f, y, t, h);
+            double error = (y_saba4 - y_saba2).norm() / std::max(h, 1e-20);
+
+            if (error <= tolerance_ || h <= h_min_) {
+                y = y_saba4;
+                t += h;
+                stats_.num_steps++;
+                h = adapt_step_size(h, error, true);
+            } else {
+                stats_.num_rejected_steps++;
+                h = adapt_step_size(h, error, false);
+            }
+        }
+        results.push_back(y);
+    }
+    
+    stats_.final_time = t;
+    return results;
+}
+
 } // namespace astdyn::propagation

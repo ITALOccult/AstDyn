@@ -22,6 +22,8 @@
 #include <astdyn/propagation/GaussIntegrator.hpp>
 #include <astdyn/propagation/Integrator.hpp>
 #include <astdyn/orbit_determination/ODSmartPolicy.hpp>
+#include <astdyn/orbit_determination/GaussIOD.hpp>
+#include <astdyn/orbit_determination/OrbFitIOD.hpp>
 
 #include <cmath>
 #include <chrono>
@@ -291,9 +293,9 @@ int main(int argc, char** argv) {
         } else {
             std::cout << "  - Starting IOD..." << std::flush;
             if (!tgt.gooding) {
-                iod_name = "GaussIOD";
+                iod_name = "OrbFitIOD";
                 GaussIODSettings s; s.use_light_time = true; s.min_separation_days = 0.5;
-                auto res = GaussIOD(s).compute(iod_obs);
+                auto res = OrbFitIOD(s).compute(iod_obs);
                 iod_ok = res.success; 
                 if (iod_ok) {
                     iod_state_gcrf = res.state;

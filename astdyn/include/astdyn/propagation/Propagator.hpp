@@ -169,6 +169,8 @@ public:
      * precision and preventing floating point tolerance blowups seen with meters.
      */
     Eigen::VectorXd integrate_raw_au(const Eigen::VectorXd& y0_au, double t0_mjd, double tf_mjd);
+
+    std::vector<Eigen::VectorXd> integrate_raw_au_batch(const Eigen::VectorXd& y0_au, double t0_mjd, const std::vector<double>& tf_mjds);
     
 private:
     
@@ -286,20 +288,27 @@ std::vector<physics::CartesianStateTyped<Frame>> Propagator::propagate_ephemeris
 {
     if (target_times.empty()) return {};
 
+    // 1. Convert initial state to AU/Ecliptic
+    auto initial_ecl = initial.template cast_frame<core::ECLIPJ2000>();
+    Eigen::VectorXd y0_au = initial_ecl.to_eigen_au_aud();
+
+    // 2. Prepare target MJD list
+    std::vector<double> mjds;
+    mjds.reserve(target_times.size());
+    for (const auto& t : target_times) mjds.push_back(t.mjd());
+
+    // 3. Perform batch integration
+    auto results_au = integrate_raw_au_batch(y0_au, initial.epoch.mjd(), mjds);
+
+    // 4. Convert back to requested frame and SI
     std::vector<physics::CartesianStateTyped<Frame>> results;
     results.reserve(target_times.size());
-
-    // Sequential propagation for O(n) total integration time instead of O(n^2)
-    physics::CartesianStateTyped<Frame> current = initial;
-    
-    for (const auto& t : target_times) {
-        if (t.mjd() == current.epoch.mjd()) {
-            results.push_back(current);
-        } else {
-            current = propagate_cartesian(current, t);
-            results.push_back(current);
-        }
+    for (size_t i = 0; i < target_times.size(); ++i) {
+        auto state_ecl = physics::CartesianStateTyped<core::ECLIPJ2000>::from_au_aud(
+            target_times[i], results_au[i], initial.gm);
+        results.push_back(state_ecl.template cast_frame<Frame>());
     }
+
     return results;
 }
 

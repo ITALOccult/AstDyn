@@ -95,6 +95,21 @@ public:
         const math::Vector3<core::GCRF, physics::Distance>& observer_pos);
     
     /**
+     * @brief Compute STM at multiple observation epochs
+     * 
+     * Uses optimized batch integration hit targets without resetting the integrator.
+     * 
+     * @param initial Initial state at t0
+     * @param target_times Vector of target times
+     * @param observer_positions Optional observer positions for calculating observation partials
+     * @return Vector of results
+     */
+    std::vector<ObservationPartials> compute_batch(
+        const physics::CartesianStateTyped<Frame>& initial,
+        const std::vector<time::EpochTDB>& target_times,
+        const std::vector<math::Vector3<core::GCRF, physics::Distance>>& observer_positions);
+    
+    /**
      * @brief Set integrator for variational equations
      */
     void set_integrator(std::shared_ptr<astdyn::propagation::Integrator> integrator) {
@@ -154,6 +169,13 @@ private:
     STMResult<Frame> propagate_with_stm(
         const physics::CartesianStateTyped<Frame>& initial,
         time::EpochTDB target_time);
+
+    /**
+     * @brief Internal batch propagator for augmented state
+     */
+    std::vector<STMResult<Frame>> propagate_with_stm_batch(
+        const physics::CartesianStateTyped<Frame>& initial,
+        const std::vector<time::EpochTDB>& target_times);
     
     /**
      * @brief Compute observation partials ∂(RA,Dec)/∂x

@@ -426,4 +426,63 @@ void AASIntegrator::integrate_steps(const DerivativeFunction& f,
     stats_.final_time = t;
 }
 
+std::vector<Eigen::VectorXd> AASIntegrator::integrate_at(const DerivativeFunction& f,
+                                                     const Eigen::VectorXd& y0,
+                                                     double t0,
+                                                     const std::vector<double>& t_targets) {
+    stats_.reset();
+    std::vector<Eigen::VectorXd> results;
+    results.reserve(t_targets.size());
+    
+    double t = t0;
+    Eigen::VectorXd q, p;
+    split_state(y0, q, p);
+    
+    Eigen::MatrixXd phi;
+    if (y0.size() == 42) {
+        phi = Eigen::MatrixXd::Zero(6, 6);
+        for (int i = 0; i < 6; ++i) {
+            for (int j = 0; j < 6; ++j) phi(i, j) = y0[6 + i * 6 + j];
+        }
+    }
+    
+    for (double tf : t_targets) {
+        if (std::abs(tf - t) < 1e-14) {
+             if (phi.size() > 0) {
+                Eigen::VectorXd y_res(42);
+                y_res.segment<3>(0) = q; y_res.segment<3>(3) = p;
+                for (int i = 0; i < 6; ++i) for (int j = 0; j < 6; ++j) y_res[6 + i * 6 + j] = phi(i, j);
+                results.push_back(y_res);
+            } else {
+                results.push_back(join_state(q, p));
+            }
+            continue;
+        }
+        
+        double direction = (tf > t) ? 1.0 : -1.0;
+        
+        while (std::abs(tf - t) > 1e-14) {
+            double ds_adaptive = precision_ / std::sqrt(std::max(1e-20, compute_force_gradient(q)));
+            double dt_physical = std::min(ds_adaptive, std::abs(tf - t));
+            double actual_ds = dt_physical * direction;
+            
+            symplectic_step(f, t, q, p, phi, actual_ds);
+            t += actual_ds;
+            stats_.num_steps++;
+        }
+        
+         if (phi.size() > 0) {
+            Eigen::VectorXd y_res(42);
+            y_res.segment<3>(0) = q; y_res.segment<3>(3) = p;
+            for (int i = 0; i < 6; ++i) for (int j = 0; j < 6; ++j) y_res[6 + i * 6 + j] = phi(i, j);
+            results.push_back(y_res);
+        } else {
+            results.push_back(join_state(q, p));
+        }
+    }
+    
+    stats_.final_time = t;
+    return results;
+}
+
 } // namespace astdyn::propagation

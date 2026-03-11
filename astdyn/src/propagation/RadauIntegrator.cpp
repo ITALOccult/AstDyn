@@ -137,6 +137,42 @@ void RadauIntegrator::integrate_steps(const DerivativeFunction& f,
     stats_.final_time = t;
 }
 
+std::vector<Eigen::VectorXd> RadauIntegrator::integrate_at(const DerivativeFunction& f,
+                                                       const Eigen::VectorXd& y0,
+                                                       double t0,
+                                                       const std::vector<double>& t_targets) {
+    stats_.reset();
+    std::vector<Eigen::VectorXd> results;
+    results.reserve(t_targets.size());
+    
+    double t = t0;
+    Eigen::VectorXd y = y0;
+    double h = h_initial_;
+    
+    for (double tf : t_targets) {
+        if (std::abs(tf - t) < 1e-14) {
+            results.push_back(y);
+            continue;
+        }
+        
+        while (std::abs(tf - t) > 1e-14) {
+            if (std::abs(tf - t) < std::abs(h)) h = tf - t;
+            
+            bool accepted = adaptive_step(f, nullptr, t, y, h, tf);
+            if (!accepted) {
+                // h is reduced inside adaptive_step
+                if (std::abs(h) < h_min_) {
+                    throw std::runtime_error("RadauIntegrator: Step size below h_min in integrate_at");
+                }
+            }
+        }
+        results.push_back(y);
+    }
+    
+    stats_.final_time = t;
+    return results;
+}
+
 bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
                                     std::function<Eigen::MatrixXd(double, const Eigen::VectorXd&)> jac,
                                     double& t,

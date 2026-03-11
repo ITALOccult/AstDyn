@@ -47,6 +47,11 @@ public:
                          std::vector<double>& t_out,
                          std::vector<Eigen::VectorXd>& y_out) override;
 
+    std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                             const Eigen::VectorXd& y0,
+                                             double t0,
+                                             const std::vector<double>& t_targets) override;
+
     void set_precision(double p) { precision_ = p; }
     void set_central_body(double mu, double J2 = 0.0, double R_eq = 6378137.0);
 

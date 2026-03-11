@@ -57,10 +57,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary
+CMAKE_SOURCE_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build
+CMAKE_BINARY_DIR = /Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -95,56 +95,11 @@ rebuild_cache:
 rebuild_cache/fast: rebuild_cache
 .PHONY : rebuild_cache/fast
 
-# Special rule for the target list_install_components
-list_install_components:
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Available install components are: \"Unspecified\""
-.PHONY : list_install_components
-
-# Special rule for the target list_install_components
-list_install_components/fast: list_install_components
-.PHONY : list_install_components/fast
-
-# Special rule for the target install
-install: preinstall
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Install the project..."
-	/opt/homebrew/bin/cmake -P cmake_install.cmake
-.PHONY : install
-
-# Special rule for the target install
-install/fast: preinstall/fast
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Install the project..."
-	/opt/homebrew/bin/cmake -P cmake_install.cmake
-.PHONY : install/fast
-
-# Special rule for the target install/local
-install/local: preinstall
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Installing only the local directory..."
-	/opt/homebrew/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
-.PHONY : install/local
-
-# Special rule for the target install/local
-install/local/fast: preinstall/fast
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Installing only the local directory..."
-	/opt/homebrew/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
-.PHONY : install/local/fast
-
-# Special rule for the target install/strip
-install/strip: preinstall
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Installing the project stripped..."
-	/opt/homebrew/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
-.PHONY : install/strip
-
-# Special rule for the target install/strip
-install/strip/fast: preinstall/fast
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Installing the project stripped..."
-	/opt/homebrew/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
-.PHONY : install/strip/fast
-
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/build/CMakeFiles /Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/ITALOccultLibrary/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -198,43 +153,56 @@ propagate_example/fast:
 .PHONY : propagate_example/fast
 
 #=============================================================================
-# Target rules for targets named test_asteroid_fitter
+# Target rules for targets named benchmark_aas
 
 # Build rule for target.
-test_asteroid_fitter: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_asteroid_fitter
-.PHONY : test_asteroid_fitter
+benchmark_aas: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 benchmark_aas
+.PHONY : benchmark_aas
 
 # fast build rule for target.
-test_asteroid_fitter/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter.dir/build.make CMakeFiles/test_asteroid_fitter.dir/build
-.PHONY : test_asteroid_fitter/fast
+benchmark_aas/fast:
+	$(MAKE) $(MAKESILENT) -f astdyn/benchmarks/CMakeFiles/benchmark_aas.dir/build.make astdyn/benchmarks/CMakeFiles/benchmark_aas.dir/build
+.PHONY : benchmark_aas/fast
 
 #=============================================================================
-# Target rules for targets named test_asteroid_fitter_horizons
+# Target rules for targets named benchmark_multi_integrator
 
 # Build rule for target.
-test_asteroid_fitter_horizons: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_asteroid_fitter_horizons
-.PHONY : test_asteroid_fitter_horizons
+benchmark_multi_integrator: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 benchmark_multi_integrator
+.PHONY : benchmark_multi_integrator
 
 # fast build rule for target.
-test_asteroid_fitter_horizons/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter_horizons.dir/build.make CMakeFiles/test_asteroid_fitter_horizons.dir/build
-.PHONY : test_asteroid_fitter_horizons/fast
+benchmark_multi_integrator/fast:
+	$(MAKE) $(MAKESILENT) -f astdyn/benchmarks/CMakeFiles/benchmark_multi_integrator.dir/build.make astdyn/benchmarks/CMakeFiles/benchmark_multi_integrator.dir/build
+.PHONY : benchmark_multi_integrator/fast
 
 #=============================================================================
-# Target rules for targets named benchmark_79450
+# Target rules for targets named benchmark_integrators
 
 # Build rule for target.
-benchmark_79450: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 benchmark_79450
-.PHONY : benchmark_79450
+benchmark_integrators: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 benchmark_integrators
+.PHONY : benchmark_integrators
 
 # fast build rule for target.
-benchmark_79450/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_79450.dir/build.make CMakeFiles/benchmark_79450.dir/build
-.PHONY : benchmark_79450/fast
+benchmark_integrators/fast:
+	$(MAKE) $(MAKESILENT) -f astdyn/benchmarks/CMakeFiles/benchmark_integrators.dir/build.make astdyn/benchmarks/CMakeFiles/benchmark_integrators.dir/build
+.PHONY : benchmark_integrators/fast
+
+#=============================================================================
+# Target rules for targets named od_benchmark
+
+# Build rule for target.
+od_benchmark: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 od_benchmark
+.PHONY : od_benchmark
+
+# fast build rule for target.
+od_benchmark/fast:
+	$(MAKE) $(MAKESILENT) -f astdyn/benchmarks/CMakeFiles/od_benchmark.dir/build.make astdyn/benchmarks/CMakeFiles/od_benchmark.dir/build
+.PHONY : od_benchmark/fast
 
 #=============================================================================
 # Target rules for targets named benchmark_json_api
@@ -246,32 +214,34 @@ benchmark_json_api: cmake_check_build_system
 
 # fast build rule for target.
 benchmark_json_api/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/build
+	$(MAKE) $(MAKESILENT) -f astdyn/benchmarks/CMakeFiles/benchmark_json_api.dir/build.make astdyn/benchmarks/CMakeFiles/benchmark_json_api.dir/build
 .PHONY : benchmark_json_api/fast
 
-astdyn/examples/benchmark_json_api.o: astdyn/examples/benchmark_json_api.cpp.o
-.PHONY : astdyn/examples/benchmark_json_api.o
+#=============================================================================
+# Target rules for targets named benchmark_extended
 
-# target to build an object file
-astdyn/examples/benchmark_json_api.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/astdyn/examples/benchmark_json_api.cpp.o
-.PHONY : astdyn/examples/benchmark_json_api.cpp.o
+# Build rule for target.
+benchmark_extended: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 benchmark_extended
+.PHONY : benchmark_extended
 
-astdyn/examples/benchmark_json_api.i: astdyn/examples/benchmark_json_api.cpp.i
-.PHONY : astdyn/examples/benchmark_json_api.i
+# fast build rule for target.
+benchmark_extended/fast:
+	$(MAKE) $(MAKESILENT) -f astdyn/benchmarks/CMakeFiles/benchmark_extended.dir/build.make astdyn/benchmarks/CMakeFiles/benchmark_extended.dir/build
+.PHONY : benchmark_extended/fast
 
-# target to preprocess a source file
-astdyn/examples/benchmark_json_api.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/astdyn/examples/benchmark_json_api.cpp.i
-.PHONY : astdyn/examples/benchmark_json_api.cpp.i
+#=============================================================================
+# Target rules for targets named propagation_benchmark
 
-astdyn/examples/benchmark_json_api.s: astdyn/examples/benchmark_json_api.cpp.s
-.PHONY : astdyn/examples/benchmark_json_api.s
+# Build rule for target.
+propagation_benchmark: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 propagation_benchmark
+.PHONY : propagation_benchmark
 
-# target to generate assembly for a file
-astdyn/examples/benchmark_json_api.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_json_api.dir/build.make CMakeFiles/benchmark_json_api.dir/astdyn/examples/benchmark_json_api.cpp.s
-.PHONY : astdyn/examples/benchmark_json_api.cpp.s
+# fast build rule for target.
+propagation_benchmark/fast:
+	$(MAKE) $(MAKESILENT) -f astdyn/benchmarks/CMakeFiles/propagation_benchmark.dir/build.make astdyn/benchmarks/CMakeFiles/propagation_benchmark.dir/build
+.PHONY : propagation_benchmark/fast
 
 astdyn/examples/propagate_79148.o: astdyn/examples/propagate_79148.cpp.o
 .PHONY : astdyn/examples/propagate_79148.o
@@ -344,6 +314,102 @@ astdyn/src/api/OrbitFitAPI.s: astdyn/src/api/OrbitFitAPI.cpp.s
 astdyn/src/api/OrbitFitAPI.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/api/OrbitFitAPI.cpp.s
 .PHONY : astdyn/src/api/OrbitFitAPI.cpp.s
+
+astdyn/src/astrometry/Astrometry.o: astdyn/src/astrometry/Astrometry.cpp.o
+.PHONY : astdyn/src/astrometry/Astrometry.o
+
+# target to build an object file
+astdyn/src/astrometry/Astrometry.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/astrometry/Astrometry.cpp.o
+.PHONY : astdyn/src/astrometry/Astrometry.cpp.o
+
+astdyn/src/astrometry/Astrometry.i: astdyn/src/astrometry/Astrometry.cpp.i
+.PHONY : astdyn/src/astrometry/Astrometry.i
+
+# target to preprocess a source file
+astdyn/src/astrometry/Astrometry.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/astrometry/Astrometry.cpp.i
+.PHONY : astdyn/src/astrometry/Astrometry.cpp.i
+
+astdyn/src/astrometry/Astrometry.s: astdyn/src/astrometry/Astrometry.cpp.s
+.PHONY : astdyn/src/astrometry/Astrometry.s
+
+# target to generate assembly for a file
+astdyn/src/astrometry/Astrometry.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/astrometry/Astrometry.cpp.s
+.PHONY : astdyn/src/astrometry/Astrometry.cpp.s
+
+astdyn/src/astrometry/OccultationLogic.o: astdyn/src/astrometry/OccultationLogic.cpp.o
+.PHONY : astdyn/src/astrometry/OccultationLogic.o
+
+# target to build an object file
+astdyn/src/astrometry/OccultationLogic.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/astrometry/OccultationLogic.cpp.o
+.PHONY : astdyn/src/astrometry/OccultationLogic.cpp.o
+
+astdyn/src/astrometry/OccultationLogic.i: astdyn/src/astrometry/OccultationLogic.cpp.i
+.PHONY : astdyn/src/astrometry/OccultationLogic.i
+
+# target to preprocess a source file
+astdyn/src/astrometry/OccultationLogic.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/astrometry/OccultationLogic.cpp.i
+.PHONY : astdyn/src/astrometry/OccultationLogic.cpp.i
+
+astdyn/src/astrometry/OccultationLogic.s: astdyn/src/astrometry/OccultationLogic.cpp.s
+.PHONY : astdyn/src/astrometry/OccultationLogic.s
+
+# target to generate assembly for a file
+astdyn/src/astrometry/OccultationLogic.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/astrometry/OccultationLogic.cpp.s
+.PHONY : astdyn/src/astrometry/OccultationLogic.cpp.s
+
+astdyn/src/catalog/CatalogIntegration.o: astdyn/src/catalog/CatalogIntegration.cpp.o
+.PHONY : astdyn/src/catalog/CatalogIntegration.o
+
+# target to build an object file
+astdyn/src/catalog/CatalogIntegration.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/catalog/CatalogIntegration.cpp.o
+.PHONY : astdyn/src/catalog/CatalogIntegration.cpp.o
+
+astdyn/src/catalog/CatalogIntegration.i: astdyn/src/catalog/CatalogIntegration.cpp.i
+.PHONY : astdyn/src/catalog/CatalogIntegration.i
+
+# target to preprocess a source file
+astdyn/src/catalog/CatalogIntegration.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/catalog/CatalogIntegration.cpp.i
+.PHONY : astdyn/src/catalog/CatalogIntegration.cpp.i
+
+astdyn/src/catalog/CatalogIntegration.s: astdyn/src/catalog/CatalogIntegration.cpp.s
+.PHONY : astdyn/src/catalog/CatalogIntegration.s
+
+# target to generate assembly for a file
+astdyn/src/catalog/CatalogIntegration.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/catalog/CatalogIntegration.cpp.s
+.PHONY : astdyn/src/catalog/CatalogIntegration.cpp.s
+
+astdyn/src/catalog/GaiaDR3Catalog.o: astdyn/src/catalog/GaiaDR3Catalog.cpp.o
+.PHONY : astdyn/src/catalog/GaiaDR3Catalog.o
+
+# target to build an object file
+astdyn/src/catalog/GaiaDR3Catalog.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/catalog/GaiaDR3Catalog.cpp.o
+.PHONY : astdyn/src/catalog/GaiaDR3Catalog.cpp.o
+
+astdyn/src/catalog/GaiaDR3Catalog.i: astdyn/src/catalog/GaiaDR3Catalog.cpp.i
+.PHONY : astdyn/src/catalog/GaiaDR3Catalog.i
+
+# target to preprocess a source file
+astdyn/src/catalog/GaiaDR3Catalog.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/catalog/GaiaDR3Catalog.cpp.i
+.PHONY : astdyn/src/catalog/GaiaDR3Catalog.cpp.i
+
+astdyn/src/catalog/GaiaDR3Catalog.s: astdyn/src/catalog/GaiaDR3Catalog.cpp.s
+.PHONY : astdyn/src/catalog/GaiaDR3Catalog.s
+
+# target to generate assembly for a file
+astdyn/src/catalog/GaiaDR3Catalog.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/catalog/GaiaDR3Catalog.cpp.s
+.PHONY : astdyn/src/catalog/GaiaDR3Catalog.cpp.s
 
 astdyn/src/close_approach/CloseApproach.o: astdyn/src/close_approach/CloseApproach.cpp.o
 .PHONY : astdyn/src/close_approach/CloseApproach.o
@@ -537,6 +603,54 @@ astdyn/src/io/AstDysOrbitFitter.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/io/AstDysOrbitFitter.cpp.s
 .PHONY : astdyn/src/io/AstDysOrbitFitter.cpp.s
 
+astdyn/src/io/HorizonsClient.o: astdyn/src/io/HorizonsClient.cpp.o
+.PHONY : astdyn/src/io/HorizonsClient.o
+
+# target to build an object file
+astdyn/src/io/HorizonsClient.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/io/HorizonsClient.cpp.o
+.PHONY : astdyn/src/io/HorizonsClient.cpp.o
+
+astdyn/src/io/HorizonsClient.i: astdyn/src/io/HorizonsClient.cpp.i
+.PHONY : astdyn/src/io/HorizonsClient.i
+
+# target to preprocess a source file
+astdyn/src/io/HorizonsClient.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/io/HorizonsClient.cpp.i
+.PHONY : astdyn/src/io/HorizonsClient.cpp.i
+
+astdyn/src/io/HorizonsClient.s: astdyn/src/io/HorizonsClient.cpp.s
+.PHONY : astdyn/src/io/HorizonsClient.s
+
+# target to generate assembly for a file
+astdyn/src/io/HorizonsClient.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/io/HorizonsClient.cpp.s
+.PHONY : astdyn/src/io/HorizonsClient.cpp.s
+
+astdyn/src/io/MPCParser.o: astdyn/src/io/MPCParser.cpp.o
+.PHONY : astdyn/src/io/MPCParser.o
+
+# target to build an object file
+astdyn/src/io/MPCParser.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/io/MPCParser.cpp.o
+.PHONY : astdyn/src/io/MPCParser.cpp.o
+
+astdyn/src/io/MPCParser.i: astdyn/src/io/MPCParser.cpp.i
+.PHONY : astdyn/src/io/MPCParser.i
+
+# target to preprocess a source file
+astdyn/src/io/MPCParser.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/io/MPCParser.cpp.i
+.PHONY : astdyn/src/io/MPCParser.cpp.i
+
+astdyn/src/io/MPCParser.s: astdyn/src/io/MPCParser.cpp.s
+.PHONY : astdyn/src/io/MPCParser.s
+
+# target to generate assembly for a file
+astdyn/src/io/MPCParser.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/io/MPCParser.cpp.s
+.PHONY : astdyn/src/io/MPCParser.cpp.s
+
 astdyn/src/io/ParserFactory.o: astdyn/src/io/ParserFactory.cpp.o
 .PHONY : astdyn/src/io/ParserFactory.o
 
@@ -584,6 +698,30 @@ astdyn/src/io/SPKReader.s: astdyn/src/io/SPKReader.cpp.s
 astdyn/src/io/SPKReader.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/io/SPKReader.cpp.s
 .PHONY : astdyn/src/io/SPKReader.cpp.s
+
+astdyn/src/math/LambertSolver.o: astdyn/src/math/LambertSolver.cpp.o
+.PHONY : astdyn/src/math/LambertSolver.o
+
+# target to build an object file
+astdyn/src/math/LambertSolver.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/math/LambertSolver.cpp.o
+.PHONY : astdyn/src/math/LambertSolver.cpp.o
+
+astdyn/src/math/LambertSolver.i: astdyn/src/math/LambertSolver.cpp.i
+.PHONY : astdyn/src/math/LambertSolver.i
+
+# target to preprocess a source file
+astdyn/src/math/LambertSolver.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/math/LambertSolver.cpp.i
+.PHONY : astdyn/src/math/LambertSolver.cpp.i
+
+astdyn/src/math/LambertSolver.s: astdyn/src/math/LambertSolver.cpp.s
+.PHONY : astdyn/src/math/LambertSolver.s
+
+# target to generate assembly for a file
+astdyn/src/math/LambertSolver.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/math/LambertSolver.cpp.s
+.PHONY : astdyn/src/math/LambertSolver.cpp.s
 
 astdyn/src/math/LinearAlgebra.o: astdyn/src/math/LinearAlgebra.cpp.o
 .PHONY : astdyn/src/math/LinearAlgebra.o
@@ -681,6 +819,30 @@ astdyn/src/observations/Observation.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/observations/Observation.cpp.s
 .PHONY : astdyn/src/observations/Observation.cpp.s
 
+astdyn/src/observations/ObservationManager.o: astdyn/src/observations/ObservationManager.cpp.o
+.PHONY : astdyn/src/observations/ObservationManager.o
+
+# target to build an object file
+astdyn/src/observations/ObservationManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/observations/ObservationManager.cpp.o
+.PHONY : astdyn/src/observations/ObservationManager.cpp.o
+
+astdyn/src/observations/ObservationManager.i: astdyn/src/observations/ObservationManager.cpp.i
+.PHONY : astdyn/src/observations/ObservationManager.i
+
+# target to preprocess a source file
+astdyn/src/observations/ObservationManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/observations/ObservationManager.cpp.i
+.PHONY : astdyn/src/observations/ObservationManager.cpp.i
+
+astdyn/src/observations/ObservationManager.s: astdyn/src/observations/ObservationManager.cpp.s
+.PHONY : astdyn/src/observations/ObservationManager.s
+
+# target to generate assembly for a file
+astdyn/src/observations/ObservationManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/observations/ObservationManager.cpp.s
+.PHONY : astdyn/src/observations/ObservationManager.cpp.s
+
 astdyn/src/observations/ObservatoryDatabase.o: astdyn/src/observations/ObservatoryDatabase.cpp.o
 .PHONY : astdyn/src/observations/ObservatoryDatabase.o
 
@@ -753,6 +915,30 @@ astdyn/src/orbit_determination/DifferentialCorrector.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/DifferentialCorrector.cpp.s
 .PHONY : astdyn/src/orbit_determination/DifferentialCorrector.cpp.s
 
+astdyn/src/orbit_determination/ExtendedKalmanFilter.o: astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.o
+.PHONY : astdyn/src/orbit_determination/ExtendedKalmanFilter.o
+
+# target to build an object file
+astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.o
+.PHONY : astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.o
+
+astdyn/src/orbit_determination/ExtendedKalmanFilter.i: astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.i
+.PHONY : astdyn/src/orbit_determination/ExtendedKalmanFilter.i
+
+# target to preprocess a source file
+astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.i
+.PHONY : astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.i
+
+astdyn/src/orbit_determination/ExtendedKalmanFilter.s: astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.s
+.PHONY : astdyn/src/orbit_determination/ExtendedKalmanFilter.s
+
+# target to generate assembly for a file
+astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.s
+.PHONY : astdyn/src/orbit_determination/ExtendedKalmanFilter.cpp.s
+
 astdyn/src/orbit_determination/GaussIOD.o: astdyn/src/orbit_determination/GaussIOD.cpp.o
 .PHONY : astdyn/src/orbit_determination/GaussIOD.o
 
@@ -777,6 +963,30 @@ astdyn/src/orbit_determination/GaussIOD.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/GaussIOD.cpp.s
 .PHONY : astdyn/src/orbit_determination/GaussIOD.cpp.s
 
+astdyn/src/orbit_determination/GoodingIOD.o: astdyn/src/orbit_determination/GoodingIOD.cpp.o
+.PHONY : astdyn/src/orbit_determination/GoodingIOD.o
+
+# target to build an object file
+astdyn/src/orbit_determination/GoodingIOD.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/GoodingIOD.cpp.o
+.PHONY : astdyn/src/orbit_determination/GoodingIOD.cpp.o
+
+astdyn/src/orbit_determination/GoodingIOD.i: astdyn/src/orbit_determination/GoodingIOD.cpp.i
+.PHONY : astdyn/src/orbit_determination/GoodingIOD.i
+
+# target to preprocess a source file
+astdyn/src/orbit_determination/GoodingIOD.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/GoodingIOD.cpp.i
+.PHONY : astdyn/src/orbit_determination/GoodingIOD.cpp.i
+
+astdyn/src/orbit_determination/GoodingIOD.s: astdyn/src/orbit_determination/GoodingIOD.cpp.s
+.PHONY : astdyn/src/orbit_determination/GoodingIOD.s
+
+# target to generate assembly for a file
+astdyn/src/orbit_determination/GoodingIOD.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/GoodingIOD.cpp.s
+.PHONY : astdyn/src/orbit_determination/GoodingIOD.cpp.s
+
 astdyn/src/orbit_determination/LeastSquaresFitter.o: astdyn/src/orbit_determination/LeastSquaresFitter.cpp.o
 .PHONY : astdyn/src/orbit_determination/LeastSquaresFitter.o
 
@@ -800,6 +1010,54 @@ astdyn/src/orbit_determination/LeastSquaresFitter.s: astdyn/src/orbit_determinat
 astdyn/src/orbit_determination/LeastSquaresFitter.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/LeastSquaresFitter.cpp.s
 .PHONY : astdyn/src/orbit_determination/LeastSquaresFitter.cpp.s
+
+astdyn/src/orbit_determination/OrbFitIOD.o: astdyn/src/orbit_determination/OrbFitIOD.cpp.o
+.PHONY : astdyn/src/orbit_determination/OrbFitIOD.o
+
+# target to build an object file
+astdyn/src/orbit_determination/OrbFitIOD.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/OrbFitIOD.cpp.o
+.PHONY : astdyn/src/orbit_determination/OrbFitIOD.cpp.o
+
+astdyn/src/orbit_determination/OrbFitIOD.i: astdyn/src/orbit_determination/OrbFitIOD.cpp.i
+.PHONY : astdyn/src/orbit_determination/OrbFitIOD.i
+
+# target to preprocess a source file
+astdyn/src/orbit_determination/OrbFitIOD.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/OrbFitIOD.cpp.i
+.PHONY : astdyn/src/orbit_determination/OrbFitIOD.cpp.i
+
+astdyn/src/orbit_determination/OrbFitIOD.s: astdyn/src/orbit_determination/OrbFitIOD.cpp.s
+.PHONY : astdyn/src/orbit_determination/OrbFitIOD.s
+
+# target to generate assembly for a file
+astdyn/src/orbit_determination/OrbFitIOD.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/OrbFitIOD.cpp.s
+.PHONY : astdyn/src/orbit_determination/OrbFitIOD.cpp.s
+
+astdyn/src/orbit_determination/ResidualAnalysis.o: astdyn/src/orbit_determination/ResidualAnalysis.cpp.o
+.PHONY : astdyn/src/orbit_determination/ResidualAnalysis.o
+
+# target to build an object file
+astdyn/src/orbit_determination/ResidualAnalysis.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/ResidualAnalysis.cpp.o
+.PHONY : astdyn/src/orbit_determination/ResidualAnalysis.cpp.o
+
+astdyn/src/orbit_determination/ResidualAnalysis.i: astdyn/src/orbit_determination/ResidualAnalysis.cpp.i
+.PHONY : astdyn/src/orbit_determination/ResidualAnalysis.i
+
+# target to preprocess a source file
+astdyn/src/orbit_determination/ResidualAnalysis.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/ResidualAnalysis.cpp.i
+.PHONY : astdyn/src/orbit_determination/ResidualAnalysis.cpp.i
+
+astdyn/src/orbit_determination/ResidualAnalysis.s: astdyn/src/orbit_determination/ResidualAnalysis.cpp.s
+.PHONY : astdyn/src/orbit_determination/ResidualAnalysis.s
+
+# target to generate assembly for a file
+astdyn/src/orbit_determination/ResidualAnalysis.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/ResidualAnalysis.cpp.s
+.PHONY : astdyn/src/orbit_determination/ResidualAnalysis.cpp.s
 
 astdyn/src/orbit_determination/Residuals.o: astdyn/src/orbit_determination/Residuals.cpp.o
 .PHONY : astdyn/src/orbit_determination/Residuals.o
@@ -849,29 +1107,29 @@ astdyn/src/orbit_determination/StateTransitionMatrix.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/orbit_determination/StateTransitionMatrix.cpp.s
 .PHONY : astdyn/src/orbit_determination/StateTransitionMatrix.cpp.s
 
-astdyn/src/propagation/AnalyticalJacobian.o: astdyn/src/propagation/AnalyticalJacobian.cpp.o
-.PHONY : astdyn/src/propagation/AnalyticalJacobian.o
+astdyn/src/propagation/AASIntegrator.o: astdyn/src/propagation/AASIntegrator.cpp.o
+.PHONY : astdyn/src/propagation/AASIntegrator.o
 
 # target to build an object file
-astdyn/src/propagation/AnalyticalJacobian.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/AnalyticalJacobian.cpp.o
-.PHONY : astdyn/src/propagation/AnalyticalJacobian.cpp.o
+astdyn/src/propagation/AASIntegrator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/AASIntegrator.cpp.o
+.PHONY : astdyn/src/propagation/AASIntegrator.cpp.o
 
-astdyn/src/propagation/AnalyticalJacobian.i: astdyn/src/propagation/AnalyticalJacobian.cpp.i
-.PHONY : astdyn/src/propagation/AnalyticalJacobian.i
+astdyn/src/propagation/AASIntegrator.i: astdyn/src/propagation/AASIntegrator.cpp.i
+.PHONY : astdyn/src/propagation/AASIntegrator.i
 
 # target to preprocess a source file
-astdyn/src/propagation/AnalyticalJacobian.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/AnalyticalJacobian.cpp.i
-.PHONY : astdyn/src/propagation/AnalyticalJacobian.cpp.i
+astdyn/src/propagation/AASIntegrator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/AASIntegrator.cpp.i
+.PHONY : astdyn/src/propagation/AASIntegrator.cpp.i
 
-astdyn/src/propagation/AnalyticalJacobian.s: astdyn/src/propagation/AnalyticalJacobian.cpp.s
-.PHONY : astdyn/src/propagation/AnalyticalJacobian.s
+astdyn/src/propagation/AASIntegrator.s: astdyn/src/propagation/AASIntegrator.cpp.s
+.PHONY : astdyn/src/propagation/AASIntegrator.s
 
 # target to generate assembly for a file
-astdyn/src/propagation/AnalyticalJacobian.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/AnalyticalJacobian.cpp.s
-.PHONY : astdyn/src/propagation/AnalyticalJacobian.cpp.s
+astdyn/src/propagation/AASIntegrator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/AASIntegrator.cpp.s
+.PHONY : astdyn/src/propagation/AASIntegrator.cpp.s
 
 astdyn/src/propagation/GaussIntegrator.o: astdyn/src/propagation/GaussIntegrator.cpp.o
 .PHONY : astdyn/src/propagation/GaussIntegrator.o
@@ -897,30 +1155,6 @@ astdyn/src/propagation/GaussIntegrator.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/GaussIntegrator.cpp.s
 .PHONY : astdyn/src/propagation/GaussIntegrator.cpp.s
 
-astdyn/src/propagation/HighPrecisionPropagator.o: astdyn/src/propagation/HighPrecisionPropagator.cpp.o
-.PHONY : astdyn/src/propagation/HighPrecisionPropagator.o
-
-# target to build an object file
-astdyn/src/propagation/HighPrecisionPropagator.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/HighPrecisionPropagator.cpp.o
-.PHONY : astdyn/src/propagation/HighPrecisionPropagator.cpp.o
-
-astdyn/src/propagation/HighPrecisionPropagator.i: astdyn/src/propagation/HighPrecisionPropagator.cpp.i
-.PHONY : astdyn/src/propagation/HighPrecisionPropagator.i
-
-# target to preprocess a source file
-astdyn/src/propagation/HighPrecisionPropagator.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/HighPrecisionPropagator.cpp.i
-.PHONY : astdyn/src/propagation/HighPrecisionPropagator.cpp.i
-
-astdyn/src/propagation/HighPrecisionPropagator.s: astdyn/src/propagation/HighPrecisionPropagator.cpp.s
-.PHONY : astdyn/src/propagation/HighPrecisionPropagator.s
-
-# target to generate assembly for a file
-astdyn/src/propagation/HighPrecisionPropagator.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/HighPrecisionPropagator.cpp.s
-.PHONY : astdyn/src/propagation/HighPrecisionPropagator.cpp.s
-
 astdyn/src/propagation/Integrator.o: astdyn/src/propagation/Integrator.cpp.o
 .PHONY : astdyn/src/propagation/Integrator.o
 
@@ -945,6 +1179,30 @@ astdyn/src/propagation/Integrator.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/Integrator.cpp.s
 .PHONY : astdyn/src/propagation/Integrator.cpp.s
 
+astdyn/src/propagation/OrbFitIntegrator.o: astdyn/src/propagation/OrbFitIntegrator.cpp.o
+.PHONY : astdyn/src/propagation/OrbFitIntegrator.o
+
+# target to build an object file
+astdyn/src/propagation/OrbFitIntegrator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/OrbFitIntegrator.cpp.o
+.PHONY : astdyn/src/propagation/OrbFitIntegrator.cpp.o
+
+astdyn/src/propagation/OrbFitIntegrator.i: astdyn/src/propagation/OrbFitIntegrator.cpp.i
+.PHONY : astdyn/src/propagation/OrbFitIntegrator.i
+
+# target to preprocess a source file
+astdyn/src/propagation/OrbFitIntegrator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/OrbFitIntegrator.cpp.i
+.PHONY : astdyn/src/propagation/OrbFitIntegrator.cpp.i
+
+astdyn/src/propagation/OrbFitIntegrator.s: astdyn/src/propagation/OrbFitIntegrator.cpp.s
+.PHONY : astdyn/src/propagation/OrbFitIntegrator.s
+
+# target to generate assembly for a file
+astdyn/src/propagation/OrbFitIntegrator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/OrbFitIntegrator.cpp.s
+.PHONY : astdyn/src/propagation/OrbFitIntegrator.cpp.s
+
 astdyn/src/propagation/OrbitalElements.o: astdyn/src/propagation/OrbitalElements.cpp.o
 .PHONY : astdyn/src/propagation/OrbitalElements.o
 
@@ -968,6 +1226,30 @@ astdyn/src/propagation/OrbitalElements.s: astdyn/src/propagation/OrbitalElements
 astdyn/src/propagation/OrbitalElements.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/OrbitalElements.cpp.s
 .PHONY : astdyn/src/propagation/OrbitalElements.cpp.s
+
+astdyn/src/propagation/PlanetaryPeriodicPerturbations.o: astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.o
+.PHONY : astdyn/src/propagation/PlanetaryPeriodicPerturbations.o
+
+# target to build an object file
+astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.o
+.PHONY : astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.o
+
+astdyn/src/propagation/PlanetaryPeriodicPerturbations.i: astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.i
+.PHONY : astdyn/src/propagation/PlanetaryPeriodicPerturbations.i
+
+# target to preprocess a source file
+astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.i
+.PHONY : astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.i
+
+astdyn/src/propagation/PlanetaryPeriodicPerturbations.s: astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.s
+.PHONY : astdyn/src/propagation/PlanetaryPeriodicPerturbations.s
+
+# target to generate assembly for a file
+astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.s
+.PHONY : astdyn/src/propagation/PlanetaryPeriodicPerturbations.cpp.s
 
 astdyn/src/propagation/Propagator.o: astdyn/src/propagation/Propagator.cpp.o
 .PHONY : astdyn/src/propagation/Propagator.o
@@ -1017,29 +1299,29 @@ astdyn/src/propagation/RadauIntegrator.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/RadauIntegrator.cpp.s
 .PHONY : astdyn/src/propagation/RadauIntegrator.cpp.s
 
-astdyn/src/propagation/STMPropagator.o: astdyn/src/propagation/STMPropagator.cpp.o
-.PHONY : astdyn/src/propagation/STMPropagator.o
+astdyn/src/propagation/saba4_integrator.o: astdyn/src/propagation/saba4_integrator.cpp.o
+.PHONY : astdyn/src/propagation/saba4_integrator.o
 
 # target to build an object file
-astdyn/src/propagation/STMPropagator.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/STMPropagator.cpp.o
-.PHONY : astdyn/src/propagation/STMPropagator.cpp.o
+astdyn/src/propagation/saba4_integrator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/saba4_integrator.cpp.o
+.PHONY : astdyn/src/propagation/saba4_integrator.cpp.o
 
-astdyn/src/propagation/STMPropagator.i: astdyn/src/propagation/STMPropagator.cpp.i
-.PHONY : astdyn/src/propagation/STMPropagator.i
+astdyn/src/propagation/saba4_integrator.i: astdyn/src/propagation/saba4_integrator.cpp.i
+.PHONY : astdyn/src/propagation/saba4_integrator.i
 
 # target to preprocess a source file
-astdyn/src/propagation/STMPropagator.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/STMPropagator.cpp.i
-.PHONY : astdyn/src/propagation/STMPropagator.cpp.i
+astdyn/src/propagation/saba4_integrator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/saba4_integrator.cpp.i
+.PHONY : astdyn/src/propagation/saba4_integrator.cpp.i
 
-astdyn/src/propagation/STMPropagator.s: astdyn/src/propagation/STMPropagator.cpp.s
-.PHONY : astdyn/src/propagation/STMPropagator.s
+astdyn/src/propagation/saba4_integrator.s: astdyn/src/propagation/saba4_integrator.cpp.s
+.PHONY : astdyn/src/propagation/saba4_integrator.s
 
 # target to generate assembly for a file
-astdyn/src/propagation/STMPropagator.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/STMPropagator.cpp.s
-.PHONY : astdyn/src/propagation/STMPropagator.cpp.s
+astdyn/src/propagation/saba4_integrator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/propagation/saba4_integrator.cpp.s
+.PHONY : astdyn/src/propagation/saba4_integrator.cpp.s
 
 astdyn/src/time/TimeScale.o: astdyn/src/time/TimeScale.cpp.o
 .PHONY : astdyn/src/time/TimeScale.o
@@ -1065,78 +1347,6 @@ astdyn/src/time/TimeScale.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/astdyn.dir/build.make CMakeFiles/astdyn.dir/astdyn/src/time/TimeScale.cpp.s
 .PHONY : astdyn/src/time/TimeScale.cpp.s
 
-astdyn/tests/benchmark_79450.o: astdyn/tests/benchmark_79450.cpp.o
-.PHONY : astdyn/tests/benchmark_79450.o
-
-# target to build an object file
-astdyn/tests/benchmark_79450.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_79450.dir/build.make CMakeFiles/benchmark_79450.dir/astdyn/tests/benchmark_79450.cpp.o
-.PHONY : astdyn/tests/benchmark_79450.cpp.o
-
-astdyn/tests/benchmark_79450.i: astdyn/tests/benchmark_79450.cpp.i
-.PHONY : astdyn/tests/benchmark_79450.i
-
-# target to preprocess a source file
-astdyn/tests/benchmark_79450.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_79450.dir/build.make CMakeFiles/benchmark_79450.dir/astdyn/tests/benchmark_79450.cpp.i
-.PHONY : astdyn/tests/benchmark_79450.cpp.i
-
-astdyn/tests/benchmark_79450.s: astdyn/tests/benchmark_79450.cpp.s
-.PHONY : astdyn/tests/benchmark_79450.s
-
-# target to generate assembly for a file
-astdyn/tests/benchmark_79450.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/benchmark_79450.dir/build.make CMakeFiles/benchmark_79450.dir/astdyn/tests/benchmark_79450.cpp.s
-.PHONY : astdyn/tests/benchmark_79450.cpp.s
-
-astdyn/tests/test_asteroid_fitter.o: astdyn/tests/test_asteroid_fitter.cpp.o
-.PHONY : astdyn/tests/test_asteroid_fitter.o
-
-# target to build an object file
-astdyn/tests/test_asteroid_fitter.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter.dir/build.make CMakeFiles/test_asteroid_fitter.dir/astdyn/tests/test_asteroid_fitter.cpp.o
-.PHONY : astdyn/tests/test_asteroid_fitter.cpp.o
-
-astdyn/tests/test_asteroid_fitter.i: astdyn/tests/test_asteroid_fitter.cpp.i
-.PHONY : astdyn/tests/test_asteroid_fitter.i
-
-# target to preprocess a source file
-astdyn/tests/test_asteroid_fitter.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter.dir/build.make CMakeFiles/test_asteroid_fitter.dir/astdyn/tests/test_asteroid_fitter.cpp.i
-.PHONY : astdyn/tests/test_asteroid_fitter.cpp.i
-
-astdyn/tests/test_asteroid_fitter.s: astdyn/tests/test_asteroid_fitter.cpp.s
-.PHONY : astdyn/tests/test_asteroid_fitter.s
-
-# target to generate assembly for a file
-astdyn/tests/test_asteroid_fitter.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter.dir/build.make CMakeFiles/test_asteroid_fitter.dir/astdyn/tests/test_asteroid_fitter.cpp.s
-.PHONY : astdyn/tests/test_asteroid_fitter.cpp.s
-
-astdyn/tests/test_asteroid_fitter_horizons.o: astdyn/tests/test_asteroid_fitter_horizons.cpp.o
-.PHONY : astdyn/tests/test_asteroid_fitter_horizons.o
-
-# target to build an object file
-astdyn/tests/test_asteroid_fitter_horizons.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter_horizons.dir/build.make CMakeFiles/test_asteroid_fitter_horizons.dir/astdyn/tests/test_asteroid_fitter_horizons.cpp.o
-.PHONY : astdyn/tests/test_asteroid_fitter_horizons.cpp.o
-
-astdyn/tests/test_asteroid_fitter_horizons.i: astdyn/tests/test_asteroid_fitter_horizons.cpp.i
-.PHONY : astdyn/tests/test_asteroid_fitter_horizons.i
-
-# target to preprocess a source file
-astdyn/tests/test_asteroid_fitter_horizons.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter_horizons.dir/build.make CMakeFiles/test_asteroid_fitter_horizons.dir/astdyn/tests/test_asteroid_fitter_horizons.cpp.i
-.PHONY : astdyn/tests/test_asteroid_fitter_horizons.cpp.i
-
-astdyn/tests/test_asteroid_fitter_horizons.s: astdyn/tests/test_asteroid_fitter_horizons.cpp.s
-.PHONY : astdyn/tests/test_asteroid_fitter_horizons.s
-
-# target to generate assembly for a file
-astdyn/tests/test_asteroid_fitter_horizons.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_asteroid_fitter_horizons.dir/build.make CMakeFiles/test_asteroid_fitter_horizons.dir/astdyn/tests/test_asteroid_fitter_horizons.cpp.s
-.PHONY : astdyn/tests/test_asteroid_fitter_horizons.cpp.s
-
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -1144,21 +1354,17 @@ help:
 	@echo "... clean"
 	@echo "... depend"
 	@echo "... edit_cache"
-	@echo "... install"
-	@echo "... install/local"
-	@echo "... install/strip"
-	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... astdyn"
-	@echo "... benchmark_79450"
+	@echo "... benchmark_aas"
+	@echo "... benchmark_extended"
+	@echo "... benchmark_integrators"
 	@echo "... benchmark_json_api"
+	@echo "... benchmark_multi_integrator"
+	@echo "... od_benchmark"
 	@echo "... propagate_example"
-	@echo "... test_asteroid_fitter"
-	@echo "... test_asteroid_fitter_horizons"
-	@echo "... astdyn/examples/benchmark_json_api.o"
-	@echo "... astdyn/examples/benchmark_json_api.i"
-	@echo "... astdyn/examples/benchmark_json_api.s"
+	@echo "... propagation_benchmark"
 	@echo "... astdyn/examples/propagate_79148.o"
 	@echo "... astdyn/examples/propagate_79148.i"
 	@echo "... astdyn/examples/propagate_79148.s"
@@ -1168,6 +1374,18 @@ help:
 	@echo "... astdyn/src/api/OrbitFitAPI.o"
 	@echo "... astdyn/src/api/OrbitFitAPI.i"
 	@echo "... astdyn/src/api/OrbitFitAPI.s"
+	@echo "... astdyn/src/astrometry/Astrometry.o"
+	@echo "... astdyn/src/astrometry/Astrometry.i"
+	@echo "... astdyn/src/astrometry/Astrometry.s"
+	@echo "... astdyn/src/astrometry/OccultationLogic.o"
+	@echo "... astdyn/src/astrometry/OccultationLogic.i"
+	@echo "... astdyn/src/astrometry/OccultationLogic.s"
+	@echo "... astdyn/src/catalog/CatalogIntegration.o"
+	@echo "... astdyn/src/catalog/CatalogIntegration.i"
+	@echo "... astdyn/src/catalog/CatalogIntegration.s"
+	@echo "... astdyn/src/catalog/GaiaDR3Catalog.o"
+	@echo "... astdyn/src/catalog/GaiaDR3Catalog.i"
+	@echo "... astdyn/src/catalog/GaiaDR3Catalog.s"
 	@echo "... astdyn/src/close_approach/CloseApproach.o"
 	@echo "... astdyn/src/close_approach/CloseApproach.i"
 	@echo "... astdyn/src/close_approach/CloseApproach.s"
@@ -1192,12 +1410,21 @@ help:
 	@echo "... astdyn/src/io/AstDysOrbitFitter.o"
 	@echo "... astdyn/src/io/AstDysOrbitFitter.i"
 	@echo "... astdyn/src/io/AstDysOrbitFitter.s"
+	@echo "... astdyn/src/io/HorizonsClient.o"
+	@echo "... astdyn/src/io/HorizonsClient.i"
+	@echo "... astdyn/src/io/HorizonsClient.s"
+	@echo "... astdyn/src/io/MPCParser.o"
+	@echo "... astdyn/src/io/MPCParser.i"
+	@echo "... astdyn/src/io/MPCParser.s"
 	@echo "... astdyn/src/io/ParserFactory.o"
 	@echo "... astdyn/src/io/ParserFactory.i"
 	@echo "... astdyn/src/io/ParserFactory.s"
 	@echo "... astdyn/src/io/SPKReader.o"
 	@echo "... astdyn/src/io/SPKReader.i"
 	@echo "... astdyn/src/io/SPKReader.s"
+	@echo "... astdyn/src/math/LambertSolver.o"
+	@echo "... astdyn/src/math/LambertSolver.i"
+	@echo "... astdyn/src/math/LambertSolver.s"
 	@echo "... astdyn/src/math/LinearAlgebra.o"
 	@echo "... astdyn/src/math/LinearAlgebra.i"
 	@echo "... astdyn/src/math/LinearAlgebra.s"
@@ -1210,6 +1437,9 @@ help:
 	@echo "... astdyn/src/observations/Observation.o"
 	@echo "... astdyn/src/observations/Observation.i"
 	@echo "... astdyn/src/observations/Observation.s"
+	@echo "... astdyn/src/observations/ObservationManager.o"
+	@echo "... astdyn/src/observations/ObservationManager.i"
+	@echo "... astdyn/src/observations/ObservationManager.s"
 	@echo "... astdyn/src/observations/ObservatoryDatabase.o"
 	@echo "... astdyn/src/observations/ObservatoryDatabase.i"
 	@echo "... astdyn/src/observations/ObservatoryDatabase.s"
@@ -1219,54 +1449,60 @@ help:
 	@echo "... astdyn/src/orbit_determination/DifferentialCorrector.o"
 	@echo "... astdyn/src/orbit_determination/DifferentialCorrector.i"
 	@echo "... astdyn/src/orbit_determination/DifferentialCorrector.s"
+	@echo "... astdyn/src/orbit_determination/ExtendedKalmanFilter.o"
+	@echo "... astdyn/src/orbit_determination/ExtendedKalmanFilter.i"
+	@echo "... astdyn/src/orbit_determination/ExtendedKalmanFilter.s"
 	@echo "... astdyn/src/orbit_determination/GaussIOD.o"
 	@echo "... astdyn/src/orbit_determination/GaussIOD.i"
 	@echo "... astdyn/src/orbit_determination/GaussIOD.s"
+	@echo "... astdyn/src/orbit_determination/GoodingIOD.o"
+	@echo "... astdyn/src/orbit_determination/GoodingIOD.i"
+	@echo "... astdyn/src/orbit_determination/GoodingIOD.s"
 	@echo "... astdyn/src/orbit_determination/LeastSquaresFitter.o"
 	@echo "... astdyn/src/orbit_determination/LeastSquaresFitter.i"
 	@echo "... astdyn/src/orbit_determination/LeastSquaresFitter.s"
+	@echo "... astdyn/src/orbit_determination/OrbFitIOD.o"
+	@echo "... astdyn/src/orbit_determination/OrbFitIOD.i"
+	@echo "... astdyn/src/orbit_determination/OrbFitIOD.s"
+	@echo "... astdyn/src/orbit_determination/ResidualAnalysis.o"
+	@echo "... astdyn/src/orbit_determination/ResidualAnalysis.i"
+	@echo "... astdyn/src/orbit_determination/ResidualAnalysis.s"
 	@echo "... astdyn/src/orbit_determination/Residuals.o"
 	@echo "... astdyn/src/orbit_determination/Residuals.i"
 	@echo "... astdyn/src/orbit_determination/Residuals.s"
 	@echo "... astdyn/src/orbit_determination/StateTransitionMatrix.o"
 	@echo "... astdyn/src/orbit_determination/StateTransitionMatrix.i"
 	@echo "... astdyn/src/orbit_determination/StateTransitionMatrix.s"
-	@echo "... astdyn/src/propagation/AnalyticalJacobian.o"
-	@echo "... astdyn/src/propagation/AnalyticalJacobian.i"
-	@echo "... astdyn/src/propagation/AnalyticalJacobian.s"
+	@echo "... astdyn/src/propagation/AASIntegrator.o"
+	@echo "... astdyn/src/propagation/AASIntegrator.i"
+	@echo "... astdyn/src/propagation/AASIntegrator.s"
 	@echo "... astdyn/src/propagation/GaussIntegrator.o"
 	@echo "... astdyn/src/propagation/GaussIntegrator.i"
 	@echo "... astdyn/src/propagation/GaussIntegrator.s"
-	@echo "... astdyn/src/propagation/HighPrecisionPropagator.o"
-	@echo "... astdyn/src/propagation/HighPrecisionPropagator.i"
-	@echo "... astdyn/src/propagation/HighPrecisionPropagator.s"
 	@echo "... astdyn/src/propagation/Integrator.o"
 	@echo "... astdyn/src/propagation/Integrator.i"
 	@echo "... astdyn/src/propagation/Integrator.s"
+	@echo "... astdyn/src/propagation/OrbFitIntegrator.o"
+	@echo "... astdyn/src/propagation/OrbFitIntegrator.i"
+	@echo "... astdyn/src/propagation/OrbFitIntegrator.s"
 	@echo "... astdyn/src/propagation/OrbitalElements.o"
 	@echo "... astdyn/src/propagation/OrbitalElements.i"
 	@echo "... astdyn/src/propagation/OrbitalElements.s"
+	@echo "... astdyn/src/propagation/PlanetaryPeriodicPerturbations.o"
+	@echo "... astdyn/src/propagation/PlanetaryPeriodicPerturbations.i"
+	@echo "... astdyn/src/propagation/PlanetaryPeriodicPerturbations.s"
 	@echo "... astdyn/src/propagation/Propagator.o"
 	@echo "... astdyn/src/propagation/Propagator.i"
 	@echo "... astdyn/src/propagation/Propagator.s"
 	@echo "... astdyn/src/propagation/RadauIntegrator.o"
 	@echo "... astdyn/src/propagation/RadauIntegrator.i"
 	@echo "... astdyn/src/propagation/RadauIntegrator.s"
-	@echo "... astdyn/src/propagation/STMPropagator.o"
-	@echo "... astdyn/src/propagation/STMPropagator.i"
-	@echo "... astdyn/src/propagation/STMPropagator.s"
+	@echo "... astdyn/src/propagation/saba4_integrator.o"
+	@echo "... astdyn/src/propagation/saba4_integrator.i"
+	@echo "... astdyn/src/propagation/saba4_integrator.s"
 	@echo "... astdyn/src/time/TimeScale.o"
 	@echo "... astdyn/src/time/TimeScale.i"
 	@echo "... astdyn/src/time/TimeScale.s"
-	@echo "... astdyn/tests/benchmark_79450.o"
-	@echo "... astdyn/tests/benchmark_79450.i"
-	@echo "... astdyn/tests/benchmark_79450.s"
-	@echo "... astdyn/tests/test_asteroid_fitter.o"
-	@echo "... astdyn/tests/test_asteroid_fitter.i"
-	@echo "... astdyn/tests/test_asteroid_fitter.s"
-	@echo "... astdyn/tests/test_asteroid_fitter_horizons.o"
-	@echo "... astdyn/tests/test_asteroid_fitter_horizons.i"
-	@echo "... astdyn/tests/test_asteroid_fitter_horizons.s"
 .PHONY : help
 
 

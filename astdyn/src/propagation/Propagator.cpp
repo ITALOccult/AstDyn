@@ -174,4 +174,12 @@ Eigen::VectorXd Propagator::integrate_raw_au(const Eigen::VectorXd& y0_au, doubl
     return integrator_->integrate(f, y0_au, t0_mjd, tf_mjd);
 }
 
+std::vector<Eigen::VectorXd> Propagator::integrate_raw_au_batch(const Eigen::VectorXd& y0_au, double t0_mjd, const std::vector<double>& tf_mjds) {
+    DerivativeFunction f = [this](double t_val, const Eigen::VectorXd& y) {
+        return compute_derivatives(time::EpochTDB::from_mjd(t_val), y);
+    };
+    
+    return integrator_->integrate_at(f, y0_au, t0_mjd, tf_mjds);
+}
+
 } // namespace astdyn::propagation
