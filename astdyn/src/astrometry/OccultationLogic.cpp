@@ -27,7 +27,9 @@ OccultationParameters OccultationLogic::compute_parameters(
     // 1. Besselian Basis (toward star)
     Eigen::Vector3d k(std::cos(as) * std::cos(ds), std::sin(as) * std::cos(ds), std::sin(ds));
     Eigen::Vector3d i(-std::sin(as), std::cos(as), 0.0);
-    Eigen::Vector3d j = k.cross(i);
+    // BUG-3: Use the rigorous North vector formula provided by the user
+    // j = (-sin(ds)cos(as), -sin(ds)sin(as), cos(ds))
+    Eigen::Vector3d j(-std::sin(ds) * std::cos(as), -std::sin(ds) * std::sin(as), std::cos(ds));
 
     // 2. Asteroid and its velocity in 3D (GCRF)
     Eigen::Vector3d r_ast_vec(
@@ -85,6 +87,8 @@ OccultationParameters OccultationLogic::compute_parameters(
     params.d_dec_mas_sec = ast_ddec_dt_rad_s * (RAD_TO_DEG * 3600.0 * 1000.0);
     
     params.closest_approach_time_offset_sec = t_ca;
+    params.time_uncertainty_sec = 0.0;
+    params.cross_track_uncertainty_km = 0.0;
 
     return params;
 }

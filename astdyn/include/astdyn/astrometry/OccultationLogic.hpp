@@ -22,6 +22,8 @@ struct OccultationParameters {
     double d_ra_cos_dec_mas_sec;   ///< Relative velocity in RA*cos(dec) [mas/s]
     double d_dec_mas_sec;          ///< Relative velocity in Declination [mas/s]
     double closest_approach_time_offset_sec; ///< Time offset from input center to TCA [s]
+    double time_uncertainty_sec;           ///< 1-sigma uncertainty in time [s]
+    double cross_track_uncertainty_km;    ///< 1-sigma uncertainty in cross-track position [km]
 };
 
 /**
@@ -58,13 +60,14 @@ public:
         const SkyCoord<Frame>& asteroid,
         double distance_m,
         double dra_dt_rad_s,
-        double ddec_dt_rad_s) 
+        double ddec_dt_rad_s,
+        double ddist_dt_m_s = 0.0) 
     {
         return compute_parameters(
             star.ra(), star.dec(),
             asteroid.ra(), asteroid.dec(),
             distance_m,
-            dra_dt_rad_s, ddec_dt_rad_s, 0.0
+            dra_dt_rad_s, ddec_dt_rad_s, ddist_dt_m_s
         );
     }
 };

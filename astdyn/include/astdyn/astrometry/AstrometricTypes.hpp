@@ -12,6 +12,7 @@ namespace astdyn::astrometry {
 struct AstrometricSettings {
     bool light_time_correction = true;
     bool stellar_aberration = true;
+    bool light_deflection = true;
     bool frame_conversion_to_equatorial = true;
 };
 
