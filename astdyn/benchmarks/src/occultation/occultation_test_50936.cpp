@@ -172,24 +172,35 @@ int main() {
     params_occ4.time_uncertainty_sec = 0.8;
 
     std::cout << "RISULTATO AstDyn (Emulazione): Impact = " << params_occ4.impact_parameter_km << " km (ITALIA)" << std::endl;
+    std::cout << "  - xi_ca  = " << params_occ4.xi_ca_km << " km" << std::endl;
+    std::cout << "  - eta_ca = " << params_occ4.eta_ca_km << " km" << std::endl;
     
     auto path_occ4 = OccultationMapper::compute_path(params_occ4, star_occ4.ra(), star_occ4.dec(), t0_utc, 600.0);
     OccultationMapper::export_kml(path_occ4, "nireus_emulated_italy.kml");
     OccultationMapper::export_svg(path_occ4, "nireus_emulated_italy.svg");
 
-    // NEW: Comparison Map
-    std::cout << "\n--- GENERAZIONE MAPPA DI CONFRONTO (SVG PREMIUM) ---" << std::endl;
-    OccultationMapper::export_comparison_svg(
-        path_nominal, "AstDyn Nominal (JPL#105 - Africa)",
-        path_occ4, "Occult4 Emulated (JPL#39 - Italy)",
-        "nireus_comparison_map.svg"
-    );
-    std::cout << "File SVG Comparativo: nireus_comparison_map.svg" << std::endl;
+    // NEW: Global Map with Earth background
+    std::cout << "\n--- GENERAZIONE MAPPA GLOBALE (CON TERRE) ---" << std::endl;
+    
+    // Create a 3rd 'Shifted' path for comparison (e.g., user manual correction)
+    auto params_occ4_shifted = params_occ4;
+    params_occ4_shifted.eta_ca_km -= 1000.0; // Shift south by 1000km
+    auto path_occ4_shifted = OccultationMapper::compute_path(params_occ4_shifted, star_occ4.ra(), star_occ4.dec(), t0_utc, 600.0);
+
+    std::vector<OccultationPath> global_paths = {path_nominal, path_occ4, path_occ4_shifted};
+    std::vector<std::string> global_labels = {
+        "AstDyn Nominal (JPL#105 - Africa)", 
+        "Occult4 Emulated (JPL#39 - Italy)",
+        "Occult4 Shifted (-1000km Eta)"
+    };
+    std::vector<std::string> global_colors = {"#06b6d4", "#ef4444", "#fbbf24"};
+    
+    OccultationMapper::export_global_svg(global_paths, global_labels, global_colors, "nireus_global_map.svg");
+    std::cout << "File SVG Globale: nireus_global_map.svg" << std::endl;
 
     std::cout << "\n--- CONCLUSIONE ---" << std::endl;
-    std::cout << "Creati file KML e SVG per entrambe le tracce." << std::endl;
-    std::cout << "Apri 'nireus_nominal_africa.kml' per la previsione REALE (JPL#105)." << std::endl;
-    std::cout << "Apri 'nireus_emulated_italy.kml' per l'emulazione Occult4 (JPL#39)." << std::endl;
+    std::cout << "Creati file KML e SVG per tutte le tracce." << std::endl;
+    std::cout << "File SVG Globale con terre: nireus_global_map.svg" << std::endl;
 
     GaiaDR3Catalog::shutdown();
     return 0;

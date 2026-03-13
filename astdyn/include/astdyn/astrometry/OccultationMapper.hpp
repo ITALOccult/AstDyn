@@ -72,6 +72,15 @@ public:
         const std::string& filename);
 
     /**
+     * @brief Generates a global SVG map with world background and multiple paths.
+     */
+    static void export_global_svg(
+        const std::vector<OccultationPath>& paths,
+        const std::vector<std::string>& labels,
+        const std::vector<std::string>& colors,
+        const std::string& filename);
+
+    /**
      * @brief Generates a KML file for Google Earth.
      * @param path Calculated path data.
      * @param filename Output path.

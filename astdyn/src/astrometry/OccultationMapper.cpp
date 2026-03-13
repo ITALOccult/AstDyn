@@ -5,54 +5,52 @@
 #include "astdyn/astrometry/OccultationMapper.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/TimeScale.hpp"
+#include "astdyn/astrometry/WorldMapData.hpp"
 #include <fstream>
 #include <cmath>
 #include <iomanip>
 
 namespace astdyn::astrometry {
 
-GeoPoint OccultationMapper::project_to_earth(double xi, double eta, double zeta, 
+GeoPoint OccultationMapper::project_to_earth(double xi, double eta, double /*zeta_unused*/, 
                                      const RightAscension& ra, const Declination& dec, 
                                      const time::EpochUTC& t) 
 {
     using namespace constants;
 
-    // 1. Rigorous Besselian to ECI transformation
-    // k points towards the star
+    // 1. Besselian Basis (toward star)
     double as = ra.to_rad();
     double ds = dec.to_rad();
-    
     Eigen::Vector3d k_vec(std::cos(as) * std::cos(ds), std::sin(as) * std::cos(ds), std::sin(ds));
     Eigen::Vector3d i_vec(-std::sin(as), std::cos(as), 0.0);
-    // User-suggested North vector (consistent with OccultationLogic fix)
     Eigen::Vector3d j_vec(-std::sin(ds) * std::cos(as), -std::sin(ds) * std::sin(as), std::cos(ds));
 
-    // Calculate zeta if not provided (intersection with Earth surface)
-    // zeta^2 = R_earth^2 - xi^2 - eta^2
+    // 2. Zeta: Intersection with Earth surface (simplified sphere)
     double r_earth = constants::R_EARTH; 
     double diff = r_earth * r_earth - (xi * xi + eta * eta);
     double z = (diff > 0) ? std::sqrt(diff) : 0.0;
     
-    // Position in GCRF/ECI
+    // Position in GCRF/ECI [km]
     Eigen::Vector3d p_eci = xi * i_vec + eta * j_vec + z * k_vec;
 
-    // 2. Simple GAST approximation for rotation to ITRF
-    // T = centuries from J2000
+    // 3. Earth Rotation Angle (ERA) - Modern IAU Standard
+    // Du = days from J2000.0 (JD 2451545.0)
     double jd = time::mjd_to_jd(t.mjd());
-    double T = (jd - 2451545.0) / 36525.0;
+    double Du = jd - 2451545.0;
     
-    // GMST in seconds (Simplified IAU model)
-    double gmst_sec = 24110.54841 + 8640184.812866 * T + 0.093104 * T*T;
-    double gast_rad = std::fmod(gmst_sec * (constants::PI / 43200.0), constants::TWO_PI);
+    // ERA (in fractions of a rotation)
+    double era_frac = 0.7790572732640 + 1.00273781191135448 * Du;
+    double era_rad = std::fmod(era_frac * constants::TWO_PI, constants::TWO_PI);
+    if (era_rad < 0) era_rad += constants::TWO_PI;
     
-    // Rotate ECI -> ITRF (Rotation about Z)
-    double cos_g = std::cos(gast_rad);
-    double sin_g = std::sin(gast_rad);
-    double x_itrf = p_eci.x() * cos_g + p_eci.y() * sin_g;
-    double y_itrf = -p_eci.x() * sin_g + p_eci.y() * cos_g;
-    double z_itrf = p_eci.z();
+    // ECI -> ITRF (Rotation about Z by +ERA)
+    double cos_era = std::cos(era_rad);
+    double sin_era = std::sin(era_rad);
+    double x_itrf =  p_eci.x() * cos_era + p_eci.y() * sin_era;
+    double y_itrf = -p_eci.x() * sin_era + p_eci.y() * cos_era;
+    double z_itrf =  p_eci.z();
 
-    // 3. ITRF to Geodetic (Spherical approximation)
+    // 4. ITRF to Geodetic
     double lat = std::asin(z_itrf / r_earth) * RAD_TO_DEG;
     double lon = std::atan2(y_itrf, x_itrf) * RAD_TO_DEG;
 
@@ -74,27 +72,28 @@ OccultationPath OccultationMapper::compute_path(
 
     // Movement angle on the fundamental plane
     double theta = params.position_angle_deg * DEG_TO_RAD;
+    double vxi = params.shadow_velocity_kms * std::sin(theta);
+    double veta = params.shadow_velocity_kms * std::cos(theta);
 
-    auto get_pos_at = [&](double t) {
-        double s = params.shadow_velocity_kms * t;
-        double xi  = params.impact_parameter_km * std::sin(theta) + s * std::cos(theta);
-        double eta = params.impact_parameter_km * std::cos(theta) - s * std::sin(theta);
-        return project_to_earth(xi, eta, 0.0, star_ra, star_dec, tca_utc);
+    auto get_pos_at = [&](double t_sec) {
+        double xi = params.xi_ca_km + vxi * t_sec;
+        double eta = params.eta_ca_km + veta * t_sec;
+        return project_to_earth(xi, eta, 0.0, star_ra, star_dec, tca_utc + time::TimeDuration::from_seconds(t_sec));
     };
 
     for (int i = -steps/2; i <= steps/2; ++i) {
         double t = i * dt;
-        double s = params.shadow_velocity_kms * t;
-
-        // Path on fundamental plane
-        double xi  = params.impact_parameter_km * std::sin(theta) + s * std::cos(theta);
-        double eta = params.impact_parameter_km * std::cos(theta) - s * std::sin(theta);
+        double xi = params.xi_ca_km + vxi * t;
+        double eta = params.eta_ca_km + veta * t;
         
-        path.center_line.push_back(project_to_earth(xi, eta, 0.0, star_ra, star_dec, tca_utc));
+        path.center_line.push_back(get_pos_at(t));
         
         double w = path.shadow_width_km / 2.0;
-        path.sigma1_north.push_back(project_to_earth(xi - w*std::sin(theta), eta + w*std::cos(theta), 0.0, star_ra, star_dec, tca_utc));
-        path.sigma1_south.push_back(project_to_earth(xi + w*std::sin(theta), eta - w*std::sin(theta), 0.0, star_ra, star_dec, tca_utc));
+        double dxi_perp = w * std::cos(theta);
+        double deta_perp = -w * std::sin(theta);
+
+        path.sigma1_north.push_back(project_to_earth(xi - dxi_perp, eta - deta_perp, 0.0, star_ra, star_dec, tca_utc + time::TimeDuration::from_seconds(t)));
+        path.sigma1_south.push_back(project_to_earth(xi + dxi_perp, eta + deta_perp, 0.0, star_ra, star_dec, tca_utc + time::TimeDuration::from_seconds(t)));
     }
 
     // Add Time Markers
@@ -328,6 +327,96 @@ void OccultationMapper::export_comparison_svg(
     // Metadata Footer
     ofs << "  <text x=\"50\" y=\"780\" fill=\"#475569\" font-family=\"sans-serif\" font-size=\"12\">Generated by AstDyn Engine v2.5 - ITALOccult System</text>\n";
 
+    ofs << "</svg>\n";
+}
+
+void OccultationMapper::export_global_svg(
+    const std::vector<OccultationPath>& paths,
+    const std::vector<std::string>& labels,
+    const std::vector<std::string>& colors,
+    const std::string& filename)
+{
+    std::ofstream ofs(filename);
+    // Standard Equirectangular Projection Space: x [-180, 180], y [-90, 90]
+    // We use a larger scale (x10) for better browser compatibility and precision
+    ofs << "<svg viewBox=\"-1800 -900 3600 1800\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background:#0f172a\">\n";
+    
+    // 1. Defs (Glow)
+    ofs << "  <defs>\n";
+    ofs << "    <filter id=\"glow_global\">\n";
+    ofs << "      <feGaussianBlur stdDeviation=\"5\" result=\"coloredBlur\"/>\n";
+    ofs << "      <feMerge><feMergeNode in=\"coloredBlur\"/><feMergeNode in=\"SourceGraphic\"/></feMerge>\n";
+    ofs << "    </filter>\n";
+    ofs << "  </defs>\n";
+
+    // 2. Graticule (Grid)
+    ofs << "  <g stroke=\"#1e293b\" stroke-width=\"1\">\n";
+    for (int lon = -180; lon <= 180; lon += 30) {
+        ofs << "    <line x1=\"" << lon*10 << "\" y1=\"-900\" x2=\"" << lon*10 << "\" y2=\"900\" />\n";
+    }
+    for (int lat = -90; lat <= 90; lat += 30) {
+        ofs << "    <line x1=\"-1800\" y1=\"" << lat*10 << "\" x2=\"1800\" y2=\"" << lat*10 << "\" />\n";
+    }
+    ofs << "  </g>\n";
+
+    // 3. Landmasses (from WorldMapData)
+    ofs << "  <g fill=\"#1e293b\" stroke=\"#334155\" stroke-width=\"2\">\n";
+    for (const auto& d : WorldMapData::get_all_paths()) {
+        // Need to scale the d string points by 10 since our viewBox is x10
+        // But the data is already (lon, -lat) which maps to SVG (x, y)
+        // We'll use a transform instead of parsing the strings.
+        ofs << "    <path d=\"" << d << "\" transform=\"scale(10)\" />\n";
+    }
+    ofs << "  </g>\n";
+
+    auto lon_to_svg = [&](double lon) { return lon * 10.0; };
+    auto lat_to_svg = [&](double lat) { return -lat * 10.0; };
+
+    // 4. Occultation Paths
+    for (size_t i = 0; i < paths.size(); ++i) {
+        const auto& p = paths[i];
+        std::string color = (i < colors.size()) ? colors[i] : "#ffffff";
+        
+        // Corridor
+        if (!p.sigma1_north.empty()) {
+            ofs << "  <path fill=\"" << color << "\" fill-opacity=\"0.15\" d=\"M ";
+            for (const auto& pt : p.sigma1_north) ofs << lon_to_svg(pt.lon_deg) << "," << lat_to_svg(pt.lat_deg) << " ";
+            for (auto it = p.sigma1_south.rbegin(); it != p.sigma1_south.rend(); ++it) 
+                ofs << "L " << lon_to_svg(it->lon_deg) << "," << lat_to_svg(it->lat_deg) << " ";
+            ofs << "Z\" />\n";
+        }
+
+        // Center line
+        if (!p.center_line.empty()) {
+            ofs << "  <polyline points=\"";
+            for (const auto& pt : p.center_line) {
+                ofs << lon_to_svg(pt.lon_deg) << "," << lat_to_svg(pt.lat_deg) << " ";
+            }
+            ofs << "\" fill=\"none\" stroke=\"" << color << "\" stroke-width=\"15\" filter=\"url(#glow_global)\" />\n";
+        }
+
+        // Markers
+        for (const auto& marker : p.markers) {
+            if (marker.label == "TCA") {
+                ofs << "  <circle cx=\"" << lon_to_svg(marker.point.lon_deg) << "\" cy=\"" << lat_to_svg(marker.point.lat_deg) 
+                    << "\" r=\"15\" fill=\"" << color << "\" stroke=\"white\" stroke-width=\"4\" />\n";
+            }
+        }
+    }
+
+    // 5. Legend (Overlay)
+    // Scale legend properly for the large coordinate space
+    ofs << "  <g transform=\"translate(-1750, -850)\">\n";
+    ofs << "    <rect width=\"1100\" height=\"" << (120 + paths.size() * 80) << "\" rx=\"40\" fill=\"#1e293b\" fill-opacity=\"0.9\" stroke=\"#334155\" stroke-width=\"5\" />\n";
+    ofs << "    <text x=\"50\" y=\"80\" fill=\"white\" font-family=\"sans-serif\" font-size=\"60\" font-weight=\"bold\">Stellar Occultation Tracker</text>\n";
+    for (size_t i = 0; i < paths.size(); ++i) {
+        std::string color = (i < colors.size()) ? colors[i] : "#ffffff";
+        ofs << "    <rect x=\"50\" y=\"" << (120 + i * 80) << "\" width=\"40\" height=\"40\" fill=\"" << color << "\" rx=\"10\" />\n";
+        ofs << "    <text x=\"110\" y=\"" << (155 + i * 80) << "\" fill=\"white\" font-family=\"sans-serif\" font-size=\"45\">" << labels[i] << "</text>\n";
+    }
+    ofs << "  </g>\n";
+
+    ofs << "  <text x=\"-1750\" y=\"850\" fill=\"#475569\" font-family=\"sans-serif\" font-size=\"40\">AstDyn Global Engine | Equirectangular Projection</text>\n";
     ofs << "</svg>\n";
 }
 

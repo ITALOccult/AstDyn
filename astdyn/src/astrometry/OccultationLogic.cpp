@@ -72,8 +72,10 @@ OccultationParameters OccultationLogic::compute_parameters(
     double eta_ca = eta + deta * t_ca;
     double b = std::sqrt(xi_ca * xi_ca + eta_ca * eta_ca);
 
-    // 5. Build Result
+    // Build Result - Preserve signs (Bug B Fix)
     OccultationParameters params;
+    params.xi_ca_km = xi_ca / 1000.0;
+    params.eta_ca_km = eta_ca / 1000.0;
     params.impact_parameter_km = b / 1000.0;
     params.shadow_velocity_kms = std::sqrt(v2) / 1000.0;
     
