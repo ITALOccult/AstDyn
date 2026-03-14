@@ -30,6 +30,15 @@ static std::string url_encode(const std::string& value) {
     return res;
 }
 
+static std::string format_command(const std::string& target) {
+    // If target is purely numeric, append a semicolon to force small-body search
+    // to avoid ambiguity with planetary satellites (e.g., 704 is Oberon).
+    if (!target.empty() && std::all_of(target.begin(), target.end(), ::isdigit)) {
+        return target + ";";
+    }
+    return target;
+}
+
 HorizonsClient::HorizonsClient(const Config& config) : config_(config) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
 }
@@ -184,7 +193,7 @@ HorizonsClient::query_observation(const std::string& target, const time::EpochTD
 
 std::string HorizonsClient::build_elements_url(const std::string& target, const time::EpochTDB& epoch) {
     std::stringstream ss;
-    ss << config_.base_url << "?format=json&COMMAND='" << url_encode(target) << "'"
+    ss << config_.base_url << "?format=json&COMMAND='" << url_encode(format_command(target)) << "'"
        << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='ELEMENTS'&CENTER='500@10'"
        << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.5) << "'"
        << "&STOP_TIME='JD" << (epoch.mjd() + 2400000.6) << "'"
@@ -194,7 +203,7 @@ std::string HorizonsClient::build_elements_url(const std::string& target, const 
 
 std::string HorizonsClient::build_vectors_url(const std::string& target, const time::EpochTDB& epoch, const std::string& center) {
     std::stringstream ss;
-    ss << config_.base_url << "?format=json&COMMAND='" << url_encode(target) << "'"
+    ss << config_.base_url << "?format=json&COMMAND='" << url_encode(format_command(target)) << "'"
        << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='VECTORS'&CENTER='" << center << "'"
        << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.5) << "'"
        << "&STOP_TIME='JD" << (epoch.mjd() + 2400000.6) << "'"
@@ -205,7 +214,7 @@ std::string HorizonsClient::build_vectors_url(const std::string& target, const t
 std::string HorizonsClient::build_observer_url(const std::string& target, const time::EpochTDB& epoch, const std::string& observer) {
     std::stringstream ss;
     auto epoch_utc = time::to_utc(epoch);
-    ss << config_.base_url << "?format=json&COMMAND='" << url_encode(target) << "'"
+    ss << config_.base_url << "?format=json&COMMAND='" << url_encode(format_command(target)) << "'"
        << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='OBSERVER'&CENTER='" << observer << "'"
        << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch_utc.mjd() + 2400000.5) << "'"
        << "&STOP_TIME='JD" << (epoch_utc.mjd() + 2400000.6) << "'"

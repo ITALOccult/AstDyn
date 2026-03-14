@@ -57,6 +57,27 @@ void example() {
 }
 ```
 
+## Tools
+
+### ioccultcalc
+A professional command-line tool for searching and comparing stellar occultations. It retrieves asteroid elements directly from **JPL Horizons** and searches the **Gaia DR3** catalog online.
+
+#### Quick Access
+A wrapper script `ioccultcalc.sh` is provided in the project root for easy execution:
+```bash
+./ioccultcalc.sh --asteroid 704 --jd 2461131.61 --mag 15.0
+```
+
+#### Command-line Options
+- `--asteroid <num>`: Asteroid number or designation.
+- `--jd <val>`: Julian Date (TDB) for the search.
+- `--mag <val>`: Magnitude limit for star search (default: 15.0).
+- `--xml-output <file>`: Save matches to an Occult4-compatible XML.
+- `--kml <file>`: Generate a KML path for Google Earth (first match).
+- `--xml-check <file>`: Compare results against a reference XML.
+
+---
+
 ## Validation Reference (34713 Ilse)
 
 | Method | Source | RA Error [arcsec] | Dec Error [arcsec] |
