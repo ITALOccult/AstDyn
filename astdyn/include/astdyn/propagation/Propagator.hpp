@@ -29,23 +29,22 @@ namespace astdyn::propagation {
  */
 struct PropagatorSettings {
     bool include_planets = true;        ///< Include planetary perturbations
-    bool include_relativity = false;    ///< Include GR corrections
-    bool include_moon = false;          ///< Include Moon separately
+    bool include_moon = true;           ///< Include Moon separately
     bool include_asteroids = false;     ///< Include asteroid perturbations (AST17)
-    
     // Planetary perturbations to include (if include_planets=true)
-    bool perturb_mercury = false;
+    bool perturb_mercury = true;
     bool perturb_venus = true;
     bool perturb_earth = true;
     bool perturb_mars = true;
     bool perturb_jupiter = true;
     bool perturb_saturn = true;
-    bool perturb_uranus = false;
-    bool perturb_neptune = false;
+    bool perturb_uranus = true;
+    bool perturb_neptune = true;
     
     double central_body_gm = constants::GMS; ///< Central body GM [AU³/day²] (heliocentric)
     
     // Relativity PPN parameters (Default: GR)
+    bool include_relativity = true;    ///< Include GR corrections (default true for precision)
     double ppn_beta = 1.0;
     double ppn_gamma = 1.0;
 
@@ -54,7 +53,7 @@ struct PropagatorSettings {
     std::string asteroid_ephemeris_file = "";
 
     // Frame Settings
-    bool integrate_in_ecliptic = false; ///< If true, rotate all perturbations to Ecliptic J2000.
+    bool integrate_in_ecliptic = true; ///< Forced true to match propagate_cartesian requirement.
     
     // Non-Gravitational Forces (Yarkovsky)
     bool include_yarkovsky = false;

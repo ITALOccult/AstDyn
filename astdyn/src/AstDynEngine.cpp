@@ -26,6 +26,7 @@
 #include <fstream>
 #include <algorithm>
 #include <stdexcept>
+#include <mutex>
 
 namespace astdyn {
 
@@ -97,20 +98,30 @@ void AstDynEngine::update_propagator() {
     
     // Update Ephemeris Provider based on config
     if (config_.ephemeris_type == EphemerisType::DE441 && !config_.ephemeris_file.empty()) {
-        if (!ephemeris_loaded_ || loaded_ephemeris_file_ != config_.ephemeris_file) {
+        static std::mutex provider_mtx;
+        static std::string last_path;
+        static std::shared_ptr<ephemeris::EphemerisProvider> cached_provider;
+
+        std::lock_guard<std::mutex> lock(provider_mtx);
+        if (last_path != config_.ephemeris_file) {
             try {
                 if (config_.verbose) std::cout << "Loading DE441 Ephemeris: " << config_.ephemeris_file << "...\n";
                 auto provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
                 ephemeris::PlanetaryEphemeris::setProvider(provider);
-                loaded_ephemeris_file_ = config_.ephemeris_file;
+                cached_provider = provider;
+                last_path = config_.ephemeris_file;
                 ephemeris_loaded_ = true;
             } catch (const std::exception& e) {
                 std::cerr << "Error loading DE441: " << e.what() << "\n";
                 ephemeris::PlanetaryEphemeris::setProvider(nullptr);
                 ephemeris_loaded_ = false;
             }
+        } else {
+            ephemeris::PlanetaryEphemeris::setProvider(cached_provider);
+            ephemeris_loaded_ = true;
         }
-    } else if (config_.ephemeris_type == EphemerisType::Analytical) {
+    }
+ else if (config_.ephemeris_type == EphemerisType::Analytical) {
         ephemeris::PlanetaryEphemeris::setProvider(nullptr);
         ephemeris_loaded_ = false;
     }

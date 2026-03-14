@@ -52,12 +52,11 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     
     auto earth_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(earth_p_eq);
     
-    // 2. SUN position
-    auto sun_p_eq = ephemeris::PlanetaryEphemeris::getPosition(ephemeris::CelestialBody::SUN, t_obs);
+
+    // 2. SUN position (Barycentric for light deflection)
+    auto sun_p_eq = de441->getPosition(ephemeris::CelestialBody::SUN, t_obs);
     auto sun_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(sun_p_eq);
     
-    // BUG-2: Rename to helio_pos_ssb_ecl for clarity? 
-    // Actually, DE441 returns vectors relative to SSB.
     // Earth(helio) = Earth(SSB) - Sun(SSB).
     Eigen::Vector3d earth_ssb_ecl = earth_p_ecl.to_eigen_si();
     Eigen::Vector3d sun_ssb_ecl = sun_p_ecl.to_eigen_si();
@@ -83,8 +82,10 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     
     auto earth_v_gcrf = earth_v_eq.to_eigen_si();
     
-    // BUG-1: light_deflection now has its own flag
-    auto rho_deflected = a_cfg.light_deflection ? apply_light_deflection(raw_rho_eq, sun_p_eq.to_eigen_si()) : raw_rho_eq;
+    // Proper Earth->Sun vector for light deflection
+    Eigen::Vector3d earth_to_sun_eq = sun_p_eq.to_eigen_si() - earth_p_eq.to_eigen_si();
+    
+    auto rho_deflected = a_cfg.light_deflection ? apply_light_deflection(raw_rho_eq, earth_to_sun_eq) : raw_rho_eq;
     auto final_rho_eq = a_cfg.stellar_aberration ? apply_stellar_aberration(rho_deflected, earth_v_gcrf) : rho_deflected;
 
     // 5. Build Result
@@ -147,7 +148,6 @@ Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     for (int i = 0; i < 3; ++i) {
         auto el_kep_ecl = engine.propagate_to(time::EpochTDB::from_mjd(t_obs.mjd() - tau_days));
         
-        // Convert Keplerian Ecliptic to Cartesian Ecliptic for distance check using type-safe API
         auto cart_ecl = propagation::keplerian_to_cartesian(el_kep_ecl);
         ast_p_ecl = cart_ecl.position.to_eigen_si();
         
@@ -179,17 +179,17 @@ Eigen::Vector3d AstrometryReducer::apply_stellar_aberration(
 }
 
 Eigen::Vector3d AstrometryReducer::apply_light_deflection(
-    const Eigen::Vector3d& rho_eq, const Eigen::Vector3d& sun_p_eq) {
+    const Eigen::Vector3d& rho_eq, const Eigen::Vector3d& earth_to_sun_eq) {
     
     // Standard Gravitational Deflection (Sun)
     // dU = 2*GM/(c^2*b) * ( (1 + cos psi) * (U x Un) )
-    // For occultations near Sun, this is critical. For Nireus at 150 deg, it is 0.008 arcsec.
-    // We implement for "scientific credibility" as requested.
     
     double r = rho_eq.norm();
     Eigen::Vector3d u = rho_eq / r;
-    Eigen::Vector3d q = -sun_p_eq; // Vector Earth -> Sun
+    Eigen::Vector3d q = earth_to_sun_eq; // Vector Earth -> Sun
     double q_dist = q.norm();
+    if (q_dist < 1000.0) return rho_eq; // Avoid NaNs if Earth is Sun (should not happen)
+    
     Eigen::Vector3d e = q / q_dist;
     
     double u_dot_e = u.dot(e);

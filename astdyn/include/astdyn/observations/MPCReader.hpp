@@ -58,6 +58,13 @@ public:
     static std::vector<OpticalObservation> readStream(std::istream& stream);
     
     /**
+     * @brief Parse observations from a string
+     * @param content Content in MPC format
+     * @return Vector of observations
+     */
+    static std::vector<OpticalObservation> parseString(const std::string& content);
+    
+    /**
      * @brief Parse a single MPC observation line
      * @param line 80-column MPC observation line
      * @return OpticalObservation, or nullopt if parsing fails

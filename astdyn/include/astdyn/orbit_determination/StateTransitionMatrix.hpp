@@ -25,6 +25,14 @@
 namespace astdyn::orbit_determination {
 
 /**
+ * @brief STM computation settings
+ */
+struct STMSettings {
+    bool use_numerical_jacobian = true; ///< Default to OrbFit style
+    double differentiation_step = 1e-7;  ///< Default step [AU]
+};
+
+/**
  * @brief State transition matrix result
  */
 template <typename Frame>
@@ -115,6 +123,14 @@ public:
     void set_integrator(std::shared_ptr<astdyn::propagation::Integrator> integrator) {
         integrator_ = integrator;
     }
+
+    /**
+     * @brief Apply STM settings
+     */
+    void apply_settings(const STMSettings& settings) {
+        use_numerical_jacobian_ = settings.use_numerical_jacobian;
+        diff_step_ = settings.differentiation_step;
+    }
     
     /**
      * @brief Set numerical differentiation step size
@@ -125,6 +141,16 @@ public:
      */
     void set_differentiation_step(double step) {
         diff_step_ = step;
+    }
+
+    /**
+     * @brief Enable or disable numerical Jacobian computation
+     * 
+     * If true, uses finite differences on the full propagator derivatives (matching OrbFit).
+     * If false, uses analytical gravity partials (traditional AstDyn behavior).
+     */
+    void set_use_numerical_jacobian(bool use_num) {
+        use_numerical_jacobian_ = use_num;
     }
 
 private:
@@ -194,7 +220,8 @@ private:
     std::shared_ptr<astdyn::propagation::Propagator> propagator_;
     std::shared_ptr<astdyn::propagation::Integrator> integrator_;
     
-    double diff_step_ = 1e-8;            ///< Numerical differentiation step
+    double diff_step_ = 1e-7;            ///< Numerical differentiation step (OrbFit default)
+    bool use_numerical_jacobian_ = true; ///< Default to true to match OrbFit logic
 };
 
 } // namespace astdyn::orbit_determination

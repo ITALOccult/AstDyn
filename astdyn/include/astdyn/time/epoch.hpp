@@ -18,6 +18,9 @@ struct TAI_tag {};
 // ============================================================================
 class TimeDuration {
 public:
+    // Constructors
+    constexpr TimeDuration() noexcept : seconds_(0.0) {}
+
     // Factory methods
     [[nodiscard]] static constexpr TimeDuration from_seconds(double s) noexcept { return TimeDuration(s); }
     [[nodiscard]] static constexpr TimeDuration from_minutes(double m) noexcept { return TimeDuration(m * 60.0); }

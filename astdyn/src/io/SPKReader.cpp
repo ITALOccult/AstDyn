@@ -190,7 +190,7 @@ void SPKReader::loadIndex() {
                 // Check bounds?
                  
                 double params[4];
-                file_.seekg((seg.end_addr - 4) * 8, std::ios::beg);
+                file_.seekg(static_cast<long long>(seg.end_addr - 4) * 8, std::ios::beg);
                 char pbuf[32];
                 file_.read(pbuf, 32);
                 std::memcpy(params, pbuf, 32);
@@ -219,7 +219,7 @@ void SPKReader::loadIndex() {
 }
 
 void SPKReader::seekToRecord(int record_idx) {
-    file_.seekg((record_idx - 1) * RECORD_SIZE, std::ios::beg);
+    file_.seekg(static_cast<long long>(record_idx - 1) * RECORD_SIZE, std::ios::beg);
 }
 
 Eigen::VectorXd SPKReader::getState(int target_id, double et) {
@@ -264,7 +264,7 @@ Eigen::VectorXd SPKReader::evaluateType2(const SPKSegment& seg, double et) {
     // Read record data (Midpoint, Radius, Coeffs...)
     std::vector<double> buf(seg.rsize);
     // Seek: (addr - 1) * 8
-    file_.seekg((rec_start_addr - 1) * 8, std::ios::beg);
+    file_.seekg(static_cast<long long>(rec_start_addr - 1) * 8, std::ios::beg);
     
     std::vector<char> byte_buf(seg.rsize * 8);
     file_.read(byte_buf.data(), seg.rsize * 8);
@@ -322,7 +322,7 @@ Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
     // Read Metadata from End
     // Layout: ... [Directory N doubles] [Degree] [N] (Last)
     double meta[2];
-    file_.seekg((seg.end_addr - 2) * 8, std::ios::beg);
+    file_.seekg(static_cast<long long>(seg.end_addr - 2) * 8, std::ios::beg);
     char mbuf[16];
     file_.read(mbuf, 16);
     std::memcpy(meta, mbuf, 16);
@@ -361,7 +361,7 @@ Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
     
     // Optimization: Just seek to End - 2 - N
     // Absolute offset in file doubles: (seg.end_addr - 2 - N)
-    file_.seekg((seg.end_addr - 2 - N) * 8, std::ios::beg);
+    file_.seekg(static_cast<long long>(seg.end_addr - 2 - N) * 8, std::ios::beg);
     std::vector<char> dbuf(N * 8);
     file_.read(dbuf.data(), N * 8);
     std::memcpy(epochs.data(), dbuf.data(), N * 8);
@@ -389,7 +389,7 @@ Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
     // Record i is at start + i * rsize
     int rec1_addr = seg.start_addr + idx * rsize;
     
-    file_.seekg((rec1_addr - 1) * 8, std::ios::beg);
+    file_.seekg(static_cast<long long>(rec1_addr - 1) * 8, std::ios::beg);
     char sbuf[12 * 8]; // Read 2 records ? RSIZE might be 6.
     // if records are adjacent? Yes.
     file_.read(sbuf, 2 * rsize * 8);

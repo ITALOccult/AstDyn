@@ -15,29 +15,29 @@ propagation::PropagatorSettings Configurator::parsePropagatorSettings(const json
     propagation::PropagatorSettings s;
     if (j.contains("propagator")) {
         auto p = j["propagator"];
-        if (p.contains("include_planets")) s.include_planets = p["include_planets"];
-        if (p.contains("include_relativity")) s.include_relativity = p["include_relativity"];
-        if (p.contains("include_moon")) s.include_moon = p["include_moon"];
-        if (p.contains("include_asteroids")) s.include_asteroids = p["include_asteroids"];
+        if (p.contains("include_planets")) s.include_planets = p["include_planets"].get<bool>();
+        if (p.contains("include_relativity")) s.include_relativity = p["include_relativity"].get<bool>();
+        if (p.contains("include_moon")) s.include_moon = p["include_moon"].get<bool>();
+        if (p.contains("include_asteroids")) s.include_asteroids = p["include_asteroids"].get<bool>();
         
-        if (p.contains("perturb_mercury")) s.perturb_mercury = p["perturb_mercury"];
-        if (p.contains("perturb_venus")) s.perturb_venus = p["perturb_venus"];
-        if (p.contains("perturb_earth")) s.perturb_earth = p["perturb_earth"];
-        if (p.contains("perturb_mars")) s.perturb_mars = p["perturb_mars"];
-        if (p.contains("perturb_jupiter")) s.perturb_jupiter = p["perturb_jupiter"];
-        if (p.contains("perturb_saturn")) s.perturb_saturn = p["perturb_saturn"];
-        if (p.contains("perturb_uranus")) s.perturb_uranus = p["perturb_uranus"];
-        if (p.contains("perturb_neptune")) s.perturb_neptune = p["perturb_neptune"];
+        if (p.contains("perturb_mercury")) s.perturb_mercury = p["perturb_mercury"].get<bool>();
+        if (p.contains("perturb_venus")) s.perturb_venus = p["perturb_venus"].get<bool>();
+        if (p.contains("perturb_earth")) s.perturb_earth = p["perturb_earth"].get<bool>();
+        if (p.contains("perturb_mars")) s.perturb_mars = p["perturb_mars"].get<bool>();
+        if (p.contains("perturb_jupiter")) s.perturb_jupiter = p["perturb_jupiter"].get<bool>();
+        if (p.contains("perturb_saturn")) s.perturb_saturn = p["perturb_saturn"].get<bool>();
+        if (p.contains("perturb_uranus")) s.perturb_uranus = p["perturb_uranus"].get<bool>();
+        if (p.contains("perturb_neptune")) s.perturb_neptune = p["perturb_neptune"].get<bool>();
         
-        if (p.contains("central_body_gm")) s.central_body_gm = p["central_body_gm"];
+        if (p.contains("central_body_gm")) s.central_body_gm = p["central_body_gm"].get<double>();
         
-        if (p.contains("ppn_beta")) s.ppn_beta = p["ppn_beta"];
-        if (p.contains("ppn_gamma")) s.ppn_gamma = p["ppn_gamma"];
+        if (p.contains("ppn_beta")) s.ppn_beta = p["ppn_beta"].get<double>();
+        if (p.contains("ppn_gamma")) s.ppn_gamma = p["ppn_gamma"].get<double>();
         
-        if (p.contains("asteroid_ephemeris_file")) s.asteroid_ephemeris_file = p["asteroid_ephemeris_file"];
-        if (p.contains("integrate_in_ecliptic")) s.integrate_in_ecliptic = p["integrate_in_ecliptic"];
-        if (p.contains("include_yarkovsky")) s.include_yarkovsky = p["include_yarkovsky"];
-        if (p.contains("yarkovsky_a2")) s.yarkovsky_a2 = p["yarkovsky_a2"];
+        if (p.contains("asteroid_ephemeris_file")) s.asteroid_ephemeris_file = p["asteroid_ephemeris_file"].get<std::string>();
+        if (p.contains("integrate_in_ecliptic")) s.integrate_in_ecliptic = p["integrate_in_ecliptic"].get<bool>();
+        if (p.contains("include_yarkovsky")) s.include_yarkovsky = p["include_yarkovsky"].get<bool>();
+        if (p.contains("yarkovsky_a2")) s.yarkovsky_a2 = p["yarkovsky_a2"].get<double>();
     }
     return s;
 }
@@ -46,19 +46,19 @@ orbit_determination::DifferentialCorrectorSettings Configurator::parseDifferenti
     orbit_determination::DifferentialCorrectorSettings s;
     if (j.contains("differential_corrector")) {
         auto d = j["differential_corrector"];
-        if (d.contains("max_iterations")) s.max_iterations = d["max_iterations"];
-        if (d.contains("convergence_tolerance_au")) s.convergence_tolerance = physics::Distance::from_au(d["convergence_tolerance_au"]);
-        if (d.contains("outlier_sigma")) s.outlier_sigma = d["outlier_sigma"];
-        if (d.contains("outlier_max_sigma")) s.outlier_max_sigma = d["outlier_max_sigma"];
-        if (d.contains("outlier_min_sigma")) s.outlier_min_sigma = d["outlier_min_sigma"];
-        if (d.contains("reject_outliers")) s.reject_outliers = d["reject_outliers"];
-        if (d.contains("compute_covariance")) s.compute_covariance = d["compute_covariance"];
-        if (d.contains("verbose")) s.verbose = d["verbose"];
-        if (d.contains("use_line_search")) s.use_line_search = d["use_line_search"];
-        if (d.contains("line_search_min_alpha")) s.line_search_min_alpha = d["line_search_min_alpha"];
-        if (d.contains("rms_tolerance_arcsec")) s.rms_tolerance_arcsec = d["rms_tolerance_arcsec"];
-        if (d.contains("check_energy_barrier")) s.check_energy_barrier = d["check_energy_barrier"];
-        if (d.contains("energy_barrier_fraction")) s.energy_barrier_fraction = d["energy_barrier_fraction"];
+        if (d.contains("max_iterations")) s.max_iterations = d["max_iterations"].get<int>();
+        if (d.contains("convergence_tolerance_au")) s.convergence_tolerance = physics::Distance::from_au(d["convergence_tolerance_au"].get<double>());
+        if (d.contains("outlier_sigma")) s.outlier_sigma = d["outlier_sigma"].get<double>();
+        if (d.contains("outlier_max_sigma")) s.outlier_max_sigma = d["outlier_max_sigma"].get<double>();
+        if (d.contains("outlier_min_sigma")) s.outlier_min_sigma = d["outlier_min_sigma"].get<double>();
+        if (d.contains("reject_outliers")) s.reject_outliers = d["reject_outliers"].get<bool>();
+        if (d.contains("compute_covariance")) s.compute_covariance = d["compute_covariance"].get<bool>();
+        if (d.contains("verbose")) s.verbose = d["verbose"].get<bool>();
+        if (d.contains("use_line_search")) s.use_line_search = d["use_line_search"].get<bool>();
+        if (d.contains("line_search_min_alpha")) s.line_search_min_alpha = d["line_search_min_alpha"].get<double>();
+        if (d.contains("rms_tolerance_arcsec")) s.rms_tolerance_arcsec = d["rms_tolerance_arcsec"].get<double>();
+        if (d.contains("check_energy_barrier")) s.check_energy_barrier = d["check_energy_barrier"].get<bool>();
+        if (d.contains("energy_barrier_fraction")) s.energy_barrier_fraction = d["energy_barrier_fraction"].get<double>();
     }
     return s;
 }
@@ -113,12 +113,68 @@ orbit_determination::GaussIODSettings Configurator::parseGaussIODSettings(const 
     orbit_determination::GaussIODSettings s;
     if (j.contains("gauss_iod")) {
         auto g = j["gauss_iod"];
-        if (g.contains("max_iterations")) s.max_iterations = g["max_iterations"];
-        if (g.contains("tolerance_au")) s.tolerance = physics::Distance::from_au(g["tolerance_au"]);
-        if (g.contains("min_separation_days")) s.min_separation_days = g["min_separation_days"];
-        if (g.contains("max_separation_days")) s.max_separation_days = g["max_separation_days"];
-        if (g.contains("use_light_time")) s.use_light_time = g["use_light_time"];
-        if (g.contains("verbose")) s.verbose = g["verbose"];
+        if (g.contains("max_iterations")) s.max_iterations = g["max_iterations"].get<int>();
+        if (g.contains("tolerance_au")) s.tolerance = physics::Distance::from_au(g["tolerance_au"].get<double>());
+        if (g.contains("min_separation_days")) s.min_separation_days = g["min_separation_days"].get<double>();
+        if (g.contains("max_separation_days")) s.max_separation_days = g["max_separation_days"].get<double>();
+        if (g.contains("use_light_time")) s.use_light_time = g["use_light_time"].get<bool>();
+        if (g.contains("verbose")) s.verbose = g["verbose"].get<bool>();
+    }
+    return s;
+}
+
+close_approach::CloseApproachSettings Configurator::parseCloseApproachSettings(const json& j) {
+    close_approach::CloseApproachSettings s;
+    if (j.contains("close_approach")) {
+        auto ca = j["close_approach"];
+        if (ca.contains("detection_distance_au")) s.detection_distance = ca["detection_distance_au"].get<double>() * constants::AU;
+        if (ca.contains("min_distance_au")) s.min_distance = ca["min_distance_au"].get<double>() * constants::AU;
+        if (ca.contains("compute_b_plane")) s.compute_b_plane = ca["compute_b_plane"].get<bool>();
+        if (ca.contains("refine_time")) s.refine_time = ca["refine_time"].get<bool>();
+        if (ca.contains("time_tolerance")) s.time_tolerance = ca["time_tolerance"].get<double>();
+        if (ca.contains("max_refinement_iter")) s.max_refinement_iter = ca["max_refinement_iter"].get<int>();
+    }
+    return s;
+}
+
+orbit_determination::GoodingIOD::Settings Configurator::parseGoodingIODSettings(const json& j) {
+    orbit_determination::GoodingIOD::Settings s;
+    if (j.contains("gooding_iod")) {
+        auto g = j["gooding_iod"];
+        if (g.contains("max_iterations")) s.max_iterations = g["max_iterations"].get<int>();
+        if (g.contains("tolerance_rad")) s.tolerance_rad = g["tolerance_rad"].get<double>();
+        if (g.contains("verbose")) s.verbose = g["verbose"].get<bool>();
+    }
+    return s;
+}
+
+orbit_determination::ExtendedKalmanFilter::Settings Configurator::parseEKFSettings(const json& j) {
+    orbit_determination::ExtendedKalmanFilter::Settings s;
+    if (j.contains("ekf")) {
+        auto e = j["ekf"];
+        if (e.contains("default_ra_sigma_arcsec")) s.default_ra_sigma = e["default_ra_sigma_arcsec"].get<double>() * constants::ARCSEC_TO_RAD;
+        if (e.contains("default_dec_sigma_arcsec")) s.default_dec_sigma = e["default_dec_sigma_arcsec"].get<double>() * constants::ARCSEC_TO_RAD;
+    }
+    return s;
+}
+
+astrometry::AstrometricSettings Configurator::parseAstrometricSettings(const json& j) {
+    astrometry::AstrometricSettings s;
+    if (j.contains("astrometry")) {
+        auto a = j["astrometry"];
+        if (a.contains("light_time_correction")) s.light_time_correction = a["light_time_correction"];
+        if (a.contains("stellar_aberration")) s.stellar_aberration = a["stellar_aberration"];
+        if (a.contains("frame_conversion_to_equatorial")) s.frame_conversion_to_equatorial = a["frame_conversion_to_equatorial"];
+    }
+    return s;
+}
+
+orbit_determination::STMSettings Configurator::parseSTMSettings(const json& j) {
+    orbit_determination::STMSettings s;
+    if (j.contains("stm")) {
+        auto stm = j["stm"];
+        if (stm.contains("use_numerical_jacobian")) s.use_numerical_jacobian = stm["use_numerical_jacobian"].get<bool>();
+        if (stm.contains("differentiation_step")) s.differentiation_step = stm["differentiation_step"].get<double>();
     }
     return s;
 }
@@ -126,7 +182,8 @@ orbit_determination::GaussIODSettings Configurator::parseGaussIODSettings(const 
 void Configurator::loadFromStream(std::istream& is,
     propagation::PropagatorSettings& prop_settings,
     orbit_determination::DifferentialCorrectorSettings& dc_settings,
-    orbit_determination::GaussIODSettings& iod_settings) {
+    orbit_determination::GaussIODSettings& iod_settings,
+    orbit_determination::STMSettings& stm_settings) {
     
     json j;
     try {
@@ -134,6 +191,7 @@ void Configurator::loadFromStream(std::istream& is,
         prop_settings = parsePropagatorSettings(j);
         dc_settings = parseDifferentialCorrectorSettings(j);
         iod_settings = parseGaussIODSettings(j);
+        stm_settings = parseSTMSettings(j);
     } catch (const json::parse_error& e) {
         std::cerr << "Configurator parse error: " << e.what() << '\n';
     }
@@ -142,7 +200,8 @@ void Configurator::loadFromStream(std::istream& is,
 void Configurator::loadFromString(const std::string& json_string,
     propagation::PropagatorSettings& prop_settings,
     orbit_determination::DifferentialCorrectorSettings& dc_settings,
-    orbit_determination::GaussIODSettings& iod_settings) {
+    orbit_determination::GaussIODSettings& iod_settings,
+    orbit_determination::STMSettings& stm_settings) {
     
     json j;
     try {
@@ -150,6 +209,7 @@ void Configurator::loadFromString(const std::string& json_string,
         prop_settings = parsePropagatorSettings(j);
         dc_settings = parseDifferentialCorrectorSettings(j);
         iod_settings = parseGaussIODSettings(j);
+        stm_settings = parseSTMSettings(j);
     } catch (const json::parse_error& e) {
         std::cerr << "Configurator parse error: " << e.what() << '\n';
     }

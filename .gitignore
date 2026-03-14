@@ -24,3 +24,8 @@ dump_spk
 .DS_Store
 *.swp
 *.user
+*.log
+astdyn/benchmark_extended_results/
+astdyn/benchmarks/results/
+astdyn/od_benchmark_log.txt
+astdyn/benchmark_output*.log

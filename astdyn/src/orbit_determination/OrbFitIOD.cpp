@@ -49,7 +49,9 @@ GaussIODResult OrbFitIOD::compute_from_three(
         );
         auto state_eclip = dummy_state.cast_frame<core::ECLIPJ2000>();
         auto r_eclip = state_eclip.position;
-        out.obs_pos = orbfit::Vec3(r_eclip.x_si() / constants::AU, r_eclip.y_si() / constants::AU, r_eclip.z_si() / constants::AU);
+        out.obs_pos = orbfit::Vec3(r_eclip.x_si() / (constants::AU * 1000.0), 
+                                   r_eclip.y_si() / (constants::AU * 1000.0), 
+                                   r_eclip.z_si() / (constants::AU * 1000.0));
         
         return out;
     };
@@ -57,6 +59,12 @@ GaussIODResult OrbFitIOD::compute_from_three(
     orbfit::Observation o1 = convert_obs(obs1);
     orbfit::Observation o2 = convert_obs(obs2);
     orbfit::Observation o3 = convert_obs(obs3);
+
+    if (settings_.verbose) {
+        std::cout << "[OrbFitIOD Debug] Obs 1 MJD: " << o1.t_obs - 2400000.5 << " Pos: " << o1.obs_pos.x << " " << o1.obs_pos.y << " " << o1.obs_pos.z << std::endl;
+        std::cout << "[OrbFitIOD Debug] Obs 2 MJD: " << o2.t_obs - 2400000.5 << " Pos: " << o2.obs_pos.x << " " << o2.obs_pos.y << " " << o2.obs_pos.z << std::endl;
+        std::cout << "[OrbFitIOD Debug] Obs 3 MJD: " << o3.t_obs - 2400000.5 << " Pos: " << o3.obs_pos.x << " " << o3.obs_pos.y << " " << o3.obs_pos.z << std::endl;
+    }
 
     GaussIODResult result;
     try {

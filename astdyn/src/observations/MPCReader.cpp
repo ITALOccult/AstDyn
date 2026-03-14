@@ -19,18 +19,20 @@ namespace observations {
 using namespace astdyn::utils;
 
 std::vector<OpticalObservation> MPCReader::readStream(std::istream& stream) {
-    std::vector<OpticalObservation> observations;
+    std::vector<OpticalObservation> result;
     std::string line;
     while (std::getline(stream, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        
-        auto obs = parseLine(line);
-        if (obs) {
-            observations.push_back(*obs);
+        if (line.length() >= 80) {
+            auto obs = parseLine(line);
+            if (obs) result.push_back(*obs);
         }
     }
-    
-    return observations;
+    return result;
+}
+
+std::vector<OpticalObservation> MPCReader::parseString(const std::string& content) {
+    std::istringstream iss(content);
+    return readStream(iss);
 }
 
 std::vector<OpticalObservation> MPCReader::readFile(const std::string& filepath) {

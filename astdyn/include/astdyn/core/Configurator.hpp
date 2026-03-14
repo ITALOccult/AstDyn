@@ -9,6 +9,10 @@
 #include "astdyn/orbit_determination/GaussIOD.hpp"
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/close_approach/CloseApproach.hpp"
+#include "astdyn/orbit_determination/GoodingIOD.hpp"
+#include "astdyn/orbit_determination/ExtendedKalmanFilter.hpp"
+#include "astdyn/astrometry/AstrometricTypes.hpp"
 #include <memory>
 
 namespace astdyn::core {
@@ -27,6 +31,11 @@ public:
     static propagation::PropagatorSettings parsePropagatorSettings(const nlohmann::json& j);
     static orbit_determination::DifferentialCorrectorSettings parseDifferentialCorrectorSettings(const nlohmann::json& j);
     static orbit_determination::GaussIODSettings parseGaussIODSettings(const nlohmann::json& j);
+    static close_approach::CloseApproachSettings parseCloseApproachSettings(const nlohmann::json& j);
+    static orbit_determination::GoodingIOD::Settings parseGoodingIODSettings(const nlohmann::json& j);
+    static orbit_determination::ExtendedKalmanFilter::Settings parseEKFSettings(const nlohmann::json& j);
+    static astrometry::AstrometricSettings parseAstrometricSettings(const nlohmann::json& j);
+    static orbit_determination::STMSettings parseSTMSettings(const nlohmann::json& j);
 
     /**
      * @brief Create an Integrator instance from JSON configuration
@@ -44,7 +53,8 @@ public:
     static void loadFromStream(std::istream& is,
         propagation::PropagatorSettings& prop_settings,
         orbit_determination::DifferentialCorrectorSettings& dc_settings,
-        orbit_determination::GaussIODSettings& iod_settings);
+        orbit_determination::GaussIODSettings& iod_settings,
+        orbit_determination::STMSettings& stm_settings);
 
     /**
      * @brief Load from string
@@ -52,7 +62,8 @@ public:
     static void loadFromString(const std::string& json_string,
         propagation::PropagatorSettings& prop_settings,
         orbit_determination::DifferentialCorrectorSettings& dc_settings,
-        orbit_determination::GaussIODSettings& iod_settings);
+        orbit_determination::GaussIODSettings& iod_settings,
+        orbit_determination::STMSettings& stm_settings);
 };
 
 } // namespace astdyn::core

@@ -273,57 +273,74 @@ std::vector<STMResult<Frame>> StateTransitionMatrix<Frame>::propagate_with_stm_b
 
 template <typename Frame>
 astdyn::Matrix6d StateTransitionMatrix<Frame>::compute_jacobian(time::EpochTDB t, const Eigen::VectorXd& state) {
-    astdyn::Matrix6d A = astdyn::Matrix6d::Zero();
-    A.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
-    
-    const Eigen::Vector3d r_ast = state.head<3>();
-    const double mu_sun = propagator_->settings().central_body_gm;
-    
-    // 1. Central body (Sun) partials
-    A.block<3, 3>(3, 0) = compute_acceleration_position_partial(r_ast, mu_sun);
-    
-    // 2. Planetary perturbations partials (Analytical)
-    if (propagator_->settings().include_planets) {
-        auto provider = ephemeris::PlanetaryEphemeris::getProvider();
-        auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
-        Eigen::Vector3d sun_pos_bary_au = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
-        
-        static const math::RotationMatrix<core::GCRF, core::ECLIPJ2000> rot_ecl = 
-            coordinates::ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>();
+    if (use_numerical_jacobian_) {
+        // Numerical Jacobian (matching OrbFit behavior)
+        // A = ∂f/∂y using central finite differences
+        astdyn::Matrix6d A = astdyn::Matrix6d::Zero();
+        const double eps = diff_step_;
 
-        if (propagator_->settings().integrate_in_ecliptic) {
-            sun_pos_bary_au = rot_ecl.to_eigen() * sun_pos_bary_au;
-        }
+        for (int j = 0; j < 6; j++) {
+            Eigen::VectorXd yp = state;
+            Eigen::VectorXd ym = state;
+            yp[j] += eps;
+            ym[j] -= eps;
 
-        auto add_planetary_jacobian = [&](ephemeris::CelestialBody body, double gm_au) {
-            auto p_pos_bary = provider->getPosition(body, t);
-            Eigen::Vector3d p_pos_bary_au = p_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
-            
-            if (propagator_->settings().integrate_in_ecliptic) {
-                p_pos_bary_au = rot_ecl.to_eigen() * p_pos_bary_au;
+            Eigen::VectorXd fp = propagator_->compute_derivatives(t, yp);
+            Eigen::VectorXd fm = propagator_->compute_derivatives(t, ym);
+
+            for (int i = 0; i < 6; i++) {
+                A(i, j) = (fp[i] - fm[i]) / (2.0 * eps);
             }
+        }
+        return A;
+    } else {
+        // Analytical gravity Jacobian (legacy AstDyn behavior)
+        astdyn::Matrix6d A = astdyn::Matrix6d::Zero();
+        A.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
+        
+        const Eigen::Vector3d r_ast = state.head<3>();
+        const double mu_sun = propagator_->settings().central_body_gm;
+        
+        // 1. Central body (Sun) partials
+        A.block<3, 3>(3, 0) = compute_acceleration_position_partial(r_ast, mu_sun);
+        
+        // 2. Planetary perturbations partials (Analytical)
+        if (propagator_->settings().include_planets) {
+            auto provider = ephemeris::PlanetaryEphemeris::getProvider();
+            auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
+            Eigen::Vector3d sun_pos_bary_au = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
             
-            Eigen::Vector3d r_planet_helio = p_pos_bary_au - sun_pos_bary_au;
-            // Analytical gradient of GM * (r_p - r) / |r_p - r|^3 w.r.t r
-            // This is exactly compute_acceleration_position_partial with relative vector (r - r_p)
-            A.block<3, 3>(3, 0) += compute_acceleration_position_partial(r_ast - r_planet_helio, gm_au);
-        };
+            static const math::RotationMatrix<core::GCRF, core::ECLIPJ2000> rot_ecl = 
+                coordinates::ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>();
 
-        const auto& s = propagator_->settings();
-        if (s.perturb_mercury) add_planetary_jacobian(ephemeris::CelestialBody::MERCURY, constants::GM_MERCURY_AU);
-        if (s.perturb_venus)   add_planetary_jacobian(ephemeris::CelestialBody::VENUS,   constants::GM_VENUS_AU);
-        if (s.perturb_earth)   add_planetary_jacobian(ephemeris::CelestialBody::EARTH,   constants::GM_EARTH_AU);
-        if (s.perturb_mars)    add_planetary_jacobian(ephemeris::CelestialBody::MARS,    constants::GM_MARS_AU);
-        if (s.perturb_jupiter) add_planetary_jacobian(ephemeris::CelestialBody::JUPITER, constants::GM_JUPITER_AU);
-        if (s.perturb_saturn)  add_planetary_jacobian(ephemeris::CelestialBody::SATURN,  constants::GM_SATURN_AU);
-        if (s.perturb_uranus)  add_planetary_jacobian(ephemeris::CelestialBody::URANUS,  constants::GM_URANUS_AU);
-        if (s.perturb_neptune) add_planetary_jacobian(ephemeris::CelestialBody::NEPTUNE, constants::GM_NEPTUNE_AU);
+            if (propagator_->settings().integrate_in_ecliptic) {
+                sun_pos_bary_au = rot_ecl.to_eigen() * sun_pos_bary_au;
+            }
+
+            auto add_planetary_jacobian = [&](ephemeris::CelestialBody body, double gm_au) {
+                auto p_pos_bary = provider->getPosition(body, t);
+                Eigen::Vector3d p_pos_bary_au = p_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
+                
+                if (propagator_->settings().integrate_in_ecliptic) {
+                    p_pos_bary_au = rot_ecl.to_eigen() * p_pos_bary_au;
+                }
+                
+                Eigen::Vector3d r_planet_helio = p_pos_bary_au - sun_pos_bary_au;
+                A.block<3, 3>(3, 0) += compute_acceleration_position_partial(r_ast - r_planet_helio, gm_au);
+            };
+
+            const auto& s = propagator_->settings();
+            if (s.perturb_mercury) add_planetary_jacobian(ephemeris::CelestialBody::MERCURY, constants::GM_MERCURY_AU);
+            if (s.perturb_venus)   add_planetary_jacobian(ephemeris::CelestialBody::VENUS,   constants::GM_VENUS_AU);
+            if (s.perturb_earth)   add_planetary_jacobian(ephemeris::CelestialBody::EARTH,   constants::GM_EARTH_AU);
+            if (s.perturb_mars)    add_planetary_jacobian(ephemeris::CelestialBody::MARS,    constants::GM_MARS_AU);
+            if (s.perturb_jupiter) add_planetary_jacobian(ephemeris::CelestialBody::JUPITER, constants::GM_JUPITER_AU);
+            if (s.perturb_saturn)  add_planetary_jacobian(ephemeris::CelestialBody::SATURN,  constants::GM_SATURN_AU);
+            if (s.perturb_uranus)  add_planetary_jacobian(ephemeris::CelestialBody::URANUS,  constants::GM_URANUS_AU);
+            if (s.perturb_neptune) add_planetary_jacobian(ephemeris::CelestialBody::NEPTUNE, constants::GM_NEPTUNE_AU);
+        }
+        return A;
     }
-    
-    // Note: Relativity and Non-gravitational partials (Yarkovsky) are tiny and neglected in Jacobian
-    // for performance. They will be captured by the residuals but not the STM geometry.
-
-    return A;
 }
 
 template <typename Frame>

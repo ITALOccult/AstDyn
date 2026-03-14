@@ -212,6 +212,7 @@ if(ASTDYN_BUILD_EXAMPLES)
 endif()
 
 add_subdirectory(benchmarks)
+add_subdirectory(tools)
 
 if(ASTDYN_BUILD_PYTHON)
     add_subdirectory(src/python)
