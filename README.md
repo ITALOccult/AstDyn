@@ -81,7 +81,7 @@ ioccultcalc --asteroid 704 --jd 2461131.61 --mag 15.0
 ## 🧪 Beta Testing
 AstDyn is currently in an active testing phase. For a comprehensive guide on using the occultation engine, high-precision configurations, and analysis tools, please refer to the:
 
-**👉 [IOccultCalc User Guide](docs/ioccultcalc_guide.md)**
+**[IOccultCalc User Guide](astdyn/docs/ioccultcalc_guide.md)**
 
 If you encounter discrepancies or bugs, please open an issue with the relevant input parameters and asteroid IDs.
 
