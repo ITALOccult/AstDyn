@@ -42,7 +42,8 @@ For maximum accuracy, especially with perturbed bodies like Jupiter Trojans (e.g
     "propagator_settings": {
         "include_planets": true,
         "include_moon": true,
-        "include_relativity": true
+        "include_relativity": true,
+        "include_asteroids": true
     },
     "light_time_correction": true,
     "aberration_correction": true
