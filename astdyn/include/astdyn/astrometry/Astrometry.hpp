@@ -40,6 +40,16 @@ public:
         const AstDynConfig& engine_cfg,
         const AstrometricSettings& a_cfg);
 
+    /** @brief Step 2: Annual Stellar Aberration Correction. */
+    static Eigen::Vector3d apply_stellar_aberration(
+        const Eigen::Vector3d& rho_eq,
+        const Eigen::Vector3d& earth_velocity_eq);
+
+    /** @brief Step 2b: Gravitational Light Deflection (Sun). */
+    static Eigen::Vector3d apply_light_deflection(
+        const Eigen::Vector3d& rho_eq,
+        const Eigen::Vector3d& earth_to_sun_eq);
+
 private:
     /** @brief Step 1: Iterative Light-Time Correction Kernel. */
     static Eigen::Vector3d compute_light_time_corrected_pos(
@@ -48,11 +58,6 @@ private:
         const time::EpochTDB& t_obs,
         const Eigen::Vector3d& earth_pos_helio_ecl,
         const AstDynConfig& cfg);
-
-    /** @brief Step 2: Annual Stellar Aberration Correction. */
-    static Eigen::Vector3d apply_stellar_aberration(
-        const Eigen::Vector3d& rho_eq,
-        const Eigen::Vector3d& earth_velocity_eq);
 
     /** @brief Step 3: Frame Transformation (Ecliptic -> Equatorial). */
     static Eigen::Vector3d convert_frame_if_needed(

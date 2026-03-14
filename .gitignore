@@ -1,81 +1,26 @@
-# Compiled binaries and objects
-*.o
-*.obj
-*.a
-*.lib
-*.so
-*.dylib
-*.dll
-*.exe
-astdyn/tools/astdyn_*
-test_*
-!test_*.cpp
-generate_*
-!generate_*.py
-!generate_*.cpp
-examples/italoccultcalc
-
-# Build directories
+# Build artifacts
 build/
-cmake-build-*/
 bin/
 lib/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+dump_spk
 
-# CMake
-CMakeCache.txt
-CMakeFiles/
-Makefile
-cmake_install.cmake
-*.cmake
-!CMakeLists.txt
-
-# LaTeX temporary files
-*.aux
-*.log
-*.out
-*.toc
-*.fls
-*.fdb_latexmk
-*.synctex.gz
-*.bbl
-*.blg
-*.lof
-*.lot
-
-# Python artifacts
-__pycache__/
-*.pyc
-
-# IDEs and Editors
-.DS_Store
-.vscode/
-.idea/
-*.swp
-*~
-
-# Test outputs and reports
-*.csv
-*.html
-!astdyn/docs/*.html # Keep docs HTML if any
-*.txt
-!CMakeLists.txt
-!README.txt
-!LICENSE.txt
-!CITATION.txt
-!src/*.txt
-!docs/*.txt
-!astdyn/docs/*.txt
-ephemeris_comparison_*
-POMPEJA_*
-*_REPORT.md
-!astdyn/docs/manual/*.tex
-!astdyn/docs/scientific_paper/*.tex
-validation_plots/
-
-# Project specific huge files (if any Ephemerides)
+# JPL Ephemerides
 *.bsp
-*.eq1
-*.rwo
 
-# Local archive for non-distribution files
-archive_non_distrib/
+# Occultation Outputs (Temporary test files)
+*.svg
+*.kml
+*.xml
+!astdyn/docs/*.xml
+!astdyn/benchmarks/data/*.xml
+
+# IDE and System files
+.vscode/
+.DS_Store
+*.swp
+*.user

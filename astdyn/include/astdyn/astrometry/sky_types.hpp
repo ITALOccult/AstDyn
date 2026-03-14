@@ -169,7 +169,15 @@ private:
 template <typename TargetFrame>
 class SkyCoord {
 public:
-    // The ONLY way to build a SkyCoord is from a strongly-typed physical vector
+    [[nodiscard]] static SkyCoord from_rad(double ra_rad, double dec_rad) {
+        return SkyCoord(RightAscension(Angle::from_rad(ra_rad)), Declination(Angle::from_rad(dec_rad)));
+    }
+
+    [[nodiscard]] static SkyCoord from_deg(double ra_deg, double dec_deg) {
+        return SkyCoord(RightAscension(Angle::from_deg(ra_deg)), Declination(Angle::from_deg(dec_deg)));
+    }
+
+    // The ONLY way to build a SkyCoord from a distance is from a strongly-typed physical vector
     // The compiler statically verifies that the vector is in TargetFrame
     template <typename PhysUnit>
     [[nodiscard]] static SkyCoord from_vector(const math::Vector3<TargetFrame, PhysUnit>& rho_vec) {
@@ -207,6 +215,8 @@ public:
     }
 
 private:
+    SkyCoord(RightAscension ra, Declination dec) : ra_(ra), dec_(dec) {}
+
     template <typename PhysUnit>
     SkyCoord(RightAscension ra, Declination dec, PhysUnit dist) 
         : ra_(ra), dec_(dec) {}

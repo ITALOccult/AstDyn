@@ -8,7 +8,11 @@
 
 #include "astdyn/astrometry/sky_types.hpp"
 #include "astdyn/core/physics_state.hpp"
+#include "astdyn/catalog/CatalogTypes.hpp"
+#include "astdyn/AstDynEngine.hpp"
 #include <Eigen/Dense>
+#include <vector>
+#include <string>
 
 namespace astdyn::astrometry {
 
@@ -16,14 +20,60 @@ namespace astdyn::astrometry {
  * @brief Physical parameters of a stellar occultation.
  */
 struct OccultationParameters {
-    double impact_parameter_km;    ///< Minimum distance of shadow center from geocenter [km]
-    double shadow_velocity_kms;    ///< Velocity of the shadow on the fundamental plane [km/s]
-    double position_angle_deg;     ///< Direction of the shadow track (North to East) [deg]
-    double d_ra_cos_dec_mas_sec;   ///< Relative velocity in RA*cos(dec) [mas/s]
-    double d_dec_mas_sec;          ///< Relative velocity in Declination [mas/s]
-    double closest_approach_time_offset_sec; ///< Time offset from input center to TCA [s]
-    double time_uncertainty_sec;           ///< 1-sigma uncertainty in time [s]
-    double cross_track_uncertainty_km;    ///< 1-sigma uncertainty in cross-track position [km]
+    physics::Distance xi_ca;              ///< Signed xi coordinate at TCA
+    physics::Distance eta_ca;             ///< Signed eta coordinate at TCA
+    physics::Distance impact_parameter;    ///< Minimum distance of shadow center from geocenter
+    physics::Velocity shadow_velocity;    ///< Velocity magnitude on fundamental plane
+    physics::Velocity dxi_dt;             ///< Velocity component along Xi (East)
+    physics::Velocity deta_dt;            ///< Velocity component along Eta (North)
+    Angle position_angle;                 ///< Direction of the shadow track (North to East)
+    
+    // Relative velocities (represented as angular displacement per second)
+    Angle d_ra_cos_dec_per_sec;
+    Angle d_dec_per_sec;
+    
+    time::TimeDuration closest_approach_time_offset; ///< Time offset from input center to TCA
+    time::TimeDuration time_uncertainty;           ///< 1-sigma uncertainty in time
+    physics::Distance cross_track_uncertainty;      ///< 1-sigma uncertainty in cross-track position
+    
+    // Metadata
+    std::string star_id;
+    double star_mag;
+    time::EpochTDB t_ca;  ///< Absolute time of closest approach
+};
+
+/**
+ * @brief Mode for asteroid state calculation.
+ */
+enum class OccultationRefinementMode {
+    ChebyshevDaily,     ///< Use precomputed daily Chebyshev polynomials (Default)
+    OrbitFitting,       ///< Download observations and fit orbit
+    PropagationOnly     ///< Propagate original elements
+};
+
+/**
+ * @brief Result for a single body in a multi-body system.
+ */
+struct BodyOccultation {
+    std::string name;
+    OccultationParameters params;
+    physics::Distance diameter;
+};
+
+/**
+ * @brief Result of a discovery/refinement run for a multi-body system.
+ */
+struct OccultationSystemCandidate {
+    catalog::Star star;
+    std::vector<BodyOccultation> bodies;
+};
+
+/**
+ * @brief Result of a discovery/refinement run.
+ */
+struct OccultationCandidate {
+    catalog::Star star;
+    OccultationParameters params;
 };
 
 /**
@@ -44,12 +94,52 @@ public:
      * @param ast_ddist_dt Radial velocity [m/s]
      * @return Physical parameters
      */
+    /**
+     * @brief Computes physical parameters of the occultation.
+     * ...
+     */
     static OccultationParameters compute_parameters(
         const RightAscension& star_ra, const Declination& star_dec,
         const RightAscension& ast_ra, const Declination& ast_dec,
-        double ast_dist_m,
-        double ast_dra_dt_rad_s, double ast_ddec_dt_rad_s,
-        double ast_ddist_dt_m_s);
+        const physics::Distance& ast_dist,
+        const Angle& ast_dra_dt, const Angle& ast_ddec_dt,
+        const physics::Velocity& ast_ddist_dt);
+
+    /**
+     * @brief Main entry point for searching occultations.
+     * 
+     * @param asteroid_id       Designation or name (for downloads)
+     * @param initial_elements  Seed elements for search
+     * @param start             Search window start
+     * @param end               Search window end
+     * @param max_mag           Magnitude limit for stars
+     * @param engine            AstDyn engine (holds config, propagator, etc)
+     * @param mode              Refinement mode (Daily Chebyshev, Fit, or Prop)
+     * @return List of verified occultations
+     */
+    static std::vector<OccultationCandidate> find_occultations(
+        const std::string& asteroid_id,
+        const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
+        time::EpochTDB start,
+        time::EpochTDB end,
+        double max_mag,
+        AstDynEngine& engine,
+        OccultationRefinementMode mode = OccultationRefinementMode::ChebyshevDaily);
+
+    /**
+     * @brief Search for occultations of a whole system (e.g. asteroid + satellites).
+     * 
+     * @param body_ids Names/IDs of the bodies to search for.
+     * @param bsp_path Path to the SPK/BSP file containing the system ephemeris.
+     * ...
+     */
+    static std::vector<OccultationSystemCandidate> find_system_occultations(
+        const std::vector<std::string>& body_ids,
+        const std::string& bsp_path,
+        time::EpochTDB start,
+        time::EpochTDB end,
+        double max_mag,
+        AstDynEngine& engine);
 
     /**
      * @brief Convenience overload using SkyCoord.
@@ -58,16 +148,16 @@ public:
     static OccultationParameters compute_from_sky(
         const SkyCoord<Frame>& star,
         const SkyCoord<Frame>& asteroid,
-        double distance_m,
-        double dra_dt_rad_s,
-        double ddec_dt_rad_s,
-        double ddist_dt_m_s = 0.0) 
+        const physics::Distance& distance,
+        const Angle& dra_dt,
+        const Angle& ddec_dt,
+        const physics::Velocity& ddist_dt = physics::Velocity::zero()) 
     {
         return compute_parameters(
             star.ra(), star.dec(),
             asteroid.ra(), asteroid.dec(),
-            distance_m,
-            dra_dt_rad_s, ddec_dt_rad_s, ddist_dt_m_s
+            distance,
+            dra_dt, ddec_dt, ddist_dt
         );
     }
 };

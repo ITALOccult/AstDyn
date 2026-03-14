@@ -16,8 +16,8 @@ namespace astdyn::astrometry {
  * @brief Point on Earth's surface.
  */
 struct GeoPoint {
-    double lat_deg; ///< Latitude [-90, 90]
-    double lon_deg; ///< Longitude [-180, 180]
+    Angle lat; ///< Latitude
+    Angle lon; ///< Longitude
 };
 
 struct TimeMarker {
@@ -30,10 +30,12 @@ struct TimeMarker {
  */
 struct OccultationPath {
     std::vector<GeoPoint> center_line;    ///< Path of the shadow center
-    std::vector<GeoPoint> sigma1_north;    ///< Northern 1-sigma boundary
-    std::vector<GeoPoint> sigma1_south;    ///< Southern 1-sigma boundary
+    std::vector<GeoPoint> shadow_north;   ///< Northern shadow boundary
+    std::vector<GeoPoint> shadow_south;   ///< Southern shadow boundary
+    std::vector<GeoPoint> sigma1_north;    ///< Northern 1-sigma boundary (shadow + uncertainty)
+    std::vector<GeoPoint> sigma1_south;    ///< Southern 1-sigma boundary (shadow + uncertainty)
     std::vector<TimeMarker> markers;       ///< Time markers (TCA, +/- sigma)
-    double shadow_width_km;                ///< Width of the asteroid shadow
+    physics::Distance shadow_width;        ///< Width of the asteroid shadow
 };
 
 /**
@@ -45,16 +47,20 @@ public:
      * @brief Computes the geographical path of the shadow.
      * 
      * @param params Calculated occultation parameters.
+     * @param star_ra Star Right Ascension
+     * @param star_dec Star Declination
+     * @param asteroid_diameter Nominal diameter for corridor calculation
      * @param tca_utc Time of Closest Approach.
-     * @param duration_sec Length of path to generate (default 300s).
+     * @param duration Length of path to generate (default 300s).
      * @return Full path data.
      */
     static OccultationPath compute_path(
         const OccultationParameters& params,
         const RightAscension& star_ra,
         const Declination& star_dec,
+        const physics::Distance& asteroid_diameter,
         const time::EpochUTC& tca_utc,
-        double duration_sec = 300.0);
+        const time::TimeDuration& duration = time::TimeDuration::from_seconds(300.0));
 
     /**
      * @brief Generates an SVG map representation.
@@ -87,10 +93,21 @@ public:
      */
     static void export_kml(const OccultationPath& path, const std::string& filename);
 
+    /**
+     * @brief Generates a KML file with multiple paths (system or comparison).
+     */
+    static void export_kml(
+        const std::vector<OccultationPath>& paths,
+        const std::vector<std::string>& labels,
+        const std::string& filename);
+
 private:
     // Internal coordinate transformation helpers
-    static GeoPoint project_to_earth(double xi, double eta, double zeta, 
-                                     const RightAscension& ra, const Declination& dec, 
+    static GeoPoint project_to_earth(const physics::Distance& xi, 
+                                     const physics::Distance& eta, 
+                                     const physics::Distance& zeta, 
+                                     const RightAscension& ra, 
+                                     const Declination& dec, 
                                      const time::EpochUTC& t);
 };
 

@@ -25,6 +25,7 @@
 #include <astdyn/orbit_determination/GaussIOD.hpp>
 #include <astdyn/orbit_determination/OrbFitIOD.hpp>
 #include <astdyn/propagation/OrbFitIntegrator.hpp>
+#include <astdyn/core/Configurator.hpp>
 
 #include <cmath>
 #include <chrono>
@@ -104,12 +105,17 @@ static void write_csv_row(std::ostream& f, const std::string& t, const std::stri
 
 int main(int argc, char** argv) {
     std::string filter = "";
+    std::string config_file = "";
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg.find("--target=") == 0) {
             filter = arg.substr(9);
         } else if (arg == "-t" && i + 1 < argc) {
             filter = argv[++i];
+        } else if (arg.find("--config=") == 0) {
+            config_file = arg.substr(9);
+        } else if (arg == "-c" && i + 1 < argc) {
+            config_file = argv[++i];
         }
     }
     
@@ -128,33 +134,61 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // --- Base propagator settings (full N-body + GR + Moon) ---
+    // --- Base propagator settings ---
     PropagatorSettings base_settings;
-    base_settings.include_planets  = true;
-    base_settings.perturb_mercury  = true;
-    base_settings.perturb_venus    = true;
-    base_settings.perturb_earth    = true;
-    base_settings.perturb_mars     = true;
-    base_settings.perturb_jupiter  = true;
-    base_settings.perturb_saturn   = true;
-    base_settings.perturb_uranus   = true;
-    base_settings.perturb_neptune  = true;
-    base_settings.include_relativity = true;
-    base_settings.include_moon     = true;
+    DifferentialCorrectorSettings lsq_settings;
+    GaussIODSettings iod_settings;
+    STMSettings stm_settings;
 
-    // Factory: creates a RK4-based propagator (Fixed step).
+    if (!config_file.empty()) {
+        std::cout << "Loading configuration from: " << config_file << std::endl;
+        std::ifstream ifs(config_file);
+        if (ifs.is_open()) {
+            Configurator::loadFromStream(ifs, base_settings, lsq_settings, iod_settings, stm_settings);
+        } else {
+            std::cerr << "Warning: Could not open config file, using defaults." << std::endl;
+        }
+    } else {
+        // Fallback hardcoded defaults (same as before)
+        base_settings.include_planets  = true;
+        base_settings.perturb_mercury  = true;
+        base_settings.perturb_venus    = true;
+        base_settings.perturb_earth    = true;
+        base_settings.perturb_mars     = true;
+        base_settings.perturb_jupiter  = true;
+        base_settings.perturb_saturn   = true;
+        base_settings.perturb_uranus   = true;
+        base_settings.perturb_neptune  = true;
+        base_settings.include_relativity = true;
+        base_settings.include_moon     = true;
+
+        lsq_settings.max_iterations = 30;
+        lsq_settings.outlier_sigma = 5.0;      
+        lsq_settings.outlier_max_sigma = 100.0;
+        lsq_settings.outlier_min_sigma = 3.0;
+        lsq_settings.reject_outliers = true;
+        lsq_settings.convergence_tolerance = Distance::from_au(1.0e-9);
+        lsq_settings.verbose = true;
+    }
+
+    // Factory: creates a propagator.
     auto make_propagator = [&](double yarkovsky_a2 = 0.0) {
-        auto integr = std::make_shared<OrbFitDPIntegrator>(
-            0.1,    // initial step [days]
-            1e-12,  // tolerance
-            1e-6,   // min step
-            5.0     // max step
-        );
-        PropagatorSettings s = base_settings;
-        s.include_yarkovsky = (std::abs(yarkovsky_a2) > 0.0);
-        s.yarkovsky_a2      = yarkovsky_a2;
-        s.integrate_in_ecliptic = true; // RESTORE: Essential for asteroid precision
-        return std::make_shared<Propagator>(integr, ephem, s);
+        if (!config_file.empty()) {
+            std::ifstream ifs(config_file);
+            nlohmann::json j;
+            ifs >> j;
+            auto s = base_settings;
+            s.include_yarkovsky = (std::abs(yarkovsky_a2) > 0.0);
+            s.yarkovsky_a2      = yarkovsky_a2;
+            return Configurator::createPropagator(j, ephem);
+        } else {
+            auto integr = std::make_shared<OrbFitDPIntegrator>(0.1, 1e-12, 1e-6, 5.0);
+            PropagatorSettings s = base_settings;
+            s.include_yarkovsky = (std::abs(yarkovsky_a2) > 0.0);
+            s.yarkovsky_a2      = yarkovsky_a2;
+            s.integrate_in_ecliptic = true;
+            return std::make_shared<Propagator>(integr, ephem, s);
+        }
     };
 
     std::vector<Target> targets;
@@ -348,6 +382,7 @@ int main(int argc, char** argv) {
 
             auto res_calc = std::make_shared<ResidualCalculator<GCRF>>(ephem, prop);
             auto stm_comp = std::make_shared<StateTransitionMatrix<GCRF>>(prop);
+            stm_comp->apply_settings(stm_settings);
 
             CartesianStateTyped<GCRF> pre_ekf_state = transform_state_typed<ECLIPJ2000, GCRF>(start_state);
             pre_ekf_state.gm = physics::GravitationalParameter::from_au3_d2(constants::GMS);
@@ -405,14 +440,6 @@ int main(int argc, char** argv) {
 
             // --- STAGE 2: Final LSQ refinement ---
             std::cout << "  - [Stage 2] Final LSQ refinement..." << std::endl;
-            DifferentialCorrectorSettings lsq_settings;
-            lsq_settings.verbose = true;
-            lsq_settings.max_iterations = 30;
-            lsq_settings.outlier_sigma = 5.0;      
-            lsq_settings.outlier_max_sigma = 100.0; // Very loose at start to avoid killing good data
-            lsq_settings.outlier_min_sigma = 3.0;   // Tight at the end
-            lsq_settings.reject_outliers = true;
-            lsq_settings.convergence_tolerance = Distance::from_au(1.0e-9); 
             
             t_start = wall_sec();
             try {
