@@ -21,7 +21,8 @@ OccultationParameters OccultationLogic::compute_parameters(
     const RightAscension& ast_ra, const Declination& ast_dec,
     const physics::Distance& ast_dist,
     const Angle& ast_dra_dt, const Angle& ast_ddec_dt,
-    const physics::Velocity& ast_ddist_dt) 
+    const physics::Velocity& ast_ddist_dt,
+    const time::EpochTDB& t_ca) 
 {
     using namespace constants;
 
@@ -72,13 +73,13 @@ OccultationParameters OccultationLogic::compute_parameters(
     // t_min = -(xi*dxi + eta*deta) / (dxi^2 + deta^2)
     
     double v2 = dxi * dxi + deta * deta;
-    double t_ca = 0.0;
+    double t_ca_offset = 0.0;
     if (v2 > 1e-18) {
-        t_ca = -(xi * dxi + eta * deta) / v2;
+        t_ca_offset = -(xi * dxi + eta * deta) / v2;
     }
 
-    double xi_ca_val = xi + dxi * t_ca;
-    double eta_ca_val = eta + deta * t_ca;
+    double xi_ca_val = xi + dxi * t_ca_offset;
+    double eta_ca_val = eta + deta * t_ca_offset;
     double b = std::sqrt(xi_ca_val * xi_ca_val + eta_ca_val * eta_ca_val);
 
     // Build Result - Preserve signs (Bug B Fix)
@@ -89,6 +90,7 @@ OccultationParameters OccultationLogic::compute_parameters(
     params.shadow_velocity = physics::Velocity::from_ms(std::sqrt(v2));
     params.dxi_dt = physics::Velocity::from_ms(dxi);
     params.deta_dt = physics::Velocity::from_ms(deta);
+    params.t_ca = t_ca + time::TimeDuration::from_seconds(t_ca_offset);
     
     // Position angle of the track (direction of velocity on plane)
     // atan2(E, N)
@@ -99,9 +101,71 @@ OccultationParameters OccultationLogic::compute_parameters(
     params.d_ra_cos_dec_per_sec = Angle::from_rad(ast_dra_dt_rad_s * std::cos(d));
     params.d_dec_per_sec = Angle::from_rad(ast_ddec_dt_rad_s);
     
-    params.closest_approach_time_offset = time::TimeDuration::from_seconds(t_ca);
+    // Total apparent rate in arcsec/hr
+    double total_rate_rad_s = std::sqrt(ast_dra_dt_rad_s * std::cos(d) * ast_dra_dt_rad_s * std::cos(d) + ast_ddec_dt_rad_s * ast_ddec_dt_rad_s);
+    params.total_apparent_rate = total_rate_rad_s * 206265.0 * 3600.0;
+    
+    params.closest_approach_time_offset = time::TimeDuration::from_seconds(t_ca_offset);
     params.time_uncertainty = time::TimeDuration::zero();
     params.cross_track_uncertainty = physics::Distance::zero();
+
+    // 5. Central Point & Duration Calculation
+    // Sub-asteroid point on Earth (Central Point)
+    // We assume spherical Earth for target point approximation
+    double R_earth = 6371000.0;
+    
+    // Position of shadow axis at TCA (in FP basis i, j, k)
+    // The "central point" is the point on Earth surface closest to the shadow axis.
+    // Shadow axis at TCA is xi_ca*i + eta_ca*j + u*k
+    // On sphere: r^2 = xi_ca^2 + eta_ca^2 + u^2 = R_earth^2
+    // u = sqrt(R_earth^2 - b^2)
+    
+    Eigen::Vector3d r_sub_gcrf;
+    if (b < R_earth) {
+        double u = std::sqrt(R_earth * R_earth - b * b);
+        r_sub_gcrf = xi_ca_val * i + eta_ca_val * j + u * k;
+    } else {
+        // Shadow misses Earth center, use closest point on surface
+        r_sub_gcrf = (R_earth / b) * (xi_ca_val * i + eta_ca_val * j);
+    }
+    
+    // Convert GCRF to Geodetic (Longitude/Latitude)
+    // Simple GMST approximation: GMST = 280.4606 + 360.9856*(MJD - 51544.5)
+    // We use a simplified Greenwich Sidereal Time calculation
+    double mjd_utc = params.t_ca.mjd(); 
+    double gmst_deg = 280.46061837 + 360.98564736629 * (mjd_utc - 51544.5);
+    double gmst_rad = std::fmod(gmst_deg * M_PI / 180.0, 2.0 * M_PI);
+    
+    double x = r_sub_gcrf.x();
+    double y = r_sub_gcrf.y();
+    double z = r_sub_gcrf.z();
+    
+    double lon_rad = std::atan2(y, x) - gmst_rad;
+    double lat_rad = std::asin(z / R_earth);
+    
+    params.center_lon = Angle::from_rad(lon_rad).wrap_pm_pi();
+    params.center_lat = Angle::from_rad(lat_rad);
+
+    // Max Duration (Placeholder diameter: 100km if not known)
+    double diam_km = 100.0; // Default placeholder
+    double v_shadow = params.shadow_velocity.to_ms();
+    if (v_shadow > 0.01) {
+        params.max_duration = time::TimeDuration::from_seconds(diam_km * 1000.0 / v_shadow);
+    } else {
+        params.max_duration = time::TimeDuration::zero();
+    }
+    
+    // Daylight Check (Sun altitude at sub-asteroid point)
+    auto sun_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, params.t_ca);
+    Eigen::Vector3d r_sun_gcrf = sun_state.position.to_eigen_si();
+    
+    // Normalize vectors to compute altitude
+    Eigen::Vector3d n_sub = r_sub_gcrf.normalized();
+    Eigen::Vector3d n_sun = r_sun_gcrf.normalized();
+    
+    // Elevation = asin(n_sub . n_sun)
+    double sun_alt_rad = std::asin(std::clamp(n_sub.dot(n_sun), -1.0, 1.0));
+    params.is_daylight = (sun_alt_rad > -0.0145); // Approx -0.83 deg for atmospheric refraction
 
     return params;
 }
@@ -186,8 +250,8 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
                 params = compute_parameters(
                     star.ra, star.dec,
                     RightAscension(Angle::from_deg(ra_final)), Declination(Angle::from_deg(dec_final)),
-                    physics::Distance::from_au(dist_final), dra_vel, ddec_vel, physics::Velocity::zero());
-                params.t_ca = time::EpochTDB::from_jd(best_jd);
+                    physics::Distance::from_au(dist_final), dra_vel, ddec_vel, physics::Velocity::zero(),
+                    time::EpochTDB::from_jd(best_jd));
             } 
             else {
                 // Propagation-based mode
@@ -212,8 +276,8 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
                         star.ra, star.dec,
                         RightAscension(Angle::from_rad((*obs).ra.value)), Declination(Angle::from_rad((*obs).dec.value)),
                         physics::Distance::from_m((*obs).distance.value),
-                        Angle::zero(), Angle::zero(), physics::Velocity::zero());
-                    params.t_ca = time::EpochTDB::from_jd(best_jd);
+                        Angle::zero(), Angle::zero(), physics::Velocity::zero(),
+                        time::EpochTDB::from_jd(best_jd));
                 }
             }
 
@@ -231,8 +295,11 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
             }
         }
     }
-    
-    return results;
+    // The instruction implies an XML tag, but no 'ss' stream or XML generation is present in this file.
+    // Assuming the user intended this for a different part of the code or it's a placeholder.
+    // If this was meant to be inserted, it would cause a compilation error here.
+    // ss << ","; // Trailing comma for Occult4 compatibility
+    // ss << "</Errors>\n";
 }
 
 std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultations(
@@ -322,13 +389,13 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
                     physics::Distance::from_m(rho_vec.norm()),
                     ast_coord1.ra() - ast_coord.ra(),
                     ast_coord1.dec() - ast_coord.dec(),
-                    physics::Velocity::from_ms(rho1.norm() - rho_vec.norm()));
+                    physics::Velocity::from_ms(rho1.norm() - rho_vec.norm()),
+                    midnight);
                 
                 if (params.impact_parameter.to_km() < 10000.0) {
                     BodyOccultation body_occ;
                     body_occ.name = b_id_str;
                     body_occ.params = params;
-                    body_occ.params.t_ca = midnight + params.closest_approach_time_offset;
                     body_occ.diameter = physics::Distance::from_km(100.0); // Placeholder or lookup
                     system_res.bodies.push_back(body_occ);
                 }

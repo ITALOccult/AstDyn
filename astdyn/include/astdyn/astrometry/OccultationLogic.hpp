@@ -39,7 +39,13 @@ struct OccultationParameters {
     // Metadata
     std::string star_id;
     double star_mag;
+    // Geometry & Timing
     time::EpochTDB t_ca;  ///< Absolute time of closest approach
+    Angle center_lon;     ///< Longitude of the sub-asteroid point at TCA (deg)
+    Angle center_lat;     ///< Latitude of the sub-asteroid point at TCA (deg)
+    time::TimeDuration max_duration; ///< Maximum occultation duration (sec)
+    double total_apparent_rate;    ///< Total angular velocity (arcsec/hr)
+    bool is_daylight;     ///< True if TCA is during daylight at central point
 };
 
 /**
@@ -103,7 +109,8 @@ public:
         const RightAscension& ast_ra, const Declination& ast_dec,
         const physics::Distance& ast_dist,
         const Angle& ast_dra_dt, const Angle& ast_ddec_dt,
-        const physics::Velocity& ast_ddist_dt);
+        const physics::Velocity& ast_ddist_dt,
+        const time::EpochTDB& t_ca);
 
     /**
      * @brief Main entry point for searching occultations.
@@ -151,13 +158,14 @@ public:
         const physics::Distance& distance,
         const Angle& dra_dt,
         const Angle& ddec_dt,
+        const time::EpochTDB& t_ca,
         const physics::Velocity& ddist_dt = physics::Velocity::zero()) 
     {
         return compute_parameters(
             star.ra(), star.dec(),
             asteroid.ra(), asteroid.dec(),
             distance,
-            dra_dt, ddec_dt, ddist_dt
+            dra_dt, ddec_dt, ddist_dt, t_ca
         );
     }
 };

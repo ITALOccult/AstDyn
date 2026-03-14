@@ -223,3 +223,42 @@ std::string HorizonsClient::build_observer_url(const std::string& target, const 
 }
 
 } // namespace astdyn::io
+
+namespace astdyn::io {
+
+std::expected<PhysicalProperties, HorizonsError> 
+HorizonsClient::query_physical_properties(const std::string& target) {
+    std::stringstream ss;
+    ss << config_.base_url << "?format=json&COMMAND='" << url_encode(format_command(target)) << "'"
+       << "&OBJ_DATA='YES'&MAKE_EPHEM='NO'";
+    
+    auto raw = fetch_url(ss.str());
+    if (!raw) return std::unexpected(raw.error());
+
+    try {
+        auto data = json::parse(*raw);
+        std::string result = data["result"];
+        PhysicalProperties props;
+
+        // Use regex for robust finding
+        std::regex h_regex(R"(H\s*=\s*([0-9.]+))");
+        std::regex diam_regex(R"(Radius\s*\(km\)\s*=\s*([0-9.]+))");
+        std::regex diam_regex2(R"(Diameter\s*\(km\)\s*=\s*([0-9.]+))");
+
+        std::smatch match;
+        if (std::regex_search(result, match, h_regex)) {
+            props.h_mag = std::stod(match[1]);
+        }
+        if (std::regex_search(result, match, diam_regex)) {
+            props.diameter_km = std::stod(match[1]) * 2.0; // Radius to Diameter
+        } else if (std::regex_search(result, match, diam_regex2)) {
+            props.diameter_km = std::stod(match[1]);
+        }
+
+        return props;
+    } catch (...) {
+        return std::unexpected(HorizonsError::ParsingError);
+    }
+}
+
+} // namespace astdyn::io

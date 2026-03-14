@@ -18,6 +18,12 @@ enum class HorizonsError {
     Timeout
 };
 
+struct PhysicalProperties {
+    double h_mag = 0.0;
+    double diameter_km = 0.0;
+    double mass_kg = 0.0;
+};
+
 /**
  * @brief JPL Horizons REST API Client
  * 
@@ -56,6 +62,12 @@ public:
      */
     std::expected<astrometry::AstrometricObservation, HorizonsError> 
     query_observation(const std::string& target, const time::EpochTDB& epoch, const std::string& observer = "500@399");
+
+    /**
+     * @brief Query physical properties like H magnitude and diameter.
+     */
+    std::expected<PhysicalProperties, HorizonsError> 
+    query_physical_properties(const std::string& target);
 
 private:
     Config config_;

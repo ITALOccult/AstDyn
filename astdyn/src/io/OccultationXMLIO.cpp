@@ -236,6 +236,7 @@ std::string OccultationXMLIO::format_event_node(const OccultationEvent& event) {
     if (event.error_extra_data.size() <= 4) {
          ss << "," << event.uncertainty_method;
     }
+    ss << ","; 
     ss << "</Errors>\n";
 
     // ID

@@ -39,6 +39,8 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.ra_event_h = cand.star.ra.to_deg() / 15.0;
     ev.dec_event_deg = cand.star.dec.to_deg();
     ev.mag_v = cand.star.g_mag;
+    ev.mag_r = cand.star.g_mag; // Placeholder
+    ev.mag_k = cand.star.g_mag; // Placeholder
     ev.ra_cat_h = ev.ra_event_h; 
     ev.dec_cat_deg = ev.dec_event_deg;
     
@@ -46,18 +48,24 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.object_name = ast_id;
     try { ev.object_number = std::stoi(ast_id); } catch(...) { ev.object_number = 0; }
     ev.object_type = "Asteroid";
-    ev.diameter_km = 0.0; // Placeholder
+    ev.diameter_km = cand.params.cross_track_uncertainty.to_km(); 
+    ev.h_mag = cand.params.star_mag; 
+    ev.apparent_rate_arcsec_hr = cand.params.total_apparent_rate;
     
     // Geometry
-    ev.combined_error_arcsec = cand.params.impact_parameter.to_km();
+    ev.longitude_deg = cand.params.center_lon.to_deg();
+    ev.latitude_deg = cand.params.center_lat.to_deg();
+    ev.max_duration_sec = cand.params.max_duration.to_seconds();
+    ev.is_daylight = cand.params.is_daylight;
+    ev.combined_error_arcsec = cand.params.impact_parameter.to_km(); 
     
-    // Orbit elements mapping (matching library conventions)
+    // Orbit elements mapping
     ev.semi_major_axis_au = el.a.to_au();
     ev.eccentricity = el.e;
     ev.inclination_deg = el.i.to_deg();
     ev.node_deg = el.node.to_deg();
-    ev.mean_anomaly_deg = el.omega.to_deg(); 
-    ev.ra_node_approx = el.M.to_deg();
+    ev.mean_anomaly_deg = el.M.to_deg(); 
+    ev.ra_node_approx = el.omega.to_deg();
 
     // Set date from epoch
     auto [year, month, day, frac] = time::mjd_to_calendar(el.epoch.mjd());
@@ -178,8 +186,13 @@ int main(int argc, char** argv) {
     std::cout << "[ioccultcalc] Result: " << results.size() << " event(s) found.\n";
 
     // --- 4. Processing and Outputs ---
+    // Fetch physical properties (Diameter, H-mag) for enrichment
+    auto props = horizons.query_physical_properties(asteroid_id);
+    double h_mag = (props) ? props->h_mag : 0.0;
+    double diameter_km = (props) ? props->diameter_km : 100.0;
+
     if (!results.empty()) {
-        std::cout << "\nLIST OF EVENTS:\n";
+        std::cout << "\nLIST OF EVENTS (H=" << h_mag << ", D=" << diameter_km << " km):\n";
         for (size_t i = 0; i < results.size(); ++i) {
             const auto& res = results[i];
             std::cout << std::setw(2) << i + 1 << ". Star: " << std::setw(20) << res.params.star_id 
@@ -190,15 +203,20 @@ int main(int argc, char** argv) {
 
         if (vm.count("kml")) {
              auto path_data = OccultationMapper::compute_path(results[0].params, results[0].star.ra, results[0].star.dec, 
-                                                             physics::Distance::from_km(250.0), 
-                                                             time::to_utc(results[0].params.t_ca));
+                                                              physics::Distance::from_km(diameter_km > 0 ? diameter_km * 2.0 : 250.0), 
+                                                              time::to_utc(results[0].params.t_ca));
              OccultationMapper::export_kml(path_data, vm["kml"].as<std::string>());
         }
     }
 
     if (vm.count("xml-output")) {
         std::vector<OccultationEvent> out_events;
-        for (const auto& res : results) out_events.push_back(candidate_to_event(res, asteroid_id, elements));
+        for (const auto& res : results) {
+            auto cand = res; // Copy to modify
+            cand.params.star_mag = h_mag; 
+            cand.params.cross_track_uncertainty = physics::Distance::from_km(diameter_km);
+            out_events.push_back(candidate_to_event(cand, asteroid_id, elements));
+        }
         OccultationXMLIO::write_file(out_events, vm["xml-output"].as<std::string>());
     }
 
