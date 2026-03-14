@@ -96,11 +96,7 @@ If you encounter discrepancies or bugs, please open an issue with the relevant i
 
 *Validation epoch: 2026-Jan-10 00:00:00 UTC (MJD 61050.0)*
 
-## Citation
 
-If you use AstDyn in your research, please cite the accompanying paper (in review):
-
-> Bigi, M., et al. (2025). "AstDyn: A High-Fidelity C++ Library for Asteroid Dynamics and Occultation Prediction." Submitted to RASTI.
 
 ## License
 
