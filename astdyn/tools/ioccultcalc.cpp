@@ -105,7 +105,12 @@ int main(int argc, char** argv) {
     }
 
     // --- 1. System and Engine Setup ---
-    std::string bsp_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp";
+    // Try to find the DE441 ephemeris in standard locations
+    std::string bsp_path = "de441.bsp"; // Default to current directory
+    if (!std::filesystem::exists(bsp_path)) {
+        bsp_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp";
+    }
+    
     AstDynEngine engine;
     
     if (vm.count("conf")) {
@@ -115,6 +120,20 @@ int main(int argc, char** argv) {
         cfg.ephemeris_file = bsp_path;
         cfg.ephemeris_type = EphemerisType::DE441;
         cfg.verbose = false;
+        
+        // --- Full Precision Default Settings ---
+        cfg.integrator_type = IntegratorType::AAS;
+        cfg.aas_precision = 1e-4; 
+        cfg.initial_step_size = 0.01; 
+        
+        cfg.propagator_settings.include_planets = true;
+        cfg.propagator_settings.include_moon = true;
+        cfg.propagator_settings.include_relativity = true;
+        cfg.propagator_settings.include_asteroids = true;
+        
+        cfg.light_time_correction = true;
+        cfg.aberration_correction = true;
+        
         engine.set_config(cfg);
     }
     
@@ -132,12 +151,15 @@ int main(int argc, char** argv) {
 
     std::cout << "[ioccultcalc] Target: " << asteroid_id << " @ JD " << std::fixed << std::setprecision(6) << jd << "\n";
     io::HorizonsClient horizons;
-    auto elements = horizons.query_elements(asteroid_id, search_epoch);
-    if (!elements) {
-        std::cerr << "Error: Failed to fetch elements from JPL Horizons.\n";
+    auto state_vec = horizons.query_vectors(asteroid_id, search_epoch);
+    if (!state_vec) {
+        std::cerr << "Error: Failed to fetch Cartesian vectors from JPL Horizons.\n";
         return 1;
     }
-    std::cout << "[ioccultcalc] Success: Elements fetched for epoch " << elements->epoch.jd() << " JD\n";
+    // Convert to Keplerian for initial state bridge (ensuring Ecliptic J2000 frame)
+    auto state_vec_ecl = state_vec->cast_frame<core::ECLIPJ2000>();
+    auto elements = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(state_vec_ecl);
+    std::cout << "[ioccultcalc] Success: Cartesian state fetched from JPL Horizons.\n";
 
     // --- 3. Occultation Search ---
     try {
@@ -152,7 +174,7 @@ int main(int argc, char** argv) {
     time::EpochTDB end_window = search_epoch + time::TimeDuration::from_days(0.5);
 
     std::cout << "[ioccultcalc] Searching Gaia DR3 (Online ESA) Corridor (Mag < " << mag_limit << ")..." << std::endl;
-    auto results = OccultationLogic::find_occultations(asteroid_id, *elements, start_window, end_window, mag_limit, engine);
+    auto results = OccultationLogic::find_occultations(asteroid_id, elements, start_window, end_window, mag_limit, engine);
     std::cout << "[ioccultcalc] Result: " << results.size() << " event(s) found.\n";
 
     // --- 4. Processing and Outputs ---
@@ -176,7 +198,7 @@ int main(int argc, char** argv) {
 
     if (vm.count("xml-output")) {
         std::vector<OccultationEvent> out_events;
-        for (const auto& res : results) out_events.push_back(candidate_to_event(res, asteroid_id, *elements));
+        for (const auto& res : results) out_events.push_back(candidate_to_event(res, asteroid_id, elements));
         OccultationXMLIO::write_file(out_events, vm["xml-output"].as<std::string>());
     }
 
@@ -195,7 +217,7 @@ int main(int argc, char** argv) {
             // Re-calculate AstDyn position at the exact XML MJD time
             time::EpochTDB t_ref = time::EpochTDB::from_mjd(ref.mjd);
             auto obs = astrometry::AstrometryReducer::compute_observation(
-                *elements, elements->epoch, t_ref, engine.config(), astrometry::AstrometricSettings());
+                elements, elements.epoch, t_ref, engine.config(), astrometry::AstrometricSettings());
             
             if (obs) {
                 double ra_ref = ref.ra_event_h * 15.0;

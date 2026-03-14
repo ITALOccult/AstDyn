@@ -175,18 +175,18 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
                 }
                 
                 // 2. Compute path parameters at best_jd
-                auto [ra_final, dec_final] = segment.evaluate(best_jd);
+                auto [ra_final, dec_final, dist_final] = segment.evaluate_all(best_jd);
                 
                 // Redefine velocities for compute_parameters (numerical derivative)
                 double dt_sec = 1.0;
-                auto [ra2, dec2] = segment.evaluate(best_jd + dt_sec/86400.0);
+                auto [ra2, dec2, dist2] = segment.evaluate_all(best_jd + dt_sec/86400.0);
                 Angle dra_vel = Angle::from_deg(ra2 - ra_final) * (1.0 / dt_sec);
                 Angle ddec_vel = Angle::from_deg(dec2 - dec_final) * (1.0 / dt_sec);
                 
                 params = compute_parameters(
                     star.ra, star.dec,
                     RightAscension(Angle::from_deg(ra_final)), Declination(Angle::from_deg(dec_final)),
-                    physics::Distance::from_au(2.5), dra_vel, ddec_vel, physics::Velocity::zero());
+                    physics::Distance::from_au(dist_final), dra_vel, ddec_vel, physics::Velocity::zero());
                 params.t_ca = time::EpochTDB::from_jd(best_jd);
             } 
             else {

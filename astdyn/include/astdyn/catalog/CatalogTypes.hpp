@@ -14,6 +14,7 @@
 #include <vector>
 #include <optional>
 #include <functional>
+#include <tuple>
 
 #include "astdyn/astrometry/sky_types.hpp"
 #include "astdyn/time/TimeScale.hpp"
@@ -126,20 +127,21 @@ struct ChebyshevSegment {
     double t_end   = 0.0;               ///< Segment end   [JD TDB]
     std::vector<double> ra_coeffs;      ///< Chebyshev coefficients for RA [deg]
     std::vector<double> dec_coeffs;     ///< Chebyshev coefficients for Dec [deg]
+    std::vector<double> dist_coeffs;    ///< Chebyshev coefficients for Distance [AU]
 
     /**
      * @brief Evaluate polynomial at specific JD.
      * @param jd Julian Date [TDB]
-     * @return pair of RA, Dec in degrees.
+     * @return tuple of RA (deg), Dec (deg), and Distance (AU).
      */
-    [[nodiscard]] std::pair<double, double> evaluate(double jd) const {
-        if (ra_coeffs.empty() || dec_coeffs.empty()) return {0.0, 0.0};
+    [[nodiscard]] std::tuple<double, double, double> evaluate_all(double jd) const {
+        if (ra_coeffs.empty() || dec_coeffs.empty()) return {0.0, 0.0, 0.0};
         
         // Normalize JD to [-1, 1]
         double tau = (2.0 * jd - (t_end + t_start)) / (t_end - t_start);
         
         auto eval_at = [](const std::vector<double>& cs, double t) {
-            if (cs.empty()) return 0.0;
+            if (cs.size() < 1) return 0.0;
             if (cs.size() == 1) return cs[0];
             
             double d1 = 0.0, d2 = 0.0;
@@ -151,7 +153,17 @@ struct ChebyshevSegment {
             return cs[0] + t * d1 - d2;
         };
 
-        return {eval_at(ra_coeffs, tau), eval_at(dec_coeffs, tau)};
+        double ra = eval_at(ra_coeffs, tau);
+        double dec = eval_at(dec_coeffs, tau);
+        double dist = dist_coeffs.empty() ? 2.5 : eval_at(dist_coeffs, tau);
+        
+        return {ra, dec, dist};
+    }
+
+    /// Backwards compatibility for RA/Dec only
+    [[nodiscard]] std::pair<double, double> evaluate(double jd) const {
+        auto [ra, dec, r] = evaluate_all(jd);
+        return {ra, dec};
     }
 };
 

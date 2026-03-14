@@ -62,10 +62,10 @@ void example() {
 ### ioccultcalc
 A professional command-line tool for searching and comparing stellar occultations. It retrieves asteroid elements directly from **JPL Horizons** and searches the **Gaia DR3** catalog online.
 
-#### Quick Access
-A wrapper script `ioccultcalc.sh` is provided in the project root for easy execution:
+#### Usage
+Run the tool directly from the command line:
 ```bash
-./ioccultcalc.sh --asteroid 704 --jd 2461131.61 --mag 15.0
+ioccultcalc --asteroid 704 --jd 2461131.61 --mag 15.0
 ```
 
 #### Command-line Options

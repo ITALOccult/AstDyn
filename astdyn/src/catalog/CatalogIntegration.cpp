@@ -202,7 +202,7 @@ ChebyshevSegment fit_chebyshev(
 
     // Sample the orbit (using +2 points to ensure enough data for degree D)
     const int N = degree + 5;
-    std::vector<double> jd_samples(N), ra_samples(N), dec_samples(N), tau_samples(N);
+    std::vector<double> jd_samples(N), ra_samples(N), dec_samples(N), dist_samples(N), tau_samples(N);
 
     astrometry::AstrometricSettings a_settings;
     a_settings.light_time_correction = true;
@@ -223,6 +223,7 @@ ChebyshevSegment fit_chebyshev(
             tau_samples[i] = tau;
             ra_samples[i]  = obs->ra.value * c::RAD_TO_DEG;
             dec_samples[i] = obs->dec.value * c::RAD_TO_DEG;
+            dist_samples[i] = obs->distance.value / (c::AU * 1000.0);
         } else {
             // Degenerate or failure, should not happen in nominal conditions
             throw std::runtime_error("fit_chebyshev: propagation failed at JD " + std::to_string(jd));
@@ -234,6 +235,7 @@ ChebyshevSegment fit_chebyshev(
     seg.t_end   = t_end;
     seg.ra_coeffs  = cheby_fit(tau_samples, ra_samples, degree);
     seg.dec_coeffs = cheby_fit(tau_samples, dec_samples, degree);
+    seg.dist_coeffs = cheby_fit(tau_samples, dist_samples, degree);
     return seg;
 }
 
