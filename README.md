@@ -17,9 +17,6 @@
 
 ## Documentation
 
-Full scientific and technical documentation is available in the `astdyn/docs` directory:
-
-*   **[Scientific Paper (RASTI Submission)](astdyn/docs/AstDyn_RASTI_Paper.pdf)**: Detailed methodology, algorithms, and validation results.
 *   **[User Manual](astdyn/docs/AstDyn_User_Manual.pdf)**: Comprehensive guide to the API, installation, and theoretical background.
 
 ## Quick Start
@@ -57,21 +54,50 @@ void example() {
 }
 ```
 
-## Validation Reference (34713 Ilse)
-
-| Method | Source | RA Error [arcsec] | Dec Error [arcsec] |
-| :--- | :--- | :--- | :--- |
-| **AstDyn (Nominal)** | AstDyS .eq1 | **0.627** | **0.151** |
-| **AstDyn (JPL-Ref)** | JPL Horizons | **0.634** | **0.147** |
-
-*Validation epoch: 2026-Jan-10 00:00:00 UTC (MJD 61050.0)*
-
-## Citation
-
-If you use AstDyn in your research, please cite the accompanying paper (in review):
-
-> Bigi, M., et al. (2025). "AstDyn: A High-Fidelity C++ Library for Asteroid Dynamics and Occultation Prediction." Submitted to RASTI.
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+1. Requisiti Fondamentali
+Aggiungi o aggiorna la sezione dei requisiti per essere molto chiaro sul file JPL:
+
+markdown
+### Prerequisites
+- **C++20 Compiler** (GCC 11+, Clang 13+, or MSVC 2022)
+- **CMake 3.20+**
+- **JPL DE441 Ephemeris**: The tools require the `de441.bsp` file. 
+  - Download it from [JPL FTP](https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de441.bsp).
+  - Place it in the executable directory or at `~/.ioccultcalc/ephemerides/de441.bsp`.
+2. Sezione "High-Precision Occultations"
+Metti in risalto le nuove capacità dinamiche:
+
+markdown
+## 💎 High-Precision Dynamics
+AstDyn 3.0 introduces an extreme-precision mode for occultation discovery, featuring:
+- **AAS Integrator**: Adaptive step-size Symplectic integrator for long-term stability.
+- **Full N-Body**: Perturbations from all planets, the Moon, and the **AST17** (17 most massive asteroids).
+- **Relativistic Corrections**: Post-Newtonian (PPN) gravity model.
+- **Dynamic Distance**: Real-time interpolation of Earth-Asteroid distance during the event refinement.
+3. Guida e Beta Testing
+Invita i tester a leggere la nuova documentazione:
+
+markdown
+## 🧪 Beta Testing
+We are currently in active beta. For a detailed walkthrough on how to use the search engine, please refer to our **[IOccultCalc User Guide](docs/ioccultcalc_guide.md)**.
+### Reporting Issues
+If you find a discrepancy with Occult4 or JPL Horizons, please open an issue providing:
+1. The asteroid name/number.
+2. The exact Julian Date used.
+3. Your `ioccultcalc_precision.json` configuration.
+4. Aggiornamento ioccultcalc
+Assicurati che l'esempio nel README sia quello più aggiornato:
+
+markdown
+### ioccultcalc Quick Start
+To find occultations for a Jupiter Trojan (e.g., 50936 Nireus) with full perturbations:
+```bash
+# Compile
+cmake -B build
+cmake --build build --target ioccultcalc
+# Run search for March 13, 2026
+./build/astdyn/tools/bin/ioccultcalc --asteroid 50936 --jd 2461112.5 --mag 15.0
