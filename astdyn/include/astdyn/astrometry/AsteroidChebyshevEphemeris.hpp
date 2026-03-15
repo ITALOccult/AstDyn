@@ -53,6 +53,15 @@ public:
     std::tuple<double, double, double> evaluate(time::EpochTDB epoch) const;
 
     /**
+     * @brief Evaluate position and velocity (derivatives) at a specific epoch.
+     * 
+     * @param epoch Target time (TDB).
+     * @return pair of tuples: (RA deg, Dec deg, Dist AU), (vRA deg/day, vDec deg/day, vDist AU/day)
+     */
+    std::pair<std::tuple<double, double, double>, std::tuple<double, double, double>> 
+    evaluate_full(time::EpochTDB epoch) const;
+
+    /**
      * @brief Get start epoch of the calculated interval.
      */
     time::EpochTDB start_epoch() const { return start_epoch_; }

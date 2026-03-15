@@ -63,4 +63,20 @@ std::tuple<double, double, double> AsteroidChebyshevEphemeris::evaluate(time::Ep
     return segments_[index].evaluate_all(jd);
 }
 
+std::pair<std::tuple<double, double, double>, std::tuple<double, double, double>> 
+AsteroidChebyshevEphemeris::evaluate_full(time::EpochTDB epoch) const {
+    double jd = epoch.jd();
+    
+    if (jd < jd_start_ || jd > jd_end_) {
+        throw std::out_of_range("AsteroidChebyshevEphemeris: requested epoch is outside the calculated interval.");
+    }
+
+    size_t index = static_cast<size_t>(std::floor(jd - jd_start_));
+    if (index >= segments_.size()) {
+        index = segments_.size() - 1;
+    }
+
+    return segments_[index].evaluate_full(jd);
+}
+
 } // namespace astdyn::astrometry

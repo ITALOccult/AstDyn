@@ -135,29 +135,60 @@ struct ChebyshevSegment {
      * @return tuple of RA (deg), Dec (deg), and Distance (AU).
      */
     [[nodiscard]] std::tuple<double, double, double> evaluate_all(double jd) const {
-        if (ra_coeffs.empty() || dec_coeffs.empty()) return {0.0, 0.0, 0.0};
-        
-        // Normalize JD to [-1, 1]
-        double tau = (2.0 * jd - (t_end + t_start)) / (t_end - t_start);
-        
-        auto eval_at = [](const std::vector<double>& cs, double t) {
-            if (cs.size() < 1) return 0.0;
-            if (cs.size() == 1) return cs[0];
-            
-            double d1 = 0.0, d2 = 0.0;
-            for (size_t j = cs.size() - 1; j >= 1; --j) {
-                double tmp = d1;
-                d1 = cs[j] + 2.0 * t * d1 - d2;
-                d2 = tmp;
+        auto [pos, vel] = evaluate_full(jd);
+        return pos;
+    }
+
+    /**
+     * @brief Evaluate polynomial and its derivative (velocity) at specific JD.
+     * 
+     * @param jd Julian Date [TDB]
+     * @return pair of tuples: (RA deg, Dec deg, Dist AU), (vRA deg/day, vDec deg/day, vDist AU/day)
+     */
+    [[nodiscard]] std::pair<std::tuple<double, double, double>, std::tuple<double, double, double>> 
+    evaluate_full(double jd) const {
+        if (ra_coeffs.empty() || dec_coeffs.empty()) {
+            return {{0,0,0}, {0,0,0}};
+        }
+
+        double dt = t_end - t_start;
+        double tau = (2.0 * jd - (t_end + t_start)) / dt;
+        double dtau_dt = 2.0 / dt;
+
+        auto eval = [&](const std::vector<double>& cs) -> std::pair<double, double> {
+            if (cs.empty()) return {0.0, 0.0};
+            if (cs.size() == 1) return {cs[0], 0.0};
+
+            // Use Clenshaw-like recurrence for position and derivative
+            // T_0 = 1, T_1 = x, T_n = 2xT_{n-1} - T_{n-2}
+            // T'_n = n U_{n-1}
+            // Faster: T_buf approach
+            size_t n = cs.size();
+            std::vector<double> T(n), U(n);
+            T[0] = 1.0;
+            U[0] = 0.0;
+            if (n > 1) {
+                T[1] = tau;
+                U[1] = 1.0;
             }
-            return cs[0] + t * d1 - d2;
+            for (size_t k = 2; k < n; ++k) {
+                T[k] = 2.0 * tau * T[k-1] - T[k-2];
+                U[k] = 2.0 * tau * U[k-1] - U[k-2] + 2.0 * T[k-1];
+            }
+
+            double p = 0.0, v = 0.0;
+            for (size_t k = 0; k < n; ++k) {
+                p += cs[k] * T[k];
+                v += cs[k] * U[k];
+            }
+            return {p, v * dtau_dt};
         };
 
-        double ra = eval_at(ra_coeffs, tau);
-        double dec = eval_at(dec_coeffs, tau);
-        double dist = dist_coeffs.empty() ? 2.5 : eval_at(dist_coeffs, tau);
-        
-        return {ra, dec, dist};
+        auto [ra, vra] = eval(ra_coeffs);
+        auto [dec, vdec] = eval(dec_coeffs);
+        auto [dist, vdist] = dist_coeffs.empty() ? std::make_pair(2.5, 0.0) : eval(dist_coeffs);
+
+        return {{ra, dec, dist}, {vra, vdec, vdist}};
     }
 
     /// Backwards compatibility for RA/Dec only
