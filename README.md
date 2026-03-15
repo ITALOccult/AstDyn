@@ -58,10 +58,10 @@ void example() {
 
 ## Tools
 
-### ioccultcalc (v2.0 - Released 2026-03-15 16:10 CET)
+### ioccultcalc (Beta 0.2 - Released 2026-03-15 16:10 CET)
 A professional command-line tool for searching and comparing stellar occultations. It retrieves asteroid elements directly from **JPL Horizons** and searches the **Gaia DR3** catalog online.
 
-**New in v2.0:**
+**New in Beta 0.2:**
 *   **Multi-Asteroid Batch Processing**: Search multiple bodies in a single run.
 *   **Flexible Input**: Supports comma-separated IDs or list files (e.g., `--asteroid @list.txt`).
 *   **Chebyshev Acceleration**: High-performance daily segmented polynomials for ultra-fast discovery over long durations.

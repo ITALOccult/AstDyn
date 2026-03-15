@@ -1,4 +1,4 @@
-# 🌌 IOccultCalc: The Ultimate Guide to Occultation Discovery
+# 🌌 IOccultCalc: The Ultimate Guide to Occultation Discovery (Beta 0.2)
 
 `ioccultcalc` is a high-precision command-line engine built on top of **AstDyn**. It integrates JPL Horizons ephemeris, Gaia DR3 stellar catalogs, and advanced numerical integration (AAS/RKF78) to predict and analyze stellar occultations.
 

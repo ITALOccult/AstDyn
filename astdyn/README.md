@@ -22,7 +22,7 @@ AstDyn C++ is a complete rewrite of the original Fortran 90 AstDyn software, bri
 - 🚧 **In Development / Optimization**
   - Advanced Orbit Determination (Least Squares)
   - Multi-body system propagation (Satellites)
-  - Multi-asteroid batch occultation discovery (ioccultcalc v2.0)
+  - Multi-asteroid batch occultation discovery (ioccultcalc Beta 0.2)
 
 ## 🛠️ Requirements
 
