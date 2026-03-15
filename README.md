@@ -103,6 +103,19 @@ If you encounter discrepancies or bugs, please open an issue with the relevant i
 
 
 
+## 🚀 Development Roadmap (Towards v1.0)
+
+AstDyn is currently in an active developmental phase. Below is the strategic plan for the IOccultCalc tool and core library:
+
+*   **Beta 0.3 (Current)**: **Binary Systems & Satellites**. Implementation of BSP/SPK native readers to support hierarchical multi-body occultation discovery (e.g., Sylvia, Kalliope).
+*   **Beta 0.4**: **Uncertainty Analysis**. Integration of orbital covariance matrices and Monte Carlo "clone" propagation for probabilistic shadow track calculation.
+*   **Beta 0.5**: **Visualization**. Automatic generation of SVG/PDF maps and enhanced KML exports for ground observers.
+*   **v1.0 RC**: **Validation**. Final stress tests against NASA/JPL reference standards and full technical documentation release.
+
+See the detailed [Development Plan](file:///Users/michelebigi/.gemini/antigravity/brain/ca66ea00-11d5-4584-b8f8-9d341f9a1847/development_plan.md) for more information.
+
+---
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
