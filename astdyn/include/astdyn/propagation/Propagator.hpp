@@ -58,6 +58,9 @@ struct PropagatorSettings {
     // Non-Gravitational Forces (Yarkovsky)
     bool include_yarkovsky = false;
     double yarkovsky_a2 = 0.0; // AU/d^2 at 1 AU (Tangential Acceleration Parameter)
+
+    // Force Model Frame
+    bool baricentric_integration = false; ///< Use SSB instead of Heliocentric origin
 };
 
 /**
@@ -204,6 +207,17 @@ private:
     std::shared_ptr<ephemeris::AsteroidPerturbations> asteroids_;
     PropagatorSettings settings_;
     Eigen::Matrix3d mat_ecl_; ///< Cached rotation matrix J2000 -> Ecliptic
+
+    // Cache for force evaluations
+    time::EpochTDB last_t_cache_;
+    Eigen::Vector3d last_sun_pos_bary_cache_;
+    struct PlanetStateCache {
+        ephemeris::CelestialBody body;
+        Eigen::Vector3d pos_bary_au;
+    };
+    PlanetStateCache planet_cache_[10]; // Fixed array to avoid allocations
+    int num_planets_cached_ = 0;
+    bool cache_valid_ = false;
 };
 
 class TwoBodyPropagator {

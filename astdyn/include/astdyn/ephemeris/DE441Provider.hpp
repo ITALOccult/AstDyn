@@ -69,7 +69,7 @@ private:
     /**
      * @brief Read full state from SPK (Single access)
      */
-    Eigen::VectorXd readState(CelestialBody body, time::EpochTDB t) const;
+    Eigen::Matrix<double, 6, 1> readState(CelestialBody body, time::EpochTDB t) const;
 };
 
 } // namespace astdyn::ephemeris

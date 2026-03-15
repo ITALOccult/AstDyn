@@ -72,13 +72,6 @@ else()
     target_link_libraries(astdyn OpenMP::OpenMP_CXX)
 endif()
 
-# Example executable (propagation demo)
-add_executable(propagate_example astdyn/examples/propagate_79148.cpp)
-target_link_libraries(propagate_example astdyn Eigen3::Eigen)
-
-# Benchmarks
-add_subdirectory(astdyn/benchmarks)
-
 # Tools
 add_subdirectory(astdyn/tools)
 

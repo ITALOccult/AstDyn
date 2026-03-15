@@ -50,14 +50,14 @@ DE441Provider::DE441Provider(const std::string& bsp_file)
 
 DE441Provider::~DE441Provider() = default;
 
-Eigen::VectorXd DE441Provider::readState(CelestialBody body, time::EpochTDB t) const {
+Eigen::Matrix<double, 6, 1> DE441Provider::readState(CelestialBody body, time::EpochTDB t) const {
     if (!loaded_) throw std::runtime_error("DE441 not loaded");
     
     int target = bodyToNAIFId(body);
     // Convert JD (TDB) to ET
     double et = (t.jd() - constants::JD2000) * 86400.0;
     
-    Eigen::VectorXd state(6);
+    Eigen::Matrix<double, 6, 1> state;
     try {
         if (target == 399) { // Earth (399 -> 3 -> 0)
             try {
@@ -100,21 +100,21 @@ Eigen::VectorXd DE441Provider::readState(CelestialBody body, time::EpochTDB t) c
 }
 
 math::Vector3<core::GCRF, physics::Distance> DE441Provider::getPosition(CelestialBody body, time::EpochTDB t) {
-    Eigen::VectorXd state = readState(body, t);
+    Eigen::Matrix<double, 6, 1> state = readState(body, t);
     return math::Vector3<core::GCRF, physics::Distance>::from_si(state[0] * 1000.0, 
                                                                 state[1] * 1000.0, 
                                                                 state[2] * 1000.0);
 }
 
 math::Vector3<core::GCRF, physics::Velocity> DE441Provider::getVelocity(CelestialBody body, time::EpochTDB t) {
-    Eigen::VectorXd state = readState(body, t);
+    Eigen::Matrix<double, 6, 1> state = readState(body, t);
     return math::Vector3<core::GCRF, physics::Velocity>::from_si(state[3] * 1000.0, 
                                                                 state[4] * 1000.0, 
                                                                 state[5] * 1000.0);
 }
 
 physics::CartesianStateTyped<core::GCRF> DE441Provider::getState(CelestialBody body, time::EpochTDB t) {
-    Eigen::VectorXd raw = readState(body, t);
+    Eigen::Matrix<double, 6, 1> raw = readState(body, t);
     // SPK is km and km/s -> convert to SI (meters, m/s)
     auto p = math::Vector3<core::GCRF, physics::Distance>::from_si(raw[0] * 1000.0, raw[1] * 1000.0, raw[2] * 1000.0);
     auto v = math::Vector3<core::GCRF, physics::Velocity>::from_si(raw[3] * 1000.0, raw[4] * 1000.0, raw[5] * 1000.0);

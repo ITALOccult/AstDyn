@@ -9,6 +9,7 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 
 # Occultation CLI Tool
 add_executable(ioccultcalc ioccultcalc.cpp)
+add_executable(astdyn_trajectory_export astdyn_trajectory_export.cpp)
 
 set(OCCULT_LIBS astdyn)
 if(ASTDYN_BUILD_CATALOG)
@@ -20,8 +21,14 @@ target_link_libraries(ioccultcalc PRIVATE
     Boost::program_options
 )
 
+target_link_libraries(astdyn_trajectory_export PRIVATE 
+    ${OCCULT_LIBS}
+    Boost::program_options
+)
+
 # Output directory for tools
 set_target_properties(ioccultcalc PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+set_target_properties(astdyn_trajectory_export PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
 
 # Installation
-install(TARGETS ioccultcalc RUNTIME DESTINATION bin)
+install(TARGETS ioccultcalc astdyn_trajectory_export RUNTIME DESTINATION bin)

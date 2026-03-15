@@ -26,7 +26,7 @@ public:
      * @param et Ephemeris time (seconds from J2000 epoch)
      * @return 6D vector [km, km/s] in Ecliptic J2000 frame
      */
-    Eigen::VectorXd getState(int target_id, double et);
+    Eigen::Matrix<double, 6, 1> getState(int target_id, double et);
 
 private:
     struct SPKSegment {
@@ -47,17 +47,29 @@ private:
         int n_comp = 3;
     };
 
+    struct Type2Cache {
+        const SPKSegment* seg = nullptr;
+        int rec_idx = -1;
+        std::vector<double> coeffs;
+    };
+
     std::string filename_;
     std::ifstream file_;
     bool big_endian_ = false;
     std::multimap<int, SPKSegment> segments_;
+    std::map<int, Type2Cache> type2_cache_;
 
     void readHeader();
     void loadIndex();
     void seekToRecord(int record_idx);
     
-    Eigen::VectorXd evaluateType2(const SPKSegment& seg, double et);
-    Eigen::VectorXd evaluateType13(const SPKSegment& seg, double et);
+    
+    Eigen::Matrix<double, 6, 1> evaluateType2(const SPKSegment& seg, double et);
+    Eigen::Matrix<double, 6, 1> evaluateType13(const SPKSegment& seg, double et);
+
+    // Buffers to avoid allocations
+    std::vector<double> T_buf_;
+    std::vector<double> U_buf_;
 };
 
 } // namespace astdyn::io

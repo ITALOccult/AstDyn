@@ -39,28 +39,101 @@ Propagator::Propagator(std::shared_ptr<Integrator> integrator,
 }
 
 Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::VectorXd& state) {
-    // State is strictly in AU and AU/day
     Eigen::Vector3d position = state.head<3>();
     Eigen::Vector3d velocity = state.tail<3>();
     
-    // Get Sun Barycentric Position
-    auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
-    Eigen::Vector3d sun_pos_bary_vec = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
-    
-    // Rotate to Ecliptic if requested
-    if (settings_.integrate_in_ecliptic) {
-        sun_pos_bary_vec = mat_ecl_ * sun_pos_bary_vec;
+    // 1. Update/Check Cache
+    if (!cache_valid_ || std::abs(t.mjd() - last_t_cache_.mjd()) > 1e-13) {
+        last_t_cache_ = t;
+        
+        auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
+        last_sun_pos_bary_cache_ = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
+        if (settings_.integrate_in_ecliptic) {
+            last_sun_pos_bary_cache_ = mat_ecl_ * last_sun_pos_bary_cache_;
+        }
+        
+        // Refresh planets
+        num_planets_cached_ = 0;
+        auto provider = ephemeris::PlanetaryEphemeris::getProvider();
+        if (settings_.include_planets && provider) {
+            static const CelestialBody bodies[] = {
+                CelestialBody::MERCURY, CelestialBody::VENUS, CelestialBody::EARTH,
+                CelestialBody::MARS, CelestialBody::JUPITER, CelestialBody::SATURN,
+                CelestialBody::URANUS, CelestialBody::NEPTUNE, CelestialBody::MOON
+            };
+            int count = settings_.include_moon ? 9 : 8;
+            
+            for (int i = 0; i < count; ++i) {
+                auto p_pos_state = provider->getPosition(bodies[i], t);
+                Eigen::Vector3d p_pos_bary_au = p_pos_state.to_eigen_si() / (constants::AU * 1000.0);
+                if (settings_.integrate_in_ecliptic) p_pos_bary_au = mat_ecl_ * p_pos_bary_au;
+                planet_cache_[num_planets_cached_++] = {bodies[i], p_pos_bary_au};
+            }
+        }
+        cache_valid_ = true;
     }
     
-    // Compute total acceleration (in AU/day^2)
-    Eigen::Vector3d acc = two_body_acceleration(position);
-    
-    if (settings_.include_planets) {
-        acc += planetary_perturbations(position, t, sun_pos_bary_vec);
+    Eigen::Vector3d acc = Eigen::Vector3d::Zero();
+
+    if (settings_.baricentric_integration) {
+        // SSB: Acc = sum [ GM_k * (r_k - r) / |r_k - r|^3 ] including Sun
+        // Sun contribution
+        Eigen::Vector3d delta_sun = last_sun_pos_bary_cache_ - position;
+        double d_sun = delta_sun.norm();
+        acc += (constants::GMS / (d_sun * d_sun * d_sun)) * delta_sun;
+        
+        // Planets
+        for (int i = 0; i < num_planets_cached_; ++i) {
+            const auto& p = planet_cache_[i];
+            double gm = 0;
+            switch(p.body) {
+                case CelestialBody::MERCURY: gm = constants::GM_MERCURY_AU; break;
+                case CelestialBody::VENUS:   gm = constants::GM_VENUS_AU; break;
+                case CelestialBody::EARTH:   gm = constants::GM_EARTH_AU; break;
+                case CelestialBody::MARS:    gm = constants::GM_MARS_AU; break;
+                case CelestialBody::JUPITER: gm = constants::GM_JUPITER_AU; break;
+                case CelestialBody::SATURN:  gm = constants::GM_SATURN_AU; break;
+                case CelestialBody::URANUS:  gm = constants::GM_URANUS_AU; break;
+                case CelestialBody::NEPTUNE: gm = constants::GM_NEPTUNE_AU; break;
+                case CelestialBody::MOON:    gm = constants::GM_MOON_AU; break;
+                default: break;
+            }
+            Eigen::Vector3d delta = p.pos_bary_au - position;
+            double r2 = delta.squaredNorm();
+            acc += (gm / (r2 * std::sqrt(r2))) * delta;
+        }
+    } else {
+        // Heliocentric: Main term is -mu*r/r^3
+        acc = two_body_acceleration(position);
+        
+        if (settings_.include_planets) {
+            for (int i = 0; i < num_planets_cached_; ++i) {
+                const auto& p = planet_cache_[i];
+                double gm = 0;
+                switch(p.body) {
+                    case CelestialBody::MERCURY: gm = constants::GM_MERCURY_AU; break;
+                    case CelestialBody::VENUS:   gm = constants::GM_VENUS_AU; break;
+                    case CelestialBody::EARTH:   gm = constants::GM_EARTH_AU; break;
+                    case CelestialBody::MARS:    gm = constants::GM_MARS_AU; break;
+                    case CelestialBody::JUPITER: gm = constants::GM_JUPITER_AU; break;
+                    case CelestialBody::SATURN:  gm = constants::GM_SATURN_AU; break;
+                    case CelestialBody::URANUS:  gm = constants::GM_URANUS_AU; break;
+                    case CelestialBody::NEPTUNE: gm = constants::GM_NEPTUNE_AU; break;
+                    case CelestialBody::MOON:    gm = constants::GM_MOON_AU; break;
+                    default: break;
+                }
+                Eigen::Vector3d planet_pos_helio_au = p.pos_bary_au - last_sun_pos_bary_cache_;
+                Eigen::Vector3d delta = planet_pos_helio_au - position;
+                
+                double r2_delta = delta.squaredNorm();
+                double r2_p = planet_pos_helio_au.squaredNorm();
+                acc += gm * (delta / (r2_delta * std::sqrt(r2_delta)) - planet_pos_helio_au / (r2_p * std::sqrt(r2_p)));
+            }
+        }
     }
     
     if (settings_.include_asteroids && asteroids_) {
-        acc += asteroid_perturbations(position, t, sun_pos_bary_vec);
+        acc += asteroids_->computePerturbationRaw(position, t.mjd(), last_sun_pos_bary_cache_, settings_.integrate_in_ecliptic);
     }
     
     if (settings_.include_relativity) {
@@ -72,17 +145,14 @@ Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::V
         double r_au = position.norm();
         double v_au_d = velocity.norm();
         if (r_au > 1e-4 && v_au_d > 1e-6) {
-            // a2 is in AU/d^2.
             double acc_val = settings_.yarkovsky_a2 / (r_au * r_au);
             acc += acc_val * (velocity / v_au_d);
         }
     }
     
-    // d[r, v]/dt = [v, a]
     Eigen::VectorXd xdot(6);
     xdot.head<3>() = velocity;
     xdot.tail<3>() = acc;
-    
     return xdot;
 }
 

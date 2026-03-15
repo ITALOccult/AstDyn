@@ -143,7 +143,7 @@ OccultationParameters OccultationLogic::compute_parameters(
     double lon_rad = std::atan2(y, x) - gmst_rad;
     double lat_rad = std::asin(z / R_earth);
     
-    params.center_lon = Angle::from_rad(lon_rad).wrap_pm_pi();
+    params.center_lon = Angle::from_rad(lon_rad).wrap_pi();
     params.center_lat = Angle::from_rad(lat_rad);
 
     // Max Duration (Placeholder diameter: 100km if not known)

@@ -163,12 +163,12 @@ int main(int argc, char** argv) {
         std::cout << " VZ = " << final_cart.velocity[2] << "\n";
         
         std::cout << "\nKeplerian Elements (J2000 Eq):\n";
-        std::cout << " a = " << final_state.semi_major_axis << " AU\n";
-        std::cout << " e = " << final_state.eccentricity << "\n";
-        std::cout << " i = " << final_state.inclination * constants::RAD_TO_DEG << " deg\n";
-        std::cout << " Ω = " << final_state.longitude_ascending_node * constants::RAD_TO_DEG << " deg\n";
-        std::cout << " ω = " << final_state.argument_perihelion * constants::RAD_TO_DEG << " deg\n";
-        std::cout << " M = " << final_state.mean_anomaly * constants::RAD_TO_DEG << " deg\n";
+        std::cout << " a = " << final_state.a.to_au() << " AU\n";
+        std::cout << " e = " << final_state.e << "\n";
+        std::cout << " i = " << final_state.i.to_deg() << " deg\n";
+        std::cout << " Ω = " << final_state.node.to_deg() << " deg\n";
+        std::cout << " ω = " << final_state.omega.to_deg() << " deg\n";
+        std::cout << " M = " << final_state.M.to_deg() << " deg\n";
 
         // 4. Compute Geocentric Equatorial Coordinates
         std::cout << "\n=== GEOCENTRIC COORDINATES (Astrometric J2000) ===\n";
@@ -181,17 +181,18 @@ int main(int argc, char** argv) {
         // Since we are forcing DE441 now, we assume Equatorial output.
         
         double target_jd_tdb = time::mjd_to_jd(target_mjd);
-        auto earth_state_raw = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, target_jd_tdb);
+        auto target_epoch = time::EpochTDB::from_jd(target_jd_tdb);
+        auto earth_state_raw = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, target_epoch);
         
         // Check if we need to transform (Analytical = Ecliptic, DE441 = Equatorial)
         // For this specific verification with DE441 loaded:
-        Vector3d earth_pos_bary = earth_state_raw.position();
+        Vector3d earth_pos_bary = earth_state_raw.position.to_eigen_si() / constants::AU / 1000.0;
         
         // CORRECTION: Convert Earth Barycentric -> Heliocentric
         // Propagator integrates in Heliocentric frame. DE441 returns Barycentric.
         // Earth_Helio = Earth_Bary - Sun_Bary
-        auto sun_state_raw = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, target_jd_tdb);
-        Vector3d sun_pos_bary = sun_state_raw.position();
+        auto sun_state_raw = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, target_epoch);
+        Vector3d sun_pos_bary = sun_state_raw.position.to_eigen_si() / constants::AU / 1000.0;
         
         Vector3d earth_pos = earth_pos_bary - sun_pos_bary;
         

@@ -135,7 +135,7 @@ void SPKReader::loadIndex() {
             break; 
         }
         
-        std::cout << "  - Loading SPK Index record " << current_rec << " (" << ns << " segments)..." << std::endl;
+        // std::cout << "  - Loading SPK Index record " << current_rec << " (" << ns << " segments)..." << std::endl;
         
         int sum_size = 2 * 8 + 6 * 4; // 40 bytes
         
@@ -150,7 +150,7 @@ void SPKReader::loadIndex() {
             
             // Log once per unique ID if possible or just print
             if (seen_ids.find(target) == seen_ids.end()) {
-                std::cout << "    [SPK] Found body ID: " << target << std::endl;
+                // std::cout << "    [SPK] Found body ID: " << target << std::endl;
                 seen_ids.insert(target);
             }
 
@@ -222,7 +222,7 @@ void SPKReader::seekToRecord(int record_idx) {
     file_.seekg(static_cast<long long>(record_idx - 1) * RECORD_SIZE, std::ios::beg);
 }
 
-Eigen::VectorXd SPKReader::getState(int target_id, double et) {
+Eigen::Matrix<double, 6, 1> SPKReader::getState(int target_id, double et) {
     auto range = segments_.equal_range(target_id);
     bool found_body = false;
     for (auto it = range.first; it != range.second; ++it) {
@@ -250,30 +250,29 @@ Eigen::VectorXd SPKReader::getState(int target_id, double et) {
     throw std::runtime_error(msg);
 }
 
-Eigen::VectorXd SPKReader::evaluateType2(const SPKSegment& seg, double et) {
-    // Type 2: Chebyshev for Position. Velocity via differentiation.
-    
+Eigen::Matrix<double, 6, 1> SPKReader::evaluateType2(const SPKSegment& seg, double et) {
     // 1. Locate record
-    // Index = floor((et - init) / intlen)
     int rec_idx = (int)std::floor((et - seg.init_sec) / seg.intlen);
     
-    // Address of this record (1-based double index)
-    // start_addr is start of DATA.
-    int rec_start_addr = seg.start_addr + rec_idx * seg.rsize;
-    
-    // Read record data (Midpoint, Radius, Coeffs...)
-    std::vector<double> buf(seg.rsize);
-    // Seek: (addr - 1) * 8
-    file_.seekg(static_cast<long long>(rec_start_addr - 1) * 8, std::ios::beg);
-    
-    std::vector<char> byte_buf(seg.rsize * 8);
-    file_.read(byte_buf.data(), seg.rsize * 8);
-    std::memcpy(buf.data(), byte_buf.data(), seg.rsize * 8);
-    
-    if (big_endian_ != isSystemBigEndian()) {
-        for (double& v : buf) v = swapEndian(v);
+    // Check Cache
+    Type2Cache& cache = type2_cache_[seg.body_id];
+    if (cache.seg != &seg || cache.rec_idx != rec_idx) {
+        // Cache miss: read from file
+        cache.seg = &seg;
+        cache.rec_idx = rec_idx;
+        cache.coeffs.resize(seg.rsize);
+        
+        int rec_start_addr = seg.start_addr + rec_idx * seg.rsize;
+        file_.seekg(static_cast<long long>(rec_start_addr - 1) * 8, std::ios::beg);
+        
+        file_.read(reinterpret_cast<char*>(cache.coeffs.data()), seg.rsize * 8);
+        
+        if (big_endian_ != isSystemBigEndian()) {
+            for (double& v : cache.coeffs) v = swapEndian(v);
+        }
     }
     
+    const std::vector<double>& buf = cache.coeffs;
     double mid = buf[0];
     double rad = buf[1];
     
@@ -281,23 +280,23 @@ Eigen::VectorXd SPKReader::evaluateType2(const SPKSegment& seg, double et) {
     double x = (et - mid) / rad;
     
     // Evaluate Chebyshev polynomials
-    int n_coeffs = (seg.rsize - 2) / 3; // Number of coefficients per component
+    int n_coeffs = (seg.rsize - 2) / 3;
     
-    std::vector<double> T(n_coeffs); // Tk(x)
-    std::vector<double> U(n_coeffs); // T'k(x)
-    
-    T[0] = 1.0;
-    T[1] = x;
-    U[0] = 0.0;
-    U[1] = 1.0;
-    
-    for (int k = 2; k < n_coeffs; ++k) {
-        T[k] = 2.0 * x * T[k-1] - T[k-2];
-        U[k] = 2.0 * x * U[k-1] - U[k-2] + 2.0 * T[k-1];
+    if ((int)T_buf_.size() < n_coeffs) {
+        T_buf_.resize(n_coeffs);
+        U_buf_.resize(n_coeffs);
     }
     
-    // Sum coefficients
-    // Layout: [Mid, Rad, X_coeffs..., Y_coeffs..., Z_coeffs...]
+    T_buf_[0] = 1.0;
+    T_buf_[1] = x;
+    U_buf_[0] = 0.0;
+    U_buf_[1] = 1.0;
+    
+    for (int k = 2; k < n_coeffs; ++k) {
+        T_buf_[k] = 2.0 * x * T_buf_[k-1] - T_buf_[k-2];
+        U_buf_[k] = 2.0 * x * U_buf_[k-1] - U_buf_[k-2] + 2.0 * T_buf_[k-1];
+    }
+    
     double pos[3] = {0, 0, 0};
     double vel[3] = {0, 0, 0};
     
@@ -305,20 +304,19 @@ Eigen::VectorXd SPKReader::evaluateType2(const SPKSegment& seg, double et) {
         int offset = 2 + comp * n_coeffs;
         for (int k = 0; k < n_coeffs; ++k) {
             double c = buf[offset + k];
-            pos[comp] += c * T[k];
-            vel[comp] += c * U[k];
+            pos[comp] += c * T_buf_[k];
+            vel[comp] += c * U_buf_[k];
         }
     }
     
-    // Velocity scaling: dx/dt = 1/rad
     for (int i=0; i<3; ++i) vel[i] /= rad;
     
-    Eigen::VectorXd state(6);
+    Eigen::Matrix<double, 6, 1> state;
     state << pos[0], pos[1], pos[2], vel[0], vel[1], vel[2];
     return state;
 }
 
-Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
+Eigen::Matrix<double, 6, 1> SPKReader::evaluateType13(const SPKSegment& seg, double et) {
     // Read Metadata from End
     // Layout: ... [Directory N doubles] [Degree] [N] (Last)
     double meta[2];
@@ -442,7 +440,7 @@ Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
     
     Eigen::Vector3d vel = (dh00 * p1 + dh10 * dt * v1 + dh01 * p2 + dh11 * dt * v2) / dt;
     
-    Eigen::VectorXd res(6);
+    Eigen::Matrix<double, 6, 1> res;
     res << pos, vel;
     return res;
 }
