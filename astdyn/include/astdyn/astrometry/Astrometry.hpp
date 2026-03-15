@@ -40,10 +40,26 @@ public:
         const AstDynConfig& engine_cfg,
         const AstrometricSettings& a_cfg);
 
-    /** @brief Step 2: Annual Stellar Aberration Correction. */
     static Eigen::Vector3d apply_stellar_aberration(
         const Eigen::Vector3d& rho_eq,
         const Eigen::Vector3d& earth_velocity_eq);
+
+    /**
+     * @brief Compute the 1-sigma cross-track uncertainty in the B-plane.
+     * 
+     * @param covariance_eq 6x6 covariance matrix in Equatorial J2000 (km, km/s)
+     * @param rho_eq Vector from observer to body (meters)
+     * @param velocity_eq Velocity of body (m/s)
+     * @param star_ra Star RA
+     * @param star_dec Star Dec
+     * @return 1-sigma cross-track uncertainty in km
+     */
+    static double compute_cross_track_uncertainty(
+        const Eigen::Matrix<double, 6, 6>& covariance_eq,
+        const Eigen::Vector3d& rho_eq,
+        const Eigen::Vector3d& velocity_eq,
+        double star_ra_rad,
+        double star_dec_rad);
 
     /** @brief Step 2b: Gravitational Light Deflection (Sun). */
     static Eigen::Vector3d apply_light_deflection(

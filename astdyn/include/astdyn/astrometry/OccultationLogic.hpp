@@ -169,6 +169,21 @@ public:
         AstDynEngine& engine);
 
     /**
+     * @brief Computes 1-sigma uncertainty parameters for an event.
+     * 
+     * @param params        The parameters to update.
+     * @param covariance_t0 6x6 covariance at the initial epoch t0.
+     * @param initial_state Nominal state at t0.
+     * @param engine        AstDyn engine for STM propagation.
+     */
+    static void apply_uncertainty(
+        OccultationParameters& params,
+        const catalog::Star& star,
+        const Eigen::Matrix<double, 6, 6>& covariance_t0,
+        const physics::CartesianStateTyped<core::GCRF>& initial_state,
+        AstDynEngine& engine);
+
+    /**
      * @brief Convenience overload using SkyCoord.
      */
     template <typename Frame>

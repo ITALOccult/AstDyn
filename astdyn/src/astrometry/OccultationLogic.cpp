@@ -11,6 +11,7 @@
 #include "astdyn/io/SPKReader.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/astrometry/ChebyshevEphemerisManager.hpp"
+#include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
 #include <cmath>
 #include <iostream>
 #include <algorithm>
@@ -108,7 +109,7 @@ OccultationParameters OccultationLogic::compute_parameters(
     
     params.closest_approach_time_offset = time::TimeDuration::from_seconds(t_ca_offset);
     params.time_uncertainty = time::TimeDuration::zero();
-    params.cross_track_uncertainty = physics::Distance::zero();
+    params.cross_track_uncertainty = physics::Distance::from_km(40.0); // Default for visualization
 
     // 5. Central Point & Duration Calculation
     // Sub-asteroid point on Earth (Central Point)
@@ -240,18 +241,20 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
                 }
                 
                 // 2. Compute path parameters at best_jd
-                auto [ra_final, dec_final, dist_final] = segment.evaluate_all(best_jd);
+                // 2. Compute path parameters at best_jd using analytical derivatives
+                auto [pos, vel] = segment.evaluate_full(best_jd);
+                auto [ra_final, dec_final, dist_final] = pos;
+                auto [vra_day, vdec_day, vdist_day] = vel;
                 
-                // Redefine velocities for compute_parameters (numerical derivative)
-                double dt_sec = 1.0;
-                auto [ra2, dec2, dist2] = segment.evaluate_all(best_jd + dt_sec/86400.0);
-                Angle dra_vel = Angle::from_deg(ra2 - ra_final) * (1.0 / dt_sec);
-                Angle ddec_vel = Angle::from_deg(dec2 - dec_final) * (1.0 / dt_sec);
-                
+                std::cout << "[DEBUG] Refined CA | JD: " << best_jd << " | RA: " << ra_final 
+                          << " | Dec: " << dec_final << " | vRA: " << vra_day << " deg/day\n";
+
                 params = compute_parameters(
                     star.ra, star.dec,
                     RightAscension(Angle::from_deg(ra_final)), Declination(Angle::from_deg(dec_final)),
-                    physics::Distance::from_au(dist_final), dra_vel, ddec_vel, physics::Velocity::zero(),
+                    physics::Distance::from_au(dist_final), 
+                    Angle::from_deg(vra_day / 86400.0), Angle::from_deg(vdec_day / 86400.0), 
+                    physics::Velocity::from_au_d(vdist_day),
                     time::EpochTDB::from_jd(best_jd));
             } 
             else {
@@ -410,6 +413,40 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
     return results;
 }
 
+void OccultationLogic::apply_uncertainty(
+    OccultationParameters& params,
+    const catalog::Star& star,
+    const Eigen::Matrix<double, 6, 6>& covariance_t0,
+    const physics::CartesianStateTyped<core::GCRF>& initial_state,
+    AstDynEngine& engine)
+{
+    using namespace orbit_determination;
+    
+    // 1. Setup STM engine
+    StateTransitionMatrix<core::GCRF> stm_engine(engine.propagator());
+    
+    // 2. Compute STM from t0 to TCA
+    auto stm_res = stm_engine.compute(initial_state, params.t_ca);
+    
+    // 3. Map covariance to TCA
+    Eigen::Matrix<double, 6, 6> cov_tca = stm_res.map_covariance(covariance_t0);
+    
+    // 4. Compute cross-track uncertainty in the B-plane
+    auto state_tca = stm_res.final_state;
+    auto earth_tca = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, params.t_ca);
+    Eigen::Vector3d rho_geo = state_tca.position.to_eigen_si() - earth_tca.position.to_eigen_si();
+
+    params.cross_track_uncertainty = physics::Distance::from_km(
+        AstrometryReducer::compute_cross_track_uncertainty(
+            cov_tca, 
+            rho_geo,
+            state_tca.velocity.to_eigen_si(),
+            star.ra.to_rad(), 
+            star.dec.to_rad()
+        )
+    );
+}
+
 std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultations(
     const std::vector<std::string>& asteroid_ids,
     ChebyshevEphemerisManager& manager,
@@ -431,9 +468,9 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
         if (day_jd < t_start_jd - 0.5 || day_jd > t_end_jd + 0.5) continue;
 
         for (const auto& id : asteroid_ids) {
-            if (!manager.has_asteroid(id)) continue;
+            if (!manager.has_body(id)) continue;
             
-            const auto& ephem = manager.get_asteroid(id);
+            const auto& ephem = manager.get_ephemeris(id);
             // Get the segment for this day
             try {
                 auto segment = ephem.get_segment(midnight);
@@ -467,8 +504,8 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
                             RightAscension(Angle::from_deg(std::get<0>(pos_f))),
                             Declination(Angle::from_deg(std::get<1>(pos_f))),
                             physics::Distance::from_au(std::get<2>(pos_f)),
-                            Angle::from_deg(std::get<0>(vel_f)),
-                            Angle::from_deg(std::get<1>(vel_f)),
+                            Angle::from_deg(std::get<0>(vel_f) / 86400.0),
+                            Angle::from_deg(std::get<1>(vel_f) / 86400.0),
                             physics::Velocity::from_au_d(std::get<2>(vel_f)),
                             time::EpochTDB::from_jd(best_jd));
                         

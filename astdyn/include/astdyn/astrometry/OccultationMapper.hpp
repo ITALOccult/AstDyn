@@ -60,7 +60,7 @@ public:
         const Declination& star_dec,
         const physics::Distance& asteroid_diameter,
         const time::EpochUTC& tca_utc,
-        const time::TimeDuration& duration = time::TimeDuration::from_seconds(300.0));
+        const time::TimeDuration& duration = time::TimeDuration::from_seconds(3600.0));
 
     /**
      * @brief Generates an SVG map representation.
@@ -109,6 +109,11 @@ private:
                                      const RightAscension& ra, 
                                      const Declination& dec, 
                                      const time::EpochUTC& t);
+
+    /**
+     * @brief Computes the points of the day/night terminator.
+     */
+    static std::vector<GeoPoint> compute_terminator(const time::EpochTDB& t);
 };
 
 } // namespace astdyn::astrometry

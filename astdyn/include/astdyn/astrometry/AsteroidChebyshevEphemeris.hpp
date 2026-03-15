@@ -9,6 +9,7 @@
 #include "astdyn/catalog/CatalogTypes.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/time/epoch.hpp"
+#include "astdyn/astrometry/IChebyshevEphemeris.hpp"
 #include <vector>
 #include <tuple>
 #include <memory>
@@ -24,7 +25,7 @@ namespace astdyn::astrometry {
  * over a specified time interval, fitting one Chebyshev polynomial per 24-hour period.
  * It provides extremely fast position retrieval compared to direct propagation.
  */
-class AsteroidChebyshevEphemeris {
+class AsteroidChebyshevEphemeris : public IChebyshevEphemeris {
 public:
     /**
      * @brief Construct and pre-calculate ephemeris.
@@ -50,7 +51,7 @@ public:
      * @return Tuple containing {RA [deg], Dec [deg], Distance [AU]}.
      * @throw std::out_of_range if epoch is outside the pre-calculated interval.
      */
-    std::tuple<double, double, double> evaluate(time::EpochTDB epoch) const;
+    std::tuple<double, double, double> evaluate(time::EpochTDB epoch) const override;
 
     /**
      * @brief Evaluate position and velocity (derivatives) at a specific epoch.
@@ -59,27 +60,27 @@ public:
      * @return pair of tuples: (RA deg, Dec deg, Dist AU), (vRA deg/day, vDec deg/day, vDist AU/day)
      */
     std::pair<std::tuple<double, double, double>, std::tuple<double, double, double>> 
-    evaluate_full(time::EpochTDB epoch) const;
+    evaluate_full(time::EpochTDB epoch) const override;
 
     /**
      * @brief Get start epoch of the calculated interval.
      */
-    time::EpochTDB start_epoch() const { return start_epoch_; }
+    time::EpochTDB start_epoch() const override { return start_epoch_; }
 
     /**
      * @brief Get end epoch of the calculated interval.
      */
-    time::EpochTDB end_epoch() const { return end_epoch_; }
+    time::EpochTDB end_epoch() const override { return end_epoch_; }
 
     /**
      * @brief Get number of segments.
      */
-    size_t num_segments() const { return segments_.size(); }
+    size_t num_segments() const override { return segments_.size(); }
 
     /**
      * @brief Get segment containing a specific epoch.
      */
-    const catalog::ChebyshevSegment& get_segment(time::EpochTDB epoch) const;
+    const catalog::ChebyshevSegment& get_segment(time::EpochTDB epoch) const override;
 
 private:
     std::vector<catalog::ChebyshevSegment> segments_;

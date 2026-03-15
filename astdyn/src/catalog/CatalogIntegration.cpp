@@ -239,6 +239,83 @@ ChebyshevSegment fit_chebyshev(
     return seg;
 }
 
+ChebyshevSegment fit_chebyshev_spk(
+    astdyn::io::SPKReader& reader,
+    int            target_id,
+    time::EpochTDB center_epoch,
+    double         duration_days,
+    int            degree)
+{
+    const double t_start = center_epoch.jd() - duration_days / 2.0;
+    const double t_end   = center_epoch.jd() + duration_days / 2.0;
+
+    // Sample the orbit
+    const int N = degree + 5;
+    std::vector<double> jd_samples(N), ra_samples(N), dec_samples(N), dist_samples(N), tau_samples(N);
+
+    // Settings for the reduction
+    astrometry::AstrometricSettings a_settings;
+    a_settings.light_time_correction = true;
+    a_settings.stellar_aberration     = false; 
+    a_settings.frame_conversion_to_equatorial = true;
+
+    for (int i = 0; i < N; ++i) {
+        double tau = -1.0 + 2.0 * i / (N - 1);
+        double jd  = t_start + (tau + 1.0) * (t_end - t_start) / 2.0;
+        time::EpochTDB t_obs = time::EpochTDB::from_jd(jd);
+        double et_obs = (jd - c::JD2000) * 86400.0;
+
+        // 1. Get Earth position at observation time
+        auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_obs);
+        Eigen::Vector3d r_earth = earth_state.position.to_eigen_si() / 1000.0; // km
+
+        // 2. Iterative light-time correction
+        double lt = 0.0;
+        Eigen::Vector3d rho_vec;
+        for (int iter = 0; iter < 5; ++iter) {
+            double et_emit = et_obs - lt;
+            auto s_emit = reader.getState(target_id, et_emit);
+            rho_vec = Eigen::Vector3d(s_emit[0], s_emit[1], s_emit[2]) - r_earth;
+            lt = rho_vec.norm() / (c::C_LIGHT / 1000.0);
+        }
+
+        // 3. Convert to Equatorial J2000 if needed (AstrometryReducer helper)
+        // Note: SPK data is already in J2000 Ecliptic (native for AstDyn) or ICRF?
+        // SPKReader.hpp says Ecliptic J2000 frame.
+        // We need to rotate to Equatorial for catalog matching.
+        
+        // Use the rotation from AstrometryReducer if private access is problematic, 
+        // we can do it manually here.
+        double eps = 23.439291 * c::DEG_TO_RAD;
+        Eigen::Matrix3d rot;
+        rot << 1, 0, 0,
+               0, std::cos(-eps), -std::sin(-eps),
+               0, std::sin(-eps),  std::cos(-eps);
+        
+        Eigen::Vector3d rho_eq = rot * rho_vec;
+        
+        // 4. Final conversion to RA/Dec
+        double r = rho_eq.norm();
+        double ra = std::atan2(rho_eq.y(), rho_eq.x()) * c::RAD_TO_DEG;
+        double dec = std::asin(rho_eq.z() / r) * c::RAD_TO_DEG;
+        if (ra < 0) ra += 360.0;
+
+        jd_samples[i]  = jd;
+        tau_samples[i] = tau;
+        ra_samples[i]  = ra;
+        dec_samples[i] = dec;
+        dist_samples[i] = r / (c::AU / 1000.0);
+    }
+
+    ChebyshevSegment seg;
+    seg.t_start = t_start;
+    seg.t_end   = t_end;
+    seg.ra_coeffs  = cheby_fit(tau_samples, ra_samples, degree);
+    seg.dec_coeffs = cheby_fit(tau_samples, dec_samples, degree);
+    seg.dist_coeffs = cheby_fit(tau_samples, dist_samples, degree);
+    return seg;
+}
+
 std::vector<Star> find_stars_near_segment(
     const GaiaDR3Catalog& catalog,
     const ChebyshevSegment& segment,

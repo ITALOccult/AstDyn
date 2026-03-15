@@ -178,6 +178,50 @@ Eigen::Vector3d AstrometryReducer::apply_stellar_aberration(
     return p_prime * r;
 }
 
+double AstrometryReducer::compute_cross_track_uncertainty(
+    const Eigen::Matrix<double, 6, 6>& covariance_eq,
+    const Eigen::Vector3d& rho_eq,
+    const Eigen::Vector3d& velocity_eq,
+    double star_ra_rad,
+    double star_dec_rad)
+{
+    // 1. Star unit vector (shadow axis)
+    Eigen::Vector3d s_hat(
+        std::cos(star_dec_rad) * std::cos(star_ra_rad),
+        std::cos(star_dec_rad) * std::sin(star_ra_rad),
+        std::sin(star_dec_rad)
+    );
+
+    // 2. Build Fundamental Plane (FP) basis
+    // u = East direction in FP orthogonal to s_hat
+    Eigen::Vector3d u_hat = Eigen::Vector3d(-std::sin(star_ra_rad), std::cos(star_ra_rad), 0.0);
+    // v = North/South direction in FP
+    Eigen::Vector3d v_hat = s_hat.cross(u_hat);
+
+    // 3. Project velocity into FP
+    // Velocity of shadow in FP (assuming Earth center at rest for 1-sigma report)
+    // velocity_eq is m/s, convert to km/s for covariance matching
+    Eigen::Vector3d v_km_s = velocity_eq / 1000.0;
+    double vx = v_km_s.dot(u_hat);
+    double vy = v_km_s.dot(v_hat);
+    
+    // Shadow path direction in FP
+    double v_mag_fp = std::sqrt(vx*vx + vy*vy);
+    Eigen::Vector3d v_path_fp = (vx * u_hat + vy * v_hat) / v_mag_fp;
+    
+    // Perpendicular (cross-track) direction in FP
+    Eigen::Vector3d cross_track_dir = s_hat.cross(v_path_fp).normalized();
+
+    // 4. Project covariance matrix onto the cross-track direction
+    // P_pos = top-left 3x3 of covariance (km^2)
+    Eigen::Matrix3d P_pos = covariance_eq.block<3, 3>(0, 0);
+    
+    // sigma^2 = n^T * P * n
+    double sigma2 = cross_track_dir.transpose() * P_pos * cross_track_dir;
+    
+    return std::sqrt(sigma2);
+}
+
 Eigen::Vector3d AstrometryReducer::apply_light_deflection(
     const Eigen::Vector3d& rho_eq, const Eigen::Vector3d& earth_to_sun_eq) {
     

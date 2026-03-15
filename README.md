@@ -58,19 +58,20 @@ void example() {
 
 ## Tools
 
-### ioccultcalc (Beta 0.2 - Released 2026-03-15 16:10 CET)
+### ioccultcalc (Beta 0.5 - Released 2026-03-16)
 A professional command-line tool for searching and comparing stellar occultations. It retrieves asteroid elements directly from **JPL Horizons** and searches the **Gaia DR3** catalog online.
 
-**New in Beta 0.2:**
-*   **Multi-Asteroid Batch Processing**: Search multiple bodies in a single run.
-*   **Flexible Input**: Supports comma-separated IDs or list files (e.g., `--asteroid @list.txt`).
-*   **Chebyshev Acceleration**: High-performance daily segmented polynomials for ultra-fast discovery over long durations.
-*   **Analytical Derivatives**: Exact shadow velocity and trend calculation via polynomial derivatives.
+**New in Beta 0.5:**
+*   **Regional Search Filter**: Search for occultations passing near your specific location with `--lat` and `--lon`.
+*   **Premium Global Mapping**: High-fidelity **SVG World Maps** and **KML Files**, including detailed coastlines, political boundaries, and major cities.
+*   **1-Sigma Uncertainty Visualization**: Automated rendering of the **1-sigma uncertainty corridor** as a shaded zone on the map (40km default or from `--covariance`).
+*   **Temporal Resolution**: High-resolution time markers (1-minute intervals) with UTC labels along the occultation path.
+*   **Satellite Systems Support**: Native support for searching secondary bodies using external **BSP/SPK ephemerides**.
 
 #### Usage
 ```bash
-# Search for Ceres and Vesta over a 10-day window
-ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0
+# Search for Ceres and Vesta over a 10-day window with map output
+ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0 --svg-output map.svg
 ```
 
 #### Command-line Options
@@ -78,8 +79,9 @@ ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0
 - `--jd-start <val>`: Starting Julian Date (TDB) for the search.
 - `--duration <days>`: Length of the search window in days (default: 1.0).
 - `--mag <val>`: Magnitude limit for star search (default: 15.0).
-- `--xml-output <file>`: Save matches to an Occult4-compatible XML.
+- `--svg-output <file>`: Generate a high-resolution SVG world map.
 - `--kml <file>`: Generate a KML path for Google Earth (first match).
+- `--xml-output <file>`: Save matches to an Occult4-compatible XML.
 
 ---
 
@@ -107,9 +109,8 @@ If you encounter discrepancies or bugs, please open an issue with the relevant i
 
 AstDyn is currently in an active developmental phase. Below is the strategic plan for the IOccultCalc tool and core library:
 
-*   **Beta 0.3 (Current)**: **Binary Systems & Satellites**. Implementation of BSP/SPK native readers to support hierarchical multi-body occultation discovery (e.g., Sylvia, Kalliope).
-*   **Beta 0.4**: **Uncertainty Analysis**. Integration of orbital covariance matrices and Monte Carlo "clone" propagation for probabilistic shadow track calculation.
-*   **Beta 0.5**: **Visualization**. Automatic generation of SVG/PDF maps and enhanced KML exports for ground observers.
+*   **Beta 0.5 (Current)**: **Advanced Visualization**. High-fidelity SVG mapping, political boundaries, and 1-sigma uncertainty corridor visualization. 
+*   **Beta 0.6**: **Multi-Body Dynamics**. Support for hierarchical asteroid systems and moon-satellite occultation discovery.
 *   **v1.0 RC**: **Validation**. Final stress tests against NASA/JPL reference standards and full technical documentation release.
 
 See the detailed [Development Plan](file:///Users/michelebigi/.gemini/antigravity/brain/ca66ea00-11d5-4584-b8f8-9d341f9a1847/development_plan.md) for more information.

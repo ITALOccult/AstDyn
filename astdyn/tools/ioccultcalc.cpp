@@ -8,6 +8,8 @@
 #include "astdyn/ephemeris/DE441Provider.hpp"
 #include "astdyn/astrometry/OccultationEvent.hpp"
 #include "astdyn/astrometry/ChebyshevEphemerisManager.hpp"
+#include "astdyn/io/CovarianceIO.hpp"
+#include "astdyn/math/MultivariateSampler.hpp"
 
 #include <boost/program_options.hpp>
 #include <iostream>
@@ -107,7 +109,15 @@ int main(int argc, char** argv) {
         ("duration", po::value<double>()->default_value(1.0), "search duration in days")
         ("mag", po::value<double>()->default_value(15.0), "magnitude limit for stars")
         ("xml-output", po::value<std::string>(), "save found occultations to XML")
+        ("svg-output", po::value<std::string>(), "save world map with paths to SVG")
         ("kml", po::value<std::string>(), "save first match to KML")
+        ("lat", po::value<double>(), "observer latitude (degrees) for regional search")
+        ("lon", po::value<double>(), "observer longitude (degrees) for regional search")
+        ("alt", po::value<double>()->default_value(0.0), "observer altitude (meters)")
+        ("bsp", po::value<std::string>(), "path to satellite ephemeris file (BSP)")
+        ("system-ids", po::value<std::string>(), "comma-separated NAIF IDs for system bodies (e.g. 100,201)")
+        ("covariance,c", po::value<std::string>(), "path to orbital covariance file (.cor or .csv)")
+        ("clones,n", po::value<int>()->default_value(0), "number of Monte Carlo clones to generate")
     ;
 
     po::variables_map vm;
@@ -148,9 +158,12 @@ int main(int argc, char** argv) {
 
     ChebyshevEphemerisManager manager(engine.config());
     HorizonsClient horizons;
+    std::map<std::string, physics::CartesianStateTyped<core::GCRF>> stored_states;
     std::map<std::string, physics::KeplerianStateTyped<core::ECLIPJ2000>> stored_elements;
     std::map<std::string, std::pair<double, double>> stored_props; // {H, D}
+    std::unique_ptr<io::SPKReader> system_reader;
 
+    // --- 2a. Load Primary Asteroids ---
     std::cout << "[ioccultcalc] Pre-calculating polynomials for " << asteroid_ids.size() << " bodies over " << duration << " days...\n";
     for (const auto& id : asteroid_ids) {
         auto state_vec = horizons.query_vectors(id, start_epoch);
@@ -158,6 +171,7 @@ int main(int argc, char** argv) {
             auto elements = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(state_vec->cast_frame<core::ECLIPJ2000>());
             manager.add_asteroid(id, elements, start_epoch, end_epoch);
             stored_elements[id] = elements;
+            stored_states[id] = state_vec->cast_frame<core::GCRF>();
             
             auto props = horizons.query_physical_properties(id);
             if (props) {
@@ -168,10 +182,67 @@ int main(int argc, char** argv) {
         }
     }
 
+    // --- 2b. Load System/Satellite Bodies from BSP ---
+    if (vm.count("bsp") && vm.count("system-ids")) {
+        std::string bsp_lib = vm["bsp"].as<std::string>();
+        std::vector<std::string> system_ids = parse_asteroid_list(vm["system-ids"].as<std::string>());
+        std::cout << "[ioccultcalc] Adding " << system_ids.size() << " bodies from BSP: " << bsp_lib << "\n";
+        
+        system_reader = std::make_unique<io::SPKReader>(bsp_lib);
+        for (const auto& id_str : system_ids) {
+            int naif_id = std::stoi(id_str);
+            manager.add_system_body(id_str, naif_id, *system_reader, start_epoch, end_epoch);
+            asteroid_ids.push_back(id_str); // Add to search list
+            stored_props[id_str] = {15.0, 10.0}; // Default for satellites (H, D)
+            
+            // Note: Covariance application for SPK bodies is complex, skipping for now
+        }
+    }
+
     // --- 3. Global Search ---
     double mag_limit = vm["mag"].as<double>();
     std::cout << "[ioccultcalc] Searching occultations..." << std::endl;
     auto results = OccultationLogic::find_multi_asteroid_occultations(asteroid_ids, manager, start_epoch, end_epoch, mag_limit, engine);
+    
+    // --- 3b. Apply Uncertainty (if requested) ---
+    if (vm.count("covariance") && !results.empty()) {
+        try {
+            astdyn::Matrix6d cov_t0 = CovarianceIO::read_file(vm["covariance"].as<std::string>());
+            std::cout << "[ioccultcalc] Applying 1-sigma uncertainty analysis...\n";
+            for (auto& res : results) {
+                if (stored_states.count(res.asteroid_id)) {
+                    OccultationLogic::apply_uncertainty(res.params, res.star, cov_t0, stored_states[res.asteroid_id], engine);
+                }
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[ioccultcalc] Warning: Failed to apply uncertainty: " << e.what() << "\n";
+        }
+    }
+
+    // --- 3c. Regional Filter ---
+    if (vm.count("lat") && vm.count("lon") && !results.empty()) {
+        double obs_lat = vm["lat"].as<double>();
+        double obs_lon = vm["lon"].as<double>();
+        std::cout << "[ioccultcalc] Filtering for observer at Lat: " << obs_lat << ", Lon: " << obs_lon << "...\n";
+        
+        std::vector<OccultationCandidate> filtered;
+        for (const auto& res : results) {
+            // Simple distance check from sub-asteroid point at TCA
+            double d_lat = res.params.center_lat.to_deg() - obs_lat;
+            double d_lon = res.params.center_lon.to_deg() - obs_lon;
+            while (d_lon > 180.0) d_lon -= 360.0;
+            while (d_lon < -180.0) d_lon += 360.0;
+            
+            double dist_deg = std::sqrt(d_lat*d_lat + d_lon*d_lon);
+            // If distance < 20 deg (very broad) let's check properly
+            if (dist_deg < 25.0) {
+                filtered.push_back(res);
+            }
+        }
+        std::cout << "[ioccultcalc] " << filtered.size() << " match(es) for this location.\n";
+        results = filtered;
+    }
+
     std::cout << "[ioccultcalc] Total: " << results.size() << " event(s) found.\n";
 
     // --- 4. Outputs ---
@@ -180,7 +251,41 @@ int main(int argc, char** argv) {
         for (const auto& res : results) {
             std::cout << " Body: " << std::setw(10) << res.asteroid_id 
                       << " | Star: " << std::setw(20) << res.params.star_id 
-                      << " | TCA: " << std::fixed << std::setprecision(5) << res.params.t_ca.mjd() << "\n";
+                      << " | TCA: " << std::fixed << std::setprecision(5) << res.params.t_ca.mjd();
+            if (res.params.cross_track_uncertainty.to_km() > 0.1 && vm.count("covariance")) {
+                std::cout << " | 1-sigma: " << std::fixed << std::setprecision(1) << res.params.cross_track_uncertainty.to_km() << " km";
+            }
+            std::cout << "\n";
+        }
+    }
+
+    // Mapping
+    if (!results.empty()) {
+        std::vector<OccultationPath> paths;
+        std::vector<std::string> labels;
+        std::vector<std::string> colors = {"#ef4444", "#3b82f6", "#22c55e", "#eab308", "#8b5cf6"};
+
+        for (const auto& res : results) {
+            double diam = 100.0; // Default
+            auto it = stored_props.find(res.asteroid_id);
+            if (it != stored_props.end()) diam = it->second.second;
+            
+            // Convert EpochTDB to EpochUTC for mapper (simplified TDB-UTC ~ 69s)
+            time::EpochUTC tca_utc = time::EpochUTC::from_mjd(res.params.t_ca.mjd() - 69.184 / 86400.0);
+            
+            auto path = OccultationMapper::compute_path(res.params, res.star.ra, res.star.dec, physics::Distance::from_km(diam), tca_utc);
+            paths.push_back(path);
+            labels.push_back(res.asteroid_id + " - " + std::to_string(res.star.source_id));
+        }
+
+        if (vm.count("kml")) {
+            OccultationMapper::export_kml(paths, labels, vm["kml"].as<std::string>());
+            std::cout << "[ioccultcalc] Exported KML to: " << vm["kml"].as<std::string>() << "\n";
+        }
+        
+        if (vm.count("svg-output")) {
+            OccultationMapper::export_global_svg(paths, labels, colors, vm["svg-output"].as<std::string>());
+            std::cout << "[ioccultcalc] Exported Global SVG to: " << vm["svg-output"].as<std::string>() << "\n";
         }
     }
 
@@ -190,13 +295,17 @@ int main(int argc, char** argv) {
             auto cand = res;
             auto prop_it = stored_props.find(res.asteroid_id);
             if (prop_it != stored_props.end()) {
-                cand.params.star_mag = prop_it->second.first; // Using field as placeholder for body mag
-                cand.params.cross_track_uncertainty = physics::Distance::from_km(prop_it->second.second);
+                cand.params.star_mag = prop_it->second.first;
+                // cross_track in cand.params is already set by apply_uncertainty if covariance was provided
             }
             
             auto it = stored_elements.find(res.asteroid_id);
             if (it != stored_elements.end()) {
                  out_events.push_back(candidate_to_event(cand, res.asteroid_id, it->second));
+            } else {
+                 physics::KeplerianStateTyped<core::ECLIPJ2000> dummy;
+                 dummy.epoch = start_epoch;
+                 out_events.push_back(candidate_to_event(cand, res.asteroid_id, dummy));
             }
         }
         OccultationXMLIO::write_file(out_events, vm["xml-output"].as<std::string>());

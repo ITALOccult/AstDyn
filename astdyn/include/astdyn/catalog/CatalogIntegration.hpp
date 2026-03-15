@@ -19,6 +19,7 @@
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/astrometry/sky_types.hpp"
 #include "astdyn/time/epoch.hpp"
+#include "astdyn/io/SPKReader.hpp"
 #include "src/core/frame_tags.hpp"
 #include <vector>
 
@@ -140,6 +141,24 @@ namespace astdyn::catalog {
     time::EpochTDB center_epoch,
     double         duration_days,
     const astdyn::AstDynConfig& cfg,
+    int            degree = 12
+);
+
+/**
+ * @brief Generate a Chebyshev polynomial approximation for an SPK-based body.
+ * 
+ * @param reader         Initialized SPKReader.
+ * @param target_id      NAIF ID of the body.
+ * @param center_epoch   Target epoch for the center of the segment (TDB).
+ * @param duration_days  Total time window duration [days].
+ * @param degree         Chebyshev polynomial degree (default: 12).
+ * @return Chebyshev coefficients for geocentric RA, Dec and Distance.
+ */
+[[nodiscard]] ChebyshevSegment fit_chebyshev_spk(
+    astdyn::io::SPKReader& reader,
+    int            target_id,
+    time::EpochTDB center_epoch,
+    double         duration_days,
     int            degree = 12
 );
 

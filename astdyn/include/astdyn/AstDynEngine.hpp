@@ -237,6 +237,11 @@ public:
     void set_verbose(bool verbose) {
         config_.verbose = verbose;
     }
+
+    /**
+     * @brief Get the internal propagator used by the engine.
+     */
+    std::shared_ptr<propagation::Propagator> propagator() const { return propagator_; }
     
     // ========================================================================
     // Statistics and Diagnostics
