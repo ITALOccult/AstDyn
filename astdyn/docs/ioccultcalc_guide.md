@@ -9,20 +9,21 @@
 To run a basic search with the internal high-precision defaults:
 
 ```bash
-ioccultcalc --asteroid 50936 --jd 2461112.5 --mag 15.0
+# Search for Ceres and Vesta over 5 days starting from JD 2461112.5
+ioccultcalc --asteroid 1,4 --jd-start 2461112.5 --duration 5.0 --mag 15.0
 ```
 
 ### Command Line Arguments
 
 | Argument | Description |
 | :--- | :--- |
-| `--asteroid <id>` | JPL Target ID (e.g., `1` for Ceres, `50936` for Nireus). |
-| `--jd <value>` | Julian Date for the center of the search window. |
+| `--asteroid <list|@f>` | JPL Target ID(s) or file (e.g., `1,4` or `@target_list.txt`). |
+| `--jd-start <value>` | Start Julian Date (TDB) for the search window. |
+| `--duration <days>` | Duration of the search in days (Default: 1.0). |
 | `--mag <limit>` | Magnitude limit for the Gaia DR3 query (Default: 15.0). |
 | `--conf <file>` | Path to a custom JSON configuration file. |
 | `--xml-output <f>` | Save found events to an Occult-compatible XML file. |
 | `--kml <file>` | Export the ground track of the first event to Google Earth. |
-| `--xml-check <f>` | Compare results against a reference Occult4 XML file. |
 
 ---
 
@@ -61,11 +62,11 @@ ioccultcalc --conf ioccultcalc_precision.json --asteroid 50936 --jd 2461112.5
 
 When you run `ioccultcalc`, the engine performs the following steps:
 
-1.  **Element Retrieval**: Fetches the state of the asteroid from **JPL Horizons** for the exact epoch.
-2.  **Corridor Scan**: Computes the asteroid's apparent path over a 24-hour window using a high-degree Chebyshev fit.
-3.  **Gaia Query**: Downloads all stars (DR3) within a **10 arcminute** corridor of the path.
-4.  **Refinement**: For each candidate, it performs a numerical refinement of the **Closest Approach (CA)**.
-5.  **Filtering**: Events are reported if the **Impact Parameter** is less than **100,000 km** (approx. 15 Earth radii).
+1.  **Preparation**: Fetches orbital states from **JPL Horizons** for all listed asteroids.
+2.  **Chebyshev Pre-calculation**: Fits high-degree polynomials for each body across the entire search window (optimized for duration).
+3.  **Corridor Scan**: Iterates daily through the window, searching for stars (DR3) within a **10 arcminute** corridor for each asteroid.
+4.  **Refinement**: For every candidate impact, it performs analytical refinement of the **Closest Approach (CA)** using polynomial derivatives.
+5.  **Filtering**: Events are reported if the **Impact Parameter** is within the discovery threshold (Default: 50,000 km).
 
 ---
 

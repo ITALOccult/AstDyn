@@ -16,9 +16,8 @@
 
 ## Documentation
 
-Full scientific and technical documentation is available in the `astdyn/docs` directory:
+Full technical documentation is available in the `astdyn/docs` directory:
 
-*   **[Scientific Paper (RASTI Submission)](astdyn/docs/AstDyn_RASTI_Paper.pdf)**: Detailed methodology, algorithms, and validation results.
 *   **[User Manual](astdyn/docs/AstDyn_User_Manual.pdf)**: Comprehensive guide to the API, installation, and theoretical background.
 
 ## Quick Start
@@ -59,22 +58,28 @@ void example() {
 
 ## Tools
 
-### ioccultcalc
+### ioccultcalc (v2.0 - Released 2026-03-15 16:10 CET)
 A professional command-line tool for searching and comparing stellar occultations. It retrieves asteroid elements directly from **JPL Horizons** and searches the **Gaia DR3** catalog online.
 
+**New in v2.0:**
+*   **Multi-Asteroid Batch Processing**: Search multiple bodies in a single run.
+*   **Flexible Input**: Supports comma-separated IDs or list files (e.g., `--asteroid @list.txt`).
+*   **Chebyshev Acceleration**: High-performance daily segmented polynomials for ultra-fast discovery over long durations.
+*   **Analytical Derivatives**: Exact shadow velocity and trend calculation via polynomial derivatives.
+
 #### Usage
-Run the tool directly from the command line:
 ```bash
-ioccultcalc --asteroid 704 --jd 2461131.61 --mag 15.0
+# Search for Ceres and Vesta over a 10-day window
+ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0
 ```
 
 #### Command-line Options
-- `--asteroid <num>`: Asteroid number or designation.
-- `--jd <val>`: Julian Date (TDB) for the search.
+- `--asteroid <list|@file>`: Comma-separated designations or a file path (prefixed with `@`).
+- `--jd-start <val>`: Starting Julian Date (TDB) for the search.
+- `--duration <days>`: Length of the search window in days (default: 1.0).
 - `--mag <val>`: Magnitude limit for star search (default: 15.0).
 - `--xml-output <file>`: Save matches to an Occult4-compatible XML.
 - `--kml <file>`: Generate a KML path for Google Earth (first match).
-- `--xml-check <file>`: Compare results against a reference XML.
 
 ---
 

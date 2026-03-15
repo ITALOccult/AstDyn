@@ -12,19 +12,17 @@ AstDyn C++ is a complete rewrite of the original Fortran 90 AstDyn software, bri
 
 ### Features
 
-- ✅ **Phase 1 Complete** (Setup & Infrastructure)
+- ✅ **Phase 1-6 Complete** (Infrastructure, Math, Ephemeris, Propagation)
   - Modern CMake build system
-  - Eigen3 for linear algebra
-  - Boost for utilities
-  - Google Test framework
-  - Core types and constants
+  - High-precision N-body propagation (AAS/RKF78)
+  - JPL DE441 integration via native C++ reader
+  - Chebyshev polynomial ephemeris system
+  - Gaia DR3 online catalog integration
 
-- 🚧 **In Development**
-  - Time scale conversions
-  - JPL ephemeris integration
-  - Orbit propagation
-  - Least squares fitting
-  - Observation handling
+- 🚧 **In Development / Optimization**
+  - Advanced Orbit Determination (Least Squares)
+  - Multi-body system propagation (Satellites)
+  - Multi-asteroid batch occultation discovery (ioccultcalc v2.0)
 
 ## 🛠️ Requirements
 
