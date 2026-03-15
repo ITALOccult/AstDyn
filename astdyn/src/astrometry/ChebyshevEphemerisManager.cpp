@@ -33,4 +33,12 @@ ChebyshevEphemerisManager::evaluate_full(const std::string& id, time::EpochTDB t
     return it->second->evaluate_full(t);
 }
 
+const AsteroidChebyshevEphemeris& ChebyshevEphemerisManager::get_asteroid(const std::string& id) const {
+    auto it = ephemerides_.find(id);
+    if (it == ephemerides_.end()) {
+        throw std::out_of_range("Asteroid " + id + " not managed");
+    }
+    return *(it->second);
+}
+
 } // namespace astdyn::astrometry

@@ -79,4 +79,14 @@ AsteroidChebyshevEphemeris::evaluate_full(time::EpochTDB epoch) const {
     return segments_[index].evaluate_full(jd);
 }
 
+const catalog::ChebyshevSegment& AsteroidChebyshevEphemeris::get_segment(time::EpochTDB epoch) const {
+    double jd = epoch.jd();
+    if (jd < jd_start_ || jd > jd_end_) {
+        throw std::out_of_range("AsteroidChebyshevEphemeris: requested epoch out of range");
+    }
+    size_t index = static_cast<size_t>(std::floor(jd - jd_start_));
+    if (index >= segments_.size()) index = segments_.size() - 1;
+    return segments_[index];
+}
+
 } // namespace astdyn::astrometry

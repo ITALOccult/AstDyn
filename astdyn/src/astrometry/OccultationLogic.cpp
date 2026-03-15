@@ -10,6 +10,7 @@
 #include "astdyn/astrometry/Astrometry.hpp"
 #include "astdyn/io/SPKReader.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/astrometry/ChebyshevEphemerisManager.hpp"
 #include <cmath>
 #include <iostream>
 #include <algorithm>
@@ -291,7 +292,11 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
             if (params.impact_parameter.to_km() < 100000.0) {
                 params.star_id = std::to_string(star.source_id);
                 params.star_mag = star.g_mag;
-                results.push_back({star, params});
+                OccultationCandidate cand;
+                cand.asteroid_id = asteroid_id;
+                cand.star = star;
+                cand.params = params;
+                results.push_back(cand);
             }
         }
     }
@@ -399,6 +404,87 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
             
             if (!system_res.bodies.empty()) {
                 results.push_back(system_res);
+            }
+        }
+    }
+    return results;
+}
+
+std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultations(
+    const std::vector<std::string>& asteroid_ids,
+    ChebyshevEphemerisManager& manager,
+    time::EpochTDB start,
+    time::EpochTDB end,
+    double max_mag,
+    AstDynEngine& engine)
+{
+    using namespace catalog;
+    std::vector<OccultationCandidate> results;
+    auto& catalog_inst = GaiaDR3Catalog::instance();
+
+    double t_start_jd = start.jd();
+    double t_end_jd = end.jd();
+
+    // Iterate through days
+    for (double day_jd = std::floor(t_start_jd - 0.5) + 0.5; day_jd <= t_end_jd + 0.5; day_jd += 1.0) {
+        time::EpochTDB midnight = time::EpochTDB::from_jd(day_jd);
+        if (day_jd < t_start_jd - 0.5 || day_jd > t_end_jd + 0.5) continue;
+
+        for (const auto& id : asteroid_ids) {
+            if (!manager.has_asteroid(id)) continue;
+            
+            const auto& ephem = manager.get_asteroid(id);
+            // Get the segment for this day
+            try {
+                auto segment = ephem.get_segment(midnight);
+                
+                // Query stars in the daily corridor for this asteroid
+                auto stars = find_stars_near_segment(catalog_inst, segment, Angle::from_arcsec(600.0), max_mag);
+                
+                for (const auto& star : stars) {
+                    // Refine each candidate
+                    double best_jd = day_jd;
+                    double min_dist_deg2 = 1e18;
+                    
+                    // 1. Coarse search
+                    for (double offset = -0.5; offset <= 0.5; offset += 10.0/86400.0) {
+                        double t = day_jd + offset;
+                        if (t < t_start_jd || t > t_end_jd) continue;
+                        auto [pos, vel] = segment.evaluate_full(t);
+                        double dra = (star.ra.to_deg() - std::get<0>(pos)) * std::cos(std::get<1>(pos) * M_PI / 180.0);
+                        double ddec = star.dec.to_deg() - std::get<1>(pos);
+                        if (dra*dra + ddec*ddec < min_dist_deg2) {
+                            min_dist_deg2 = dra*dra + ddec*ddec;
+                            best_jd = t;
+                        }
+                    }
+                    
+                    if (min_dist_deg2 < 0.01) { // within 0.1 deg
+                        // 2. Compute final parameters
+                        auto [pos_f, vel_f] = segment.evaluate_full(best_jd);
+                        auto params = compute_parameters(
+                            star.ra, star.dec,
+                            RightAscension(Angle::from_deg(std::get<0>(pos_f))),
+                            Declination(Angle::from_deg(std::get<1>(pos_f))),
+                            physics::Distance::from_au(std::get<2>(pos_f)),
+                            Angle::from_deg(std::get<0>(vel_f)),
+                            Angle::from_deg(std::get<1>(vel_f)),
+                            physics::Velocity::from_au_d(std::get<2>(vel_f)),
+                            time::EpochTDB::from_jd(best_jd));
+                        
+                        if (params.impact_parameter.to_km() < 50000.0) {
+                            params.star_id = std::to_string(star.source_id);
+                            params.star_mag = star.g_mag;
+                            OccultationCandidate cand;
+                            cand.asteroid_id = id;
+                            cand.star = star;
+                            cand.params = params;
+                            results.push_back(cand);
+                        }
+                    }
+                }
+            } catch (...) {
+                continue;
             }
         }
     }

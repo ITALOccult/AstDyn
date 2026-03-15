@@ -68,6 +68,11 @@ public:
      */
     size_t size() const { return ephemerides_.size(); }
 
+    /**
+     * @brief Get underlying ephemeris for an asteroid.
+     */
+    const AsteroidChebyshevEphemeris& get_asteroid(const std::string& id) const;
+
 private:
     const AstDynConfig& config_;
     std::map<std::string, std::unique_ptr<AsteroidChebyshevEphemeris>> ephemerides_;

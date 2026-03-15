@@ -76,6 +76,11 @@ public:
      */
     size_t num_segments() const { return segments_.size(); }
 
+    /**
+     * @brief Get segment containing a specific epoch.
+     */
+    const catalog::ChebyshevSegment& get_segment(time::EpochTDB epoch) const;
+
 private:
     std::vector<catalog::ChebyshevSegment> segments_;
     time::EpochTDB start_epoch_;

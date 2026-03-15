@@ -78,6 +78,7 @@ struct OccultationSystemCandidate {
  * @brief Result of a discovery/refinement run.
  */
 struct OccultationCandidate {
+    std::string asteroid_id;
     catalog::Star star;
     OccultationParameters params;
 };
@@ -143,6 +144,25 @@ public:
     static std::vector<OccultationSystemCandidate> find_system_occultations(
         const std::vector<std::string>& body_ids,
         const std::string& bsp_path,
+        time::EpochTDB start,
+        time::EpochTDB end,
+        double max_mag,
+        AstDynEngine& engine);
+
+    /**
+     * @brief Search for occultations for multiple asteroids using pre-calculated polynomials.
+     * 
+     * @param asteroid_ids List of asteroid designations to search.
+     * @param manager      Pre-filled manager containing AsteroidChebyshevEphemeris for each ID.
+     * @param start        Search window start.
+     * @param end          Search window end.
+     * @param max_mag      Stellar magnitude limit.
+     * @param engine       AstDyn engine.
+     * @return List of verified occultations.
+     */
+    static std::vector<OccultationCandidate> find_multi_asteroid_occultations(
+        const std::vector<std::string>& asteroid_ids,
+        class ChebyshevEphemerisManager& manager,
         time::EpochTDB start,
         time::EpochTDB end,
         double max_mag,
