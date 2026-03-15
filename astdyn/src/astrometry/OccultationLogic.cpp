@@ -295,11 +295,7 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
             }
         }
     }
-    // The instruction implies an XML tag, but no 'ss' stream or XML generation is present in this file.
-    // Assuming the user intended this for a different part of the code or it's a placeholder.
-    // If this was meant to be inserted, it would cause a compilation error here.
-    // ss << ","; // Trailing comma for Occult4 compatibility
-    // ss << "</Errors>\n";
+    return results;
 }
 
 std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultations(
