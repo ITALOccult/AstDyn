@@ -35,8 +35,11 @@ struct OccultationEvent {
     double ra_cat_h;      // RA at catalog epoch (hours)
     double dec_cat_deg;   // Dec at catalog epoch (degrees)
     double mag_v, mag_r, mag_k; // Magnitudes
-    double ra_event_h;    // RA at event epoch (hours)
-    double dec_event_deg; // Dec at event epoch (degrees)
+    double pm_ra_as_yr = 0.0;   // Proper motion in RA (arcsec/yr)
+    double pm_dec_as_yr = 0.0;  // Proper motion in Dec (arcsec/yr)
+    double parallax_as = 0.0;   // Parallax (arcsec)
+    double ra_event_h;          // RA at event epoch (hours)
+    double dec_event_deg;       // Dec at event epoch (degrees)
     std::vector<double> star_extra_data; // Remaining values in <Star>
 
     // --- Object (Asteroid Properties) ---
@@ -45,12 +48,13 @@ struct OccultationEvent {
     double h_mag;
     double diameter_km;
     double apparent_rate_arcsec_hr;
-    std::string object_type; // e.g., "Asteroid"
+    double g_param = 0.15;      // Slope parameter
+    std::string object_type;    // e.g., "Asteroid"
     std::vector<double> object_extra_data; // Remaining values in <Object>
 
     // --- Orbit (Keplerian Elements) ---
-    double orbit_type; // First value (often 0)
-    double ra_node_approx; // Second value
+    double orbit_type = 0; // First value (often 0)
+    double ra_node_approx; // Second value (sometimes Omega)
     int epoch_year, epoch_month, epoch_day;
     double mean_anomaly_deg;
     double node_deg;
@@ -61,6 +65,10 @@ struct OccultationEvent {
 
     // --- Errors (Uncertainty) ---
     double combined_error_arcsec;
+    double star_error_ra_as = 0.0; // Uncertainty in star RA (arcsec)
+    double star_error_dec_as = 0.0; // Uncertainty in star Dec (arcsec)
+    double object_error_ra_as = 0.0; // Uncertainty in asteroid RA (arcsec)
+    double object_error_dec_as = 0.0; // Uncertainty in asteroid Dec (arcsec)
     std::string uncertainty_method; // e.g., "Star+JplPeakEphemUncert"
     std::vector<double> error_extra_data; // Remaining numeric values in <Errors>
 

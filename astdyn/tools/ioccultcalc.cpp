@@ -34,30 +34,42 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.event_id = cand.params.star_id + "_" + std::to_string((int)cand.params.t_ca.mjd());
     ev.mjd = cand.params.t_ca.mjd();
     
-    // Star data
+    // Star data (Gaia DR3)
     ev.star_catalog_id = cand.params.star_id;
     ev.ra_event_h = cand.star.ra.to_deg() / 15.0;
     ev.dec_event_deg = cand.star.dec.to_deg();
-    ev.mag_v = cand.star.g_mag;
-    ev.mag_r = cand.star.g_mag; // Placeholder
-    ev.mag_k = cand.star.g_mag; // Placeholder
+    
+    // Catalog epoch data (Gaia is J2016.0)
     ev.ra_cat_h = ev.ra_event_h; 
     ev.dec_cat_deg = ev.dec_event_deg;
+    ev.pm_ra_as_yr = cand.star.pm_ra_cosdec.to_arcsec_yr(); 
+    ev.pm_dec_as_yr = cand.star.pm_dec.to_arcsec_yr();
+    ev.parallax_as = cand.star.parallax.to_arcsec();
+    
+    ev.mag_v = cand.star.g_mag;
+    ev.mag_r = cand.star.rp_mag; // Better mapping from Gaia RP
+    ev.mag_k = cand.star.g_mag;  // Placeholder
     
     // Object data
     ev.object_name = ast_id;
     try { ev.object_number = std::stoi(ast_id); } catch(...) { ev.object_number = 0; }
     ev.object_type = "Asteroid";
     ev.diameter_km = cand.params.cross_track_uncertainty.to_km(); 
-    ev.h_mag = cand.params.star_mag; 
+    ev.h_mag = cand.params.star_mag; // reused for H
     ev.apparent_rate_arcsec_hr = cand.params.total_apparent_rate;
     
     // Geometry
     ev.longitude_deg = cand.params.center_lon.to_deg();
     ev.latitude_deg = cand.params.center_lat.to_deg();
+    ev.alt_or_other = 0.0; // Central line distance placeholder
     ev.max_duration_sec = cand.params.max_duration.to_seconds();
     ev.is_daylight = cand.params.is_daylight;
-    ev.combined_error_arcsec = cand.params.impact_parameter.to_km(); 
+    
+    // Errors
+    ev.combined_error_arcsec = cand.params.impact_parameter.to_km() / 150000000.0 * 206265.0; // very rough arcsec impact
+    ev.star_error_ra_as = cand.star.pmra_error_mas_yr / 1000.0;
+    ev.star_error_dec_as = cand.star.pmdec_error_mas_yr / 1000.0;
+    ev.uncertainty_method = "AstDyn-GaiaDR3-JplDE441";
     
     // Orbit elements mapping
     ev.semi_major_axis_au = el.a.to_au();

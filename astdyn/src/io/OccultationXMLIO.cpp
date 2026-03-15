@@ -85,11 +85,17 @@ OccultationEvent OccultationXMLIO::parse_event_node(const std::string& event_xml
             event.mag_v = std::stod(star_parts[3]);
             event.mag_r = std::stod(star_parts[4]);
             event.mag_k = std::stod(star_parts[5]);
-            event.ra_event_h = std::stod(star_parts[9]);
-            event.dec_event_deg = std::stod(star_parts[10]);
-            for (size_t i = 11; i < star_parts.size(); ++i) {
-                if (!star_parts[i].empty())
-                    event.star_extra_data.push_back(std::stod(star_parts[i]));
+            if (star_parts.size() > 6) event.pm_ra_as_yr = std::stod(star_parts[6]);
+            if (star_parts.size() > 7) event.pm_dec_as_yr = std::stod(star_parts[7]);
+            if (star_parts.size() > 8 && !star_parts[8].empty()) event.parallax_as = std::stod(star_parts[8]);
+            
+            if (star_parts.size() >= 11) {
+                event.ra_event_h = std::stod(star_parts[9]);
+                event.dec_event_deg = std::stod(star_parts[10]);
+                for (size_t i = 11; i < star_parts.size(); ++i) {
+                    if (!star_parts[i].empty())
+                        event.star_extra_data.push_back(std::stod(star_parts[i]));
+                }
             }
         } catch(...) {}
     }
@@ -104,10 +110,14 @@ OccultationEvent OccultationXMLIO::parse_event_node(const std::string& event_xml
             event.h_mag = std::stod(object_parts[2]);
             event.diameter_km = std::stod(object_parts[3]);
             event.apparent_rate_arcsec_hr = std::stod(object_parts[4]);
-            event.object_type = object_parts[9];
-            for (size_t i = 10; i < object_parts.size(); ++i) {
-                 if (object_parts[i].empty()) continue;
-                 event.object_extra_data.push_back(std::stod(object_parts[i]));
+            if (object_parts.size() > 5 && !object_parts[5].empty()) event.g_param = std::stod(object_parts[5]);
+            
+            if (object_parts.size() >= 10) {
+                event.object_type = object_parts[9];
+                for (size_t i = 10; i < object_parts.size(); ++i) {
+                     if (object_parts[i].empty()) continue;
+                     event.object_extra_data.push_back(std::stod(object_parts[i]));
+                }
             }
         } catch(...) {}
     }
@@ -140,9 +150,14 @@ OccultationEvent OccultationXMLIO::parse_event_node(const std::string& event_xml
     if (errors_parts.size() >= 6) {
         try {
             event.combined_error_arcsec = std::stod(errors_parts[0]);
-            event.uncertainty_method = errors_parts[5];
-            for (size_t i = 1; i < errors_parts.size(); ++i) {
-                if (i == 5) continue;
+            if (errors_parts.size() > 1 && !errors_parts[1].empty()) event.star_error_ra_as = std::stod(errors_parts[1]);
+            if (errors_parts.size() > 2 && !errors_parts[2].empty()) event.star_error_dec_as = std::stod(errors_parts[2]);
+            if (errors_parts.size() > 3 && !errors_parts[3].empty()) event.object_error_ra_as = std::stod(errors_parts[3]);
+            if (errors_parts.size() > 4 && !errors_parts[4].empty()) event.object_error_dec_as = std::stod(errors_parts[4]);
+            
+            if (errors_parts.size() > 5) event.uncertainty_method = errors_parts[5];
+            
+            for (size_t i = 6; i < errors_parts.size(); ++i) {
                 if (!errors_parts[i].empty())
                     event.error_extra_data.push_back(std::stod(errors_parts[i]));
             }
@@ -177,6 +192,7 @@ std::vector<std::string> OccultationXMLIO::split_csv(const std::string& csv) {
 
 std::string OccultationXMLIO::write_string(const std::vector<OccultationEvent>& events) {
     std::stringstream ss;
+    ss << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
     ss << "<Occultations>\n";
     for (const auto& event : events) {
         ss << format_event_node(event);
@@ -202,15 +218,16 @@ std::string OccultationXMLIO::format_event_node(const OccultationEvent& event) {
 
     // Star
     ss << "    <Star>" << event.star_catalog_id << "," << event.ra_cat_h << "," << event.dec_cat_deg << ","
-       << event.mag_v << "," << event.mag_r << "," << event.mag_k << ",0.0,0,,"
+       << event.mag_v << "," << event.mag_r << "," << event.mag_k << ","
+       << event.pm_ra_as_yr << "," << event.pm_dec_as_yr << "," << event.parallax_as << ","
        << event.ra_event_h << "," << event.dec_event_deg;
     for (double d : event.star_extra_data) ss << "," << d;
     ss << "</Star>\n";
 
     // Object
     ss << "    <Object>" << event.object_number << "," << event.object_name << ","
-       << event.h_mag << "," << event.diameter_km << "," << event.apparent_rate_arcsec_hr << ",0,0,0,0,"
-       << event.object_type;
+       << event.h_mag << "," << event.diameter_km << "," << event.apparent_rate_arcsec_hr << ","
+       << event.g_param << ",0,0,0," << event.object_type;
     for (double d : event.object_extra_data) ss << "," << d;
     ss << "</Object>\n";
 
@@ -223,20 +240,11 @@ std::string OccultationXMLIO::format_event_node(const OccultationEvent& event) {
     ss << "</Orbit>\n";
 
     // Errors
-    ss << "    <Errors>";
-    ss << event.combined_error_arcsec;
-    for (size_t i = 0; i < event.error_extra_data.size(); ++i) {
-        if (i == 4) { // Inject method string at index 5 effectively
-            ss << "," << event.error_extra_data[i] << "," << event.uncertainty_method;
-        } else {
-             ss << "," << event.error_extra_data[i];
-        }
-    }
-    // Handle case where method wasn't reached
-    if (event.error_extra_data.size() <= 4) {
-         ss << "," << event.uncertainty_method;
-    }
-    ss << ","; 
+    ss << "    <Errors>" << event.combined_error_arcsec << ","
+       << event.star_error_ra_as << "," << event.star_error_dec_as << ","
+       << event.object_error_ra_as << "," << event.object_error_dec_as << ","
+       << event.uncertainty_method;
+    for (double d : event.error_extra_data) ss << "," << d;
     ss << "</Errors>\n";
 
     // ID
