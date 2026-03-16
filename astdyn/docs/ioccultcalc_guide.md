@@ -9,9 +9,14 @@
 To run a basic search with organized workspace output:
 
 ```bash
-# Search for Ceres and Vesta over 30 days, sorting results into a folder
+# Search for Ceres and Vesta over 30 days using all CPU cores
 ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 30.0 --out-dir campaign_2026 --prefix v_test
 ```
+
+### v0.7 Features (Latest)
+- **OpenMP Acceleration**: Automatically scales search tasks across all CPU cores.
+- **CSPICE-Free Engine**: No external dependencies required for high-precision ephemeris.
+- **Bessel-FP Refinement**: Validated occultation logic with milli-arcsecond accuracy.
 
 ### Essential Command Line Arguments
 
@@ -79,8 +84,9 @@ When you run `ioccultcalc`, the engine performs:
 1.  **Preparation**: Fetches orbital states from **JPL Horizons** or local **SPK** files.
 2.  **Stellar Correctors**: Applies Gaia DR3 proper motion, **annual parallax**, and relativistic **aberration**.
 3.  **Corridor Scan**: Iterates through the window searching for stars within a discovery corridor.
-4.  **Refinement**: Performs analytical refinement of the **Closest Approach (CA)** using polynomial derivatives.
-5.  **Uncertainty Modeling**: If a `--covariance` file is provided, it calculates 1-sigma uncertainty cross-tracks.
+4.  **Refinement**: Performs analytical refinement of the **Closest Approach (CA)** using polynomial derivatives and high-precision Bessel proejction.
+5.  **Multi-core Scaling**: Search tasks are distributed via **OpenMP** for maximum throughput.
+6.  **Uncertainty Modeling**: If a `--covariance` file is provided, it calculates 1-sigma uncertainty cross-tracks.
 
 ---
 
