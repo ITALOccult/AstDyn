@@ -20,6 +20,7 @@
 #include "astdyn/propagation/RadauIntegrator.hpp"
 #include "astdyn/propagation/saba4_integrator.hpp"
 #include "astdyn/propagation/AASIntegrator.hpp"
+#include "astdyn/core/IOCConfig.hpp"
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <iomanip>
@@ -137,57 +138,42 @@ void AstDynEngine::update_propagator() {
 }
 
 void AstDynEngine::load_config(const std::string& config_file) {
-    if (config_.verbose) std::cout << "Loading configuration from: " << config_file << "\n";
+    if (config_.verbose) std::cout << "Loading configuration (Advanced IOC) from: " << config_file << "\n";
 
-    std::ifstream f(config_file);
-    if (!f.is_open()) return;
-
-    nlohmann::json j;
-    try {
-        f >> j;
-    } catch (...) { return; }
+    core::IOCConfig ioc;
+    if (!ioc.load(config_file)) return;
     
-    if (j.contains("integrator")) {
-        auto& ji = j["integrator"];
-        config_.integrator_type = string_to_integrator(ji.value("type", "RK4"));
-        config_.initial_step_size = ji.value("step_size", 0.1);
-        config_.tolerance = ji.value("tolerance", 1e-12);
-        config_.aas_precision = ji.value("aas_precision", 1e-4);
-    }
+    // Integrator
+    config_.integrator_type = string_to_integrator(ioc.get<std::string>("integrator.type", "RK4"));
+    config_.initial_step_size = ioc.get<double>("integrator.step_size", 0.1);
+    config_.tolerance = ioc.get<double>("integrator.tolerance", 1e-12);
+    config_.aas_precision = ioc.get<double>("integrator.aas_precision", 1e-4);
     
-    if (j.contains("ephemeris")) {
-        auto& je = j["ephemeris"];
-        config_.ephemeris_type = string_to_ephemeris(je.value("type", "Analytical"));
-        config_.ephemeris_file = je.value("file", "");
-        config_.asteroid_ephemeris_file = je.value("asteroid_file", "");
-    }
+    // Ephemeris
+    config_.ephemeris_type = string_to_ephemeris(ioc.get<std::string>("ephemeris.type", "Analytical"));
+    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", "");
+    config_.asteroid_ephemeris_file = ioc.get<std::string>("ephemeris.asteroid_file", "");
     
-    if (j.contains("diffcorr")) {
-        auto& jd = j["diffcorr"];
-        config_.max_iterations = jd.value("max_iter", 10);
-        config_.convergence_threshold = jd.value("convergence", 1e-6);
-        config_.outlier_sigma = jd.value("outlier_threshold", 3.0);
-        
-        // Advanced Corrections
-        config_.light_time_correction = jd.value("light_time", true);
-        config_.aberration_correction = jd.value("aberration", true);
-        config_.light_deflection = jd.value("light_deflection", true);
-    }
+    // DiffCorr
+    config_.max_iterations = ioc.get<int>("diffcorr.max_iter", 10);
+    config_.convergence_threshold = ioc.get<double>("diffcorr.convergence", 1e-6);
+    config_.outlier_sigma = ioc.get<double>("diffcorr.outlier_threshold", 3.0);
+    config_.light_time_correction = ioc.get<bool>("diffcorr.light_time", true);
+    config_.aberration_correction = ioc.get<bool>("diffcorr.aberration", true);
+    config_.light_deflection = ioc.get<bool>("diffcorr.light_deflection", true);
 
-    if (j.contains("occultation")) {
-        auto& jo = j["occultation"];
-        auto& occ = config_.occultation_settings;
-        occ.min_sun_altitude = jo.value("min_sun_alt", -12.0);
-        occ.min_object_altitude = jo.value("min_obj_alt", 10.0);
-        occ.min_moon_dist = jo.value("min_moon_dist", 5.0);
-        occ.min_mag_drop = jo.value("min_mag_drop", 0.05);
-        occ.max_mag_star = jo.value("max_mag_star", 16.0);
-        occ.filter_daylight = jo.value("filter_daylight", true);
-        occ.use_proper_motion = jo.value("use_proper_motion", true);
-        occ.use_parallax = jo.value("use_parallax", true);
-    }
+    // Occultation
+    auto& occ = config_.occultation_settings;
+    occ.min_sun_altitude = ioc.get<double>("occultation.min_sun_alt", -12.0);
+    occ.min_object_altitude = ioc.get<double>("occultation.min_obj_alt", 10.0);
+    occ.min_moon_dist = ioc.get<double>("occultation.min_moon_dist", 5.0);
+    occ.min_mag_drop = ioc.get<double>("occultation.min_mag_drop", 0.05);
+    occ.max_mag_star = ioc.get<double>("occultation.max_mag_star", 16.0);
+    occ.filter_daylight = ioc.get<bool>("occultation.filter_daylight", true);
+    occ.use_proper_motion = ioc.get<bool>("occultation.use_proper_motion", true);
+    occ.use_parallax = ioc.get<bool>("occultation.use_parallax", true);
 
-    config_.verbose = j.value("verbose", true);
+    config_.verbose = ioc.get<bool>("verbose", true);
     update_propagator();
 }
 

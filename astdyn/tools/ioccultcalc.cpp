@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
         po::notify(vm);
     } catch (...) { return 1; }
 
-    if (vm.count("help") || !vm.count("asteroid") || !vm.count("jd-start")) {
+    if (vm.count("help") || (!vm.count("asteroid") && !vm.count("system-ids")) || !vm.count("jd-start")) {
         std::cout << desc << "\n";
         return 0;
     }
@@ -155,7 +155,10 @@ int main(int argc, char** argv) {
     } catch (...) { return 1; }
 
     // --- 2. Preparing Asteroids & Polynomials ---
-    std::vector<std::string> asteroid_ids = parse_asteroid_list(vm["asteroid"].as<std::string>());
+    std::vector<std::string> asteroid_ids;
+    if (vm.count("asteroid")) {
+        asteroid_ids = parse_asteroid_list(vm["asteroid"].as<std::string>());
+    }
     double jd_start = vm["jd-start"].as<double>();
     double duration = vm["duration"].as<double>();
     time::EpochTDB start_epoch = time::EpochTDB::from_jd(jd_start);
@@ -169,20 +172,22 @@ int main(int argc, char** argv) {
     std::unique_ptr<io::SPKReader> system_reader;
 
     // --- 2a. Load Primary Asteroids ---
-    std::cout << "[ioccultcalc] Pre-calculating polynomials for " << asteroid_ids.size() << " bodies over " << duration << " days...\n";
-    for (const auto& id : asteroid_ids) {
-        auto state_vec = horizons.query_vectors(id, start_epoch);
-        if (state_vec) {
-            auto elements = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(state_vec->cast_frame<core::ECLIPJ2000>());
-            manager.add_asteroid(id, elements, start_epoch, end_epoch);
-            stored_elements[id] = elements;
-            stored_states[id] = state_vec->cast_frame<core::GCRF>();
-            
-            auto props = horizons.query_physical_properties(id);
-            if (props) {
-                stored_props[id] = {props->h_mag, props->diameter_km};
-            } else {
-                stored_props[id] = {0.0, 100.0};
+    if (!asteroid_ids.empty()) {
+        std::cout << "[ioccultcalc] Pre-calculating polynomials for " << asteroid_ids.size() << " bodies over " << duration << " days...\n";
+        for (const auto& id : asteroid_ids) {
+            auto state_vec = horizons.query_vectors(id, start_epoch);
+            if (state_vec) {
+                auto elements = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(state_vec->cast_frame<core::ECLIPJ2000>());
+                manager.add_asteroid(id, elements, start_epoch, end_epoch);
+                stored_elements[id] = elements;
+                stored_states[id] = state_vec->cast_frame<core::GCRF>();
+                
+                auto props = horizons.query_physical_properties(id);
+                if (props) {
+                    stored_props[id] = {props->h_mag, props->diameter_km};
+                } else {
+                    stored_props[id] = {0.0, 100.0};
+                }
             }
         }
     }
@@ -210,9 +215,40 @@ int main(int argc, char** argv) {
         occ_config.max_mag_star = vm["mag"].as<double>();
     }
     
-    std::cout << "[ioccultcalc] Searching occultations with mag < " << occ_config.max_mag_star << "..." << std::endl;
-    auto results = OccultationLogic::find_multi_asteroid_occultations(asteroid_ids, manager, start_epoch, end_epoch, occ_config, engine);
-    
+    std::vector<OccultationCandidate> results;
+
+    if (vm.count("bsp") && vm.count("system-ids")) {
+        std::string bsp_lib = vm["bsp"].as<std::string>();
+        std::vector<std::string> system_ids = parse_asteroid_list(vm["system-ids"].as<std::string>());
+        std::cout << "[ioccultcalc] Searching system occultations (BSP: " << bsp_lib << ")..." << std::endl;
+        
+        auto system_results = OccultationLogic::find_system_occultations(system_ids, bsp_lib, start_epoch, end_epoch, occ_config, engine);
+        
+        std::cout << "[ioccultcalc] System Search Complete. Found " << system_results.size() << " grouped candidates.\n";
+        for (const auto& res : system_results) {
+            std::cout << "\n🌟 [System Event] Star ID: " << res.star.source_id << " | G=" << res.star.g_mag << "\n";
+            for (const auto& body : res.bodies) {
+                std::cout << "   - Body: " << body.name 
+                          << " | TCA: " << body.params.t_ca.jd() 
+                          << " | Impact: " << body.params.impact_parameter.to_km() << " km\n";
+                
+                // Also add to global results for mapping/XML
+                OccultationCandidate cand;
+                cand.asteroid_id = body.name;
+                cand.star = res.star;
+                cand.params = body.params;
+                results.push_back(cand);
+            }
+        }
+    } else {
+        std::cout << "[ioccultcalc] Searching occultations with mag < " << occ_config.max_mag_star << "..." << std::endl;
+        results = OccultationLogic::find_multi_asteroid_occultations(asteroid_ids, manager, start_epoch, end_epoch, occ_config, engine);
+        
+        // Show results
+        for (const auto& res : results) {
+            std::cout << "Occultation: Asteroid=" << res.asteroid_id << " Star=" << res.star.source_id << " TCA=" << res.params.t_ca.jd() << std::endl;
+        }
+    }
     // --- 3b. Apply Uncertainty (if requested) ---
     if (vm.count("covariance") && !results.empty()) {
         try {

@@ -6,6 +6,7 @@
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/TimeScale.hpp"
 #include "astdyn/astrometry/WorldMapData.hpp"
+#include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include <fstream>
 #include <cmath>
 #include <iomanip>

@@ -193,8 +193,6 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
     const OccultationConfig& config,
     AstDynEngine& engine,
     OccultationRefinementMode mode)
-    AstDynEngine& engine,
-    OccultationRefinementMode mode)
 {
     using namespace catalog;
     std::vector<OccultationCandidate> results;
@@ -230,7 +228,7 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
         auto segment = catalog::fit_chebyshev(working_elements, midnight, 1.0, engine.config());
         
         // (Step 2) Query candidates in the daily corridor
-        auto candidates = find_stars_near_segment(catalog_inst, segment, Angle::from_arcsec(600.0), max_mag);
+        auto candidates = find_stars_near_segment(catalog_inst, segment, Angle::from_arcsec(300.0), config.max_mag_star);
         
         // (Step 3) Verification and Refinement for each found star
         for (const auto& star : candidates) {
@@ -326,7 +324,7 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
     const std::string& bsp_path,
     time::EpochTDB start,
     time::EpochTDB end,
-    double max_mag,
+    const OccultationConfig& config,
     AstDynEngine& engine)
 {
     using namespace catalog;
@@ -367,7 +365,7 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
             earth_states.push_back(e_ssb); 
         }
 
-        auto query = astdyn::catalog::make_orbit_query(body_states, earth_states, midnight - time::TimeDuration::from_hours(12), midnight + time::TimeDuration::from_hours(12), Angle::from_arcsec(120.0), max_mag);
+        auto query = astdyn::catalog::make_orbit_query(body_states, earth_states, midnight - time::TimeDuration::from_hours(12), midnight + time::TimeDuration::from_hours(12), Angle::from_arcsec(300.0), config.max_mag_star);
         auto candidates = catalog_inst.query_orbit(query);
 
         for (const auto& star : candidates) {
@@ -378,45 +376,65 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
             for (const auto& b_id_str : body_ids) {
                 int b_id = std::stoi(b_id_str);
                 
-                // Get Apparent State and compute parameters
-                // (Iterative Light Time + Aberration)
-                double lt = 0.0;
-                auto earth_mid = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, midnight);
-                Eigen::Vector3d rho_vec;
+                // 1. Find TCA (Time of Closest Approach)
+                double best_jd = day_jd;
+                double min_dist_deg2 = 1e18;
                 
-                for(int i=0; i<3; ++i) {
-                    double et_emit = et_mid - lt;
-                    auto s_emit = system_reader.getState(b_id, et_emit);
-                    rho_vec = (Eigen::Vector3d(s_emit[0], s_emit[1], s_emit[2]) * 1000.0) - earth_mid.position.to_eigen_si();
-                    lt = rho_vec.norm() / (astdyn::constants::C_LIGHT * 1000.0);
+                // Coarse search (+/- 12 hours, 1 minute steps)
+                for (double offset = -0.5; offset <= 0.5; offset += 60.0/86400.0) {
+                    double et = et_mid + offset * 86400.0;
+                    auto s = system_reader.getState(b_id, et);
+                    auto e = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, midnight + time::TimeDuration::from_seconds(offset * 86400.0));
+                    
+                    Eigen::Vector3d rho = (Eigen::Vector3d(s[0], s[1], s[2]) * 1000.0) - e.position.to_eigen_si();
+                    double dist = rho.norm();
+                    double ra_a = std::atan2(rho.y(), rho.x()) * 180.0 / M_PI;
+                    if (ra_a < 0) ra_a += 360.0;
+                    double dec_a = std::asin(rho.z() / dist) * 180.0 / M_PI;
+                    
+                    double dra = (star.ra.to_deg() - ra_a) * std::cos(dec_a * M_PI / 180.0);
+                    double ddec = star.dec.to_deg() - dec_a;
+                    double d2 = dra*dra + ddec*ddec;
+                    if (d2 < min_dist_deg2) {
+                        min_dist_deg2 = d2;
+                        best_jd = day_jd + offset;
+                    }
                 }
-                rho_vec = AstrometryReducer::apply_stellar_aberration(rho_vec, earth_mid.velocity.to_eigen_si());
                 
-                auto ast_coord = SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, physics::Distance>::from_si(rho_vec.x(), rho_vec.y(), rho_vec.z()));
-                
-                // Simple rate (1s diff)
-                double et1 = et_mid + 1.0;
-                auto s1 = system_reader.getState(b_id, et1 - lt); 
-                auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, midnight + time::TimeDuration::from_seconds(1.0));
-                Eigen::Vector3d rho1 = (Eigen::Vector3d(s1[0], s1[1], s1[2]) * 1000.0) - earth1.position.to_eigen_si();
-                rho1 = AstrometryReducer::apply_stellar_aberration(rho1, earth1.velocity.to_eigen_si());
-                auto ast_coord1 = SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, physics::Distance>::from_si(rho1.x(), rho1.y(), rho1.z()));
-                
-                auto params = compute_parameters(
-                    star.ra, star.dec,
-                    ast_coord.ra(), ast_coord.dec(),
-                    physics::Distance::from_m(rho_vec.norm()),
-                    ast_coord1.ra() - ast_coord.ra(),
-                    ast_coord1.dec() - ast_coord.dec(),
-                    physics::Velocity::from_ms(rho1.norm() - rho_vec.norm()),
-                    midnight);
-                
-                if (params.impact_parameter.to_km() < 10000.0) {
-                    BodyOccultation body_occ;
-                    body_occ.name = b_id_str;
-                    body_occ.params = params;
-                    body_occ.diameter = physics::Distance::from_km(100.0); // Placeholder or lookup
-                    system_res.bodies.push_back(body_occ);
+                if (min_dist_deg2 < 0.01) { // within 0.1 deg
+                    double et_ca = (best_jd - astdyn::constants::JD2000) * 86400.0;
+                    auto earth_ca = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, time::EpochTDB::from_jd(best_jd));
+                    
+                    // Apparent State at TCA
+                    auto s_ca = system_reader.getState(b_id, et_ca);
+                    Eigen::Vector3d rho_ca = (Eigen::Vector3d(s_ca[0], s_ca[1], s_ca[2]) * 1000.0) - earth_ca.position.to_eigen_si();
+                    rho_ca = AstrometryReducer::apply_stellar_aberration(rho_ca, earth_ca.velocity.to_eigen_si());
+                    
+                    auto ast_coord = SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, physics::Distance>::from_si(rho_ca.x(), rho_ca.y(), rho_ca.z()));
+                    
+                    // Simple rate at TCA
+                    auto s_next = system_reader.getState(b_id, et_ca + 1.0);
+                    auto earth_next = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, time::EpochTDB::from_jd(best_jd + 1.0/86400.0));
+                    Eigen::Vector3d rho_next = (Eigen::Vector3d(s_next[0], s_next[1], s_next[2]) * 1000.0) - earth_next.position.to_eigen_si();
+                    rho_next = AstrometryReducer::apply_stellar_aberration(rho_next, earth_next.velocity.to_eigen_si());
+                    auto ast_coord_next = SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, physics::Distance>::from_si(rho_next.x(), rho_next.y(), rho_next.z()));
+                    
+                    auto params = compute_parameters(
+                        star.ra, star.dec,
+                        ast_coord.ra(), ast_coord.dec(),
+                        physics::Distance::from_m(rho_ca.norm()),
+                        ast_coord_next.ra() - ast_coord.ra(),
+                        ast_coord_next.dec() - ast_coord.dec(),
+                        physics::Velocity::from_ms(rho_next.norm() - rho_ca.norm()),
+                        time::EpochTDB::from_jd(best_jd));
+                    
+                    if (params.impact_parameter.to_km() < 20000.0) {
+                        BodyOccultation body_occ;
+                        body_occ.name = b_id_str;
+                        body_occ.params = params;
+                        body_occ.diameter = physics::Distance::from_km(100.0); // Placeholder
+                        system_res.bodies.push_back(body_occ);
+                    }
                 }
             }
             
@@ -491,7 +509,7 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
                 auto segment = ephem.get_segment(midnight);
                 
                 // Query stars in the daily corridor for this asteroid
-                auto stars = find_stars_near_segment(catalog_inst, segment, Angle::from_arcsec(600.0), max_mag);
+                auto stars = find_stars_near_segment(catalog_inst, segment, Angle::from_arcsec(300.0), config.max_mag_star);
                 
                 for (const auto& star : stars) {
                     // Refine each candidate

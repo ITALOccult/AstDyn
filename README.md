@@ -61,9 +61,27 @@ void example() {
 ### ioccultcalc (Beta 0.6 - Released 2026-03-16)
 A professional command-line tool for searching and comparing stellar occultations. It retrieves asteroid elements directly from **JPL Horizons** and searches the **Gaia DR3** catalog.
 
-**New in Beta 0.6 (v1.0 RC Features):**
+### Advanced Configuration System (IOCConfig)
+AstDyn now features a powerful, multi-format configuration manager inspired by the `IOC_Config` pattern. It supports:
+*   **JSON**: Native support for structured configurations.
+*   **YAML/OOP Format**: High-level hierarchical syntax with braces (e.g., `integrator { type = RK4 }`).
+*   **Flat Dot-Notation**: Compact key-value pairs (e.g., `integrator.step_size = 0.1`).
+*   **Automatic Type Deduction**: Parses booleans, numbers, and strings automatically.
+
+**Example YAML-style config (`config.yaml`):**
+```yaml
+integrator {
+  type = RKF78
+  step_size = 0.01
+}
+diffcorr.light_time = true
+verbose = false
+```
+
+**New in Beta 0.6 (v1.0 RC Features - Updated 2026-03-16):**
+*   **Advanced IOC Configuration**: Support for YAML, OOP, and JSON configuration files via `--conf`.
 *   **High-Precision Catalog Corrections**: Full implementation of Gaia DR3 **3D Space Motion** (proper motion) and **Annual/Annual Parallax** shift.
-*   **Relativistic Aberration & Light Deflection**: Native support for rigorous IAU 2000 aberration and gravitational light deflection (GR) configurable via JSON.
+*   **Relativistic Aberration & Light Deflection**: Native support for rigorous IAU 2000 aberration and gravitational light deflection (GR).
 *   **Advanced Observer Filters**: Automate search refinement with thresholds for **Sun/Moon Altitude**, **Moon Proximity**, and **Magnitude Drop**.
 *   **Multi-Catalog Framework**: Support for dynamic selection of stellar catalogs (Gaia DR3, Legacy) via `--catalog`.
 *   **Regional Search Filter**: Search for occultations passing near your specific location with `--lat` and `--lon`.

@@ -9,10 +9,11 @@
 #include "astdyn/astrometry/sky_types.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/catalog/CatalogTypes.hpp"
-#include "astdyn/AstDynEngine.hpp"
 #include <Eigen/Dense>
 #include <vector>
 #include <string>
+
+namespace astdyn { class AstDynEngine; }
 
 namespace astdyn::astrometry {
 

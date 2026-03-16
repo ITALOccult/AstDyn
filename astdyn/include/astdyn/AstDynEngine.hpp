@@ -73,6 +73,8 @@ struct AstDynConfig {
     std::string preferred_catalog = "gaia_dr3"; ///< gaia_dr3, ucac4 (placeholder)
     std::string catalog_bias_file = "";      ///< Path to catalog bias CSV file
 };
+
+/**
  * @brief Results from orbit determination
  */
 struct OrbitDeterminationResult {
