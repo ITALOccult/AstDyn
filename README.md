@@ -14,11 +14,23 @@
 *   **Validated Accuracy**: Validated against NASA/JPL Horizons Ephemeris System with residuals $< 2.5 \mu\text{m}$ ($10^{-9}$ AU) and sub-arcsecond geocentric precision ($< 0.7$ arcsec).
 *   **Performance**: Optimized C++17 architecture, ~8x faster than numerical STM approaches.
 
+---
+
+## 🏛️ Technical Overview
+
+AstDyn is architected for both research and high-demand operational environments. Its core is built around a hybrid propagation engine:
+
+*   **Propulsion & Precision**: Native support for **AAS (Adaptive Step Symplectic)** integrators, specifically tuned for Encke-type asteroid dynamics.
+*   **Perturbation Engine**: The **AST17** module includes real-time gravitational influences from the 17 most massive asteroids (Ceres, Pallas, Vesta, etc.), essential for 10-mas occultation precision.
+*   **Unified Reference Frames**: Seamless handling of GCRF, ECLIPJ2000, and ITRF (Topocentric) frames using high-fidelity IAU 2000/2006 precession-nutation models.
+*   **Modular Architecture**: Designed for easy integration with external projects (e.g., via `ITALOccultLibrary`) while maintaining a strict high-performance core.
+
 ## Documentation
 
 Full technical documentation is available in the `astdyn/docs` directory:
 
 *   **[User Manual](astdyn/docs/AstDyn_User_Manual.pdf)**: Comprehensive guide to the API, installation, and theoretical background.
+*   **[Configuration Manual](astdyn/docs/config_manual.md)**: Detailed guide for advanced `IOCConfig` (YAML, OOP, JSON).
 
 ## Quick Start
 
@@ -80,6 +92,8 @@ verbose = false
 
 **New in Beta 0.6 (v1.0 RC Features - Updated 2026-03-16):**
 *   **Advanced IOC Configuration**: Support for YAML, OOP, and JSON configuration files via `--conf`.
+*   **Workspace & Path Management**: Organize multi-event searches with `--out-dir` and `--prefix` for automated file sorting.
+*   **Individual Event Mapping**: Automatically generates dedicated SVG/KML files for every match in a batch search.
 *   **High-Precision Catalog Corrections**: Full implementation of Gaia DR3 **3D Space Motion** (proper motion) and **Annual/Annual Parallax** shift.
 *   **Relativistic Aberration & Light Deflection**: Native support for rigorous IAU 2000 aberration and gravitational light deflection (GR).
 *   **Advanced Observer Filters**: Automate search refinement with thresholds for **Sun/Moon Altitude**, **Moon Proximity**, and **Magnitude Drop**.
@@ -88,8 +102,8 @@ verbose = false
 
 #### Usage
 ```bash
-# Search with high-precision aberration and specific magnitude drop filter
-ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0 --svg-output map.svg --catalog gaia_dr3
+# Search with high-precision aberration and organized workspace output
+ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 30.0 --out-dir campaign_v1 --prefix vesta_test
 ```
 
 #### Command-line Options
@@ -98,19 +112,34 @@ ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0 --svg
 - `--duration <days>`: Length of the search window in days (default: 1.0).
 - `--mag <val>`: Magnitude limit for star search (default: 15.0).
 - `--catalog <type>`: Stellar catalog to use (`gaia_dr3`, `legacy`).
+- `--out-dir <path>`: Base directory for all output files (autosorts multi-event results).
+- `--prefix <str>`: Prefix for individual event files (default: `occ`).
 - `--svg-output <file>`: Generate a high-resolution SVG world map.
-- `--zoom <val>`: Zoom level for the SVG map (e.g., 4.0 for regional, 10.0 for local).
-- `--map-lat <val>`: Center latitude for the SVG map.
-- `--map-lon <val>`: Center longitude for the SVG map.
-- `--kml <file>`: Generate a KML path for Google Earth (first match).
 - `--xml-output <file>`: Save matches to an Occult4-compatible XML.
+- `--zoom <val>`: Zoom level (1.0 = global, 10.0 = local).
+- `--lat` / `--lon`: Regional filter for observation sites.
 
 ---
 
-## 🧪 Beta Testing
+## 🧪 Beta Testing & Implementation Status
+
 AstDyn is currently in an active testing phase. For a comprehensive guide on using the occultation engine, high-precision configurations, and analysis tools, please refer to the:
 
-**[IOccultCalc User Guide](astdyn/docs/ioccultcalc_guide.md)**
+**[IOccultCalc User Guide (v0.6)](astdyn/docs/ioccultcalc_guide.md)** | **[Configuration Manual](astdyn/docs/config_manual.md)**
+
+### Implementation Card (v1.0 RC Ready)
+
+| Feature | Status | Description |
+| :--- | :---: | :--- |
+| **N-Body Dynamics** | ✅ | Full planetary perturbations (DE441). |
+| **Asteroid Perturbations** | ✅ | AST17 (Top 17 most massive asteroids). |
+| **Stellar Corrections** | ✅ | Proper motion, parallax, aberration, light deflection. |
+| **Numerical Methods** | ✅ | AAS, RKF78, Gauss, Radau, SABA4. |
+| **Occultation Engine** | ✅ | Corridor discovery, refinement, and uncertainty modeling. |
+| **Binary Systems** | ✅ | Support for satellite occultations via BSP files. |
+| **Advanced Config** | ✅ | YAML, OOP, JSON hierarchical support. |
+| **Visualization** | ✅ | Global/Local SVG, KML, Occult4 XML. |
+| **Workspace Org** | ✅ | Automatic directory sorting and event prefixing. |
 
 If you encounter discrepancies or bugs, please open an issue with the relevant input parameters and asteroid IDs.
 

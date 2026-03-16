@@ -19,6 +19,7 @@
 #include <cmath>
 #include <tuple>
 #include <sstream>
+#include <filesystem>
 #include "astdyn/time/TimeScale.hpp"
 
 using namespace astdyn;
@@ -112,6 +113,8 @@ int main(int argc, char** argv) {
         ("xml-output", po::value<std::string>(), "save found occultations to XML")
         ("svg-output", po::value<std::string>(), "save world map with paths to SVG")
         ("kml", po::value<std::string>(), "save first match to KML")
+        ("out-dir", po::value<std::string>(), "base directory for all output files")
+        ("prefix", po::value<std::string>()->default_value("occ"), "prefix for individual output files")
         ("lat", po::value<double>(), "observer latitude (degrees) for regional search")
         ("lon", po::value<double>(), "observer longitude (degrees) for regional search")
         ("alt", po::value<double>()->default_value(0.0), "observer altitude (meters)")
@@ -187,6 +190,14 @@ int main(int argc, char** argv) {
 
     double duration = (!vm["duration"].defaulted()) ? vm["duration"].as<double>() : adv_cfg.get<double>("duration", 1.0);
     double mag_limit = (!vm["mag"].defaulted()) ? vm["mag"].as<double>() : adv_cfg.get<double>("mag", 15.0);
+    
+    std::string out_dir = vm.count("out-dir") ? vm["out-dir"].as<std::string>() : adv_cfg.get<std::string>("out-dir", "");
+    std::string prefix = (!vm["prefix"].defaulted()) ? vm["prefix"].as<std::string>() : adv_cfg.get<std::string>("prefix", "occ");
+
+    if (!out_dir.empty()) {
+        std::filesystem::create_directories(out_dir);
+    }
+
     time::EpochTDB start_epoch = time::EpochTDB::from_jd(jd_start);
     time::EpochTDB end_epoch = time::EpochTDB::from_jd(jd_start + duration);
 
@@ -358,12 +369,14 @@ int main(int argc, char** argv) {
 
         std::string kml_file = vm.count("kml") ? vm["kml"].as<std::string>() : adv_cfg.get<std::string>("kml", "");
         if (!kml_file.empty()) {
-            OccultationMapper::export_kml(paths, labels, kml_file);
-            std::cout << "[ioccultcalc] Exported KML to: " << kml_file << "\n";
+            std::filesystem::path p = std::filesystem::path(out_dir) / kml_file;
+            OccultationMapper::export_kml(paths, labels, p.string());
+            std::cout << "[ioccultcalc] Exported KML to: " << p.string() << "\n";
         }
         
         std::string svg_file = vm.count("svg-output") ? vm["svg-output"].as<std::string>() : adv_cfg.get<std::string>("svg-output", "");
         if (!svg_file.empty()) {
+            std::filesystem::path p = std::filesystem::path(out_dir) / svg_file;
             double c_lat = 0.0, c_lon = 0.0, z = 1.0;
             if (!vm["zoom"].defaulted()) z = vm["zoom"].as<double>();
             else z = adv_cfg.get<double>("zoom", 1.0);
@@ -374,15 +387,31 @@ int main(int argc, char** argv) {
             if (vm.count("map-lon")) c_lon = vm["map-lon"].as<double>();
             else c_lon = adv_cfg.get<double>("map-lon", obs_lon);
             
-            OccultationMapper::export_global_svg(paths, labels, colors, svg_file, c_lat, c_lon, z);
-            std::cout << "[ioccultcalc] Exported Global SVG to: " << svg_file 
+            OccultationMapper::export_global_svg(paths, labels, colors, p.string(), c_lat, c_lon, z);
+            std::cout << "[ioccultcalc] Exported Global SVG to: " << p.string() 
                       << " (Zoom: " << std::fixed << std::setprecision(1) << z 
                       << ", Center: " << c_lat << "," << c_lon << ")\n";
+        }
+
+        // --- Individual Maps (only if out_dir is set) ---
+        if (!out_dir.empty()) {
+            std::cout << "[ioccultcalc] Exporting individual event maps to " << out_dir << "...\n";
+            for (size_t i = 0; i < results.size(); ++i) {
+                const auto& res = results[i];
+                std::stringstream ss;
+                ss << prefix << "_" << res.asteroid_id << "_" << res.star.source_id << "_" << (int)res.params.t_ca.mjd() << ".svg";
+                std::filesystem::path ip = std::filesystem::path(out_dir) / ss.str();
+                
+                // For individual maps, center on the event
+                OccultationMapper::export_global_svg({paths[i]}, {labels[i]}, {colors[i % colors.size()]}, 
+                                                     ip.string(), res.params.center_lat.to_deg(), res.params.center_lon.to_deg(), 4.0);
+            }
         }
     }
 
     std::string xml_file = vm.count("xml-output") ? vm["xml-output"].as<std::string>() : adv_cfg.get<std::string>("xml-output", "");
     if (!xml_file.empty() && !results.empty()) {
+        std::filesystem::path p = std::filesystem::path(out_dir) / xml_file;
         std::vector<OccultationEvent> out_events;
         for (const auto& res : results) {
             auto cand = res;
@@ -400,8 +429,8 @@ int main(int argc, char** argv) {
                  out_events.push_back(candidate_to_event(cand, res.asteroid_id, dummy));
             }
         }
-        OccultationXMLIO::write_file(out_events, xml_file);
-        std::cout << "[ioccultcalc] Exported XML to: " << xml_file << "\n";
+        OccultationXMLIO::write_file(out_events, p.string());
+        std::cout << "[ioccultcalc] Exported XML to: " << p.string() << "\n";
     }
 
     catalog::GaiaDR3Catalog::shutdown();

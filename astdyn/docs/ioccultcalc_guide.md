@@ -1,90 +1,98 @@
-# 🌌 IOccultCalc: The Ultimate Guide to Occultation Discovery (Beta 0.2)
+# 🌌 IOccultCalc: The Ultimate Guide to Occultation Discovery (Beta 0.6)
 
 `ioccultcalc` is a high-precision command-line engine built on top of **AstDyn**. It integrates JPL Horizons ephemeris, Gaia DR3 stellar catalogs, and advanced numerical integration (AAS/RKF78) to predict and analyze stellar occultations.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (v0.6 Features)
 
-To run a basic search with the internal high-precision defaults:
+To run a basic search with organized workspace output:
 
 ```bash
-# Search for Ceres and Vesta over 5 days starting from JD 2461112.5
-ioccultcalc --asteroid 1,4 --jd-start 2461112.5 --duration 5.0 --mag 15.0
+# Search for Ceres and Vesta over 30 days, sorting results into a folder
+ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 30.0 --out-dir campaign_2026 --prefix v_test
 ```
 
-### Command Line Arguments
+### Essential Command Line Arguments
 
 | Argument | Description |
 | :--- | :--- |
-| `--asteroid <list|@f>` | JPL Target ID(s) or file (e.g., `1,4` or `@target_list.txt`). |
+| `--asteroid <list|@f>` | JPL Target ID(s) or file (e.g., `1,4` or `@targets.txt`). |
 | `--jd-start <value>` | Start Julian Date (TDB) for the search window. |
 | `--duration <days>` | Duration of the search in days (Default: 1.0). |
-| `--mag <limit>` | Magnitude limit for the Gaia DR3 query (Default: 15.0). |
-| `--conf <file>` | Path to a custom JSON configuration file. |
-| `--xml-output <f>` | Save found events to an Occult-compatible XML file. |
-| `--kml <file>` | Export the ground track of the first event to Google Earth. |
+| `--mag <limit>` | Magnitude limit for stars (Default: 15.0). |
+| `--conf <file>` | Path to a custom YAML, OOP, or JSON configuration file. |
+| `--out-dir <path>` | Base directory for all output files. |
+| `--prefix <str>` | Prefix for individual match files (default: `occ`). |
+| `--xml-output <f>` | Save summary results to an Occult4-compatible XML. |
+| `--svg-output <f>` | Generate a high-resolution Global SVG map. |
 
 ---
 
-## 🛠️ Precision Configuration (AAS)
+## 📂 Workspace Management & Batch Processing
 
-For maximum accuracy, especially with perturbed bodies like Jupiter Trojans (e.g., Nireus), use the **AAS (Adaptive Step size)** integrator.
+Starting from **Beta 0.6**, `ioccultcalc` treats output sets as cohesive "workspaces".
 
-### `ioccultcalc_precision.json`
+### Directory Sorting
+Using `--out-dir <path>` ensures that:
+1.  The specified folder is created if it doesn't exist.
+2.  The global XML (`events.xml`) and KML files are placed inside.
+3.  **Individual SVG Maps** are automatically generated for *every* occultation found, centered on the event path.
 
-```json
-{
-    "ephemeris_file": "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp",
-    "ephemeris_type": "DE441",
-    "integrator_type": "AAS",
-    "aas_precision": 1e-04,
-    "initial_step_size": 0.01,
-    "propagator_settings": {
-        "include_planets": true,
-        "include_moon": true,
-        "include_relativity": true,
-        "include_asteroids": true
-    },
-    "light_time_correction": true,
-    "aberration_correction": true
+### Filename Prefixing
+Individual maps follow the naming convention:
+`{prefix}_{body}_{star_id}_{mjd}.svg`
+
+Example: `v_test_Vesta_12345678_61135.svg`
+
+---
+
+## 🛠️ Advanced Configuration (IOCConfig)
+
+`ioccultcalc` now uses the unified `IOCConfig` system for all engine and tool parameters. You can pass a comprehensive setup file instead of long CLI strings.
+
+**Example `occult_setup.yaml`:**
+```yaml
+integrator {
+  type = RKF78
+  step_size = 0.05
 }
+# Results will go here
+out-dir = vesta_summer_campaign
+prefix = vesta
+jd-start = 2461131.5
+duration = 60.0
+asteroid = 4
 ```
 
-To use it:
+To run:
 ```bash
-ioccultcalc --conf ioccultcalc_precision.json --asteroid 50936 --jd 2461112.5
+ioccultcalc --conf occult_setup.yaml
 ```
 
 ---
 
-## 🔍 Discovery Logic
+## 🔍 Discovery & Precision Logic
 
-When you run `ioccultcalc`, the engine performs the following steps:
+When you run `ioccultcalc`, the engine performs:
 
-1.  **Preparation**: Fetches orbital states from **JPL Horizons** for all listed asteroids.
-2.  **Chebyshev Pre-calculation**: Fits high-degree polynomials for each body across the entire search window (optimized for duration).
-3.  **Corridor Scan**: Iterates daily through the window, searching for stars (DR3) within a **10 arcminute** corridor for each asteroid.
-4.  **Refinement**: For every candidate impact, it performs analytical refinement of the **Closest Approach (CA)** using polynomial derivatives.
-5.  **Filtering**: Events are reported if the **Impact Parameter** is within the discovery threshold (Default: 50,000 km).
-
----
-
-## 📊 Interpreting Results
-
-The output list shows:
-- **TCA (MJD)**: Time of Closest Approach.
-- **Impact**: Distance from the Earth's center to the shadow axis (km). If `< 6371 km`, the shadow hits the Earth!
-- **Vel**: Velocity of the shadow on the fundamental plane (km/s).
-
-### Ground Track Visualization
-Use the `--kml` flag to generate a file you can open in **Google Earth** or **Marble** to see exactly where the shadow will pass:
-
-```bash
-ioccultcalc --asteroid 50936 --jd 2461112.5 --kml track.kml
-```
+1.  **Preparation**: Fetches orbital states from **JPL Horizons** or local **SPK** files.
+2.  **Stellar Correctors**: Applies Gaia DR3 proper motion, **annual parallax**, and relativistic **aberration**.
+3.  **Corridor Scan**: Iterates through the window searching for stars within a discovery corridor.
+4.  **Refinement**: Performs analytical refinement of the **Closest Approach (CA)** using polynomial derivatives.
+5.  **Uncertainty Modeling**: If a `--covariance` file is provided, it calculates 1-sigma uncertainty cross-tracks.
 
 ---
 
-> [!TIP]
-> If you are looking for a specific star and it's not appearing, try increasing the `--mag` limit or check if the asteroid orbit in JPL is up-to-date with the latest astrometry.
+## 📊 Outputs & Visualization
+
+### Occult4 XML
+The summary XML output is fully compatible with **Occult4**, including the necessary asteroid elements and star properties for further refinement.
+
+### Global & Local SVG
+Use `--svg-output` for a world-wide overview. For regional views, use `--zoom <v>` and `--map-lat`/`--map-lon` to center the camera.
+
+---
+
+> [!IMPORTANT]
+> Always verify that your `de441.bsp` path is correctly set in your configuration file or points to the default `~/.ioccultcalc/ephemerides/` location.
