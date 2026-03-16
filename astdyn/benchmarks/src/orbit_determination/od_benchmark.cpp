@@ -332,7 +332,7 @@ int main(int argc, char** argv) {
             if (!tgt.gooding) {
                 iod_name = "OrbFitIOD";
                 GaussIODSettings s; s.use_light_time = true; s.min_separation_days = 0.5;
-                auto res = OrbFitIOD(s).compute(iod_obs);
+                auto res = OrbFitIOD(ephem, s).compute(iod_obs);
                 iod_ok = res.success; 
                 if (iod_ok) {
                     iod_state_gcrf = res.state;
@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
             } else {
                 iod_name = (tgt.gooding_max_iter == 0) ? "LambertIOD" : "GoodingIOD";
                 GoodingIOD::Settings gs; gs.max_iterations = tgt.gooding_max_iter;
-                auto res = GoodingIOD(gs).compute(iod_obs[0], iod_obs[1], iod_obs[2], tgt.r1, tgt.r3);
+                auto res = GoodingIOD(ephem, gs).compute(iod_obs[0], iod_obs[1], iod_obs[2], tgt.r1, tgt.r3);
                 iod_ok = res.success && !res.solutions.empty();
                 if (iod_ok) {
                     iod_state_gcrf = res.solutions[0].state;

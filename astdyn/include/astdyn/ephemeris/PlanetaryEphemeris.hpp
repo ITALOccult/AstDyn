@@ -46,66 +46,62 @@ namespace ephemeris {
 class PlanetaryEphemeris {
 public:
     /**
-     * @brief Construct ephemeris calculator
+     * @brief Construct ephemeris gateway with a provider
+     * @param provider Shared pointer to high-precision provider
      */
+    explicit PlanetaryEphemeris(std::shared_ptr<EphemerisProvider> provider = nullptr);
+
     /**
      * @param body Celestial body
      * @param t Epoch (TDB)
      * @return Position vector in J2000 equatorial frame (ICRF)
      */
-    static math::Vector3<core::GCRF, physics::Distance> getPosition(CelestialBody body, time::EpochTDB t);
+    math::Vector3<core::GCRF, physics::Distance> getPosition(CelestialBody body, time::EpochTDB t) const;
     
     /**
      * @param body Celestial body
      * @param t Epoch (TDB)
      * @return Velocity vector in J2000 equatorial frame (ICRF)
      */
-    static math::Vector3<core::GCRF, physics::Velocity> getVelocity(CelestialBody body, time::EpochTDB t);
+    math::Vector3<core::GCRF, physics::Velocity> getVelocity(CelestialBody body, time::EpochTDB t) const;
     
     /**
      * @param body Celestial body
      * @param t Epoch (TDB)
      * @return CartesianState in J2000 equatorial frame (GCRF)
      */
-    static physics::CartesianStateTyped<core::GCRF> getState(CelestialBody body, time::EpochTDB t);
+    physics::CartesianStateTyped<core::GCRF> getState(CelestialBody body, time::EpochTDB t) const;
     
     /**
      * @param t Epoch (TDB)
      * @return Position vector of Sun relative to SSB
-     * 
-     * Computed as weighted sum of planetary positions.
-     * Useful for high-precision orbit determination.
      */
-    static math::Vector3<core::GCRF, physics::Distance> getSunBarycentricPosition(time::EpochTDB t);
+    math::Vector3<core::GCRF, physics::Distance> getSunBarycentricPosition(time::EpochTDB t) const;
     
     /**
      * @brief Convert heliocentric to barycentric state
-     * @param heliocentric_state State relative to Sun
-     * @param t Epoch (TDB)
-     * @return State relative to Solar System Barycenter
      */
-    static physics::CartesianStateTyped<core::GCRF> heliocentricToBarycentric(
+    physics::CartesianStateTyped<core::GCRF> heliocentricToBarycentric(
         const physics::CartesianStateTyped<core::GCRF>& heliocentric_state, 
         time::EpochTDB t
-    );
+    ) const;
 
     /**
-     * @brief Set a high-precision ephemeris provider (e.g. DE441)
-     * 
-     * If set, getPosition/getVelocity will use this provider instead of
-     * the internal analytical approximations.
-     * 
-     * @param provider Shared pointer to provider (can be null to reset to default)
+     * @brief Set the global ephemeris provider for the current thread
      */
-    static void setProvider(std::shared_ptr<EphemerisProvider> provider);
+    static void setGlobalProvider(std::shared_ptr<EphemerisProvider> provider);
     
     /**
-     * @return Current ephemeris provider (usually DE441)
+     * @return Global provider for the current thread
      */
-    static std::shared_ptr<EphemerisProvider> getProvider() { return global_provider_; }
+    static std::shared_ptr<EphemerisProvider> getGlobalProvider();
+
+    void setProvider(std::shared_ptr<EphemerisProvider> provider);
+    std::shared_ptr<EphemerisProvider> getProvider() const { return provider_; }
 
 private:
-    static std::shared_ptr<EphemerisProvider> global_provider_;
+    std::shared_ptr<EphemerisProvider> provider_;
+    static thread_local std::shared_ptr<EphemerisProvider> global_provider_;
 
     /**
      * @brief Compute Julian centuries from J2000.0

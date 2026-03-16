@@ -12,6 +12,9 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace astdyn {
 namespace ephemeris {
@@ -63,7 +66,107 @@ AsteroidPerturbations::AsteroidPerturbations(const std::string& filename) {
 
 void AsteroidPerturbations::loadDefaultAsteroids() {
     asteroids_ = ast17::getDefaultAsteroids();
+    enabled_flags_.assign(asteroids_.size(), true);
 }
+
+void AsteroidPerturbations::loadDefault30Asteroids() {
+    asteroids_.clear();
+    constexpr double epoch = 51544.5;
+    
+    // Top 30 massive asteroids (BC405-like set)
+    // number, name, GM, a, e, i, omega, Omega, M0, epoch, n, naif_id
+    asteroids_.push_back({1, "Ceres", 62.6284, 2.7675, 0.0760, 10.593, 73.597, 80.3932, 113.410, epoch, 0.2141, 2000001});
+    asteroids_.push_back({2, "Pallas", 13.80, 2.7730, 0.2299, 34.837, 310.049, 173.0962, 78.194, epoch, 0.2133, 2000002});
+    asteroids_.push_back({3, "Juno", 1.8, 2.668, 0.258, 12.98, 248.1, 170.3, 34.2, epoch, 0.224, 2000003});
+    asteroids_.push_back({4, "Vesta", 17.8, 2.3615, 0.0887, 7.142, 151.198, 103.8513, 205.546, epoch, 0.2716, 2000004});
+    asteroids_.push_back({6, "Hebe", 0.8, 2.425, 0.201, 14.75, 239.1, 138.7, 120.5, epoch, 0.262, 2000006});
+    asteroids_.push_back({7, "Iris", 1.2, 2.385, 0.231, 5.52, 145.23, 259.56, 18.3, epoch, 0.267, 2000007});
+    asteroids_.push_back({8, "Flora", 0.5, 2.201, 0.156, 5.88, 285.4, 110.9, 15.6, epoch, 0.301, 2000008});
+    asteroids_.push_back({9, "Metis", 0.1, 2.387, 0.122, 5.58, 5.7, 68.9, 140.2, epoch, 0.266, 2000009});
+    asteroids_.push_back({10, "Hygiea", 5.78, 3.1393, 0.1146, 3.831, 283.455, 283.2045, 107.590, epoch, 0.1794, 2000010});
+    asteroids_.push_back({13, "Egeria", 0.5, 2.576, 0.085, 16.54, 80.2, 43.3, 230.1, epoch, 0.238, 2000013});
+    asteroids_.push_back({15, "Eunomia", 2.1, 2.6439, 0.1866, 11.737, 97.767, 293.2081, 142.405, epoch, 0.2262, 2000015});
+    asteroids_.push_back({16, "Psyche", 1.8, 2.9216, 0.1339, 3.096, 227.305, 150.2873, 179.942, epoch, 0.1990, 2000016});
+    asteroids_.push_back({19, "Fortuna", 0.4, 2.442, 0.159, 1.57, 182.1, 211.3, 15.6, epoch, 0.259, 2000019});
+    asteroids_.push_back({20, "Massalia", 0.4, 2.409, 0.143, 0.71, 256.4, 206.5, 120.1, epoch, 0.263, 2000020});
+    asteroids_.push_back({24, "Themis", 0.3, 3.129, 0.132, 0.76, 107.8, 35.9, 15.6, epoch, 0.180, 2000024});
+    asteroids_.push_back({29, "Amphitrite", 0.4, 2.554, 0.073, 6.10, 63.4, 356.5, 15.6, epoch, 0.242, 2000029});
+    asteroids_.push_back({31, "Euphrosyne", 1.7, 3.1515, 0.2257, 26.307, 61.588, 31.2873, 325.478, epoch, 0.1785, 2000031});
+    asteroids_.push_back({45, "Eugenia", 0.4, 2.720, 0.082, 6.61, 204.3, 147.9, 15.6, epoch, 0.221, 2000045});
+    asteroids_.push_back({48, "Doris", 0.2, 3.110, 0.075, 6.55, 250.2, 177.3, 15.6, epoch, 0.181, 2000048});
+    asteroids_.push_back({52, "Europa", 1.59, 3.0958, 0.1020, 7.460, 343.545, 129.0380, 252.132, epoch, 0.1824, 2000052});
+    asteroids_.push_back({65, "Cybele", 1.58, 3.4332, 0.1050, 3.562, 155.889, 155.5463, 196.234, epoch, 0.1636, 2000065});
+    asteroids_.push_back({87, "Sylvia", 1.50, 3.4876, 0.0808, 10.866, 266.315, 73.3430, 271.478, epoch, 0.1610, 2000087});
+    asteroids_.push_back({88, "Thisbe", 1.3, 2.7671, 0.1641, 5.222, 36.714, 276.0972, 355.489, epoch, 0.2141, 2000088});
+    asteroids_.push_back({94, "Aurora", 0.2, 3.161, 0.089, 7.97, 10.2, 2.4, 15.6, epoch, 0.177, 2000094});
+    asteroids_.push_back({107, "Camilla", 1.12, 3.4886, 0.0692, 10.044, 309.785, 173.0458, 120.234, epoch, 0.1609, 2000107});
+    asteroids_.push_back({121, "Hermione", 0.3, 3.446, 0.135, 7.59, 240.1, 137.9, 15.6, epoch, 0.163, 2000121});
+    asteroids_.push_back({324, "Bamberga", 0.7, 2.6835, 0.3381, 11.095, 43.678, 327.8394, 155.234, epoch, 0.2226, 2000324});
+    asteroids_.push_back({451, "Patientia", 0.8, 3.0639, 0.0764, 15.240, 278.789, 96.9873, 234.456, epoch, 0.1843, 2000451});
+    asteroids_.push_back({511, "Davida", 2.0, 3.1805, 0.1833, 15.942, 107.234, 270.0945, 186.789, epoch, 0.1768, 2000511});
+    asteroids_.push_back({704, "Interamnia", 2.1, 3.0616, 0.1502, 17.296, 94.789, 280.3456, 145.234, epoch, 0.1844, 2000704});
+
+    enabled_flags_.assign(asteroids_.size(), true);
+}
+
+void AsteroidPerturbations::loadAstDynDefaultSet() {
+    asteroids_.clear();
+    constexpr double epoch = 51544.5;
+    
+    // 10: Pluto
+    asteroids_.push_back({10, "Pluto", constants::GM_PLUTO, 39.48, 0.248, 17.14, 113.83, 110.29, 14.53, epoch, 0.0039, 999});
+    
+    // 11: Camilla
+    asteroids_.push_back({11, "Camilla", ast17::GM_CAMILLA, 3.4886, 0.0692, 10.044, 309.785, 173.0458, 120.234, epoch, 0.1609, 2000107});
+    
+    // 12: Ceres
+    asteroids_.push_back({12, "Ceres", ast17::GM_CERES, 2.7675, 0.0760, 10.593, 73.597, 80.3932, 113.410, epoch, 0.2141, 2000001});
+    
+    // 13: Cybele
+    asteroids_.push_back({13, "Cybele", ast17::GM_CYBELE, 3.4332, 0.1050, 3.562, 155.889, 155.5463, 196.234, epoch, 0.1636, 2000065});
+    
+    // 14: Davida
+    asteroids_.push_back({14, "Davida", ast17::GM_DAVIDA, 3.1805, 0.1833, 15.942, 107.234, 270.0945, 186.789, epoch, 0.1768, 2000511});
+    
+    // 15: Eunomia
+    asteroids_.push_back({15, "Eunomia", ast17::GM_EUNOMIA, 2.6439, 0.1866, 11.737, 97.767, 293.2081, 142.405, epoch, 0.2262, 2000015});
+    
+    // 16: Euphrosyne
+    asteroids_.push_back({16, "Euphrosyne", ast17::GM_EUPHROSYNE, 3.1515, 0.2257, 26.307, 61.588, 31.2873, 325.478, epoch, 0.1785, 2000031});
+    
+    // 17: Europa
+    asteroids_.push_back({17, "Europa", ast17::GM_EUROPA, 3.0958, 0.1020, 7.460, 343.545, 129.0380, 252.132, epoch, 0.1824, 2000052});
+    
+    // 18: Hygiea
+    asteroids_.push_back({18, "Hygiea", ast17::GM_HYGIEA, 3.1393, 0.1146, 3.831, 283.455, 283.2045, 107.590, epoch, 0.1794, 2000010});
+    
+    // 19: Interamnia
+    asteroids_.push_back({19, "Interamnia", ast17::GM_INTERAMNIA, 3.0616, 0.1502, 17.296, 94.789, 280.3456, 145.234, epoch, 0.1844, 2000704});
+    
+    // 20: Iris
+    asteroids_.push_back({20, "Iris", 1.2, 2.385, 0.231, 5.52, 145.23, 259.56, 18.3, epoch, 0.267, 2000007});
+    
+    // 21: Juno
+    asteroids_.push_back({21, "Juno", 1.8, 2.668, 0.258, 12.98, 248.1, 170.3, 34.2, epoch, 0.224, 2000003});
+    
+    // 22: Pallas
+    asteroids_.push_back({22, "Pallas", ast17::GM_PALLAS, 2.7730, 0.2299, 34.837, 310.049, 173.0962, 78.194, epoch, 0.2133, 2000002});
+    
+    // 23: Psyche
+    asteroids_.push_back({23, "Psyche", ast17::GM_PSYCHE, 2.9216, 0.1339, 3.096, 227.305, 150.2873, 179.942, epoch, 0.1990, 2000016});
+    
+    // 24: Sylvia
+    asteroids_.push_back({24, "Sylvia", ast17::GM_SYLVIA, 3.4876, 0.0808, 10.866, 266.315, 73.3430, 271.478, epoch, 0.1610, 2000087});
+    
+    // 25: Thisbe
+    asteroids_.push_back({25, "Thisbe", ast17::GM_THISBE, 2.7671, 0.1641, 5.222, 36.714, 276.0972, 355.489, epoch, 0.2141, 2000088});
+    
+    // 26: Vesta
+    asteroids_.push_back({26, "Vesta", ast17::GM_VESTA, 2.3615, 0.0887, 7.142, 151.198, 103.8513, 205.546, epoch, 0.2716, 2000004});
+
+    enabled_flags_.assign(asteroids_.size(), true);
+}
+
 
 void AsteroidPerturbations::loadSPK(const std::string& filename) {
     try {
@@ -80,7 +183,7 @@ math::Vector3<core::ECLIPJ2000, physics::Distance> AsteroidPerturbations::getPos
     // Try SPK first if loaded
     if (spk_reader_) {
         try {
-            int naif_id = 2000000 + asteroid.number;
+            int naif_id = asteroid.naif_id;
             double et = (t.mjd() - 51544.5) * 86400.0;
             
             Eigen::VectorXd state = spk_reader_->getState(naif_id, et);
@@ -89,9 +192,10 @@ math::Vector3<core::ECLIPJ2000, physics::Distance> AsteroidPerturbations::getPos
                 state[0] * 1000.0, state[1] * 1000.0, state[2] * 1000.0);
             
         } catch (...) {
+            // Fallback for some weird cases where only number works
             try {
                  int raw_id = asteroid.number;
-                 double et = (t.mjd() - 51544.5) * 86400.0; // Convert MJD to ET seconds past J2000
+                 double et = (t.mjd() - 51544.5) * 86400.0;
                  Eigen::VectorXd state = spk_reader_->getState(raw_id, et);
                  return math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(
                     state[0] * 1000.0, state[1] * 1000.0, state[2] * 1000.0);
@@ -128,19 +232,24 @@ math::Vector3<Frame, physics::Acceleration> AsteroidPerturbations::computePertur
     // Transform Sun position to integration frame
     auto sun_pos_frame = coordinates::ReferenceFrame::transform_pos<core::GCRF, Frame>(sun_pos_bary, state.epoch);
 
-    for (size_t i = 0; i < asteroids_.size(); ++i) {
-        if (!enabled_flags_[i]) continue;
-        
-        const auto& asteroid = asteroids_[i];
-        
-        try {
-            // Get asteroid position (Heliocentric, GCRF for easier conversion)
-            auto ast_pos_ecl = getPosition(asteroid, state.epoch);
-            auto ast_pos_frame = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, Frame>(ast_pos_ecl, state.epoch);
+    // For few asteroids, overhead might exceed benefit, but it enables scaling.
+    #pragma omp parallel
+    {
+        math::Vector3<Frame, physics::Acceleration> thread_acc = math::Vector3<Frame, physics::Acceleration>::from_si(0,0,0);
+        #pragma omp for nowait
+        for (size_t i = 0; i < asteroids_.size(); ++i) {
+            if (!enabled_flags_[i]) continue;
             
-            total_acc = total_acc + computeSinglePerturbation<Frame>(state.position, ast_pos_frame, asteroid.gm);
+            const auto& asteroid = asteroids_[i];
             
-        } catch (...) { }
+            try {
+                auto ast_pos_ecl = getPosition(asteroid, state.epoch);
+                auto ast_pos_frame = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, Frame>(ast_pos_ecl, state.epoch);
+                thread_acc = thread_acc + computeSinglePerturbation<Frame>(state.position, ast_pos_frame, asteroid.gm);
+            } catch (...) { }
+        }
+        #pragma omp critical
+        total_acc = total_acc + thread_acc;
     }
     
     return total_acc;
@@ -192,40 +301,37 @@ Eigen::Vector3d AsteroidPerturbations::computePerturbationRaw(
     // We need to know the frame for 'getPosition' and 'coordinates::ReferenceFrame'
     // Internal getPosition returns Heliorcentric ECLIPJ2000.
     
-    for (size_t i = 0; i < asteroids_.size(); ++i) {
-        if (!enabled_flags_[i]) continue;
-        
-        const auto& asteroid = asteroids_[i];
-        
-        try {
-            // ast_pos is Heliocentric ECLIPJ2000 in KM -> convert to AU
-            auto ast_pos_ecl_math = getPosition(asteroid, t);
-            Eigen::Vector3d ast_pos_ecl_au = ast_pos_ecl_math.to_eigen_si() / (constants::AU * 1000.0);
+    #pragma omp parallel
+    {
+        Eigen::Vector3d thread_acc = Eigen::Vector3d::Zero();
+        #pragma omp for nowait
+        for (size_t i = 0; i < asteroids_.size(); ++i) {
+            if (!enabled_flags_[i]) continue;
             
-            Eigen::Vector3d ast_pos_frame_au = ast_pos_ecl_au;
-            Eigen::Vector3d target_pos_frame_au = pos_au;
+            const auto& asteroid = asteroids_[i];
             
-            if (!in_ecliptic) {
-                // asteroid is in ECLIPJ2000, target (pos_au) is in GCRF
-                ast_pos_frame_au = coordinates::ReferenceFrame::ecliptic_to_j2000() * ast_pos_ecl_au;
-            }
+            try {
+                auto ast_pos_ecl_math = getPosition(asteroid, t);
+                Eigen::Vector3d ast_pos_ecl_au = ast_pos_ecl_math.to_eigen_si() / (constants::AU * 1000.0);
+                
+                Eigen::Vector3d ast_pos_frame_au = ast_pos_ecl_au;
+                if (!in_ecliptic) {
+                    ast_pos_frame_au = coordinates::ReferenceFrame::ecliptic_to_j2000() * ast_pos_ecl_au;
+                }
 
-            // Delta: asteroid - target
-            Eigen::Vector3d delta = ast_pos_frame_au - target_pos_frame_au;
-            double d_norm = delta.norm();
-            double d3 = d_norm * d_norm * d_norm;
-            
-            double gm_au_d2 = asteroid.gm.to_au3_d2();
-            
-            // Direct term
-            total_acc_au_d2 += gm_au_d2 * delta / d3;
-            
-            // Indirect term
-            double r_ast = ast_pos_frame_au.norm();
-            double r_ast3 = r_ast * r_ast * r_ast;
-            total_acc_au_d2 -= gm_au_d2 * ast_pos_frame_au / r_ast3;
-            
-        } catch (...) { }
+                Eigen::Vector3d delta = ast_pos_frame_au - pos_au;
+                double d_norm = delta.norm();
+                double d3 = d_norm * d_norm * d_norm;
+                double gm_au_d2 = asteroid.gm.to_au3_d2();
+                
+                thread_acc += gm_au_d2 * delta / d3;
+                double r_ast = ast_pos_frame_au.norm();
+                thread_acc -= gm_au_d2 * ast_pos_frame_au / (r_ast * r_ast * r_ast);
+                
+            } catch (...) { }
+        }
+        #pragma omp critical
+        total_acc_au_d2 += thread_acc;
     }
     
     return total_acc_au_d2;

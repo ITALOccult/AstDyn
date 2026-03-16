@@ -1,12 +1,11 @@
 /**
  * @file DE441Provider.hpp
- * @brief JPL DE441 ephemeris provider via CSPICE
+ * @brief JPL DE441 ephemeris provider (Native SPK Reader)
  * @author AstDyn Team
  * @date 2025-12-09
  * 
  * Requires:
- * - CSPICE library
- * - de441.bsp file (~3.3 GB)
+ * - de441.bsp file (~3.3 GB) or equivalent SPK kernels
  * 
  * Accuracy: ~cm level
  * Epoch: 1550-2650

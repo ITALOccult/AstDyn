@@ -131,18 +131,10 @@ int main(int argc, char** argv) {
             std::cout << "   Loading configuration from " << oop_file << "...\n";
             engine.load_config(oop_file);
         } else {
-            std::cout << "   Warning: " << oop_file << " not found, using default configuration.\n";
-            std::cout << "   Forcing planetary perturbations ON (Sun+Planets).\n";
+            std::cout << "   Warning: " << oop_file << " not found, using default configuration (Full Physics).\n";
             AstDynConfig config = engine.config();
             config.propagator_settings.include_planets = true;
-            config.propagator_settings.perturb_mercury = true;
-            config.propagator_settings.perturb_venus = true;
-            config.propagator_settings.perturb_earth = true;
-            config.propagator_settings.perturb_mars = true;
-            config.propagator_settings.perturb_jupiter = true;
-            config.propagator_settings.perturb_saturn = true;
-            config.propagator_settings.perturb_uranus = true;
-            config.propagator_settings.perturb_neptune = true;
+            config.propagator_settings.include_asteroids = true; 
             engine.set_config(config);
         }
 

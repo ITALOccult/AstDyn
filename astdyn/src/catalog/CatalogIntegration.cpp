@@ -244,7 +244,8 @@ ChebyshevSegment fit_chebyshev_spk(
     int            target_id,
     time::EpochTDB center_epoch,
     double         duration_days,
-    int            degree)
+    int            degree,
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem)
 {
     const double t_start = center_epoch.jd() - duration_days / 2.0;
     const double t_end   = center_epoch.jd() + duration_days / 2.0;
@@ -266,7 +267,8 @@ ChebyshevSegment fit_chebyshev_spk(
         double et_obs = (jd - c::JD2000) * 86400.0;
 
         // 1. Get Earth position at observation time
-        auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_obs);
+        auto actual_ephem = ephem ? ephem : std::make_shared<ephemeris::PlanetaryEphemeris>();
+        auto earth_state = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t_obs);
         Eigen::Vector3d r_earth = earth_state.position.to_eigen_si() / 1000.0; // km
 
         // 2. Iterative light-time correction

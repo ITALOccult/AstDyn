@@ -12,8 +12,9 @@
  */
 
 #include "astdyn/propagation/RadauIntegrator.hpp"
-#include <cmath>
-#include <stdexcept>
+#include <iostream>
+#include <iomanip>
+#include "astdyn/utils/Atomics.hpp"
 #include <algorithm>
 
 namespace astdyn::propagation {
@@ -234,8 +235,12 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
         y = y_new;
         
         stats_.num_steps++;
-        stats_.min_step_size = (stats_.min_step_size == 0.0) ? h : std::min(stats_.min_step_size, h);
-        stats_.max_step_size = std::max(stats_.max_step_size, h);
+        if (stats_.min_step_size == 0.0) {
+            stats_.min_step_size = std::abs(h);
+        } else {
+            astdyn::utils::atomic_min(stats_.min_step_size, std::abs(h));
+        }
+        astdyn::utils::atomic_max(stats_.max_step_size, std::abs(h));
         
         // Increase step size for next step
         h *= fac;

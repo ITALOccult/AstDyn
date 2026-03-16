@@ -39,9 +39,9 @@ struct AstDynConfig {
     double aas_precision = 1e-4;                         ///< Precision metric for AAS integrator (step size control)
 
     // Ephemeris Configuration
-    EphemerisType ephemeris_type = EphemerisType::Analytical; ///< Analytical, DE441
-    std::string ephemeris_file;                               ///< Path to .bsp file (if DE441)
-    std::string asteroid_ephemeris_file;                    ///< Path to asteroid .bsp file (optional)
+    EphemerisType ephemeris_type = EphemerisType::DE441; ///< Analytical, DE441 (Default to high precision)
+    std::string ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp";
+    std::string asteroid_ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp";
     
     // Differential correction settings
     int max_iterations = 10;                 ///< Maximum DC iterations
@@ -146,6 +146,7 @@ public:
     const AstDynConfig& config() const { return config_; }
     void set_verbose(bool verbose) { config_.verbose = verbose; }
     std::shared_ptr<propagation::Propagator> propagator() const { return propagator_; }
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> getEphemeris() const { return ephemeris_; }
     
     double shadow_hamiltonian_drift() const;
     long total_force_evaluations() const;

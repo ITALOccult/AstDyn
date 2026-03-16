@@ -23,7 +23,7 @@ public:
         : ephemeris_(eph), propagator_(prop) 
     {
         auto residual_calc = std::make_shared<ResidualCalculator<Frame>>(ephemeris_, propagator_);
-        auto stm_computer = std::make_shared<StateTransitionMatrix<Frame>>(propagator_);
+        auto stm_computer = std::make_shared<StateTransitionMatrix<Frame>>(propagator_, ephemeris_);
         corrector_ = std::make_unique<DifferentialCorrector<Frame>>(residual_calc, stm_computer);
     }
 

@@ -50,8 +50,8 @@ void GaussIODResult::print_summary() const {
 // GaussIOD
 // ============================================================================
 
-GaussIOD::GaussIOD(const GaussIODSettings& settings)
-    : settings_(settings) {}
+GaussIOD::GaussIOD(std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem, const GaussIODSettings& settings)
+    : settings_(settings), ephemeris_(ephem) {}
 
 GaussIODResult GaussIOD::compute(
     const std::vector<observations::OpticalObservation>& observations) {
@@ -103,9 +103,10 @@ GaussIODResult GaussIOD::compute_from_three(
     // result.state is CartesianStateTyped<core::GCRF>, it will be initialized later via from_si
     
     // Get Earth position at each observation time (Heliocentric)
-    auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t1_tdb);
-    auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t2_tdb);
-    auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t3_tdb);
+    auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
+    auto earth1 = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t1_tdb);
+    auto earth2 = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t2_tdb);
+    auto earth3 = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t3_tdb);
 
     // Apply topocentric correction: add the observatory displacement from Earth's
     // center to each observer position vector. Without this, the IOD uses the

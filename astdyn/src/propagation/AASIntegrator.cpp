@@ -5,6 +5,7 @@
 
 #include "astdyn/propagation/AASIntegrator.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/utils/Atomics.hpp"
 #include <cmath>
 #include <iostream>
 

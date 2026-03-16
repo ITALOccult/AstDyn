@@ -20,8 +20,9 @@ using namespace astdyn::propagation;
 
 template <typename Frame>
 StateTransitionMatrix<Frame>::StateTransitionMatrix(
-    std::shared_ptr<propagation::Propagator> propagator)
-    : propagator_(propagator) {
+    std::shared_ptr<propagation::Propagator> propagator,
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem)
+    : propagator_(propagator), ephemeris_(ephem) {
     
     // STM always uses a dedicated high-precision RKF78 integrator
     // to avoid interference with the propagator's integrator and ensure stability
@@ -306,8 +307,9 @@ astdyn::Matrix6d StateTransitionMatrix<Frame>::compute_jacobian(time::EpochTDB t
         
         // 2. Planetary perturbations partials (Analytical)
         if (propagator_->settings().include_planets) {
-            auto provider = ephemeris::PlanetaryEphemeris::getProvider();
-            auto sun_pos_bary = ephemeris::PlanetaryEphemeris::getSunBarycentricPosition(t);
+            auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
+            auto provider = actual_ephem->getProvider();
+            auto sun_pos_bary = actual_ephem->getSunBarycentricPosition(t);
             Eigen::Vector3d sun_pos_bary_au = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
             
             static const math::RotationMatrix<core::GCRF, core::ECLIPJ2000> rot_ecl = 

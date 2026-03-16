@@ -239,7 +239,8 @@ std::optional<math::Vector3<core::GCRF, physics::Distance>> ResidualCalculator<F
     const OpticalObservation& obs) const {
     
     time::EpochTDB t_tdb = time::to_tdb(obs.time);
-    auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_tdb);
+    auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
+    auto earth_state = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t_tdb);
     
     // earth_state is heliocentric GCRF
     math::Vector3<core::GCRF, physics::Distance> earth_center_vec = earth_state.position;
@@ -257,7 +258,8 @@ std::optional<math::Vector3<core::GCRF, physics::Velocity>> ResidualCalculator<F
     const OpticalObservation& obs) const {
     
     time::EpochTDB t_tdb = time::to_tdb(obs.time);
-    auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_tdb);
+    auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
+    auto earth_state = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t_tdb);
     
     return earth_state.velocity;
 }

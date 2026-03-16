@@ -14,6 +14,7 @@ add_executable(astdyn_unit_tests
     test_rigorous_validation.cpp
     test_integrator_comparative.cpp
     test_occultation.cpp
+    test_asteroid_perturbations.cpp
 )
 
 target_link_libraries(astdyn_unit_tests
@@ -22,6 +23,9 @@ target_link_libraries(astdyn_unit_tests
         GTest::gtest
         GTest::gtest_main
 )
+if(ASTDYN_BUILD_CATALOG)
+    target_link_libraries(astdyn_unit_tests PRIVATE astdyn_catalog)
+endif()
 
 gtest_discover_tests(astdyn_unit_tests)
 

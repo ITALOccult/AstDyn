@@ -207,11 +207,7 @@ int main(int argc, char** argv) {
         config.max_iterations = opts.max_iterations;
         config.tolerance = opts.tolerance;
         config.propagator_settings.include_planets = true;
-        config.propagator_settings.include_asteroids = false;  // Can enable if needed
-        config.propagator_settings.perturb_jupiter = true;
-        config.propagator_settings.perturb_saturn = true;
-        config.propagator_settings.perturb_earth = true;
-        config.propagator_settings.perturb_venus = true;
+        config.propagator_settings.include_asteroids = true;  // Enabled by default for precision
         
         AstDynEngine engine(config);
         

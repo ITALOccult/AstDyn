@@ -25,25 +25,29 @@ int main() {
     std::cout << "=== ASTDYN BENCHMARK: (4) VESTA OCCULTATION 2026-03-22 (BSP MODE) ===" << std::endl;
 
     // 1. Setup Ephemeris
+    auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
     auto ephem_provider = std::make_shared<ephemeris::DE441Provider>("/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp");
-    ephemeris::PlanetaryEphemeris::setProvider(ephem_provider);
+    ephem->setProvider(ephem_provider);
 
     // 2. Setup Vesta BSP Reader (sb441-n16.bsp)
     io::SPKReader vesta_reader("/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp");
     const int VESTA_NAIF_ID = 2000004;
 
-    // 3. Definizione Stella: TYC 5817-00509-1 (Mean J2000 from Occult4)
-    double star_ra_h = 22.56756392;
-    double star_dec_deg = -12.6708136;
-    SkyCoord<core::GCRF> target_star = SkyCoord<core::GCRF>::from_deg(star_ra_h * 15.0, star_dec_deg);
+    // 3. Definizione Stella: TYC 5817-00509-1 (ICRS from Occult4)
+    SkyCoord<core::GCRF> target_star = SkyCoord<core::GCRF>::from_deg(338.51345875, -12.67081361);
 
-    // 4. Time Reference (T0 = 12.58265 UTC from Occult4 <Elements> tag)
+    // 4. Time Reference (T0 = 12:34:57.55 UTC from Occult4)
     double t0_hours = 12.5826525;
     auto t0_utc = time::EpochUTC::from_mjd(time::calendar_to_mjd(2026, 3, 22, t0_hours / 24.0));
     auto t0_tdb = time::to_tdb(t0_utc);
 
     // 5. AstDyn Nominal Computation using BSP for Vesta
-    auto earth_ssb = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t0_tdb);
+    // We use heliocentric vector subtraction for maximum precision:
+    // Rho = Vesta(t-LT)_helio - Earth(t)_helio
+    
+    // Position of Earth relative to Sun
+    auto earth_helio = ephem->getState(ephemeris::CelestialBody::EARTH, t0_tdb);
+    Eigen::Vector3d p_earth_helio = earth_helio.position.to_eigen_si();
 
     double lt = 0.0;
     Eigen::Vector3d rho_vec;
@@ -51,10 +55,10 @@ int main() {
         auto t_emit = t0_tdb - time::TimeDuration::from_seconds(lt);
         double et_emit = (t_emit.jd() - constants::JD2000) * 86400.0;
         
-        Eigen::VectorXd v_ssb_emit_raw = vesta_reader.getState(VESTA_NAIF_ID, et_emit);
-        Eigen::Vector3d v_ssb_emit = v_ssb_emit_raw.head<3>() * 1000.0; // to meters
+        Eigen::VectorXd v_helio_emit_raw = vesta_reader.getState(VESTA_NAIF_ID, et_emit);
+        Eigen::Vector3d v_helio_emit = v_helio_emit_raw.head<3>() * 1000.0; // to meters
         
-        rho_vec = v_ssb_emit - earth_ssb.position.to_eigen_si();
+        rho_vec = v_helio_emit - p_earth_helio;
         lt = rho_vec.norm() / (constants::C_LIGHT * 1000.0);
     }
 
@@ -63,6 +67,14 @@ int main() {
     double dec_rad = std::asin(rho_vec.z() / rho_vec.norm());
     RightAscension vesta_ra(Angle::from_rad(ra_rad));
     Declination vesta_dec(Angle::from_rad(dec_rad));
+    
+    std::cout << "  [DEBUG] Vesta RA:  " << vesta_ra.to_deg() << " deg" << std::endl;
+    std::cout << "  [DEBUG] Vesta Dec: " << vesta_dec.to_deg() << " deg" << std::endl;
+    std::cout << "  [DEBUG] Star RA:   " << target_star.ra().to_deg() << " deg" << std::endl;
+    std::cout << "  [DEBUG] Star Dec:  " << target_star.dec().to_deg() << " deg" << std::endl;
+    
+    auto vesta_sky = SkyCoord<core::GCRF>::from_rad(vesta_ra.to_rad(), vesta_dec.to_rad());
+    std::cout << "  [DEBUG] Separation: " << (target_star.separation(vesta_sky).to_arcsec()) << " arcsec" << std::endl;
 
     // Rate computation
     auto t1_tdb = t0_tdb + time::TimeDuration::from_seconds(1.0);
@@ -71,8 +83,12 @@ int main() {
     Eigen::VectorXd v_ssb_emit1_raw = vesta_reader.getState(VESTA_NAIF_ID, et_emit1);
     Eigen::Vector3d v_ssb_emit1 = v_ssb_emit1_raw.head<3>() * 1000.0;
     
-    auto earth_ssb1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t1_tdb);
+    auto earth_ssb1 = ephem->getState(ephemeris::CelestialBody::EARTH, t1_tdb);
     Eigen::Vector3d rho_vec1 = v_ssb_emit1 - earth_ssb1.position.to_eigen_si();
+    if (vesta_reader.getCenter(VESTA_NAIF_ID) == 10) {
+        auto sun_ssb1 = ephem->getState(ephemeris::CelestialBody::SUN, t1_tdb - time::TimeDuration::from_seconds(lt));
+        rho_vec1 += sun_ssb1.position.to_eigen_si();
+    }
 
     double ra_rad1 = std::atan2(rho_vec1.y(), rho_vec1.x());
     double dec_rad1 = std::asin(rho_vec1.z() / rho_vec1.norm());
@@ -86,11 +102,15 @@ int main() {
     Angle ddec = Angle::from_rad(dec_rad1 - dec_rad);
     physics::Velocity v_rad = physics::Velocity::from_ms(rho_vec1.norm() - rho_vec.norm());
 
+    std::cout << "[DEBUG] Vesta Motion RA:  " << (dra.to_arcsec() * 3600.0) << " \"/hr" << std::endl;
+    std::cout << "[DEBUG] Vesta Motion Dec: " << (ddec.to_arcsec() * 3600.0) << " \"/hr" << std::endl;
+
     auto params_astdyn = OccultationLogic::compute_parameters(
         target_star.ra(), target_star.dec(),
         vesta_ra, vesta_dec,
         physics::Distance::from_m(rho_vec.norm()),
-        dra, ddec, v_rad
+        dra, ddec, v_rad,
+        t0_tdb, ephem
     );
 
     // 6. Official Occult4 Elements
@@ -102,10 +122,16 @@ int main() {
     params_official.position_angle = Angle::from_rad(std::atan2(24.8204827, 8.4418234)).wrap_0_2pi();
     params_official.dxi_dt = physics::Velocity::from_ms(24.8204827 * R_E * 1000.0 / 3600.0);
     params_official.deta_dt = physics::Velocity::from_ms(8.4418234 * R_E * 1000.0 / 3600.0);
-    params_official.closest_approach_time_offset = time::TimeDuration::zero();
+    params_official.t_ca = t0_tdb;
 
-    // 7. Output and Comparison
+    // 7. Output
     std::cout << "\n--- RESULTS COMPARISON (Fundamental Plane) ---" << std::endl;
+    std::cout << "  AstDyn Star RA (deg):  " << target_star.ra().to_deg() << std::endl;
+    std::cout << "  AstDyn Star Dec (deg): " << target_star.dec().to_deg() << std::endl;
+    std::cout << "  AstDyn T_ca (MJD):     " << params_astdyn.t_ca.mjd() << std::endl;
+    std::cout << "  AstDyn T_ca (UTC):     " << time::format_time(time::tdb_to_utc(params_astdyn.t_ca.mjd())) << std::endl;
+    
+    // Comparison Table... (rest of printing)
     std::cout << std::left << std::setw(20) << "Parameter" << std::setw(20) << "AstDyn" << std::setw(20) << "Occult4" << std::setw(20) << "Diff" << std::endl;
     std::cout << std::string(80, '-') << std::endl;
     
@@ -128,10 +154,10 @@ int main() {
 
     // 8. Mapping
     physics::Distance diameter = physics::Distance::from_km(529.226);
-    auto path_astdyn = OccultationMapper::compute_path(params_astdyn, target_star.ra(), target_star.dec(), diameter, t0_utc, time::TimeDuration::from_seconds(3600.0));
-    auto path_official = OccultationMapper::compute_path(params_official, target_star.ra(), target_star.dec(), diameter, t0_utc, time::TimeDuration::from_seconds(3600.0));
+    auto path_astdyn = OccultationMapper::compute_path(params_astdyn, target_star.ra(), target_star.dec(), diameter, t0_utc, ephem, time::TimeDuration::from_seconds(3600.0));
+    auto path_official = OccultationMapper::compute_path(params_official, target_star.ra(), target_star.dec(), diameter, t0_utc, ephem, time::TimeDuration::from_seconds(3600.0));
 
-    OccultationMapper::export_global_svg({path_astdyn, path_official}, {"AstDyn BSP", "Occult4 Official"}, {"#06b6d4", "#ef4444"}, "vesta_2026_map.svg");
+    OccultationMapper::export_global_svg({path_astdyn, path_official}, {"AstDyn BSP", "Occult4 Official"}, {"#06b6d4", "#ef4444"}, "vesta_2026_map.svg", ephem);
     OccultationMapper::export_kml(path_astdyn, "vesta_astdyn.kml");
     OccultationMapper::export_kml(path_official, "vesta_official.kml");
 

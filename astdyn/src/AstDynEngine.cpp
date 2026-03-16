@@ -108,22 +108,25 @@ void AstDynEngine::update_propagator() {
             try {
                 if (config_.verbose) std::cout << "Loading DE441 Ephemeris: " << config_.ephemeris_file << "...\n";
                 auto provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
-                ephemeris::PlanetaryEphemeris::setProvider(provider);
+                ephemeris_->setProvider(provider);
+                ephemeris::PlanetaryEphemeris::setGlobalProvider(provider); // For legacy static calls
                 cached_provider = provider;
                 last_path = config_.ephemeris_file;
                 ephemeris_loaded_ = true;
             } catch (const std::exception& e) {
                 std::cerr << "Error loading DE441: " << e.what() << "\n";
-                ephemeris::PlanetaryEphemeris::setProvider(nullptr);
+                ephemeris_->setProvider(nullptr);
                 ephemeris_loaded_ = false;
             }
         } else {
-            ephemeris::PlanetaryEphemeris::setProvider(cached_provider);
+            ephemeris_->setProvider(cached_provider);
+            ephemeris::PlanetaryEphemeris::setGlobalProvider(cached_provider);
             ephemeris_loaded_ = true;
         }
     }
  else if (config_.ephemeris_type == EphemerisType::Analytical) {
-        ephemeris::PlanetaryEphemeris::setProvider(nullptr);
+        ephemeris_->setProvider(nullptr);
+        ephemeris::PlanetaryEphemeris::setGlobalProvider(nullptr);
         ephemeris_loaded_ = false;
     }
     
@@ -134,7 +137,7 @@ void AstDynEngine::update_propagator() {
         ephemeris_,
         config_.propagator_settings);
     
-    ca_detector_ = std::make_unique<CloseApproachDetector>(propagator_, config_.ca_settings);
+    ca_detector_ = std::make_unique<CloseApproachDetector>(propagator_, ephemeris_, config_.ca_settings);
 }
 
 void AstDynEngine::load_config(const std::string& config_file) {
@@ -150,9 +153,18 @@ void AstDynEngine::load_config(const std::string& config_file) {
     config_.aas_precision = ioc.get<double>("integrator.aas_precision", 1e-4);
     
     // Ephemeris
-    config_.ephemeris_type = string_to_ephemeris(ioc.get<std::string>("ephemeris.type", "Analytical"));
-    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", "");
-    config_.asteroid_ephemeris_file = ioc.get<std::string>("ephemeris.asteroid_file", "");
+    config_.ephemeris_type = string_to_ephemeris(ioc.get<std::string>("ephemeris.type", "DE441"));
+    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp");
+    config_.asteroid_ephemeris_file = ioc.get<std::string>("ephemeris.asteroid_file", "/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp");
+    
+    // Force Model Precision
+    auto& ps = config_.propagator_settings;
+    ps.include_sun_j2 = ioc.get<bool>("physics.sun_j2", true);
+    ps.include_earth_j2 = ioc.get<bool>("physics.earth_j2", true);
+    ps.include_asteroids = ioc.get<bool>("physics.asteroids.enabled", true);
+    ps.use_default_asteroid_set = ioc.get<bool>("physics.asteroids.use_default_17", true);
+    ps.use_default_30_set = ioc.get<bool>("physics.asteroids.use_default_30", false);
+    ps.include_relativity = ioc.get<bool>("physics.relativity", true);
     
     // DiffCorr
     config_.max_iterations = ioc.get<int>("diffcorr.max_iter", 10);
@@ -205,7 +217,7 @@ physics::KeplerianStateTyped<core::ECLIPJ2000> AstDynEngine::initial_orbit_deter
         throw std::runtime_error("Insufficient observations for IOD (need 3)");
     }
     
-    GaussIOD iod;
+    GaussIOD iod(ephemeris_);
     auto iod_res = iod.compute(obs_context_.observations());
     if (!iod_res.success) throw std::runtime_error("IOD failed: " + iod_res.error_message);
     

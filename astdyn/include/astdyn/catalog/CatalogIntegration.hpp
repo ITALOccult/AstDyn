@@ -20,6 +20,7 @@
 #include "astdyn/astrometry/sky_types.hpp"
 #include "astdyn/time/epoch.hpp"
 #include "astdyn/io/SPKReader.hpp"
+#include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "src/core/frame_tags.hpp"
 #include <vector>
 
@@ -159,7 +160,8 @@ namespace astdyn::catalog {
     int            target_id,
     time::EpochTDB center_epoch,
     double         duration_days,
-    int            degree = 12
+    int            degree = 12,
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem = nullptr
 );
 
 /**

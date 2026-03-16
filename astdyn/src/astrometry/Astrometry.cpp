@@ -44,7 +44,7 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     if (!de441) return std::unexpected(AstrometryError::EphemerisUnavailable);
     
     // Sync PlanetaryEphemeris provider too
-    ephemeris::PlanetaryEphemeris::setProvider(de441);
+    ephemeris::PlanetaryEphemeris::setGlobalProvider(de441);
 
     // Get Earth state in GCRF and transform to Ecliptic J2000
     auto earth_p_eq = de441->getPosition(ephemeris::CelestialBody::EARTH, t_obs);
@@ -102,7 +102,7 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     if (e_cfg.ephemeris_file.empty()) return std::unexpected(AstrometryError::EphemerisUnavailable);
     auto de441 = get_cached_provider(e_cfg.ephemeris_file);
     if (!de441) return std::unexpected(AstrometryError::EphemerisUnavailable);
-    ephemeris::PlanetaryEphemeris::setProvider(de441);
+    ephemeris::PlanetaryEphemeris::setGlobalProvider(de441);
 
     // Transform initial state to Ecliptic properly
     auto pos_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(initial.position);

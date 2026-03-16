@@ -30,7 +30,13 @@ namespace astdyn::propagation {
 struct PropagatorSettings {
     bool include_planets = true;        ///< Include planetary perturbations
     bool include_moon = true;           ///< Include Moon separately
-    bool include_asteroids = false;     ///< Include asteroid perturbations (AST17)
+    bool include_asteroids = true;     ///< Include asteroid perturbations
+    // Asteroid selection
+    std::vector<int> include_asteroids_list = {};    ///< Specific asteroid numbers to include
+    std::vector<int> exclude_asteroids_list = {};    ///< Specific asteroid numbers to exclude
+    bool use_default_asteroid_set = true;          ///< If true, loads a predefined set of 17 massive asteroids (Pluto + 16)
+    bool use_default_30_set = false;                ///< If true, loads the top 30 most massive asteroids (BC405 or similar)
+
     // Planetary perturbations to include (if include_planets=true)
     bool perturb_mercury = true;
     bool perturb_venus = true;
@@ -40,7 +46,7 @@ struct PropagatorSettings {
     bool perturb_saturn = true;
     bool perturb_uranus = true;
     bool perturb_neptune = true;
-    
+
     double central_body_gm = constants::GMS; ///< Central body GM [AU³/day²] (heliocentric)
     
     // Relativity PPN parameters (Default: GR)
@@ -48,9 +54,13 @@ struct PropagatorSettings {
     double ppn_beta = 1.0;
     double ppn_gamma = 1.0;
 
+    // Harmonic corrections
+    bool include_earth_j2 = true;     ///< Include Earth J2 perturbation
+    bool include_sun_j2 = true;       ///< Include Sun J2 perturbation
+
     // Optional: Path to Asteroid SPK kernel (e.g. codes_300ast.bsp)
     // If empty, uses analytical approximation (AST17 constants)
-    std::string asteroid_ephemeris_file = "";
+    std::string asteroid_ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp";
 
     // Frame Settings
     bool integrate_in_ecliptic = true; ///< Forced true to match propagate_cartesian requirement.

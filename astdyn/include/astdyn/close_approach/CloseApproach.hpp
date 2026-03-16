@@ -146,6 +146,7 @@ public:
      */
     CloseApproachDetector(
         std::shared_ptr<propagation::Propagator> propagator,
+        std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
         const CloseApproachSettings& settings = CloseApproachSettings());
     
     /**
@@ -191,6 +192,7 @@ public:
 
 private:
     std::shared_ptr<propagation::Propagator> propagator_;
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
     CloseApproachSettings settings_;
     
     /**

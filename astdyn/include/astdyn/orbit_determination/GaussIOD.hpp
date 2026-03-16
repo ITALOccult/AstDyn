@@ -84,7 +84,8 @@ public:
     /**
      * @brief Constructor
      */
-    explicit GaussIOD(const GaussIODSettings& settings = GaussIODSettings());
+    explicit GaussIOD(std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem = nullptr, 
+                      const GaussIODSettings& settings = GaussIODSettings());
     
     /**
      * @brief Determine orbit from observations
@@ -118,6 +119,7 @@ public:
 
 private:
     GaussIODSettings settings_;
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
     
     /**
      * @brief Select three optimal observations

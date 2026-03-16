@@ -60,6 +60,7 @@ public:
         const Declination& star_dec,
         const physics::Distance& asteroid_diameter,
         const time::EpochUTC& tca_utc,
+        std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem,
         const time::TimeDuration& duration = time::TimeDuration::from_seconds(3600.0));
 
     /**
@@ -85,6 +86,7 @@ public:
         const std::vector<std::string>& labels,
         const std::vector<std::string>& colors,
         const std::string& filename,
+        std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem,
         double center_lat = 0.0,
         double center_lon = 0.0,
         double zoom = 1.0);
@@ -116,7 +118,8 @@ private:
     /**
      * @brief Computes the points of the day/night terminator.
      */
-    static std::vector<GeoPoint> compute_terminator(const time::EpochTDB& t);
+    static std::vector<GeoPoint> compute_terminator(const time::EpochTDB& t, 
+                                                   std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem);
 };
 
 } // namespace astdyn::astrometry

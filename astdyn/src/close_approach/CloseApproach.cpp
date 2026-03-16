@@ -120,8 +120,9 @@ namespace {
 
 CloseApproachDetector::CloseApproachDetector(
     std::shared_ptr<Propagator> propagator,
+    std::shared_ptr<PlanetaryEphemeris> ephemeris,
     const CloseApproachSettings& settings)
-    : propagator_(propagator), settings_(settings)
+    : propagator_(propagator), ephemeris_(ephemeris), settings_(settings)
 {
     if (!propagator_) {
         throw std::invalid_argument("CloseApproachDetector: null propagator");
@@ -224,7 +225,8 @@ double CloseApproachDetector::compute_distance(
     BodyType body) const
 {
     CelestialBody cb = to_celestial_body(body);
-    auto planet_pos = PlanetaryEphemeris::getPosition(cb, t);
+    auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<PlanetaryEphemeris>();
+    auto planet_pos = actual_ephem->getPosition(cb, t);
     return (state.position.to_eigen_si() - planet_pos.to_eigen_si()).norm();
 }
 
@@ -292,8 +294,9 @@ CloseApproach CloseApproachDetector::build_approach(
     ca.velocity_object = state.velocity;
     
     CelestialBody cb = to_celestial_body(body);
-    ca.position_body = PlanetaryEphemeris::getPosition(cb, t);
-    ca.velocity_body = PlanetaryEphemeris::getVelocity(cb, t);
+    auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<PlanetaryEphemeris>();
+    ca.position_body = actual_ephem->getPosition(cb, t);
+    ca.velocity_body = actual_ephem->getVelocity(cb, t);
     
     ca.rel_position = ca.position_object - ca.position_body;
     ca.rel_velocity = ca.velocity_object - ca.velocity_body;

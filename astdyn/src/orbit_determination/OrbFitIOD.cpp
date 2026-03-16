@@ -11,7 +11,8 @@
 
 namespace astdyn::orbit_determination {
 
-OrbFitIOD::OrbFitIOD(const GaussIODSettings& settings) : settings_(settings) {}
+OrbFitIOD::OrbFitIOD(std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem, const GaussIODSettings& settings) 
+    : settings_(settings), ephemeris_(ephem) {}
 
 std::optional<std::array<int, 3>> OrbFitIOD::select_observations(
     const std::vector<observations::OpticalObservation>& observations) const {
@@ -26,7 +27,7 @@ GaussIODResult OrbFitIOD::compute_from_three(
     const observations::OpticalObservation& obs2,
     const observations::OpticalObservation& obs3) {
 
-    auto convert_obs = [](const observations::OpticalObservation& o) -> orbfit::Observation {
+    auto convert_obs = [this](const observations::OpticalObservation& o) -> orbfit::Observation {
         orbfit::Observation out;
         out.t_obs = o.time.mjd() + 2400000.5; // JD
         out.ra = o.ra.to_rad();
@@ -36,7 +37,10 @@ GaussIODResult OrbFitIOD::compute_from_three(
         out.station_code = o.observatory_code;
         
         auto t_tdb = astdyn::time::EpochTDB::from_mjd(o.time.mjd()); // Just approximate UTC=TDB for this
-        auto earth = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t_tdb);
+        
+        // Use instance ephemeris if available, otherwise fallback
+        auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
+        auto earth = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t_tdb);
         math::Vector3<core::GCRF, physics::Distance> R = earth.position;
         const auto& obs_db = observations::ObservatoryDatabase::getInstance();
         if (auto info = obs_db.getObservatory(o.observatory_code)) {

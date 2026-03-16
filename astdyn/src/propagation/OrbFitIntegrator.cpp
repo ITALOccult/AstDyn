@@ -1,6 +1,7 @@
 #include "astdyn/propagation/OrbFitIntegrator.hpp"
 #include <cmath>
 #include <algorithm>
+#include "astdyn/utils/Atomics.hpp"
 
 namespace astdyn::propagation {
 
@@ -77,8 +78,12 @@ void OrbFitDPIntegrator::integrate_steps(const DerivativeFunction& f,
             t_out.push_back(t);
             y_out.push_back(y);
             stats_.num_steps++;
-            if(stats_.min_step_size == 0.0 || std::abs(h) < stats_.min_step_size) stats_.min_step_size = std::abs(h);
-            if(std::abs(h) > stats_.max_step_size) stats_.max_step_size = std::abs(h);
+            if(stats_.min_step_size == 0.0) {
+                stats_.min_step_size = std::abs(h);
+            } else {
+                astdyn::utils::atomic_min(stats_.min_step_size, std::abs(h));
+            }
+            astdyn::utils::atomic_max(stats_.max_step_size, std::abs(h));
         } else {
             stats_.num_rejected_steps++;
         }
@@ -160,8 +165,12 @@ void OrbFitRK4Integrator::integrate_steps(const DerivativeFunction& f,
         
         stats_.num_function_evals += 4;
         stats_.num_steps++;
-        if(stats_.min_step_size == 0.0 || std::abs(h) < stats_.min_step_size) stats_.min_step_size = std::abs(h);
-        if(std::abs(h) > stats_.max_step_size) stats_.max_step_size = std::abs(h);
+        if(stats_.min_step_size == 0.0) {
+            stats_.min_step_size = std::abs(h);
+        } else {
+            astdyn::utils::atomic_min(stats_.min_step_size, std::abs(h));
+        }
+        astdyn::utils::atomic_max(stats_.max_step_size, std::abs(h));
 
         t_out.push_back(t);
         y_out.push_back(y);

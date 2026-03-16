@@ -42,7 +42,8 @@ namespace ephemeris {
  * @brief Asteroid data for perturbation calculations
  */
 struct AsteroidData {
-    int number;                           ///< Asteroid number
+    int number;                           ///< Asteroid number (displayed/config)
+    int naif_id;                          ///< NAIF ID for SPK lookup
     std::string name;                     ///< Name
     physics::GravitationalParameter gm;    ///< Gravitational parameter
     physics::Distance a;                  ///< Semi-major axis
@@ -59,8 +60,9 @@ struct AsteroidData {
      */
     AsteroidData(int num, std::string nam, double gm_val, double a_au, double ecc, 
                  double i_deg, double om_deg, double Om_deg, double m0_deg, 
-                 double mjd, double n_deg_day)
-        : number(num), name(std::move(nam)), 
+                 double mjd, double n_deg_day, int naif = -1)
+        : number(num), naif_id(naif == -1 ? (num < 1000000 ? 2000000 + num : num) : naif), 
+          name(std::move(nam)), 
           gm(physics::GravitationalParameter::from_km3_s2(gm_val)),
           a(physics::Distance::from_au(a_au)), e(ecc),
           i(astrometry::Angle::from_deg(i_deg)),
@@ -172,6 +174,17 @@ public:
      * @brief Load default AST17 asteroid data
      */
     void loadDefaultAsteroids();
+
+    /**
+     * @brief Load the specific AstDyn default set of 17 asteroids (Pluto + 16 massive asteroids)
+     * with custom numbering 10-26 as requested.
+     */
+    void loadAstDynDefaultSet();
+
+    /**
+     * @brief Load the top 30 most massive asteroids
+     */
+    void loadDefault30Asteroids();
 
     /**
      * @brief Load asteroid SPK file for precise positions

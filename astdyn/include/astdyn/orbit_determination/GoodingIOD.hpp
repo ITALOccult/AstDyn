@@ -56,7 +56,7 @@ public:
             verbose(false) {}
     };
 
-    explicit GoodingIOD(const Settings& settings = Settings());
+    explicit GoodingIOD(std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem, const Settings& settings = Settings());
 
     /**
      * @brief Compute orbit using Gooding's algorithm.
@@ -77,6 +77,7 @@ public:
 
 private:
     Settings settings_;
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem_;
 
     /** @brief Newton iteration core. */
     bool solve_iteration(

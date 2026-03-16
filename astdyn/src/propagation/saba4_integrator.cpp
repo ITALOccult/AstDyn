@@ -154,7 +154,7 @@ Eigen::VectorXd SABA4Integrator::integrate(const DerivativeFunction& f,
     h = std::abs(h) * direction;
 
     while (std::abs(tf - t) > 1e-14) {
-        if (stats_.num_steps >= max_steps) {
+        if (stats_.num_steps.load() >= max_steps) {
             std::cerr << "[SABA4] Warning: max steps " << max_steps << " reached.\n";
             break;
         }
@@ -214,7 +214,7 @@ void SABA4Integrator::integrate_steps(const DerivativeFunction& f,
 
     const int max_steps = 5000000;
     while (t < tf) {
-        if (stats_.num_steps >= max_steps) break;
+        if (stats_.num_steps.load() >= max_steps) break;
         if (t + h > tf) h = tf - t;
 
         Eigen::VectorXd y_saba4 = saba4_step(f, y, t, h);

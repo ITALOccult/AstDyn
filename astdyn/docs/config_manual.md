@@ -48,11 +48,21 @@ Controls the numerical integration of asteroid orbits.
 
 ### 2.2 `ephemeris`
 Controls solar system barycentric ephemeris sources.
-- `type` (string): `Analytical` (low precision), `DE441` (high precision JPL).
-- `file` (string): Absolute path to the JPL `.bsp` file (e.g., `de441.bsp`).
-- `asteroid_file` (string): Optional path to a `.bsp` containing specific asteroid ephemerides for perturbations.
+- `type` (string): `Analytical` (low precision), `DE441` (high precision JPL - **Default**).
+- `file` (string): Absolute path to the JPL `.bsp` file (default: `/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp`).
+- `asteroid_file` (string): Path to a `.bsp` containing asteroid ephemerides (default: `/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp`).
 
-### 2.3 `diffcorr`
+### 2.3 `physics`
+Controls the high-precision force model.
+- `sun_j2` (bool): Include Sun J2 oblateness (default: `true`).
+- `earth_j2` (bool): Include Earth J2 oblateness (default: `true`).
+- `relativity` (bool): Include General Relativity PPN corrections (default: `true`).
+- `asteroids`:
+  - `enabled` (bool): Enable asteroid perturbations (default: `true`).
+  - `use_default_17` (bool): Use the AstDyn default set of 17 massive asteroids + Pluto (default: `true`).
+  - `use_default_30` (bool): Use the top 30 most massive asteroids (BC405 set) (default: `false`).
+
+### 2.4 `diffcorr`
 Controls the Differential Correction (Least Squares) orbit fitting process.
 - `max_iter` (int): Maximum number of iterations (default: `10`).
 - `convergence` (double): Convergence threshold in AU on the state vector (default: `1e-6`).
@@ -61,7 +71,7 @@ Controls the Differential Correction (Least Squares) orbit fitting process.
 - `aberration` (bool): Apply annual stellar aberration correction.
 - `light_deflection` (bool): Apply gravitational light deflection (GR).
 
-### 2.4 `occultation` (Engine-level)
+### 2.5 `occultation` (Engine-level)
 Controls the discovery and refinement logic for occultation candidates.
 - `min_sun_alt` (double): Maximum Sun altitude for visibility (default: `-12.0`).
 - `min_obj_alt` (double): Minimum asteroid altitude for visibility at center line.
@@ -122,7 +132,17 @@ integrator {
 
 ephemeris {
   type = DE441
-  file = /Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp
+  file = /Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp
+  asteroid_file = /Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp
+}
+
+physics {
+  sun_j2 = true
+  earth_j2 = true
+  asteroids {
+    enabled = true
+    use_default_17 = true
+  }
 }
 
 occultation {

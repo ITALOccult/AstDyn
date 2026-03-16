@@ -76,7 +76,8 @@ static bool kepler_prop(const Eigen::Vector3d& r0, const Eigen::Vector3d& v0,
     return true;
 }
 
-GoodingIOD::GoodingIOD(const Settings& settings) : settings_(settings) {}
+GoodingIOD::GoodingIOD(std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem, const Settings& settings) 
+    : settings_(settings), ephem_(ephem) {}
 
 GoodingIODResult GoodingIOD::compute(
     const observations::OpticalObservation& obs1,
@@ -108,9 +109,9 @@ GoodingIODResult GoodingIOD::compute(
     Eigen::Vector3d L3 = compute_los(obs3.ra, obs3.dec);
 
     // Get Earth positions
-    auto earth1 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t1);
-    auto earth2 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t2);
-    auto earth3 = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t3);
+    auto earth1 = ephem_->getState(ephemeris::CelestialBody::EARTH, t1);
+    auto earth2 = ephem_->getState(ephemeris::CelestialBody::EARTH, t2);
+    auto earth3 = ephem_->getState(ephemeris::CelestialBody::EARTH, t3);
 
     math::Vector3<core::GCRF, physics::Distance> R1 = earth1.position;
     math::Vector3<core::GCRF, physics::Distance> R2 = earth2.position;

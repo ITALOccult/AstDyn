@@ -100,6 +100,12 @@ constexpr double R_EARTH = 6378.137;
 /// Earth flattening (WGS84)
 constexpr double EARTH_FLATTENING = 1.0 / 298.257223563;
 
+/// Earth J2 harmonic coefficient (WGS84)
+constexpr double EARTH_J2 = 0.001082626322;
+
+/// Sun J2 harmonic coefficient
+constexpr double SUN_J2 = 2.2e-7;
+
 /// Obliquity of the Ecliptic at J2000.0 [rad] (IAU 2006: 84381.406 arcsec).
 /// This is the fixed value at J2000.0.  For a time-varying value use
 /// coordinates::ReferenceFrame::mean_obliquity(epoch).

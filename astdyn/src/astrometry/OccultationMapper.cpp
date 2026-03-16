@@ -61,6 +61,7 @@ OccultationPath OccultationMapper::compute_path(
     const Declination& star_dec,
     const physics::Distance& asteroid_diameter,
     const time::EpochUTC& tca_utc,
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem,
     const time::TimeDuration& duration) 
 {
     using namespace constants;
@@ -79,9 +80,9 @@ OccultationPath OccultationMapper::compute_path(
         
         // Offset perpendicular to track (for limits and sigma)
         if (std::abs(offset_perp_m) > 1e-3) {
-            double pa_rad = params.position_angle.to_rad();
-            xi_m += offset_perp_m * std::cos(pa_rad);
-            eta_m -= offset_perp_m * std::sin(pa_rad);
+            double v_norm = std::sqrt(vxi*vxi + veta*veta);
+            xi_m += offset_perp_m * (-veta / v_norm);
+            eta_m += offset_perp_m * ( vxi  / v_norm);
         }
 
         double r_earth_m = constants::R_EARTH * 1000.0;
@@ -196,13 +197,17 @@ void OccultationMapper::export_comparison_svg(
     ofs << "</svg>\n";
 }
 
-std::vector<GeoPoint> OccultationMapper::compute_terminator(const time::EpochTDB& t) {
+std::vector<GeoPoint> OccultationMapper::compute_terminator(const time::EpochTDB& t,
+                                                   std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem) {
     using namespace constants;
     std::vector<GeoPoint> points;
     
+    // Fallback if ephem is null to avoid crash (though it should be provided)
+    auto actual_ephem = ephem ? ephem : std::make_shared<ephemeris::PlanetaryEphemeris>();
+
     // 1. Get Sun position in GCRF
-    auto sun_ssb = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, t);
-    auto earth_ssb = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, t);
+    auto sun_ssb = actual_ephem->getState(ephemeris::CelestialBody::SUN, t);
+    auto earth_ssb = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t);
     Eigen::Vector3d s_vec = (sun_ssb.position.to_eigen_si() - earth_ssb.position.to_eigen_si()).normalized();
     
     // 2. Earth Rotation Angle (ERA)
@@ -248,6 +253,7 @@ void OccultationMapper::export_global_svg(
     const std::vector<std::string>& labels,
     const std::vector<std::string>& colors,
     const std::string& filename,
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem,
     double center_lat,
     double center_lon,
     double zoom)
@@ -317,7 +323,7 @@ void OccultationMapper::export_global_svg(
     ofs << "  </g>\n";
 
     // 4. Day/Night Terminator
-    auto term_pts = compute_terminator(time::EpochTDB::from_jd(2461121.5));
+    auto term_pts = compute_terminator(time::EpochTDB::from_jd(2461121.5), ephem);
     if (!term_pts.empty()) {
         ofs << "  <polyline points=\"";
         for (const auto& pt : term_pts) ofs << lon_to_svg(pt.lon.to_deg()) << "," << lat_to_svg(pt.lat.to_deg()) << " ";

@@ -4,11 +4,14 @@
  */
 
 #include "astdyn/propagation/Integrator.hpp"
+#include "astdyn/utils/Atomics.hpp"
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>
 
 namespace astdyn::propagation {
+
+using namespace astdyn::utils;
 
 // ============================================================================
 // RK4Integrator Implementation
@@ -239,8 +242,8 @@ bool RKF78Integrator::adaptive_step(const DerivativeFunction& f,
         h_new_abs = std::max(h_new_abs, h_min_);
         
         // Update statistics
-        stats_.min_step_size = std::min(stats_.min_step_size, std::abs(h));
-        stats_.max_step_size = std::max(stats_.max_step_size, std::abs(h));
+        atomic_min(stats_.min_step_size, std::abs(h));
+        atomic_max(stats_.max_step_size, std::abs(h));
         
         h = direction * h_new_abs;  // Preserve direction
         return true;

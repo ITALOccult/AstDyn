@@ -13,7 +13,7 @@ namespace astdyn::orbit_determination {
  */
 class OrbFitIOD {
 public:
-    explicit OrbFitIOD(const GaussIODSettings& settings = GaussIODSettings());
+    explicit OrbFitIOD(std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem = nullptr, const GaussIODSettings& settings = GaussIODSettings());
 
     /**
      * @brief Determine orbit from multiple observations (selects best 3).
@@ -38,6 +38,7 @@ public:
 
 private:
     GaussIODSettings settings_;
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
 
     std::optional<std::array<int, 3>> select_observations(
         const std::vector<observations::OpticalObservation>& observations) const;

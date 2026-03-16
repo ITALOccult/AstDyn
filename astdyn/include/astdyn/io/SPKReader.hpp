@@ -6,6 +6,7 @@
 #include <vector>
 #include <map>
 #include <Eigen/Dense>
+#include <mutex>
 
 namespace astdyn::io {
 
@@ -27,6 +28,7 @@ public:
      * @return 6D vector [km, km/s] in Ecliptic J2000 frame
      */
     Eigen::Matrix<double, 6, 1> getState(int target_id, double et);
+    int getCenter(int target_id) const;
 
 private:
     struct SPKSegment {
@@ -55,6 +57,7 @@ private:
 
     std::string filename_;
     std::ifstream file_;
+    mutable std::mutex file_mutex_; // Mutex for thread-safety
     bool big_endian_ = false;
     std::multimap<int, SPKSegment> segments_;
     std::map<int, Type2Cache> type2_cache_;
@@ -67,9 +70,6 @@ private:
     Eigen::Matrix<double, 6, 1> evaluateType2(const SPKSegment& seg, double et);
     Eigen::Matrix<double, 6, 1> evaluateType13(const SPKSegment& seg, double et);
 
-    // Buffers to avoid allocations
-    std::vector<double> T_buf_;
-    std::vector<double> U_buf_;
 };
 
 } // namespace astdyn::io

@@ -81,11 +81,11 @@ PYBIND11_MODULE(pyastdyn, m) {
         .export_values();
 
     py::class_<astdyn::ephemeris::PlanetaryEphemeris>(m, "PlanetaryEphemeris")
-        .def_static("get_position", [](astdyn::ephemeris::CelestialBody body, const time::EpochTDB& t) {
-            auto pos = astdyn::ephemeris::PlanetaryEphemeris::getPosition(body, t);
-            return pos.to_eigen_si(); // returns Eigen::Vector3d in meters
+        .def(py::init<>()) // Add default constructor for Python to create instances
+        .def("get_position", [](astdyn::ephemeris::PlanetaryEphemeris& self, astdyn::ephemeris::CelestialBody body, astdyn::time::EpochTDB t) {
+            return self.getPosition(body, t).to_eigen_si(); // returns Eigen::Vector3d in meters
         })
-        .def_static("set_provider", &astdyn::ephemeris::PlanetaryEphemeris::setProvider);
+        .def_static("set_provider", &astdyn::ephemeris::PlanetaryEphemeris::setGlobalProvider);
 
     // --- IO Module ---
     py::class_<io::MPCParser>(m, "MPCParser")

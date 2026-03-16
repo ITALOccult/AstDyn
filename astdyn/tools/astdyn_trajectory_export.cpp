@@ -44,8 +44,14 @@ int main(int argc, char** argv) {
         ("step", po::value<double>()->default_value(30.0), "output step (days)")
         ("integrator", po::value<std::string>()->default_value("AAS"), "AAS | RKF78 | GL8")
         ("tolerance", po::value<double>()->default_value(1e-4), "tolerance (for RKF78/GL8) or precision (for AAS)")
-        ("forces", po::value<std::string>()->default_value("full"), "full | twobody")
+        ("forces", po::value<std::string>(), "full | twobody (shortcut to toggle all)")
         ("output", po::value<std::string>()->default_value("trajectory.csv"), "output CSV file")
+        ("sun-j2", po::value<bool>()->default_value(true), "include Sun J2")
+        ("earth-j2", po::value<bool>()->default_value(true), "include Earth J2")
+        ("relativity", po::value<bool>()->default_value(true), "include General Relativity")
+        ("asteroids", po::value<bool>()->default_value(true), "include asteroid perturbations")
+        ("asteroid-set", po::value<std::string>()->default_value("17"), "17 (AstDyn set) | 30 (BC405 set)")
+        ("ephem", po::value<std::string>(), "path to planetary ephemeris BSP")
         ("stm", "include State Transition Matrix integration")
     ;
 
@@ -75,7 +81,6 @@ int main(int argc, char** argv) {
     std::string output_file = vm["output"].as<std::string>();
     std::string integrator_name = vm["integrator"].as<std::string>();
     double tol = vm["tolerance"].as<double>();
-    std::string forces = vm["forces"].as<std::string>();
 
     // --- 1. Fetch Initial State from Horizons ---
     HorizonsClient horizons;
@@ -92,32 +97,56 @@ int main(int argc, char** argv) {
     Eigen::VectorXd y0_au = state_res->to_eigen_au_aud();
 
     // --- 2. Setup Ephemeris and Propagator ---
-    std::string bsp_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp";
-    if (!std::filesystem::exists(bsp_path)) {
+    std::string bsp_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp";
+    if (vm.count("ephem")) {
+        bsp_path = vm["ephem"].as<std::string>();
+    } else if (!std::filesystem::exists(bsp_path)) {
         bsp_path = "de441.bsp"; 
     }
     
     std::shared_ptr<ephemeris::DE441Provider> de441;
     try {
         de441 = std::make_shared<ephemeris::DE441Provider>(bsp_path);
-        ephemeris::PlanetaryEphemeris::setProvider(de441);
+        ephemeris::PlanetaryEphemeris::setGlobalProvider(de441);
     } catch (const std::exception& e) {
         std::cerr << "Error: Ephemeris setup failed: " << e.what() << "\n";
         return 1;
     }
-    auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
+    auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>(de441);
 
     PropagatorSettings settings;
-    if (forces == "twobody") {
+    if (vm.count("forces") && vm["forces"].as<std::string>() == "twobody") {
         settings.include_planets = false;
         settings.include_moon = false;
         settings.include_relativity = false;
         settings.include_asteroids = false;
+        settings.include_sun_j2 = false;
+        settings.include_earth_j2 = false;
     } else {
         settings.include_planets = true;
         settings.include_moon = true;
-        settings.include_relativity = true;
-        settings.include_asteroids = false; 
+        settings.include_relativity = vm["relativity"].as<bool>();
+        settings.include_asteroids = vm["asteroids"].as<bool>();
+        settings.include_sun_j2 = vm["sun-j2"].as<bool>();
+        settings.include_earth_j2 = vm["earth-j2"].as<bool>();
+        
+        if (settings.include_asteroids) {
+            std::string set = vm["asteroid-set"].as<std::string>();
+            if (set == "17") {
+                settings.use_default_asteroid_set = true;
+                settings.use_default_30_set = false;
+            } else if (set == "30") {
+                settings.use_default_asteroid_set = false;
+                settings.use_default_30_set = true;
+            }
+            
+            // Default asteroid ephemeris
+            settings.asteroid_ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp";
+            if (!std::filesystem::exists(settings.asteroid_ephemeris_file)) {
+                settings.asteroid_ephemeris_file = "sb441-n16.bsp";
+            }
+        }
+        
         settings.baricentric_integration = true;
     }
 

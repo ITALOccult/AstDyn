@@ -250,7 +250,14 @@ Eigen::Matrix<double, 6, 1> SPKReader::getState(int target_id, double et) {
     throw std::runtime_error(msg);
 }
 
+int SPKReader::getCenter(int target_id) const {
+    auto it = segments_.find(target_id);
+    if (it != segments_.end()) return it->second.center_id;
+    return -1;
+}
+
 Eigen::Matrix<double, 6, 1> SPKReader::evaluateType2(const SPKSegment& seg, double et) {
+    std::lock_guard<std::mutex> lock(file_mutex_);
     // 1. Locate record
     int rec_idx = (int)std::floor((et - seg.init_sec) / seg.intlen);
     
@@ -264,7 +271,6 @@ Eigen::Matrix<double, 6, 1> SPKReader::evaluateType2(const SPKSegment& seg, doub
         
         int rec_start_addr = seg.start_addr + rec_idx * seg.rsize;
         file_.seekg(static_cast<long long>(rec_start_addr - 1) * 8, std::ios::beg);
-        
         file_.read(reinterpret_cast<char*>(cache.coeffs.data()), seg.rsize * 8);
         
         if (big_endian_ != isSystemBigEndian()) {
@@ -282,19 +288,17 @@ Eigen::Matrix<double, 6, 1> SPKReader::evaluateType2(const SPKSegment& seg, doub
     // Evaluate Chebyshev polynomials
     int n_coeffs = (seg.rsize - 2) / 3;
     
-    if ((int)T_buf_.size() < n_coeffs) {
-        T_buf_.resize(n_coeffs);
-        U_buf_.resize(n_coeffs);
-    }
+    std::vector<double> T_buf(n_coeffs);
+    std::vector<double> U_buf(n_coeffs);
     
-    T_buf_[0] = 1.0;
-    T_buf_[1] = x;
-    U_buf_[0] = 0.0;
-    U_buf_[1] = 1.0;
+    T_buf[0] = 1.0;
+    T_buf[1] = x;
+    U_buf[0] = 0.0;
+    U_buf[1] = 1.0;
     
     for (int k = 2; k < n_coeffs; ++k) {
-        T_buf_[k] = 2.0 * x * T_buf_[k-1] - T_buf_[k-2];
-        U_buf_[k] = 2.0 * x * U_buf_[k-1] - U_buf_[k-2] + 2.0 * T_buf_[k-1];
+        T_buf[k] = 2.0 * x * T_buf[k-1] - T_buf[k-2];
+        U_buf[k] = 2.0 * x * U_buf[k-1] - U_buf[k-2] + 2.0 * T_buf[k-1];
     }
     
     double pos[3] = {0, 0, 0};
@@ -304,8 +308,8 @@ Eigen::Matrix<double, 6, 1> SPKReader::evaluateType2(const SPKSegment& seg, doub
         int offset = 2 + comp * n_coeffs;
         for (int k = 0; k < n_coeffs; ++k) {
             double c = buf[offset + k];
-            pos[comp] += c * T_buf_[k];
-            vel[comp] += c * U_buf_[k];
+            pos[comp] += c * T_buf[k];
+            vel[comp] += c * U_buf[k];
         }
     }
     
@@ -317,6 +321,7 @@ Eigen::Matrix<double, 6, 1> SPKReader::evaluateType2(const SPKSegment& seg, doub
 }
 
 Eigen::Matrix<double, 6, 1> SPKReader::evaluateType13(const SPKSegment& seg, double et) {
+    std::lock_guard<std::mutex> lock(file_mutex_);
     // Read Metadata from End
     // Layout: ... [Directory N doubles] [Degree] [N] (Last)
     double meta[2];

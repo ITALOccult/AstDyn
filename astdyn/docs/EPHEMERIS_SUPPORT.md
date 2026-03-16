@@ -5,8 +5,9 @@
 AstDyn C++ now supports multiple ephemeris sources and asteroid perturbations:
 
 1. **VSOP87** - Built-in analytical planetary ephemerides (1-20 arcsec accuracy)
-2. **JPL DE405/DE441** - High-precision numerical ephemerides via CSPICE
-3. **AST17 Asteroids** - Perturbations from 16 most massive asteroids
+2. **JPL DE441** - High-precision numerical ephemerides (Standard default)
+3. **AstDyn Default 17** - Perturbations from 16 most massive asteroids + Pluto (Default)
+4. **BC405 Asteroids** - Set of 30 most massive asteroids
 
 ## Installation
 
@@ -75,11 +76,15 @@ auto mars_state = provider->getState(CelestialBody::MARS, jd_tdb);
 ```cpp
 #include <astdyn/ephemeris/AsteroidPerturbations.hpp>
 
-// Load default AST17 asteroids (16 most massive)
+// Load default 17-asteroid set (16 most massive + Pluto)
 AsteroidPerturbations asteroids;
+asteroids.loadAstDynDefaultSet();
+
+// Or load from a BSP file (e.g., sb441-n16.bsp)
+asteroids.loadSPK("/path/to/sb441-n16.bsp");
 
 // Compute perturbation at spacecraft position
-Eigen::Vector3d position = ...; // spacecraft position [AU]
+Eigen::Vector3d position = ...; // position [AU]
 double mjd_tdb = 60000.0;
 Eigen::Vector3d accel = asteroids.computePerturbation(position, mjd_tdb);
 
@@ -136,9 +141,9 @@ auto final_state = propagator.propagate_cartesian(initial_state, target_mjd);
 - **16 asteroids**: ~16 extra force evaluations per step
 - **Impact on step size**: Minimal (~5% reduction)
 - **When to include**:
-  - Inner solar system (< 3 AU): Use Ceres, Pallas, Vesta
-  - Outer solar system: Usually negligible
-  - High precision orbits: Include all 16
+  - Inner solar system (< 3 AU): Ceres, Pallas, Vesta are mandatory.
+  - High precision orbits: Include all 17 default asteroids.
+  - Close approaches: Use the 30-asteroid set (BC405) for improved thermal/gravitational modeling.
 
 ### Optimization Tips
 

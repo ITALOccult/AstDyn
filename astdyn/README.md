@@ -12,10 +12,12 @@ AstDyn C++ is a complete rewrite of the original Fortran 90 AstDyn software, bri
 
 ### Features
 
-- ✅ **Phase 1-6 Complete** (Infrastructure, Math, Ephemeris, Propagation)
+- ✅ **Phase 1-7 Complete** (Infrastructure, Math, Ephemeris, Propagation, OD)
   - Modern CMake build system
-  - High-precision N-body propagation (AAS/RKF78)
+  - High-precision N-body propagation (AAS/RKF78/Gauss)
   - JPL DE441 integration via native C++ reader
+  - Default 17-asteroid perturbation set (16 + Pluto)
+  - Relativistic corrections and J2 harmonics (Sun/Earth)
   - Chebyshev polynomial ephemeris system
   - Gaia DR3 online catalog integration
 
@@ -177,12 +179,12 @@ g++ -std=c++17 example.cpp -lastdyn -I/usr/local/include -L/usr/local/lib
 int main() {
     astdyn::initialize();
 
-    // 1. Configure for JPL precision
-    astdyn::propagation::HighPrecisionPropagator::Config config;
-    config.de441_path = "de441.bsp";
+    // 1. Configure for High Precision
+    astdyn::propagation::PropagatorSettings settings;
+    settings.include_planets = true;
+    settings.include_asteroids = true;
+    settings.use_default_asteroid_set = true;  // Load 17 massive asteroids
     
-    astdyn::propagation::HighPrecisionPropagator propagator(config);
-
     // 2. Initial elements (Epoch 2458315.5)
     astdyn::propagation::KeplerianElements elements;
     // ... set elements ...
@@ -322,8 +324,8 @@ Original Fortran AstDyn © 1997-2020 AstDyn Consortium
 - [ ] **Phase 3**: Ephemerides & Reference Systems
 - [ ] **Phase 4**: Observations
 - [ ] **Phase 5**: Orbital Elements
-- [ ] **Phase 6**: Propagation Core
-- [ ] **Phase 7**: Orbit Determination
+- [x] **Phase 6**: Propagation Core *(Complete)*
+- [x] **Phase 7**: Orbit Determination *(Complete)*
 - [ ] **Phase 8**: Close Approaches
 - [ ] **Phase 9**: Main Programs
 - [ ] **Phase 10**: Testing & Validation

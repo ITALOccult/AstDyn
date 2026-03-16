@@ -35,6 +35,14 @@ propagation::PropagatorSettings Configurator::parsePropagatorSettings(const json
         if (p.contains("ppn_gamma")) s.ppn_gamma = p["ppn_gamma"].get<double>();
         
         if (p.contains("asteroid_ephemeris_file")) s.asteroid_ephemeris_file = p["asteroid_ephemeris_file"].get<std::string>();
+        if (p.contains("include_asteroids_list")) s.include_asteroids_list = p["include_asteroids_list"].get<std::vector<int>>();
+        if (p.contains("exclude_asteroids_list")) s.exclude_asteroids_list = p["exclude_asteroids_list"].get<std::vector<int>>();
+        if (p.contains("use_default_asteroid_set")) s.use_default_asteroid_set = p["use_default_asteroid_set"].get<bool>();
+        if (p.contains("use_default_30_set")) s.use_default_30_set = p["use_default_30_set"].get<bool>();
+        
+        if (p.contains("include_earth_j2")) s.include_earth_j2 = p["include_earth_j2"].get<bool>();
+        if (p.contains("include_sun_j2")) s.include_sun_j2 = p["include_sun_j2"].get<bool>();
+
         if (p.contains("integrate_in_ecliptic")) s.integrate_in_ecliptic = p["integrate_in_ecliptic"].get<bool>();
         if (p.contains("include_yarkovsky")) s.include_yarkovsky = p["include_yarkovsky"].get<bool>();
         if (p.contains("yarkovsky_a2")) s.yarkovsky_a2 = p["yarkovsky_a2"].get<double>();

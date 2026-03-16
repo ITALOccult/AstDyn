@@ -66,7 +66,8 @@ public:
      * 
      * @param propagator Orbit propagator (provides force model)
      */
-    explicit StateTransitionMatrix(std::shared_ptr<astdyn::propagation::Propagator> propagator);
+    explicit StateTransitionMatrix(std::shared_ptr<astdyn::propagation::Propagator> propagator,
+                                   std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem = nullptr);
     
     /**
      * @brief Compute STM from t₀ to t
@@ -219,6 +220,7 @@ private:
 private:
     std::shared_ptr<astdyn::propagation::Propagator> propagator_;
     std::shared_ptr<astdyn::propagation::Integrator> integrator_;
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephemeris_;
     
     double diff_step_ = 1e-7;            ///< Numerical differentiation step (OrbFit default)
     bool use_numerical_jacobian_ = true; ///< Default to true to match OrbFit logic

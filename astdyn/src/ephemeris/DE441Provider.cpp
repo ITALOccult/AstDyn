@@ -41,7 +41,6 @@ DE441Provider::DE441Provider(const std::string& bsp_file)
     try {
         reader_ = std::make_unique<io::SPKReader>(bsp_file);
         loaded_ = true;
-        std::cout << "✓ DE441 loaded (Native Reader): " << bsp_file << std::endl;
     } catch (const std::exception& e) {
         loaded_ = false;
         throw std::runtime_error("Failed to load DE441: " + std::string(e.what()));

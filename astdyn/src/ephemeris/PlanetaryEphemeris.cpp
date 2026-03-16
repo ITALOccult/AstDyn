@@ -28,69 +28,67 @@ using namespace astdyn::core;
 // Public Interface
 // ============================================================================
 
-std::shared_ptr<EphemerisProvider> PlanetaryEphemeris::global_provider_ = nullptr;
+PlanetaryEphemeris::PlanetaryEphemeris(std::shared_ptr<EphemerisProvider> provider)
+    : provider_(provider ? provider : global_provider_) {}
 
 void PlanetaryEphemeris::setProvider(std::shared_ptr<EphemerisProvider> provider) {
-    global_provider_ = provider;
+    provider_ = provider;
 }
 
-math::Vector3<core::GCRF, physics::Distance> PlanetaryEphemeris::getPosition(CelestialBody body, time::EpochTDB t) {
+math::Vector3<core::GCRF, physics::Distance> PlanetaryEphemeris::getPosition(CelestialBody body, time::EpochTDB t) const {
     if (body == CelestialBody::SUN) return math::Vector3<core::GCRF, physics::Distance>::from_si(0.0, 0.0, 0.0);
-
-    if (global_provider_ && global_provider_->isAvailable()) {
-        auto p_bary = global_provider_->getPosition(body, t);
-        auto s_bary = global_provider_->getPosition(CelestialBody::SUN, t);
+    auto p = provider_ ? provider_ : global_provider_;
+    if (p && p->isAvailable()) {
+        auto p_bary = p->getPosition(body, t);
+        auto s_bary = p->getPosition(CelestialBody::SUN, t);
         return math::Vector3<core::GCRF, physics::Distance>::from_si(
             p_bary.x_si() - s_bary.x_si(),
             p_bary.y_si() - s_bary.y_si(),
             p_bary.z_si() - s_bary.z_si()
         );
     }
-    
-    throw std::runtime_error("PlanetaryEphemeris: Analytical VSOP87 fallback is DEPRECATED and DISABLED. "
-                             "Please use PlanetaryEphemeris::setProvider() to initialize a high-precision source (e.g. DE441).");
+    throw std::runtime_error("PlanetaryEphemeris: No provider set.");
 }
 
-math::Vector3<core::GCRF, physics::Velocity> PlanetaryEphemeris::getVelocity(CelestialBody body, time::EpochTDB t) {
+math::Vector3<core::GCRF, physics::Velocity> PlanetaryEphemeris::getVelocity(CelestialBody body, time::EpochTDB t) const {
     if (body == CelestialBody::SUN) return math::Vector3<core::GCRF, physics::Velocity>::from_si(0.0, 0.0, 0.0);
-
-    if (global_provider_ && global_provider_->isAvailable()) {
-        auto v_bary = global_provider_->getVelocity(body, t);
-        auto vs_bary = global_provider_->getVelocity(CelestialBody::SUN, t);
+    auto p = provider_ ? provider_ : global_provider_;
+    if (p && p->isAvailable()) {
+        auto v_bary = p->getVelocity(body, t);
+        auto vs_bary = p->getVelocity(CelestialBody::SUN, t);
         return math::Vector3<core::GCRF, physics::Velocity>::from_si(
             v_bary.x_si() - vs_bary.x_si(),
             v_bary.y_si() - vs_bary.y_si(),
             v_bary.z_si() - vs_bary.z_si()
         );
     }
-    
-    throw std::runtime_error("PlanetaryEphemeris: Analytical VSOP87 fallback is DEPRECATED and DISABLED.");
+    throw std::runtime_error("PlanetaryEphemeris: No provider set.");
 }
 
-physics::CartesianStateTyped<core::GCRF> PlanetaryEphemeris::getState(CelestialBody body, time::EpochTDB t) {
+physics::CartesianStateTyped<core::GCRF> PlanetaryEphemeris::getState(CelestialBody body, time::EpochTDB t) const {
     if (body == CelestialBody::SUN) return physics::CartesianStateTyped<core::GCRF>::from_si(
         t,
         math::Vector3<core::GCRF, physics::Distance>::from_si(0,0,0),
         math::Vector3<core::GCRF, physics::Velocity>::from_si(0,0,0)
     );
-
-    if (global_provider_ && global_provider_->isAvailable()) {
-        auto sv = global_provider_->getState(body, t);
-        auto ss = global_provider_->getState(CelestialBody::SUN, t);
+    auto p = provider_ ? provider_ : global_provider_;
+    if (p && p->isAvailable()) {
+        auto sv = p->getState(body, t);
+        auto ss = p->getState(CelestialBody::SUN, t);
         return physics::CartesianStateTyped<core::GCRF>::from_si(
             t,
             sv.position - ss.position,
             sv.velocity - ss.velocity
         );
     }
-
-    throw std::runtime_error("PlanetaryEphemeris: no provider set. Call setProvider() first.");
+    throw std::runtime_error("PlanetaryEphemeris: no provider set.");
 }
 
-math::Vector3<core::GCRF, physics::Distance> PlanetaryEphemeris::getSunBarycentricPosition(time::EpochTDB t) {
-    if (global_provider_ && global_provider_->isAvailable()) {
+math::Vector3<core::GCRF, physics::Distance> PlanetaryEphemeris::getSunBarycentricPosition(time::EpochTDB t) const {
+    auto p = provider_ ? provider_ : global_provider_;
+    if (p && p->isAvailable()) {
         try {
-            return global_provider_->getPosition(CelestialBody::SUN, t);
+            return p->getPosition(CelestialBody::SUN, t);
         } catch (...) {
             return math::Vector3<core::GCRF, physics::Distance>::from_si(0.0, 0.0, 0.0);
         }
@@ -100,16 +98,24 @@ math::Vector3<core::GCRF, physics::Distance> PlanetaryEphemeris::getSunBarycentr
 
 physics::CartesianStateTyped<core::GCRF> PlanetaryEphemeris::heliocentricToBarycentric(
     const physics::CartesianStateTyped<core::GCRF>& heliocentric_state, 
-    time::EpochTDB t) 
+    time::EpochTDB t) const
 {
     auto r_sun = getSunBarycentricPosition(t);
-    // getSunBarycentricPosition returns barycentric position of Sun (relative to SSB)
-    // bary_pos = helio_pos + r_sun
     return physics::CartesianStateTyped<core::GCRF>::from_si(
         t,
         heliocentric_state.position + r_sun,
-        heliocentric_state.velocity // Sun velocity not easily available here, simplified
+        heliocentric_state.velocity 
     );
+}
+
+thread_local std::shared_ptr<EphemerisProvider> PlanetaryEphemeris::global_provider_ = nullptr;
+
+void PlanetaryEphemeris::setGlobalProvider(std::shared_ptr<EphemerisProvider> provider) {
+    global_provider_ = provider;
+}
+
+std::shared_ptr<EphemerisProvider> PlanetaryEphemeris::getGlobalProvider() {
+    return global_provider_;
 }
 
 // ============================================================================

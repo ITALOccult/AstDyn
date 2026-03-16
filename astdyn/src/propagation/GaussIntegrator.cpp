@@ -16,6 +16,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
+#include "astdyn/utils/Atomics.hpp"
 
 namespace astdyn::propagation {
 
@@ -117,8 +118,12 @@ Eigen::VectorXd GaussIntegrator::integrate(const DerivativeFunction& f,
             h = std::max(h, h_min_);
         }
         
-        stats_.min_step_size = (stats_.min_step_size == 0.0) ? h : std::min(stats_.min_step_size, h);
-        stats_.max_step_size = std::max(stats_.max_step_size, h);
+        if (stats_.min_step_size == 0.0) {
+            stats_.min_step_size = std::abs(h);
+        } else {
+            astdyn::utils::atomic_min(stats_.min_step_size, std::abs(h));
+        }
+        astdyn::utils::atomic_max(stats_.max_step_size, std::abs(h));
     }
     
     stats_.final_time = t;
