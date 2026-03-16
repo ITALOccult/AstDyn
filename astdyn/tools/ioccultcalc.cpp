@@ -10,6 +10,7 @@
 #include "astdyn/astrometry/ChebyshevEphemerisManager.hpp"
 #include "astdyn/io/CovarianceIO.hpp"
 #include "astdyn/math/MultivariateSampler.hpp"
+#include "astdyn/core/IOCConfig.hpp"
 
 #include <boost/program_options.hpp>
 #include <iostream>
@@ -130,13 +131,15 @@ int main(int argc, char** argv) {
         po::notify(vm);
     } catch (...) { return 1; }
 
-    if (vm.count("help") || (!vm.count("asteroid") && !vm.count("system-ids")) || !vm.count("jd-start")) {
-        std::cout << desc << "\n";
-        return 0;
+    // --- 1. Load Configuration ---
+    core::IOCConfig adv_cfg;
+    if (vm.count("conf")) {
+        adv_cfg.load(vm["conf"].as<std::string>());
     }
 
-    // --- 1. Engine Setup ---
-    std::string bsp_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp";
+    // --- 2. Engine Setup ---
+    std::string bsp_path = adv_cfg.get<std::string>("ephemeris.file", "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp");
+    
     AstDynEngine engine;
     if (vm.count("conf")) {
         engine.load_config(vm["conf"].as<std::string>());
@@ -149,18 +152,41 @@ int main(int argc, char** argv) {
         engine.set_config(cfg);
     }
     
+    // Override engine ephemeris if specified in CLI
+    if (vm.count("bsp")) {
+        // Here we mean the planet ephemeris, but CLI 'bsp' is often used for satellites in this tool.
+        // If the user wants to override de441, they should use --conf or we could add --ephem-file.
+    }
+
     try {
         ephemeris::PlanetaryEphemeris::setProvider(std::make_shared<ephemeris::DE441Provider>(engine.config().ephemeris_file));
         catalog::GaiaDR3Catalog::initialize(R"({"catalog_type":"online_esa"})");
     } catch (...) { return 1; }
 
-    // --- 2. Preparing Asteroids & Polynomials ---
+    // --- 3. Preparing Asteroids & Polynomials ---
     std::vector<std::string> asteroid_ids;
     if (vm.count("asteroid")) {
         asteroid_ids = parse_asteroid_list(vm["asteroid"].as<std::string>());
+    } else if (adv_cfg.has("asteroid")) {
+        asteroid_ids = parse_asteroid_list(adv_cfg.get<std::string>("asteroid", ""));
     }
-    double jd_start = vm["jd-start"].as<double>();
-    double duration = vm["duration"].as<double>();
+
+    double jd_start = 0.0;
+    if (vm.count("jd-start")) {
+        jd_start = vm["jd-start"].as<double>();
+    } else if (adv_cfg.has("jd-start")) {
+        jd_start = adv_cfg.get<double>("jd-start", 0.0);
+    }
+
+
+    if ((asteroid_ids.empty() && !vm.count("system-ids") && !adv_cfg.has("system-ids")) || jd_start == 0.0) {
+        if (!vm.count("help")) std::cerr << "Error: Missing asteroid list or jd-start (check CLI or config file).\n";
+        std::cout << desc << "\n";
+        return 1;
+    }
+
+    double duration = (!vm["duration"].defaulted()) ? vm["duration"].as<double>() : adv_cfg.get<double>("duration", 1.0);
+    double mag_limit = (!vm["mag"].defaulted()) ? vm["mag"].as<double>() : adv_cfg.get<double>("mag", 15.0);
     time::EpochTDB start_epoch = time::EpochTDB::from_jd(jd_start);
     time::EpochTDB end_epoch = time::EpochTDB::from_jd(jd_start + duration);
 
@@ -192,37 +218,33 @@ int main(int argc, char** argv) {
         }
     }
 
-    // --- 2b. Load System/Satellite Bodies from BSP ---
-    if (vm.count("bsp") && vm.count("system-ids")) {
-        std::string bsp_lib = vm["bsp"].as<std::string>();
-        std::vector<std::string> system_ids = parse_asteroid_list(vm["system-ids"].as<std::string>());
-        std::cout << "[ioccultcalc] Adding " << system_ids.size() << " bodies from BSP: " << bsp_lib << "\n";
+    // --- 3b. Load System/Satellite Bodies from BSP ---
+    std::string system_bsp = vm.count("bsp") ? vm["bsp"].as<std::string>() : adv_cfg.get<std::string>("bsp", "");
+    std::string system_ids_str = vm.count("system-ids") ? vm["system-ids"].as<std::string>() : adv_cfg.get<std::string>("system-ids", "");
+
+    if (!system_bsp.empty() && !system_ids_str.empty()) {
+        std::vector<std::string> system_ids = parse_asteroid_list(system_ids_str);
+        std::cout << "[ioccultcalc] Adding " << system_ids.size() << " bodies from BSP: " << system_bsp << "\n";
         
-        system_reader = std::make_unique<io::SPKReader>(bsp_lib);
+        system_reader = std::make_unique<io::SPKReader>(system_bsp);
         for (const auto& id_str : system_ids) {
             int naif_id = std::stoi(id_str);
             manager.add_system_body(id_str, naif_id, *system_reader, start_epoch, end_epoch);
             asteroid_ids.push_back(id_str); // Add to search list
             stored_props[id_str] = {15.0, 10.0}; // Default for satellites (H, D)
-            
-            // Note: Covariance application for SPK bodies is complex, skipping for now
         }
     }
 
-    // --- 3. Global Search ---
+    // --- 3c. Global Search ---
     OccultationConfig occ_config = engine.config().occultation_settings;
-    if (vm.count("mag")) {
-        occ_config.max_mag_star = vm["mag"].as<double>();
-    }
+    occ_config.max_mag_star = mag_limit;
     
     std::vector<OccultationCandidate> results;
 
-    if (vm.count("bsp") && vm.count("system-ids")) {
-        std::string bsp_lib = vm["bsp"].as<std::string>();
-        std::vector<std::string> system_ids = parse_asteroid_list(vm["system-ids"].as<std::string>());
-        std::cout << "[ioccultcalc] Searching system occultations (BSP: " << bsp_lib << ")..." << std::endl;
-        
-        auto system_results = OccultationLogic::find_system_occultations(system_ids, bsp_lib, start_epoch, end_epoch, occ_config, engine);
+    if (!system_bsp.empty() && !system_ids_str.empty()) {
+        std::vector<std::string> system_ids = parse_asteroid_list(system_ids_str);
+        std::cout << "[ioccultcalc] Searching system occultations (BSP: " << system_bsp << ")..." << std::endl;
+        auto system_results = OccultationLogic::find_system_occultations(system_ids, system_bsp, start_epoch, end_epoch, occ_config, engine);
         
         std::cout << "[ioccultcalc] System Search Complete. Found " << system_results.size() << " grouped candidates.\n";
         for (const auto& res : system_results) {
@@ -249,10 +271,11 @@ int main(int argc, char** argv) {
             std::cout << "Occultation: Asteroid=" << res.asteroid_id << " Star=" << res.star.source_id << " TCA=" << res.params.t_ca.jd() << std::endl;
         }
     }
-    // --- 3b. Apply Uncertainty (if requested) ---
-    if (vm.count("covariance") && !results.empty()) {
+    // --- 3d. Apply Uncertainty (if requested) ---
+    std::string cov_file = vm.count("covariance") ? vm["covariance"].as<std::string>() : adv_cfg.get<std::string>("covariance", "");
+    if (!cov_file.empty() && !results.empty()) {
         try {
-            astdyn::Matrix6d cov_t0 = CovarianceIO::read_file(vm["covariance"].as<std::string>());
+            astdyn::Matrix6d cov_t0 = CovarianceIO::read_file(cov_file);
             std::cout << "[ioccultcalc] Applying 1-sigma uncertainty analysis...\n";
             for (auto& res : results) {
                 if (stored_states.count(res.asteroid_id)) {
@@ -264,10 +287,20 @@ int main(int argc, char** argv) {
         }
     }
 
-    // --- 3c. Regional Filter ---
-    if (vm.count("lat") && vm.count("lon") && !results.empty()) {
-        double obs_lat = vm["lat"].as<double>();
-        double obs_lon = vm["lon"].as<double>();
+    // --- 3e. Regional Filter ---
+    double obs_lat = 0.0, obs_lon = 0.0;
+    bool has_location = false;
+    if (vm.count("lat") && vm.count("lon")) {
+        obs_lat = vm["lat"].as<double>();
+        obs_lon = vm["lon"].as<double>();
+        has_location = true;
+    } else if (adv_cfg.has("lat") && adv_cfg.has("lon")) {
+        obs_lat = adv_cfg.get<double>("lat", 0.0);
+        obs_lon = adv_cfg.get<double>("lon", 0.0);
+        has_location = true;
+    }
+
+    if (has_location && !results.empty()) {
         std::cout << "[ioccultcalc] Filtering for observer at Lat: " << obs_lat << ", Lon: " << obs_lon << "...\n";
         
         std::vector<OccultationCandidate> filtered;
@@ -323,36 +356,39 @@ int main(int argc, char** argv) {
             labels.push_back(res.asteroid_id + " - " + std::to_string(res.star.source_id));
         }
 
-        if (vm.count("kml")) {
-            OccultationMapper::export_kml(paths, labels, vm["kml"].as<std::string>());
-            std::cout << "[ioccultcalc] Exported KML to: " << vm["kml"].as<std::string>() << "\n";
+        std::string kml_file = vm.count("kml") ? vm["kml"].as<std::string>() : adv_cfg.get<std::string>("kml", "");
+        if (!kml_file.empty()) {
+            OccultationMapper::export_kml(paths, labels, kml_file);
+            std::cout << "[ioccultcalc] Exported KML to: " << kml_file << "\n";
         }
         
-        if (vm.count("svg-output")) {
+        std::string svg_file = vm.count("svg-output") ? vm["svg-output"].as<std::string>() : adv_cfg.get<std::string>("svg-output", "");
+        if (!svg_file.empty()) {
             double c_lat = 0.0, c_lon = 0.0, z = 1.0;
-            if (vm.count("zoom")) z = vm["zoom"].as<double>();
+            if (!vm["zoom"].defaulted()) z = vm["zoom"].as<double>();
+            else z = adv_cfg.get<double>("zoom", 1.0);
             
             if (vm.count("map-lat")) c_lat = vm["map-lat"].as<double>();
-            else if (vm.count("lat")) c_lat = vm["lat"].as<double>();
+            else c_lat = adv_cfg.get<double>("map-lat", obs_lat);
             
             if (vm.count("map-lon")) c_lon = vm["map-lon"].as<double>();
-            else if (vm.count("lon")) c_lon = vm["lon"].as<double>();
+            else c_lon = adv_cfg.get<double>("map-lon", obs_lon);
             
-            OccultationMapper::export_global_svg(paths, labels, colors, vm["svg-output"].as<std::string>(), c_lat, c_lon, z);
-            std::cout << "[ioccultcalc] Exported Global SVG to: " << vm["svg-output"].as<std::string>() 
+            OccultationMapper::export_global_svg(paths, labels, colors, svg_file, c_lat, c_lon, z);
+            std::cout << "[ioccultcalc] Exported Global SVG to: " << svg_file 
                       << " (Zoom: " << std::fixed << std::setprecision(1) << z 
                       << ", Center: " << c_lat << "," << c_lon << ")\n";
         }
     }
 
-    if (vm.count("xml-output") && !results.empty()) {
+    std::string xml_file = vm.count("xml-output") ? vm["xml-output"].as<std::string>() : adv_cfg.get<std::string>("xml-output", "");
+    if (!xml_file.empty() && !results.empty()) {
         std::vector<OccultationEvent> out_events;
         for (const auto& res : results) {
             auto cand = res;
             auto prop_it = stored_props.find(res.asteroid_id);
             if (prop_it != stored_props.end()) {
                 cand.params.star_mag = prop_it->second.first;
-                // cross_track in cand.params is already set by apply_uncertainty if covariance was provided
             }
             
             auto it = stored_elements.find(res.asteroid_id);
@@ -364,7 +400,8 @@ int main(int argc, char** argv) {
                  out_events.push_back(candidate_to_event(cand, res.asteroid_id, dummy));
             }
         }
-        OccultationXMLIO::write_file(out_events, vm["xml-output"].as<std::string>());
+        OccultationXMLIO::write_file(out_events, xml_file);
+        std::cout << "[ioccultcalc] Exported XML to: " << xml_file << "\n";
     }
 
     catalog::GaiaDR3Catalog::shutdown();

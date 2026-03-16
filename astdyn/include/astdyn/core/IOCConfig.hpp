@@ -50,6 +50,11 @@ public:
             return default_value;
         }
         try {
+            if constexpr (std::is_same_v<T, std::string>) {
+                if (node->is_number()) {
+                    return node->dump();
+                }
+            }
             return node->get<T>();
         } catch (...) {
             return default_value;

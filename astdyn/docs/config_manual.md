@@ -1,0 +1,147 @@
+# AstDyn Configuration Manual (v1.0 RC)
+
+This manual provides a comprehensive overview of the configuration parameters for the AstDyn library and the `ioccultcalc` tool.
+
+## 1. Configuration Syntax
+
+AstDyn supports three interchangeable syntax styles via the `IOCConfig` system:
+
+### 1.1 YAML / OOP Braced Style
+Best for structured, hierarchical configurations.
+```yaml
+integrator {
+  type = RKF78
+  step_size = 0.05
+}
+```
+
+### 1.2 Flat Dot-Notation
+Best for quick overrides or simple scripts.
+```properties
+integrator.type = RK4
+integrator.step_size = 0.2
+```
+
+### 1.3 JSON
+Standard for automated workflows.
+```json
+{
+  "integrator": {
+    "type": "RKF78",
+    "step_size": 0.05
+  }
+}
+```
+
+---
+
+## 2. Core Library Parameters
+
+These parameters affect the `AstDynEngine` logic, including integration, ephemeris retrieval, and orbit fitting.
+
+### 2.1 `integrator`
+Controls the numerical integration of asteroid orbits.
+- `type` (string): `RK4`, `RKF78`, `GAUSS`, `RADAU`, `AAS`, `SABA4`.
+- `step_size` (double): Initial integration step in days (e.g., `0.1`).
+- `tolerance` (double): Local error tolerance for adaptive integrators (e.g., `1e-12`).
+- `aas_precision` (double): Step control metric specifically for the `AAS` (Encke-type) integrator.
+
+### 2.2 `ephemeris`
+Controls solar system barycentric ephemeris sources.
+- `type` (string): `Analytical` (low precision), `DE441` (high precision JPL).
+- `file` (string): Absolute path to the JPL `.bsp` file (e.g., `de441.bsp`).
+- `asteroid_file` (string): Optional path to a `.bsp` containing specific asteroid ephemerides for perturbations.
+
+### 2.3 `diffcorr`
+Controls the Differential Correction (Least Squares) orbit fitting process.
+- `max_iter` (int): Maximum number of iterations (default: `10`).
+- `convergence` (double): Convergence threshold in AU on the state vector (default: `1e-6`).
+- `outlier_threshold` (double): Sigma clipping threshold for rejected observations.
+- `light_time` (bool): Apply light-time delay correction.
+- `aberration` (bool): Apply annual stellar aberration correction.
+- `light_deflection` (bool): Apply gravitational light deflection (GR).
+
+### 2.4 `occultation` (Engine-level)
+Controls the discovery and refinement logic for occultation candidates.
+- `min_sun_alt` (double): Maximum Sun altitude for visibility (default: `-12.0`).
+- `min_obj_alt` (double): Minimum asteroid altitude for visibility at center line.
+- `min_moon_dist` (double): Minimum angular distance from the Moon (deg).
+- `min_mag_drop` (double): Minimum stellar magnitude drop for detectability.
+- `max_mag_star` (double): Maximum stellar magnitude for searching.
+- `filter_daylight` (bool): If true, skip events occurring during local daylight.
+- `use_proper_motion` (bool): Apply Gaia DR3 proper motion to star positions.
+- `use_parallax` (bool): Apply annual parallax shift to star positions.
+
+---
+
+## 3. `ioccultcalc` Tool Parameters
+
+The `ioccultcalc` tool inherits all core parameters above and adds specific ones for batch searching and visualization. These can also be passed in the config file.
+
+### 3.1 Search Parameters
+- `asteroid` (string): Comma-separated list or `@filename`.
+- `jd-start` (double): Start Julian Date (TDB).
+- `duration` (double): Search window in days.
+- `mag` (double): (Override for `occultation.max_mag_star`).
+
+### 3.2 System / Satellite Parameters
+- `bsp` (string): Path to an SPK file containing secondary/satellite ephemerides.
+- `system-ids` (string): Comma-separated NAIF IDs for the bodies in the system (e.g., `101,201`).
+
+### 3.3 Uncertainty & Analysis
+- `covariance` (string): Path to a `.cor` or `.csv` 6x6 covariance matrix file.
+- `clones` (int): Number of Monte Carlo clones for probability analysis (experimental).
+
+### 3.4 Observer & Regional Filtering
+- `lat` (double): Observer geocentric latitude (degrees).
+- `lon` (double): Observer geocentric longitude (degrees).
+- `alt` (double): Observer altitude (meters).
+
+### 3.5 Visualization & Mapping
+- `svg-output` (string): Output filename for world map SVG.
+- `kml` (string): Output filename for Google Earth path.
+- `zoom` (double): Zoom level (1.0 = global, >10.0 = local).
+- `map-lat` / `map-lon` (double): Center of the generated map.
+
+### 3.6 Data Export
+- `xml-output` (string): Path for Occult4-compatible XML results.
+- `verbose` (bool): Enable/disable detailed logging.
+
+---
+
+## 4. Example: Full YAML-Style Config
+```yaml
+# Comprehensive Occultation Campaign Config
+verbose = true
+
+integrator {
+  type = RKF78
+  step_size = 0.05
+  tolerance = 1e-13
+}
+
+ephemeris {
+  type = DE441
+  file = /Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp
+}
+
+occultation {
+  max_mag_star = 14.5
+  min_sun_alt = -18.0
+  use_proper_motion = true
+  use_parallax = true
+}
+
+# ioccultcalc specific
+jd-start = 2461131.5
+duration = 10.0
+asteroid = @major_asteroids.txt
+svg-output = campaign_map.svg
+xml-output = results.xml
+lat = 41.9
+lon = 12.5
+zoom = 5.0
+```
+
+---
+*Generated by AstDyn Advanced Agentic AI System - 2026-03-16*
