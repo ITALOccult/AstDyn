@@ -118,6 +118,9 @@ int main(int argc, char** argv) {
         ("system-ids", po::value<std::string>(), "comma-separated NAIF IDs for system bodies (e.g. 100,201)")
         ("covariance,c", po::value<std::string>(), "path to orbital covariance file (.cor or .csv)")
         ("clones,n", po::value<int>()->default_value(0), "number of Monte Carlo clones to generate")
+        ("zoom", po::value<double>()->default_value(1.0), "zoom level for SVG map")
+        ("map-lat", po::value<double>(), "center latitude for SVG map")
+        ("map-lon", po::value<double>(), "center longitude for SVG map")
     ;
 
     po::variables_map vm;
@@ -284,8 +287,19 @@ int main(int argc, char** argv) {
         }
         
         if (vm.count("svg-output")) {
-            OccultationMapper::export_global_svg(paths, labels, colors, vm["svg-output"].as<std::string>());
-            std::cout << "[ioccultcalc] Exported Global SVG to: " << vm["svg-output"].as<std::string>() << "\n";
+            double c_lat = 0.0, c_lon = 0.0, z = 1.0;
+            if (vm.count("zoom")) z = vm["zoom"].as<double>();
+            
+            if (vm.count("map-lat")) c_lat = vm["map-lat"].as<double>();
+            else if (vm.count("lat")) c_lat = vm["lat"].as<double>();
+            
+            if (vm.count("map-lon")) c_lon = vm["map-lon"].as<double>();
+            else if (vm.count("lon")) c_lon = vm["lon"].as<double>();
+            
+            OccultationMapper::export_global_svg(paths, labels, colors, vm["svg-output"].as<std::string>(), c_lat, c_lon, z);
+            std::cout << "[ioccultcalc] Exported Global SVG to: " << vm["svg-output"].as<std::string>() 
+                      << " (Zoom: " << std::fixed << std::setprecision(1) << z 
+                      << ", Center: " << c_lat << "," << c_lon << ")\n";
         }
     }
 

@@ -246,17 +246,26 @@ void OccultationMapper::export_global_svg(
     const std::vector<OccultationPath>& paths,
     const std::vector<std::string>& labels,
     const std::vector<std::string>& colors,
-    const std::string& filename)
+    const std::string& filename,
+    double center_lat,
+    double center_lon,
+    double zoom)
 {
     std::ofstream ofs(filename);
     
+    // Dynamic ViewBox
+    double vw = 3600.0 / zoom;
+    double vh = 1800.0 / zoom;
+    double vx = center_lon * 10.0 - vw / 2.0;
+    double vy = -center_lat * 10.0 - vh / 2.0;
+
     // SVG Header
-    ofs << "<svg viewBox=\"-1800 -900 3600 1800\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background:#0b0e14; font-family: 'Outfit', 'Inter', sans-serif;\">\n";
+    ofs << "<svg viewBox=\"" << vx << " " << vy << " " << vw << " " << vh << "\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background:#0b0e14; font-family: 'Outfit', 'Inter', sans-serif;\">\n";
     
     // Defs
     ofs << "  <defs>\n";
     ofs << "    <filter id=\"glow\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\">\n";
-    ofs << "      <feGaussianBlur stdDeviation=\"8\" result=\"blur\" />\n";
+    ofs << "      <feGaussianBlur stdDeviation=\"" << 8.0 / zoom << "\" result=\"blur\" />\n";
     ofs << "      <feComposite in=\"SourceGraphic\" in2=\"blur\" operator=\"over\" />\n";
     ofs << "    </filter>\n";
     
@@ -277,20 +286,20 @@ void OccultationMapper::export_global_svg(
     ofs << "  <rect x=\"-1800\" y=\"-900\" width=\"3600\" height=\"1800\" fill=\"#0b0e14\" />\n";
 
     // 2. Graticule
-    ofs << "  <g stroke=\"#1e293b\" stroke-width=\"1\" stroke-dasharray=\"10,10\" opacity=\"0.5\">\n";
-    for (int lat = -60; lat <= 60; lat += 30) ofs << "    <line x1=\"-1800\" y1=\"" << lat_to_svg(lat) << "\" x2=\"1800\" y2=\"" << lat_to_svg(lat) << "\" />\n";
-    for (int lon = -150; lon <= 150; lon += 30) ofs << "    <line x1=\"" << lon_to_svg(lon) << "\" y1=\"-900\" x2=\"" << lon_to_svg(lon) << "\" y2=\"900\" />\n";
+    ofs << "  <g stroke=\"#1e293b\" stroke-width=\"" << 1.0 / zoom << "\" stroke-dasharray=\"" << 10.0/zoom << "," << 10.0/zoom << "\" opacity=\"0.5\">\n";
+    for (int lat = -90; lat <= 90; lat += 15) ofs << "    <line x1=\"-1800\" y1=\"" << lat_to_svg(lat) << "\" x2=\"1800\" y2=\"" << lat_to_svg(lat) << "\" />\n";
+    for (int lon = -180; lon <= 180; lon += 15) ofs << "    <line x1=\"" << lon_to_svg(lon) << "\" y1=\"-900\" x2=\"" << lon_to_svg(lon) << "\" y2=\"900\" />\n";
     ofs << "  </g>\n";
 
     // 3. Detailed World Map - Coastlines
-    ofs << "  <g fill=\"#1e293b\" stroke=\"#334155\" stroke-width=\"0.8\" transform=\"scale(10, -10)\">\n";
+    ofs << "  <g fill=\"#1e293b\" stroke=\"#334155\" stroke-width=\"" << 0.8 / zoom << "\" transform=\"scale(10, -10)\">\n";
     for (const auto& d : WorldMapData::get_coastlines()) {
         ofs << "    <path d=\"" << d << "\" />\n";
     }
     ofs << "  </g>\n";
 
     // 3.1 Political Boundaries
-    ofs << "  <g fill=\"none\" stroke=\"#475569\" stroke-width=\"0.5\" stroke-dasharray=\"1,1\" transform=\"scale(10, -10)\" opacity=\"0.7\">\n";
+    ofs << "  <g fill=\"none\" stroke=\"#475569\" stroke-width=\"" << 0.5 / zoom << "\" stroke-dasharray=\"" << 1.0/zoom << "," << 1.0/zoom << "\" transform=\"scale(10, -10)\" opacity=\"0.7\">\n";
     for (const auto& d : WorldMapData::get_borders()) {
         ofs << "    <path d=\"" << d << "\" />\n";
     }
@@ -301,43 +310,25 @@ void OccultationMapper::export_global_svg(
     for (const auto& city : WorldMapData::get_major_cities()) {
         double cx = lon_to_svg(city.lon);
         double cy = lat_to_svg(city.lat);
-        // Circle for city
-        ofs << "    <circle cx=\"" << cx << "\" cy=\"" << cy << "\" r=\"5\" fill=\"#94a3b8\" opacity=\"0.6\" />\n";
-        // Heuristic: only show labels if they don't overlap too much or for very major ones
-        // (Actually, let's just show them for now with a very small font)
-        ofs << "    <text x=\"" << cx + 10 << "\" y=\"" << cy + 5 << "\" fill=\"#64748b\" font-size=\"20\" opacity=\"0.5\">" << city.name << "</text>\n";
+        ofs << "    <circle cx=\"" << cx << "\" cy=\"" << cy << "\" r=\"" << 5.0 / zoom << "\" fill=\"#94a3b8\" opacity=\"0.6\" />\n";
+        ofs << "    <text x=\"" << cx + 10.0/zoom << "\" y=\"" << cy + 5.0/zoom << "\" fill=\"#64748b\" font-size=\"" << 20.0 / zoom << "\" opacity=\"0.5\">" << city.name << "</text>\n";
     }
     ofs << "  </g>\n";
 
-    // 4. Day/Night Terminator (Curved)
-    if (!paths.empty()) {
-        // Use TCA of first path for terminator
-        // (Wait, we need a time. OccultationPath doesn't store time, but we can compute it if we pass it)
-        // For now, let's use a dummy time if we don't have it, or improve compute_path to store it.
-        // Actually, let's just use MJD 61121.5 as in the test case for now, 
-        // OR better: we should have the time in export_global_svg.
-        // Let's assume the user wants the terminator at the time of the events.
-    }
-    // Hardcoded for the example since we don't have time easily available here without interface change
-    // Let's add a parameter or just use J2000 for now to prove curvature
+    // 4. Day/Night Terminator
     auto term_pts = compute_terminator(time::EpochTDB::from_jd(2461121.5));
     if (!term_pts.empty()) {
         ofs << "  <polyline points=\"";
         for (const auto& pt : term_pts) ofs << lon_to_svg(pt.lon.to_deg()) << "," << lat_to_svg(pt.lat.to_deg()) << " ";
-        ofs << "\" fill=\"none\" stroke=\"#facc15\" stroke-width=\"6\" stroke-dasharray=\"20,15\" opacity=\"0.6\" />\n";
-        
-        // Add "Day" and "Night" labels near the terminator
-        // (Simple heuristic for labels)
-        ofs << "  <text x=\"-800\" y=\"850\" fill=\"#facc15\" font-size=\"35\" opacity=\"0.8\">DAY</text>\n";
-        ofs << "  <text x=\"1000\" y=\"850\" fill=\"#94a3b8\" font-size=\"35\" opacity=\"0.8\">NIGHT</text>\n";
+        ofs << "\" fill=\"none\" stroke=\"#facc15\" stroke-width=\"" << 6.0 / zoom << "\" stroke-dasharray=\"" << 20.0/zoom << "," << 15.0/zoom << "\" opacity=\"0.6\" />\n";
     }
 
-        // 5. Occultation Paths
+    // 5. Occultation Paths
     for (size_t i = 0; i < paths.size(); ++i) {
         const auto& p = paths[i];
         std::string color = (i < colors.size()) ? colors[i] : "#ffffff";
         
-        // --- 1-Sigma Uncertainty Region (Shaded Background) ---
+        // --- 1-Sigma Uncertainty Region ---
         if (!p.sigma1_north.empty() && p.sigma1_north.size() == p.sigma1_south.size()) {
             ofs << "  <path fill=\"" << color << "\" fill-opacity=\"0.12\" d=\"M ";
             for (const auto& pt : p.sigma1_north) ofs << lon_to_svg(pt.lon.to_deg()) << "," << lat_to_svg(pt.lat.to_deg()) << " ";
@@ -359,47 +350,45 @@ void OccultationMapper::export_global_svg(
             if (pts.empty()) return;
             ofs << "  <polyline points=\"";
             for (const auto& pt : pts) ofs << lon_to_svg(pt.lon.to_deg()) << "," << lat_to_svg(pt.lat.to_deg()) << " ";
-            ofs << "\" fill=\"none\" stroke=\"" << color << "\" stroke-width=\"" << width << "\" stroke-linecap=\"round\" ";
-            if (dashed) ofs << "stroke-dasharray=\"20,20\" ";
+            ofs << "\" fill=\"none\" stroke=\"" << color << "\" stroke-width=\"" << width / zoom << "\" stroke-linecap=\"round\" ";
+            if (dashed) ofs << "stroke-dasharray=\"" << 20.0/zoom << "," << 20.0/zoom << "\" ";
             ofs << "opacity=\"" << op << "\" />\n";
         };
 
-        // Draw sigma-1 boundary lines (clearly dashed)
         draw_line(p.sigma1_north, color, 3, 0.4, true);
         draw_line(p.sigma1_south, color, 3, 0.4, true);
-        
-        // Draw nominal shadow limits
         draw_line(p.shadow_north, color, 6, 0.3);
         draw_line(p.shadow_south, color, 6, 0.3);
-        
-        // Draw center line
         draw_line(p.center_line, color, 5, 1.0);
         
         for (const auto& m : p.markers) {
             double mx = lon_to_svg(m.point.lon.to_deg());
             double my = lat_to_svg(m.point.lat.to_deg());
-            ofs << "  <circle cx=\"" << mx << "\" cy=\"" << my << "\" r=\"8\" fill=\"" << color << "\" />\n";
-            ofs << "  <text x=\"" << mx + 15 << "\" y=\"" << my + 5 << "\" fill=\"#f8fafc\" font-size=\"25\" font-weight=\"bold\" stroke=\"#0b0e14\" stroke-width=\"4\" paint-order=\"stroke\">" << m.label << "</text>\n";
+            ofs << "  <circle cx=\"" << mx << "\" cy=\"" << my << "\" r=\"" << 8.0 / zoom << "\" fill=\"" << color << "\" />\n";
+            ofs << "  <text x=\"" << mx + 15.0/zoom << "\" y=\"" << my + 5.0/zoom << "\" fill=\"#f8fafc\" font-size=\"" << 25.0 / zoom << "\" font-weight=\"bold\" stroke=\"#0b0e14\" stroke-width=\"" << 4.0/zoom << "\" paint-order=\"stroke\">" << m.label << "</text>\n";
         }
     }
 
-    // Header and Legend (Premium Style)
-    ofs << "  <rect x=\"-1750\" y=\"-850\" width=\"850\" height=\"200\" rx=\"25\" fill=\"#1e293b\" fill-opacity=\"0.95\" stroke=\"#334155\" stroke-width=\"2\" />\n";
-    ofs << "  <text x=\"-1710\" y=\"-785\" fill=\"#f8fafc\" font-size=\"65\" font-weight=\"900\">ASTDYN PRECISION MAP</text>\n";
-    ofs << "  <text x=\"-1710\" y=\"-720\" fill=\"#94a3b8\" font-size=\"42\">Beta 0.5 - High-Fidelity Projection</text>\n";
+    // Header and Legend (Positioned relative to ViewBox)
+    double ui_scale = 1.0 / zoom;
+    double margin = 50.0 * ui_scale;
+    double lx = vx + margin;
+    double ly = vy + margin;
+
+    ofs << "  <rect x=\"" << lx << "\" y=\"" << ly << "\" width=\"" << 850 * ui_scale << "\" height=\"" << 200 * ui_scale << "\" rx=\"" << 25 * ui_scale << "\" fill=\"#1e293b\" fill-opacity=\"0.95\" stroke=\"#334155\" stroke-width=\"" << 2 * ui_scale << "\" />\n";
+    ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 65 * ui_scale << "\" fill=\"#f8fafc\" font-size=\"" << 65 * ui_scale << "\" font-weight=\"900\">ASTDYN PRECISION MAP</text>\n";
+    ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 130 * ui_scale << "\" fill=\"#94a3b8\" font-size=\"" << 42 * ui_scale << "\">Beta 0.5 - High-Fidelity Projection</text>\n";
 
     for (size_t i = 0; i < paths.size(); ++i) {
         std::string label = (i < labels.size()) ? labels[i] : "Path " + std::to_string(i);
         std::string color = (i < colors.size()) ? colors[i] : "#ffffff";
-        double y_coord = -630.0 + static_cast<double>(i) * 110.0;
+        double y_coord = ly + 220 * ui_scale + static_cast<double>(i) * 110.0 * ui_scale;
         
-        // Nominal Path
-        ofs << "  <rect x=\"-1710\" y=\"" << y_coord - 30 << "\" width=\"45\" height=\"45\" rx=\"8\" fill=\"" << color << "\" />\n";
-        ofs << "  <text x=\"-1645\" y=\"" << y_coord + 10 << "\" fill=\"#f8fafc\" font-size=\"38\">" << label << "</text>\n";
+        ofs << "  <rect x=\"" << lx << "\" y=\"" << y_coord - 30 * ui_scale << "\" width=\"" << 45 * ui_scale << "\" height=\"" << 45 * ui_scale << "\" rx=\"" << 8 * ui_scale << "\" fill=\"" << color << "\" />\n";
+        ofs << "  <text x=\"" << lx + 65 * ui_scale << "\" y=\"" << y_coord + 10 * ui_scale << "\" fill=\"#f8fafc\" font-size=\"" << 38 * ui_scale << "\">" << label << "</text>\n";
         
-        // Sigma-1 Label
-        ofs << "  <rect x=\"-1710\" y=\"" << y_coord + 25 << "\" width=\"45\" height=\"15\" rx=\"4\" fill=\"" << color << "\" fill-opacity=\"0.3\" stroke=\"#f8fafc\" stroke-dasharray=\"5,3\" />\n";
-        ofs << "  <text x=\"-1645\" y=\"" << y_coord + 40 << "\" fill=\"#94a3b8\" font-size=\"30\">1-sigma Uncertainty Corridor (40km)</text>\n";
+        ofs << "  <rect x=\"" << lx << "\" y=\"" << y_coord + 25 * ui_scale << "\" width=\"" << 45 * ui_scale << "\" height=\"" << 15 * ui_scale << "\" rx=\"" << 4 * ui_scale << "\" fill=\"" << color << "\" fill-opacity=\"0.3\" stroke=\"#f8fafc\" stroke-width=\"" << 1.0*ui_scale << "\" stroke-dasharray=\"" << 5*ui_scale << "," << 3*ui_scale << "\" />\n";
+        ofs << "  <text x=\"" << lx + 65 * ui_scale << "\" y=\"" << y_coord + 40 * ui_scale << "\" fill=\"#94a3b8\" font-size=\"" << 30 * ui_scale << "\">1-sigma Uncertainty Corridor</text>\n";
     }
 
     ofs << "</svg>\n";

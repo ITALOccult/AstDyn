@@ -84,7 +84,10 @@ public:
         const std::vector<OccultationPath>& paths,
         const std::vector<std::string>& labels,
         const std::vector<std::string>& colors,
-        const std::string& filename);
+        const std::string& filename,
+        double center_lat = 0.0,
+        double center_lon = 0.0,
+        double zoom = 1.0);
 
     /**
      * @brief Generates a KML file for Google Earth.

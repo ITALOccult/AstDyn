@@ -80,6 +80,9 @@ ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0 --svg
 - `--duration <days>`: Length of the search window in days (default: 1.0).
 - `--mag <val>`: Magnitude limit for star search (default: 15.0).
 - `--svg-output <file>`: Generate a high-resolution SVG world map.
+- `--zoom <val>`: Zoom level for the SVG map (e.g., 4.0 for regional, 10.0 for local).
+- `--map-lat <val>`: Center latitude for the SVG map.
+- `--map-lon <val>`: Center longitude for the SVG map.
 - `--kml <file>`: Generate a KML path for Google Earth (first match).
 - `--xml-output <file>`: Save matches to an Occult4-compatible XML.
 
