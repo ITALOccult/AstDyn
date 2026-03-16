@@ -45,7 +45,29 @@ struct OccultationParameters {
     Angle center_lat;     ///< Latitude of the sub-asteroid point at TCA (deg)
     time::TimeDuration max_duration; ///< Maximum occultation duration (sec)
     double total_apparent_rate;    ///< Total angular velocity (arcsec/hr)
+    
+    // Observability Filters
     bool is_daylight;     ///< True if TCA is during daylight at central point
+    double sun_altitude;  ///< Elevation of Sun at central point (deg)
+    double moon_altitude; ///< Elevation of Moon at central point (deg)
+    double moon_dist;     ///< Angular distance from Moon to Star (deg)
+    double mag_drop;      ///< Expected magnitude drop (m_star - m_asteroid)
+};
+
+/**
+ * @brief Configuration for filtering occultation events.
+ */
+struct OccultationConfig {
+    double min_sun_altitude = -12.0;       ///< Max Sun elevation (civil/nautical twilight)
+    double min_object_altitude = 10.0;     ///< Min Object elevation at center
+    double min_moon_dist = 5.0;            ///< Min angular distance from Moon (deg)
+    double min_mag_drop = 0.05;            ///< Min magnitude drop for detectability
+    double max_mag_star = 16.0;            ///< Max star magnitude
+    bool filter_daylight = true;           ///< Skip events in daylight
+    
+    // Refinement settings
+    bool use_proper_motion = true;         ///< Apply star proper motion to TCA
+    bool use_parallax = true;             ///< Apply star parallax
 };
 
 /**
@@ -130,7 +152,7 @@ public:
         const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
         time::EpochTDB start,
         time::EpochTDB end,
-        double max_mag,
+        const OccultationConfig& config,
         AstDynEngine& engine,
         OccultationRefinementMode mode = OccultationRefinementMode::ChebyshevDaily);
 
@@ -146,7 +168,7 @@ public:
         const std::string& bsp_path,
         time::EpochTDB start,
         time::EpochTDB end,
-        double max_mag,
+        const OccultationConfig& config,
         AstDynEngine& engine);
 
     /**
@@ -165,7 +187,7 @@ public:
         class ChebyshevEphemerisManager& manager,
         time::EpochTDB start,
         time::EpochTDB end,
-        double max_mag,
+        const OccultationConfig& config,
         AstDynEngine& engine);
 
     /**

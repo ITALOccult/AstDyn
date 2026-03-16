@@ -70,8 +70,10 @@ struct Star {
     double ruwe = 0.0;                  ///< Renormalised unit weight error
     double astrometric_excess_noise = 0.0;
 
-    /// Predict star position at a specific TDB epoch (proper motion + parallax)
-    [[nodiscard]] SkyCoord<core::GCRF> predict_at(time::EpochTDB target_time) const;
+    /// Predict star position at a specific TDB epoch (proper motion + annual parallax)
+    [[nodiscard]] SkyCoord<core::GCRF> predict_at(
+        time::EpochTDB target_time,
+        const std::optional<Eigen::Vector3d>& observer_pos_ssb_m = std::nullopt) const;
 
     [[nodiscard]] bool has_parallax() const noexcept { return parallax.to_mas() > 0.0; }
     [[nodiscard]] bool has_proper_motion() const noexcept {

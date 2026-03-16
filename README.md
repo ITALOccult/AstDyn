@@ -58,20 +58,20 @@ void example() {
 
 ## Tools
 
-### ioccultcalc (Beta 0.5 - Released 2026-03-16)
-A professional command-line tool for searching and comparing stellar occultations. It retrieves asteroid elements directly from **JPL Horizons** and searches the **Gaia DR3** catalog online.
+### ioccultcalc (Beta 0.6 - Released 2026-03-16)
+A professional command-line tool for searching and comparing stellar occultations. It retrieves asteroid elements directly from **JPL Horizons** and searches the **Gaia DR3** catalog.
 
-**New in Beta 0.5:**
+**New in Beta 0.6 (v1.0 RC Features):**
+*   **High-Precision Catalog Corrections**: Full implementation of Gaia DR3 **3D Space Motion** (proper motion) and **Annual/Annual Parallax** shift.
+*   **Relativistic Aberration & Light Deflection**: Native support for rigorous IAU 2000 aberration and gravitational light deflection (GR) configurable via JSON.
+*   **Advanced Observer Filters**: Automate search refinement with thresholds for **Sun/Moon Altitude**, **Moon Proximity**, and **Magnitude Drop**.
+*   **Multi-Catalog Framework**: Support for dynamic selection of stellar catalogs (Gaia DR3, Legacy) via `--catalog`.
 *   **Regional Search Filter**: Search for occultations passing near your specific location with `--lat` and `--lon`.
-*   **Premium Global Mapping**: High-fidelity **SVG World Maps** and **KML Files**, including detailed coastlines, political boundaries, and major cities.
-*   **1-Sigma Uncertainty Visualization**: Automated rendering of the **1-sigma uncertainty corridor** as a shaded zone on the map (40km default or from `--covariance`).
-*   **Temporal Resolution**: High-resolution time markers (1-minute intervals) with UTC labels along the occultation path.
-*   **Satellite Systems Support**: Native support for searching secondary bodies using external **BSP/SPK ephemerides**.
 
 #### Usage
 ```bash
-# Search for Ceres and Vesta over a 10-day window with map output
-ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0 --svg-output map.svg
+# Search with high-precision aberration and specific magnitude drop filter
+ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0 --svg-output map.svg --catalog gaia_dr3
 ```
 
 #### Command-line Options
@@ -79,6 +79,7 @@ ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 10.0 --mag 14.0 --svg
 - `--jd-start <val>`: Starting Julian Date (TDB) for the search.
 - `--duration <days>`: Length of the search window in days (default: 1.0).
 - `--mag <val>`: Magnitude limit for star search (default: 15.0).
+- `--catalog <type>`: Stellar catalog to use (`gaia_dr3`, `legacy`).
 - `--svg-output <file>`: Generate a high-resolution SVG world map.
 - `--zoom <val>`: Zoom level for the SVG map (e.g., 4.0 for regional, 10.0 for local).
 - `--map-lat <val>`: Center latitude for the SVG map.
@@ -106,14 +107,12 @@ If you encounter discrepancies or bugs, please open an issue with the relevant i
 
 *Validation epoch: 2026-Jan-10 00:00:00 UTC (MJD 61050.0)*
 
-
-
 ## 🚀 Development Roadmap (Towards v1.0)
 
 AstDyn is currently in an active developmental phase. Below is the strategic plan for the IOccultCalc tool and core library:
 
-*   **Beta 0.5 (Current)**: **Advanced Visualization**. High-fidelity SVG mapping, political boundaries, and 1-sigma uncertainty corridor visualization. 
-*   **Beta 0.6**: **Multi-Body Dynamics**. Support for hierarchical asteroid systems and moon-satellite occultation discovery.
+*   **Beta 0.5**: **Advanced Visualization**. High-fidelity SVG mapping, political boundaries, and 1-sigma uncertainty corridor. (Completed 2026-03-16)
+*   **Beta 0.6 (Current)**: **Search Engine Refinement**. Rigorous Gaia DR3 corrections, annual parallax, and observer filters.
 *   **v1.0 RC**: **Validation**. Final stress tests against NASA/JPL reference standards and full technical documentation release.
 
 See the detailed [Development Plan](file:///Users/michelebigi/.gemini/antigravity/brain/ca66ea00-11d5-4584-b8f8-9d341f9a1847/development_plan.md) for more information.

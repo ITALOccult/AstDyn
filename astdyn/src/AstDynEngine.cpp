@@ -167,6 +167,24 @@ void AstDynEngine::load_config(const std::string& config_file) {
         config_.max_iterations = jd.value("max_iter", 10);
         config_.convergence_threshold = jd.value("convergence", 1e-6);
         config_.outlier_sigma = jd.value("outlier_threshold", 3.0);
+        
+        // Advanced Corrections
+        config_.light_time_correction = jd.value("light_time", true);
+        config_.aberration_correction = jd.value("aberration", true);
+        config_.light_deflection = jd.value("light_deflection", true);
+    }
+
+    if (j.contains("occultation")) {
+        auto& jo = j["occultation"];
+        auto& occ = config_.occultation_settings;
+        occ.min_sun_altitude = jo.value("min_sun_alt", -12.0);
+        occ.min_object_altitude = jo.value("min_obj_alt", 10.0);
+        occ.min_moon_dist = jo.value("min_moon_dist", 5.0);
+        occ.min_mag_drop = jo.value("min_mag_drop", 0.05);
+        occ.max_mag_star = jo.value("max_mag_star", 16.0);
+        occ.filter_daylight = jo.value("filter_daylight", true);
+        occ.use_proper_motion = jo.value("use_proper_motion", true);
+        occ.use_parallax = jo.value("use_parallax", true);
     }
 
     config_.verbose = j.value("verbose", true);

@@ -99,32 +99,50 @@ ioc::gaia::OrbitQueryParams to_upstream(const OrbitQuery& q) {
 // Star::predict_at implementation
 // ============================================================================
 
-SkyCoord<core::GCRF> Star::predict_at(time::EpochTDB target_time) const {
-    // Gaia reference epoch is J2016.0 (JD 2457388.5 TDB)
-    constexpr double GAIA_EPOCH_JD = 2457388.5;
-    double dt_years = (target_time.mjd() + 2400000.5 - GAIA_EPOCH_JD) / 365.25;
+SkyCoord<core::GCRF> Star::predict_at(time::EpochTDB target_time, const std::optional<Eigen::Vector3d>& observer_pos_ssb_m) const {
+    // 1. Setup Time and Distance
+    constexpr double GAIA_EPOCH_JD = 2457388.5; // J2016.0
+    double dt_years = (target_time.jd() - GAIA_EPOCH_JD) / 365.25;
+    
+    double dist_pc = 1000.0; // Default if no parallax (broadly distant)
+    if (parallax.to_mas() > 1e-6) {
+        dist_pc = 1000.0 / parallax.to_mas();
+    }
+    double dist_m = dist_pc * 3.085677581e16;
 
-    Angle d_ra  = pm_ra_cosdec.multiply_time(dt_years) * (1.0 / std::cos(dec.to_rad()));
-    Angle d_dec = pm_dec.multiply_time(dt_years);
-
-    // Simplified proper motion (for more rigor, convert to vectors, rotate, back to angles)
-    RightAscension ra_new(ra + d_ra);
-    Declination    dec_new(dec + d_dec);
-
-    // Convert to vector for SkyCoord
-    double cos_dec = std::cos(dec_new.to_rad());
-    Eigen::Vector3d rho(
-        cos_dec * std::cos(ra_new.to_rad()),
-        cos_dec * std::sin(ra_new.to_rad()),
-        std::sin(dec_new.to_rad())
+    // 2. Compute 3D Position at Gaia Epoch (GCRF/ICRS)
+    double r_a = ra.to_rad();
+    double r_d = dec.to_rad();
+    Eigen::Vector3d pos0(
+        dist_m * std::cos(r_a) * std::cos(r_d),
+        dist_m * std::sin(r_a) * std::cos(r_d),
+        dist_m * std::sin(r_d)
     );
 
-    // Multiply by distance if we have parallax
-    Distance d = parallax.to_distance();
-    if (d.to_m() > 0) {
-        rho *= d.to_m();
+    // 3. Proper Motion Vector (Space Motion)
+    // pm_ra_cosdec and pm_dec are in mas/yr. 
+    // Tangential velocity: v = d * pm
+    double pm_ra_rad_yr = (pm_ra_cosdec.to_mas_yr() / 1000.0 / 3600.0) * (M_PI / 180.0);
+    double pm_dec_rad_yr = (pm_dec.to_mas_yr() / 1000.0 / 3600.0) * (M_PI / 180.0);
+    
+    // Basis vectors in spherical coordinates
+    Eigen::Vector3d e_ra(-std::sin(r_a), std::cos(r_a), 0.0);
+    Eigen::Vector3d e_dec(-std::sin(r_d) * std::cos(r_a), -std::sin(r_d) * std::sin(r_a), std::cos(r_d));
+    
+    // Space motion velocity vector (m/yr)
+    // Assume radial velocity is zero for Gaia stars without it
+    Eigen::Vector3d vel = dist_m * (pm_ra_rad_yr * e_ra + pm_dec_rad_yr * e_dec);
+    
+    // 4. Propagate to target time
+    Eigen::Vector3d pos_star_ssb = pos0 + vel * dt_years;
+    
+    // 5. Apply Annual Parallax if observer position is provided
+    Eigen::Vector3d rho = pos_star_ssb;
+    if (observer_pos_ssb_m) {
+        rho = pos_star_ssb - (*observer_pos_ssb_m);
     }
-
+    
+    // 6. Return as SkyCoord
     return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho.x(), rho.y(), rho.z()));
 }
 

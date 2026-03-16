@@ -23,7 +23,7 @@
 #ifndef ASTDYN_CATALOG_GAIADR3CATALOG_HPP
 #define ASTDYN_CATALOG_GAIADR3CATALOG_HPP
 
-#include "astdyn/catalog/CatalogTypes.hpp"
+#include "astdyn/catalog/StellarCatalog.hpp"
 #include <string>
 #include <vector>
 #include <optional>
@@ -70,7 +70,7 @@ struct CatalogStats {
  * Backed by IOC_GaiaLib's UnifiedGaiaCatalog. Supports multiple catalog
  * backends (multifile HEALPix, SQLite, online ESA/VizieR) configured via JSON.
  */
-class GaiaDR3Catalog {
+class GaiaDR3Catalog : public StellarCatalog {
 public:
     // -----------------------------------------------------------------------
     // Lifecycle
@@ -108,7 +108,7 @@ public:
      * @param params  Center, radius, magnitude and parallax cuts.
      * @return Stars within the cone, sorted by G magnitude.
      */
-    [[nodiscard]] std::vector<Star> query_cone(const ConeQuery& params) const;
+    [[nodiscard]] std::vector<Star> query_cone(const ConeQuery& params) const override;
 
     /**
      * @brief Search along a polyline corridor on the sky.
@@ -119,7 +119,7 @@ public:
      * @param params  Path, half-width, magnitude limit.
      * @return Stars within the corridor.
      */
-    [[nodiscard]] std::vector<Star> query_corridor(const CorridorQuery& params) const;
+    [[nodiscard]] std::vector<Star> query_corridor(const CorridorQuery& params) const override;
 
     /**
      * @brief Search stars along a propagated orbit (Chebyshev representation).
@@ -133,14 +133,14 @@ public:
      */
     [[nodiscard]] std::vector<Star> query_orbit(
         const OrbitQuery& params,
-        ProgressCallback progress = nullptr) const;
+        ProgressCallback progress = nullptr) const override;
 
     // -----------------------------------------------------------------------
     // Direct lookups
     // -----------------------------------------------------------------------
 
-    [[nodiscard]] std::optional<Star> by_source_id(int64_t source_id) const;
-    [[nodiscard]] std::optional<Star> by_name(const std::string& common_name) const;
+    [[nodiscard]] std::optional<Star> by_source_id(int64_t source_id) const override;
+    [[nodiscard]] std::optional<Star> by_name(const std::string& common_name) const override;
     [[nodiscard]] std::optional<Star> by_hd(const std::string& hd_number) const;
     [[nodiscard]] std::optional<Star> by_hipparcos(const std::string& hip_number) const;
     [[nodiscard]] std::optional<Star> by_tycho2(const std::string& tycho2_id) const;

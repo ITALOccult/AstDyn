@@ -157,17 +157,30 @@ OccultationParameters OccultationLogic::compute_parameters(
         params.max_duration = time::TimeDuration::zero();
     }
     
-    // Daylight Check (Sun altitude at sub-asteroid point)
-    auto sun_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, params.t_ca);
-    Eigen::Vector3d r_sun_gcrf = sun_state.position.to_eigen_si();
-    
-    // Normalize vectors to compute altitude
+    // 6. Observability Filters
     Eigen::Vector3d n_sub = r_sub_gcrf.normalized();
-    Eigen::Vector3d n_sun = r_sun_gcrf.normalized();
-    
-    // Elevation = asin(n_sub . n_sun)
+
+    // 6.1 SUN (Altitude at sub-asteroid point)
+    auto sun_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, params.t_ca);
+    Eigen::Vector3d n_sun = sun_state.position.to_eigen_si().normalized();
     double sun_alt_rad = std::asin(std::clamp(n_sub.dot(n_sun), -1.0, 1.0));
-    params.is_daylight = (sun_alt_rad > -0.0145); // Approx -0.83 deg for atmospheric refraction
+    params.sun_altitude = sun_alt_rad * 180.0 / M_PI;
+    params.is_daylight = (params.sun_altitude > -0.83); 
+
+    // 6.2 MOON
+    auto moon_ssb = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::MOON, params.t_ca);
+    auto earth_ssb = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, params.t_ca);
+    Eigen::Vector3d n_moon = (moon_ssb.position.to_eigen_si() - earth_ssb.position.to_eigen_si()).normalized();
+    double moon_alt_rad = std::asin(std::clamp(n_sub.dot(n_moon), -1.0, 1.0));
+    params.moon_altitude = moon_alt_rad * 180.0 / M_PI;
+
+    // 6.3 Moon Distance (from Star)
+    params.moon_dist = std::acos(std::clamp(k.dot(n_moon), -1.0, 1.0)) * 180.0 / M_PI;
+
+    // 6.4 Magnitude Drop (Simplified: m_comb - m_ast)
+    double flux_ast_proxy = std::pow(10.0, -0.4 * 12.0); // Assume H=12
+    double flux_star = std::pow(10.0, -0.4 * params.star_mag);
+    params.mag_drop = -2.5 * std::log10(flux_star / (flux_star + flux_ast_proxy));
 
     return params;
 }
@@ -177,7 +190,9 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
     const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
     time::EpochTDB start,
     time::EpochTDB end,
-    double max_mag,
+    const OccultationConfig& config,
+    AstDynEngine& engine,
+    OccultationRefinementMode mode)
     AstDynEngine& engine,
     OccultationRefinementMode mode)
 {
@@ -452,7 +467,7 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
     ChebyshevEphemerisManager& manager,
     time::EpochTDB start,
     time::EpochTDB end,
-    double max_mag,
+    const OccultationConfig& config,
     AstDynEngine& engine)
 {
     using namespace catalog;
@@ -497,10 +512,14 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
                     }
                     
                     if (min_dist_deg2 < 0.01) { // within 0.1 deg
-                        // 2. Compute final parameters
+                        // 2. Refine Star Position (Proper Motion & Parallax) at TCA
+                        auto earth_state = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, time::EpochTDB::from_jd(best_jd));
+                        auto star_refined = star.predict_at(time::EpochTDB::from_jd(best_jd), earth_state.position.to_eigen_si());
+
+                        // 3. Compute final parameters
                         auto [pos_f, vel_f] = segment.evaluate_full(best_jd);
                         auto params = compute_parameters(
-                            star.ra, star.dec,
+                            star_refined.ra(), star_refined.dec(),
                             RightAscension(Angle::from_deg(std::get<0>(pos_f))),
                             Declination(Angle::from_deg(std::get<1>(pos_f))),
                             physics::Distance::from_au(std::get<2>(pos_f)),
@@ -509,7 +528,13 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
                             physics::Velocity::from_au_d(std::get<2>(vel_f)),
                             time::EpochTDB::from_jd(best_jd));
                         
-                        if (params.impact_parameter.to_km() < 50000.0) {
+                        // 4. Observability Filtering
+                        bool filter_pass = true;
+                        if (config.filter_daylight && params.is_daylight) filter_pass = false;
+                        if (params.sun_altitude > config.min_sun_altitude) filter_pass = false;
+                        if (params.moon_dist < config.min_moon_dist) filter_pass = false;
+                        
+                        if (filter_pass && params.impact_parameter.to_km() < 50000.0) {
                             params.star_id = std::to_string(star.source_id);
                             params.star_mag = star.g_mag;
                             OccultationCandidate cand;

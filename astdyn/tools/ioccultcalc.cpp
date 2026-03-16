@@ -121,6 +121,7 @@ int main(int argc, char** argv) {
         ("zoom", po::value<double>()->default_value(1.0), "zoom level for SVG map")
         ("map-lat", po::value<double>(), "center latitude for SVG map")
         ("map-lon", po::value<double>(), "center longitude for SVG map")
+        ("catalog", po::value<std::string>()->default_value("gaia_dr3"), "stellar catalog to use (gaia_dr3, legacy)")
     ;
 
     po::variables_map vm;
@@ -144,6 +145,7 @@ int main(int argc, char** argv) {
         cfg.ephemeris_file = bsp_path;
         cfg.ephemeris_type = EphemerisType::DE441;
         cfg.verbose = false;
+        cfg.preferred_catalog = vm["catalog"].as<std::string>();
         engine.set_config(cfg);
     }
     
@@ -203,9 +205,13 @@ int main(int argc, char** argv) {
     }
 
     // --- 3. Global Search ---
-    double mag_limit = vm["mag"].as<double>();
-    std::cout << "[ioccultcalc] Searching occultations..." << std::endl;
-    auto results = OccultationLogic::find_multi_asteroid_occultations(asteroid_ids, manager, start_epoch, end_epoch, mag_limit, engine);
+    OccultationConfig occ_config = engine.config().occultation_settings;
+    if (vm.count("mag")) {
+        occ_config.max_mag_star = vm["mag"].as<double>();
+    }
+    
+    std::cout << "[ioccultcalc] Searching occultations with mag < " << occ_config.max_mag_star << "..." << std::endl;
+    auto results = OccultationLogic::find_multi_asteroid_occultations(asteroid_ids, manager, start_epoch, end_epoch, occ_config, engine);
     
     // --- 3b. Apply Uncertainty (if requested) ---
     if (vm.count("covariance") && !results.empty()) {
