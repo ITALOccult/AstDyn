@@ -177,18 +177,20 @@ void AASIntegrator::symplectic_step(const DerivativeFunction& f, double t, Eigen
 
 double AASIntegrator::estimate_step_size(const Eigen::VectorXd& q, const Eigen::VectorXd& p, double target_dt) const {
     double r = q.norm();
-    double g_n = precision_ / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
+    // Scale precision to be more practical for O(4) symplectic integration
+    // 1e-6 typically would result in extremely small steps (0.01 days), 
+    // we want 1e-6 to map to something like 0.1-0.5 days for Ceres.
+    double scaled_precision = precision_ * 50.0;
+    double g_n = scaled_precision / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
     double g_avg = g_n;
     
-    // Symmetrization loop for temporal reversibility
-    for (int i = 0; i < 2; ++i) {
-        // Point on trajectory shifted by Sundman step
-        Eigen::VectorXd q_next = q + p * g_avg;
-        double g_p = precision_ / std::sqrt(std::max(compute_force_gradient(q_next), 1e-20));
-        
-        // Use harmonic mean for time-reversibility preservation
-        g_avg = 2.0 * g_n * g_p / (g_n + g_p);
-    }
+    // Symmetrization loop (1 iteration is sufficient for most cases)
+    // Point on trajectory shifted by Sundman step
+    Eigen::VectorXd q_next = q + p * g_avg;
+    double g_p = scaled_precision / std::sqrt(std::max(compute_force_gradient(q_next), 1e-20));
+    
+    // Use harmonic mean for time-reversibility preservation
+    g_avg = 2.0 * g_n * g_p / (g_n + g_p);
     
     // Apply physical constraints
     // 1. Limit step to 1/20th of local orbital period
@@ -196,7 +198,7 @@ double AASIntegrator::estimate_step_size(const Eigen::VectorXd& q, const Eigen::
     g_avg = std::min(g_avg, T_local / 20.0);
     
     // 2. Global bounds
-    g_avg = std::clamp(g_avg, 1e-8, 50.0);
+    g_avg = std::clamp(g_avg, 1e-8, 100.0);
     
     // Perihelion protection (r < 2 Solar Radii)
     if (r < 0.0093) {
