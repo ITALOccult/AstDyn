@@ -26,8 +26,8 @@ struct GoodingIODResult {
     struct Solution {
         physics::CartesianStateTyped<core::GCRF> state; ///< Heliocentric state at t1
         time::EpochTDB epoch;                           ///< Epoch t1
-        double rho1, rho2, rho3;                         ///< Slant ranges [AU]
-        double rms_error;                               ///< Post-fit RMS on obs 2 [arcsec]
+        physics::Distance rho1, rho2, rho3;             ///< Slant ranges
+        astrometry::Angle rms_error;                    ///< Post-fit RMS on obs 2
     };
     
     std::vector<Solution> solutions;
@@ -72,8 +72,8 @@ public:
         const observations::OpticalObservation& obs1,
         const observations::OpticalObservation& obs2,
         const observations::OpticalObservation& obs3,
-        double rho1_guess,
-        double rho3_guess);
+        physics::Distance rho1_guess,
+        physics::Distance rho3_guess);
 
 private:
     Settings settings_;
@@ -86,7 +86,7 @@ private:
         const math::Vector3<core::GCRF, physics::Distance>& R1,
         const math::Vector3<core::GCRF, physics::Distance>& R2,
         const math::Vector3<core::GCRF, physics::Distance>& R3,
-        double& rho1_m, double& rho3_m,
+        physics::Distance& rho1, physics::Distance& rho3,
         physics::CartesianStateTyped<core::GCRF>& final_state);
 };
 

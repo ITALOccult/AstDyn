@@ -263,16 +263,18 @@ public:
     void set_max_step(double h_max) { h_max_ = h_max; }
     
 private:
-    double h_initial_; ///< Initial step size
-    double tolerance_; ///< Relative error tolerance
-    double h_min_;     ///< Minimum step size
-    double h_max_;     ///< Maximum step size
+    void compute_stages(const DerivativeFunction& f, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k);
+    double estimate_error(const Eigen::VectorXd& y, const Eigen::VectorXd& y7, const Eigen::VectorXd& y8, double h) const;
+
+    double h_initial_;
+    double tolerance_;
+    double h_min_;
+    double h_max_;
     
-    // RKF78 Butcher tableau coefficients
-    static const double a_[13][12];  // Matrix A
-    static const double b7_[13];     // 7th order weights
-    static const double b8_[13];     // 8th order weights
-    static const double c_[13];      // Time nodes
+    static const double a_[13][12];
+    static const double b7_[13];
+    static const double b8_[13];
+    static const double c_[13];
 };
 
 } // namespace astdyn::propagation

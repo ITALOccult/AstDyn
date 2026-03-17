@@ -126,16 +126,16 @@ void SPKReader::loadIndex() {
         
         // Safety check to avoid infinite loops if 'next' is same as current or invalid
         if (next == current_rec || next < 0) {
-            std::cout << "  [!] SPK Index error: invalid next record " << next << " at current " << current_rec << std::endl;
+            std::cout << "  [!] SPK Index error: invalid next record " << next << " at current " << current_rec << "\n";
             break;
         }
 
         if (ns > 250 || ns < 0) {
-            std::cout << "  [!] SPK Index error: invalid NS " << ns << " at current " << current_rec << std::endl;
+            std::cout << "  [!] SPK Index error: invalid NS " << ns << " at current " << current_rec << "\n";
             break; 
         }
         
-        // std::cout << "  - Loading SPK Index record " << current_rec << " (" << ns << " segments)..." << std::endl;
+        // std::cout << "  - Loading SPK Index record " << current_rec << " (" << ns << " segments)..." << "\n";
         
         int sum_size = 2 * 8 + 6 * 4; // 40 bytes
         
@@ -150,7 +150,7 @@ void SPKReader::loadIndex() {
             
             // Log once per unique ID if possible or just print
             if (seen_ids.find(target) == seen_ids.end()) {
-                // std::cout << "    [SPK] Found body ID: " << target << std::endl;
+                // std::cout << "    [SPK] Found body ID: " << target << "\n";
                 seen_ids.insert(target);
             }
 

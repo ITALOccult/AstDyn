@@ -18,13 +18,13 @@ public:
     /** @brief Logs a message to stdout based on the key and preferred language. */
     static void info(const MessageKey key, const Language lang = Language::English) noexcept {
         const auto message = core::get_message(key, lang);
-        std::cout << "[AstDyn INFO] " << message << std::endl;
+        std::cout << "[AstDyn INFO] " << message << "\n";
     }
 
     /** @brief Logs an error message to stderr. */
     static void error(const MessageKey key, const Language lang = Language::English) noexcept {
         const auto message = core::get_message(key, lang);
-        std::cerr << "[AstDyn ERROR] " << message << std::endl;
+        std::cerr << "[AstDyn ERROR] " << message << "\n";
     }
 };
 

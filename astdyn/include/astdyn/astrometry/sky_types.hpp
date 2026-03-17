@@ -68,6 +68,13 @@ public:
     constexpr RightAscension() noexcept : Angle(0.0) {}
     explicit constexpr RightAscension(Angle a) noexcept : Angle(a.wrap_0_2pi().to_rad()) {}
     
+    [[nodiscard]] static constexpr RightAscension from_rad(double rad) noexcept { 
+        return RightAscension(Angle::from_rad(rad)); 
+    }
+    [[nodiscard]] static constexpr RightAscension from_deg(double deg) noexcept { 
+        return RightAscension(Angle::from_deg(deg)); 
+    }
+    
     // Format: "HH MM SS.ss"
     [[nodiscard]] std::string to_hms() const {
         double total_hours = to_deg() / 15.0;
@@ -94,6 +101,13 @@ public:
         // Enforce [-pi/2, pi/2]
         if (rad_ > constants::PI / 2.0) rad_ = constants::PI - rad_;
         if (rad_ < -constants::PI / 2.0) rad_ = -constants::PI - rad_;
+    }
+
+    [[nodiscard]] static constexpr Declination from_rad(double rad) noexcept { 
+        return Declination(Angle::from_rad(rad)); 
+    }
+    [[nodiscard]] static constexpr Declination from_deg(double deg) noexcept { 
+        return Declination(Angle::from_deg(deg)); 
     }
 
     // Format: "+DD MM SS.ss"
@@ -131,9 +145,11 @@ public:
     /// Convert to physical Distance (returns 0 if parallax <= 0)
     [[nodiscard]] constexpr physics::Distance to_distance() const noexcept {
         if (mas_ <= 0.0) return physics::Distance::zero();
-        // 1 pc = 206264.806 AU. Distance (pc) = 1 / parallax (arcsec)
-        double au = 1000.0 / mas_ * 206264.806;
-        return physics::Distance::from_au(au);
+        // Distance (pc) = 1 / parallax (arcsec)
+        // 1 pc in AU is defined as 1 / tan(1 arcsec) ~ 1 / arcsen(1 rad)
+        // We use the reciprocal relationship directly.
+        double dist_au = 1.0 / (to_arcsec() * constants::ARCSEC_TO_RAD);
+        return physics::Distance::from_au(dist_au);
     }
 
 private:
@@ -156,6 +172,10 @@ public:
     /// Compute angular displacement over time
     [[nodiscard]] Angle multiply_time(double years) const noexcept {
         return Angle::from_mas(mas_yr_ * years);
+    }
+
+    [[nodiscard]] constexpr double to_rad_yr() const noexcept {
+        return (mas_yr_ / 3600000.0) * constants::DEG_TO_RAD;
     }
 
 private:

@@ -13,59 +13,38 @@
 
 namespace astdyn::astrometry {
 
-GeoPoint OccultationMapper::project_to_earth(
-    const physics::Distance& xi, 
-    const physics::Distance& eta, 
-    const physics::Distance& zeta, 
-    const RightAscension& ra, 
-    const Declination& dec, 
-    const time::EpochUTC& t) 
-{
-    using namespace constants;
+double OccultationMapper::compute_era(const time::EpochUTC& t) {
+    double dut1 = time::get_dut1(t.mjd());
+    double jd_ut1 = time::mjd_to_jd(t.mjd() + dut1 / constants::SECONDS_PER_DAY);
+    double d = jd_ut1 - 2451545.0;
+    double era = std::fmod((0.7790572732640 + 1.00273781191135448 * d) * constants::TWO_PI, constants::TWO_PI);
+    return (era < 0) ? era + constants::TWO_PI : era;
+}
 
-    // 1. Besselian Basis (toward star)
+GeoPoint OccultationMapper::project_to_earth(
+    const physics::Distance& xi, const physics::Distance& eta, const physics::Distance& zeta, 
+    const RightAscension& ra, const Declination& dec, const time::EpochUTC& t) 
+{
     double as = ra.to_rad();
     double ds = dec.to_rad();
     Eigen::Vector3d k_star(std::cos(as) * std::cos(ds), std::sin(as) * std::cos(ds), std::sin(ds));
     Eigen::Vector3d i_basis(-std::sin(as), std::cos(as), 0.0);
     Eigen::Vector3d j_basis(-std::sin(ds) * std::cos(as), -std::sin(ds) * std::sin(as), std::cos(ds));
 
-    // 2. Cartesian position in GCRF (m)
     Eigen::Vector3d p_eci = xi.to_m() * i_basis + eta.to_m() * j_basis + zeta.to_m() * k_star;
+    double era_rad = compute_era(t);
+    
+    double lon = std::atan2(p_eci.y(), p_eci.x()) - era_rad;
+    while (lon > constants::PI) lon -= constants::TWO_PI;
+    while (lon <= -constants::PI) lon += constants::TWO_PI;
 
-    // 3. Earth Rotation Angle (ERA)
-    // DU is defined in UT1 days since J2000.0
-    double dut1 = time::get_dut1(t.mjd());
-    double mjd_ut1 = t.mjd() + dut1 / constants::SECONDS_PER_DAY;
-    double jd_ut1 = time::mjd_to_jd(mjd_ut1);
-    double days_since_j2000 = jd_ut1 - 2451545.0;
-    
-    // IERS Technical Note 32 - ERA formula
-    constexpr double ERA_CONSTANT = 0.7790572732640;
-    constexpr double ERA_RATE = 1.00273781191135448;
-    double era_frac = ERA_CONSTANT + ERA_RATE * days_since_j2000;
-    double era_rad = std::fmod(era_frac * constants::TWO_PI, constants::TWO_PI);
-    if (era_rad < 0) era_rad += constants::TWO_PI;
-    
-    // 4. Geodetic Projection (Spherical approximation)
-    double ra_p = std::atan2(p_eci.y(), p_eci.x());
-    double dec_p = std::asin(p_eci.z() / p_eci.norm());
-    
-    double lon_rad = ra_p - era_rad;
-    while (lon_rad > PI) lon_rad -= TWO_PI;
-    while (lon_rad <= -PI) lon_rad += TWO_PI;
-
-    return {Angle::from_rad(dec_p), Angle::from_rad(lon_rad)};
+    return {Angle::from_rad(std::asin(p_eci.z() / p_eci.norm())), Angle::from_rad(lon)};
 }
 
 OccultationPath OccultationMapper::compute_path(
-    const OccultationParameters& params,
-    const RightAscension& star_ra,
-    const Declination& star_dec,
-    const physics::Distance& asteroid_diameter,
-    const time::EpochUTC& tca_utc,
-    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem,
-    const time::TimeDuration& duration) 
+    const OccultationParameters& params, const RightAscension& star_ra, const Declination& star_dec,
+    const physics::Distance& asteroid_diameter, const time::EpochUTC& tca_utc, 
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem, const time::TimeDuration& duration) 
 {
     OccultationPath path;
     path.shadow_width = asteroid_diameter;
@@ -73,28 +52,25 @@ OccultationPath OccultationMapper::compute_path(
     time::TimeDuration dt = duration / static_cast<double>(steps);
 
     for (int i = -steps/2; i <= steps/2; ++i) {
-        time::TimeDuration dt_from_ca = dt * static_cast<double>(i);
-        
-        // 1. Center Line & Markers
-        auto pt_center = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::zero());
-        if (pt_center) {
-            path.center_line.push_back(*pt_center);
-            add_time_marker(path, *pt_center, dt_from_ca, tca_utc);
+        time::TimeDuration dt_step = dt * static_cast<double>(i);
+        auto pt = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_step, physics::Distance::zero());
+        if (pt) {
+            path.center_line.push_back(*pt);
+            add_time_marker(path, *pt, dt_step, tca_utc);
         }
         
-        // 2. Boundaries (Nominal & Sigma)
         double w2 = path.shadow_width.to_m() / 2.0;
-        double sigma_m = params.cross_track_uncertainty.to_m();
+        double sigma = params.cross_track_uncertainty.to_m();
+        
+        auto n = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_step, physics::Distance::from_m(-w2));
+        auto s = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_step, physics::Distance::from_m(w2));
+        if (n) path.shadow_north.push_back(*n);
+        if (s) path.shadow_south.push_back(*s);
 
-        auto pt_n = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::from_m(-w2));
-        auto pt_s = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::from_m(w2));
-        if (pt_n) path.shadow_north.push_back(*pt_n);
-        if (pt_s) path.shadow_south.push_back(*pt_s);
-
-        auto pt_sn = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::from_m(-(w2 + sigma_m)));
-        auto pt_ss = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::from_m(w2 + sigma_m));
-        if (pt_sn) path.sigma1_north.push_back(*pt_sn);
-        if (pt_ss) path.sigma1_south.push_back(*pt_ss);
+        auto sn = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_step, physics::Distance::from_m(-(w2 + sigma)));
+        auto ss = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_step, physics::Distance::from_m(w2 + sigma));
+        if (sn) path.sigma1_north.push_back(*sn);
+        if (ss) path.sigma1_south.push_back(*ss);
     }
     return path;
 }

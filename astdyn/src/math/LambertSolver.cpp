@@ -29,53 +29,59 @@ double LambertSolver::S(double z) {
         return 1.0 / 6.0 - z / 120.0 + z * z / 5040.0;
 }
 
-Eigen::Vector3d LambertSolver::solve(
-    const Eigen::Vector3d& r1_vec,
-    const Eigen::Vector3d& r2_vec,
-    double dt,
-    double mu,
+math::Vector3<core::GCRF, physics::Velocity> LambertSolver::solve(
+    const math::Vector3<core::GCRF, physics::Distance>& r1_vec,
+    const math::Vector3<core::GCRF, physics::Distance>& r2_vec,
+    time::TimeDuration dt,
+    physics::GravitationalParameter mu,
     bool retrograde)
 {
-    double r1 = r1_vec.norm();
-    double r2 = r2_vec.norm();
-    double cos_theta = r1_vec.dot(r2_vec) / (r1 * r2);
+    // Convert to canonical units [AU, days] for internal solver stability
+    double r1_au = r1_vec.norm().to_au();
+    double r2_au = r2_vec.norm().to_au();
+    double mu_au = mu.to_au3_d2();
+    double dt_days = dt.to_days();
+
+    Eigen::Vector3d r1v = r1_vec.to_eigen_si() * (1.0 / (constants::AU * 1000.0));
+    Eigen::Vector3d r2v = r2_vec.to_eigen_si() * (1.0 / (constants::AU * 1000.0));
+
+    double cos_theta = r1v.dot(r2v) / (r1_au * r2_au);
 
     if (retrograde) {
-        if (r1_vec.cross(r2_vec).z() >= 0)
+        if (r1v.cross(r2v).z() >= 0)
             cos_theta = -cos_theta; 
     }
 
-    double A = std::sqrt(r1 * r2 * (1.0 + cos_theta));
-    if (A == 0.0) return Eigen::Vector3d::Zero();
+    double A = std::sqrt(r1_au * r2_au * (1.0 + cos_theta));
+    if (A == 0.0) return math::Vector3<core::GCRF, physics::Velocity>();
 
     // Initial guess for z
-    double z = 0.0;
     double psi = 0.0;
-    double psi_up = 4.0 * M_PI * M_PI;
-    double psi_low = -4.0 * M_PI;
+    double psi_up = 4.0 * constants::PI * constants::PI;
+    double psi_low = -4.0 * constants::PI;
 
     for (int iter = 0; iter < 100; ++iter) {
         double c = C(psi);
         double s = S(psi);
-        double y = r1 + r2 + A * (psi * s - 1.0) / std::sqrt(c);
+        double y = r1_au + r2_au + A * (psi * s - 1.0) / std::sqrt(c);
 
         if (A > 0.0 && y < 0.0) {
-            // Newton step or adjustment for negative y
+            // Newton step adjustment for negative y
             while (y < 0.0) {
                 psi_low += 0.1;
                 psi = psi_low;
                 c = C(psi);
                 s = S(psi);
-                y = r1 + r2 + A * (psi * s - 1.0) / std::sqrt(c);
+                y = r1_au + r2_au + A * (psi * s - 1.0) / std::sqrt(c);
             }
         }
 
         double chi = std::sqrt(y / c);
-        double t = (chi * chi * chi * s + A * std::sqrt(y)) / std::sqrt(mu);
+        double t = (chi * chi * chi * s + A * std::sqrt(y)) / std::sqrt(mu_au);
 
-        if (std::abs(t - dt) < 1e-12) break;
+        if (std::abs(t - dt_days) < 1e-12) break;
 
-        if (t < dt)
+        if (t < dt_days)
             psi_low = psi;
         else
             psi_up = psi;
@@ -86,14 +92,20 @@ Eigen::Vector3d LambertSolver::solve(
     // Final result reconstruction
     double c = C(psi);
     double s = S(psi);
-    double y = r1 + r2 + A * (psi * s - 1.0) / std::sqrt(c);
+    double y = r1_au + r2_au + A * (psi * s - 1.0) / std::sqrt(c);
     
-    double f = 1.0 - y / r1;
-    double g = A * std::sqrt(y / mu);
-    // double g_dot = 1.0 - y / r2;
+    double f = 1.0 - y / r1_au;
+    double g = A * std::sqrt(y / mu_au);
 
-    Eigen::Vector3d v1 = (r2_vec - f * r1_vec) / g;
-    return v1;
+    // v1 [AU/day]
+    Eigen::Vector3d v1_aupd = (r2v - f * r1v) / g;
+    
+    // Convert back to SI [m/s]
+    double v_scale = (constants::AU * 1000.0) / constants::SECONDS_PER_DAY;
+    return math::Vector3<core::GCRF, physics::Velocity>::from_si(
+        v1_aupd.x() * v_scale, 
+        v1_aupd.y() * v_scale, 
+        v1_aupd.z() * v_scale);
 }
 
 } // namespace astdyn::math

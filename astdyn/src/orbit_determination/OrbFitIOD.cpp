@@ -65,21 +65,20 @@ GaussIODResult OrbFitIOD::compute_from_three(
     orbfit::Observation o3 = convert_obs(obs3);
 
     if (settings_.verbose) {
-        std::cout << "[OrbFitIOD Debug] Obs 1 MJD: " << o1.t_obs - 2400000.5 << " Pos: " << o1.obs_pos.x << " " << o1.obs_pos.y << " " << o1.obs_pos.z << std::endl;
-        std::cout << "[OrbFitIOD Debug] Obs 2 MJD: " << o2.t_obs - 2400000.5 << " Pos: " << o2.obs_pos.x << " " << o2.obs_pos.y << " " << o2.obs_pos.z << std::endl;
-        std::cout << "[OrbFitIOD Debug] Obs 3 MJD: " << o3.t_obs - 2400000.5 << " Pos: " << o3.obs_pos.x << " " << o3.obs_pos.y << " " << o3.obs_pos.z << std::endl;
+        std::cout << "[OrbFitIOD Debug] Obs 1 MJD: " << o1.t_obs - 2400000.5 << " Pos: " << o1.obs_pos.x << " " << o1.obs_pos.y << " " << o1.obs_pos.z << "\n";
+        std::cout << "[OrbFitIOD Debug] Obs 2 MJD: " << o2.t_obs - 2400000.5 << " Pos: " << o2.obs_pos.x << " " << o2.obs_pos.y << " " << o2.obs_pos.z << "\n";
+        std::cout << "[OrbFitIOD Debug] Obs 3 MJD: " << o3.t_obs - 2400000.5 << " Pos: " << o3.obs_pos.x << " " << o3.obs_pos.y << " " << o3.obs_pos.z << "\n";
     }
 
     GaussIODResult result;
     try {
         orbfit::GaussSolution sol;
-        double dt13 = std::abs(o3.t_obs - o1.t_obs);
-        if (dt13 < 2.0) {
+        time::TimeDuration dt13 = (obs3.time - obs1.time);
+        if (std::abs(dt13.to_days()) < 2.0) {
             sol = orbfit::laplace_iod(o1, o2, o3);
         } else {
             sol = orbfit::gauss_iod(o1, o2, o3);
         }
-
         result.success = sol.converged;
         result.error_message = "";
         
@@ -97,9 +96,9 @@ GaussIODResult OrbFitIOD::compute_from_three(
         result.epoch = epoch;
         
         // Dummy slant ranges as OrbFit's API doesn't expose them directly in the return struct
-        result.slant_range_1 = (sv.pos - o1.obs_pos).norm();
-        result.slant_range_2 = (sv.pos - o2.obs_pos).norm();
-        result.slant_range_3 = (sv.pos - o3.obs_pos).norm();
+        result.slant_range_1 = physics::Distance::from_au((sv.pos - o1.obs_pos).norm());
+        result.slant_range_2 = physics::Distance::from_au((sv.pos - o2.obs_pos).norm());
+        result.slant_range_3 = physics::Distance::from_au((sv.pos - o3.obs_pos).norm());
         
         result.iterations = 1;
 

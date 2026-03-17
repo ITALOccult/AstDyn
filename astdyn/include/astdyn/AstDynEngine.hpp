@@ -40,8 +40,8 @@ struct AstDynConfig {
 
     // Ephemeris Configuration
     EphemerisType ephemeris_type = EphemerisType::DE441; ///< Analytical, DE441 (Default to high precision)
-    std::string ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp";
-    std::string asteroid_ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp";
+    std::string ephemeris_file = "ephemerides/de441.bsp";
+    std::string asteroid_ephemeris_file = "ephemerides/sb441.bsp";
     
     // Differential correction settings
     int max_iterations = 10;                 ///< Maximum DC iterations
@@ -97,9 +97,9 @@ struct OrbitDeterminationResult {
  */
 struct ApparentPlace {
     time::EpochTDB epoch;
-    double ra;      ///< Topocentric RA [rad]
-    double dec;     ///< Topocentric Dec [rad]
-    double dist;    ///< Distance to observer [AU]
+    astrometry::RightAscension ra;
+    astrometry::Declination dec;
+    physics::Distance dist;
 };
 
 /**
@@ -158,6 +158,12 @@ public:
 
 private:
     void update_propagator();
+    std::unique_ptr<propagation::Integrator> create_integrator();
+    void load_ephemeris_provider();
+    void load_integrator_settings(const core::IOCConfig& ioc);
+    void load_physics_settings(const core::IOCConfig& ioc);
+    void load_fitting_settings(const core::IOCConfig& ioc);
+    void load_occultation_settings(const core::IOCConfig& ioc);
     template <typename Frame> OrbitDeterminationResult run_fit_in_frame();
 
     AstDynConfig config_;

@@ -51,6 +51,9 @@ constexpr double RAD_TO_ARCSEC = (180.0 * 3600.0) / PI;
 /// Julian Date of J2000.0 epoch
 constexpr double JD2000 = 2451545.0;
 
+/// Julian Date of J2016.0 epoch (Gaia DR3 reference epoch)
+constexpr double JD2016 = 2457389.0;
+
 /// Modified Julian Date of J2000.0 epoch
 constexpr double MJD2000 = 51544.5;
 
@@ -65,6 +68,9 @@ constexpr double DAYS_PER_YEAR = 365.25;
 
 /// Seconds per Julian year
 constexpr double YEAR = DAYS_PER_YEAR * SECONDS_PER_DAY;
+
+/// Gaia DR3 reference epoch JD
+constexpr double GAIA_EPOCH_JD = JD2016;
 
 /// Days per Julian century
 constexpr double DAYS_PER_CENTURY = 36525.0;
@@ -84,6 +90,9 @@ constexpr double C_LIGHT = 299792.458;
 
 /// Astronomical Unit [km] (IAU 2012/2015)
 constexpr double AU = 149597870.700;
+
+/// Parsec to Meters [m]
+constexpr double PARSEC_TO_M = 3.085677581e16;
 
 /// Gaussian gravitational constant [AU^(3/2) / (M_sun^(1/2) * day)]
 constexpr double K_GAUSS = 0.01720209895;

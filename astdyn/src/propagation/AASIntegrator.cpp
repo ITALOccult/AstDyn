@@ -162,327 +162,83 @@ double AASIntegrator::compute_modified_hamiltonian(const Eigen::VectorXd& q,
     return H0 + correction;
 }
 
-void AASIntegrator::symplectic_step(const DerivativeFunction& f,
-                                    double t,
-                                    Eigen::VectorXd& q, 
-                                    Eigen::VectorXd& p, 
-                                    Eigen::MatrixXd& phi,
-                                    double ds) {
-    bool has_stm = (phi.rows() == 6 && phi.cols() == 6);
-    
-    auto update_phi_drift = [&](double step) {
-        if (!has_stm) return;
-        phi.block<3, 6>(0, 0) += step * phi.block<3, 6>(3, 0);
-    };
-    
-    auto update_phi_kick = [&](double step, const Eigen::VectorXd& q_eval, const Eigen::VectorXd& p_eval) {
-        if (!has_stm) return;
-        
-        // Full Jacobian: d a / d q AND d a / d v (M4 Requirement)
-        // Required for non-conservative forces (Drag, Yarkovsky)
-        const double h_fd = 1e-7;
-        Eigen::Matrix3d JF = Eigen::Matrix3d::Zero();
-        Eigen::Matrix3d JV = Eigen::Matrix3d::Zero();
-        Eigen::VectorXd y_base = join_state(q_eval, p_eval);
-        
-        for (int col = 0; col < 3; ++col) {
-            double pert_q = h_fd * std::max(std::abs(y_base[col]), 1.0);
-            Eigen::VectorXd y_pq = y_base; y_pq[col] += pert_q;
-            Eigen::VectorXd y_mq = y_base; y_mq[col] -= pert_q;
-            JF.col(col) = (f(t, y_pq).tail(3) - f(t, y_mq).tail(3)) / (2.0 * pert_q);
-
-            double pert_v = h_fd * std::max(std::abs(y_base[3+col]), 1.0);
-            Eigen::VectorXd y_pv = y_base; y_pv[3+col] += pert_v;
-            Eigen::VectorXd y_mv = y_base; y_mv[3+col] -= pert_v;
-            JV.col(col) = (f(t, y_pv).tail(3) - f(t, y_mv).tail(3)) / (2.0 * pert_v);
-        }
-        
-        // Tangent map kick: Φ_new = [[I, 0], [step*JF, I + step*JV]] * Φ_old
-        phi.block<3, 6>(3, 0) += step * (JF * phi.block<3, 6>(0, 0) + JV * phi.block<3, 6>(3, 0));
-    };
-
-    // Yoshida-4 DKDKDKD
-    // Step 1: Drift
-    q += p * (c1 * ds);
-    update_phi_drift(c1 * ds);
-    
-    // Step 1: Kick
-    Eigen::VectorXd y1 = join_state(q, p);
-    Eigen::VectorXd force1 = f(t, y1).tail(3);
-    p += force1 * (d1 * ds);
-    update_phi_kick(d1 * ds, q, p);
-    stats_.num_function_evals++;
-
-    // Step 2: Drift
-    q += p * (c2 * ds);
-    update_phi_drift(c2 * ds);
-    
-    // Step 2: Kick
-    Eigen::VectorXd y2 = join_state(q, p);
-    Eigen::VectorXd force2 = f(t, y2).tail(3);
-    p += force2 * (d2 * ds);
-    update_phi_kick(d2 * ds, q, p);
-    stats_.num_function_evals++;
-
-    // Step 3: Drift
-    q += p * (c2 * ds);
-    update_phi_drift(c2 * ds);
-    
-    // Step 3: Kick
-    Eigen::VectorXd y3 = join_state(q, p);
-    Eigen::VectorXd force3 = f(t, y3).tail(3);
-    p += force3 * (d1 * ds);
-    update_phi_kick(d1 * ds, q, p);
-    stats_.num_function_evals++;
-
-    // Step 4: Drift
-    q += p * (c1 * ds);
-    update_phi_drift(c1 * ds);
+void AASIntegrator::update_phi_kick(const DerivativeFunction& f, double t, double step, const Eigen::VectorXd& q, const Eigen::VectorXd& p, Eigen::MatrixXd& phi) {
+    if (phi.size() == 0) return;
+    const double h_fd = 1e-7; Eigen::Matrix3d JF, JV; Eigen::VectorXd y = join_state(q, p);
+    for (int i = 0; i < 3; ++i) {
+        double d_q = h_fd * std::max(std::abs(y[i]), 1.0), d_v = h_fd * std::max(std::abs(y[3+i]), 1.0);
+        Eigen::VectorXd y_pq = y; y_pq[i] += d_q; Eigen::VectorXd y_mq = y; y_mq[i] -= d_q;
+        JF.col(i) = (f(t, y_pq).tail(3) - f(t, y_mq).tail(3)) / (2.0 * d_q);
+        Eigen::VectorXd y_pv = y; y_pv[3+i] += d_v; Eigen::VectorXd y_mv = y; y_mv[3+i] -= d_v;
+        JV.col(i) = (f(t, y_pv).tail(3) - f(t, y_mv).tail(3)) / (2.0 * d_v);
+    }
+    phi.block<3, 6>(3, 0) += step * (JF * phi.block<3, 6>(0, 0) + JV * phi.block<3, 6>(3, 0));
 }
 
-Eigen::VectorXd AASIntegrator::integrate(const DerivativeFunction& f,
-                                         const Eigen::VectorXd& y0,
-                                         double t0, double tf) {
-    Integrator::reset_statistics();
-    const double direction = (tf > t0) ? 1.0 : -1.0;
-    double t = t0;
-    
-    Eigen::VectorXd q, p;
-    split_state(y0, q, p);
-
-    const double dtau = 1.0; // Sundman fictitious time step (fixed to unity)
-    double g_init = precision_ / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
-    double H_mod_initial = compute_modified_hamiltonian(q, p, g_init);
-    double H_initial = compute_total_energy(q, p);
-
-    Eigen::MatrixXd phi = Eigen::MatrixXd::Zero(0, 0);
-    if (y0.size() == 42) {
-        phi.resize(6, 6);
-        for (int i = 0; i < 6; ++i) {
-            for (int j = 0; j < 6; ++j) phi(i, j) = y0[6 + i * 6 + j];
-        }
-    }
-
-    const int max_steps = 1000000;
-    double last_h = 0.0;
-    
-    while (std::abs(tf - t) > 1e-14) {
-        if (stats_.num_steps >= max_steps) break;
-        
-        // 1. Estimate current step size g_n
-        double g_n = precision_ / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
-        
-        // 2. Symmetrization loop (M1) - Iterative Fix for g_avg
-        double g_avg = g_n;
-        for (int iter = 0; iter < 3; ++iter) {
-            double dt_est = g_avg * dtau;
-            
-            // Predict q_next for g(q_next) evaluation
-            // We use a simple drift-kick-drift prediction for speed
-            Eigen::VectorXd q_next = q + p * dt_est; 
-            double g_p = precision_ / std::sqrt(std::max(compute_force_gradient(q_next), 1e-20));
-            
-            // Re-calc average
-            g_avg = 0.5 * (g_n + g_p);
-        }
-        
-        // 3. Safety Clamps (m2)
-        // Everything is unified in AU / AU-day / MJD
-        // g_avg is already in DAYS because mu is in AU3/day2 and q is in AU.
-        
-        const double one_minute = 1.0 / 1440.0;
-        const double limit_min = 1e-5; // ~1 second
-        const double limit_max = 20.0; // 20 days
-        
-        g_avg = std::clamp(g_avg, limit_min, limit_max);
-        
-        // Perihelion protection: ensure stability near Sun/Central Body
-        const double r_obj = q.norm();
-        const double R_SUN_AU = 0.00465047; 
-        if (r_obj < 2.0 * R_SUN_AU) {
-             g_avg = std::min(g_avg, one_minute); 
-        }
-        
-        double dt_physical = std::min(g_avg, std::abs(tf - t));
-        double actual_ds = dt_physical * direction;
-        
-        symplectic_step(f, t, q, p, phi, actual_ds);
-        
-        t += actual_ds;
-        last_h = dt_physical;
-        stats_.num_steps++;
-    }
-    
-    double H_final = compute_total_energy(q, p);
-    double H_mod_final = compute_modified_hamiltonian(q, p, last_h);
-    
-    stats_.hamiltonian_drift = std::abs((H_final - H_initial) / H_initial);
-    stats_.shadow_hamiltonian_drift = std::abs((H_mod_final - H_mod_initial) / H_mod_initial);
-    stats_.final_time = t;
-    
-    if (phi.size() > 0) {
-        Eigen::VectorXd y_out(42);
-        y_out.segment<3>(0) = q;
-        y_out.segment<3>(3) = p;
-        for (int i = 0; i < 6; ++i) {
-            for (int j = 0; j < 6; ++j) y_out[6 + i * 6 + j] = phi(i, j);
-        }
-        return y_out;
-    } else {
-        return join_state(q, p);
-    }
+void AASIntegrator::symplectic_step(const DerivativeFunction& f, double t, Eigen::VectorXd& q, Eigen::VectorXd& p, Eigen::MatrixXd& phi, double ds) {
+    auto drift = [&](double h) { q += p * h; if (phi.size() > 0) phi.block<3, 6>(0, 0) += h * phi.block<3, 6>(3, 0); };
+    auto kick = [&](double h) { Eigen::VectorXd force = f(t, join_state(q, p)).tail(3); p += force * h; update_phi_kick(f, t, h, q, p, phi); stats_.num_function_evals++; };
+    drift(c1*ds); kick(d1*ds); drift(c2*ds); kick(d2*ds); drift(c2*ds); kick(d1*ds); drift(c1*ds);
 }
 
-void AASIntegrator::integrate_steps(const DerivativeFunction& f,
-                                   const Eigen::VectorXd& y0,
-                                   double t0, double tf,
-                                   std::vector<double>& t_out,
-                                   std::vector<Eigen::VectorXd>& y_out) {
-    Integrator::reset_statistics();
-    t_out.clear();
-    y_out.clear();
-    const double direction = (tf > t0) ? 1.0 : -1.0;
-    double t = t0;
-    t_out.push_back(t);
-    y_out.push_back(y0);
-    
-    Eigen::VectorXd q, p;
-    split_state(y0, q, p);
-    
-    const double dtau = 1.0; // Sundman fictitious time step (fixed to unity)
-    double g_init = precision_ / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
-    double H_mod_initial = compute_modified_hamiltonian(q, p, g_init);
-    double H_initial = compute_total_energy(q, p);
-
-    Eigen::MatrixXd phi = Eigen::MatrixXd::Zero(0, 0);
-    if (y0.size() == 42) {
-        phi.resize(6, 6);
-        for (int i = 0; i < 6; ++i) {
-            for (int j = 0; j < 6; ++j) phi(i, j) = y0[6 + i * 6 + j];
-        }
+double AASIntegrator::estimate_step_size(const Eigen::VectorXd& q, const Eigen::VectorXd& p, double target_dt) const {
+    double r = q.norm(), g_n = precision_ / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
+    double g_avg = g_n;
+    for (int i = 0; i < 2; ++i) {
+        Eigen::VectorXd q_next = q + p * g_avg;
+        double g_p = precision_ / std::sqrt(std::max(compute_force_gradient(q_next), 1e-20));
+        g_avg = 0.5 * (g_n + g_p);
     }
-    
-    const int max_steps = 1000000;
-    double last_h = 0.0;
-    while (std::abs(tf - t) > 1e-14) {
-        if (stats_.num_steps >= max_steps) break;
-        
-        // 1. Estimate current step size g_n
-        double g_n = precision_ / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
-        
-        // 2. Symmetrization loop (M1) - Iterative Fix for g_avg
-        double g_avg = g_n;
-        for (int iter = 0; iter < 3; ++iter) {
-            double dt_est = g_avg * dtau;
-            
-            // Predict q_next for g(q_next) evaluation
-            Eigen::VectorXd q_next = q + p * dt_est; 
-            double g_p = precision_ / std::sqrt(std::max(compute_force_gradient(q_next), 1e-20));
-            
-            // Re-calc average
-            g_avg = 0.5 * (g_n + g_p);
-        }
-        
-        // 3. Safety Clamps (m2)
-        const double one_minute = 1.0 / 1440.0;
-        const double limit_min = 1e-5; 
-        const double limit_max = 20.0; 
-        
-        g_avg = std::clamp(g_avg, limit_min, limit_max);
-        
-        // Perihelion protection
-        const double r_obj = q.norm();
-        const double R_SUN_AU = 0.00465047; 
-        if (r_obj < 2.0 * R_SUN_AU) {
-             g_avg = std::min(g_avg, one_minute); 
-        }
-        
-        double dt_physical = std::min(g_avg, std::abs(tf - t));
-        double actual_ds = dt_physical * direction;
-        
-        symplectic_step(f, t, q, p, phi, actual_ds);
-        
-        t += actual_ds;
-        last_h = dt_physical;
-        stats_.num_steps++;
-        
-        t_out.push_back(t);
-        if (phi.size() > 0) {
-            Eigen::VectorXd y_step(42);
-            y_step.segment<3>(0) = q;
-            y_step.segment<3>(3) = p;
-            for (int i = 0; i < 6; ++i) {
-                for (int j = 0; j < 6; ++j) y_step[6 + i * 6 + j] = phi(i, j);
-            }
-            y_out.push_back(y_step);
-        } else {
-            y_out.push_back(join_state(q, p));
-        }
-    }
-    
-    double H_final = compute_total_energy(q, p);
-    double H_mod_final = compute_modified_hamiltonian(q, p, last_h);
-    stats_.hamiltonian_drift = std::abs((H_final - H_initial) / H_initial);
-    stats_.shadow_hamiltonian_drift = std::abs((H_mod_final - H_mod_initial) / H_mod_initial);
-    stats_.final_time = t;
+    g_avg = std::clamp(g_avg, 1e-5, 20.0);
+    if (r < 0.0093) g_avg = std::min(g_avg, 1.0/1440.0);
+    return std::min(g_avg, target_dt);
 }
 
-std::vector<Eigen::VectorXd> AASIntegrator::integrate_at(const DerivativeFunction& f,
-                                                     const Eigen::VectorXd& y0,
-                                                     double t0,
-                                                     const std::vector<double>& t_targets) {
+Eigen::VectorXd AASIntegrator::integrate(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf) {
     stats_.reset();
-    std::vector<Eigen::VectorXd> results;
-    results.reserve(t_targets.size());
-    
-    double t = t0;
-    Eigen::VectorXd q, p;
-    split_state(y0, q, p);
-    
-    Eigen::MatrixXd phi;
-    if (y0.size() == 42) {
-        phi = Eigen::MatrixXd::Zero(6, 6);
-        for (int i = 0; i < 6; ++i) {
-            for (int j = 0; j < 6; ++j) phi(i, j) = y0[6 + i * 6 + j];
-        }
+    double t = t0, dir = (tf > t0) ? 1.0 : -1.0;
+    Eigen::VectorXd q, p; split_state(y0, q, p);
+    Eigen::MatrixXd phi; if (y0.size() == 42) { phi.resize(6, 6); for (int i=0; i<36; ++i) phi(i/6, i%6) = y0[6+i]; }
+    double H_i = compute_total_energy(q, p), h_last = 0.0;
+    while (std::abs(tf - t) > 1e-14 && stats_.num_steps < 1000000) {
+        double dt = estimate_step_size(q, p, std::abs(tf - t));
+        symplectic_step(f, t, q, p, phi, dt * dir);
+        t += dt * dir; h_last = dt; stats_.num_steps++;
     }
-    
-    for (double tf : t_targets) {
-        if (std::abs(tf - t) < 1e-14) {
-             if (phi.size() > 0) {
-                Eigen::VectorXd y_res(42);
-                y_res.segment<3>(0) = q; y_res.segment<3>(3) = p;
-                for (int i = 0; i < 6; ++i) for (int j = 0; j < 6; ++j) y_res[6 + i * 6 + j] = phi(i, j);
-                results.push_back(y_res);
-            } else {
-                results.push_back(join_state(q, p));
-            }
-            continue;
-        }
-        
-        double direction = (tf > t) ? 1.0 : -1.0;
-        
-        while (std::abs(tf - t) > 1e-14) {
-            double ds_adaptive = precision_ / std::sqrt(std::max(1e-20, compute_force_gradient(q)));
-            double dt_physical = std::min(ds_adaptive, std::abs(tf - t));
-            double actual_ds = dt_physical * direction;
-            
-            symplectic_step(f, t, q, p, phi, actual_ds);
-            t += actual_ds;
-            stats_.num_steps++;
-        }
-        
-         if (phi.size() > 0) {
-            Eigen::VectorXd y_res(42);
-            y_res.segment<3>(0) = q; y_res.segment<3>(3) = p;
-            for (int i = 0; i < 6; ++i) for (int j = 0; j < 6; ++j) y_res[6 + i * 6 + j] = phi(i, j);
-            results.push_back(y_res);
-        } else {
-            results.push_back(join_state(q, p));
-        }
-    }
-    
+    stats_.hamiltonian_drift = std::abs((compute_total_energy(q, p) - H_i) / H_i);
     stats_.final_time = t;
+    if (phi.size() == 36) { Eigen::VectorXd r(42); r << q, p, Eigen::Map<Eigen::VectorXd>(phi.data(), 36); return r; }
+    return join_state(q, p);
+}
+
+void AASIntegrator::integrate_steps(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf, std::vector<double>& t_out, std::vector<Eigen::VectorXd>& y_out) {
+    stats_.reset(); t_out.clear(); y_out.clear();
+    double t = t0, dir = (tf > t0) ? 1.0 : -1.0;
+    Eigen::VectorXd q, p; split_state(y0, q, p);
+    Eigen::MatrixXd phi; if (y0.size() == 42) { phi.resize(6, 6); for (int i=0; i<36; ++i) phi(i/6, i%6) = y0[6+i]; }
+    t_out.push_back(t); y_out.push_back(y0);
+    while (std::abs(tf - t) > 1e-14 && stats_.num_steps < 1000000) {
+        double dt = estimate_step_size(q, p, std::abs(tf - t));
+        symplectic_step(f, t, q, p, phi, dt * dir); t += dt * dir; stats_.num_steps++;
+        t_out.push_back(t); 
+        if (phi.size() == 36) { Eigen::VectorXd r(42); r << q, p, Eigen::Map<Eigen::VectorXd>(phi.data(), 36); y_out.push_back(r); }
+        else y_out.push_back(join_state(q, p));
+    }
+}
+
+std::vector<Eigen::VectorXd> AASIntegrator::integrate_at(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, const std::vector<double>& t_targets) {
+    stats_.reset(); std::vector<Eigen::VectorXd> results; results.reserve(t_targets.size());
+    double t = t0; Eigen::VectorXd q, p; split_state(y0, q, p);
+    Eigen::MatrixXd phi; if (y0.size() == 42) { phi.resize(6, 6); for (int i=0; i<36; ++i) phi(i/6, i%6) = y0[6+i]; }
+    for (double target : t_targets) {
+        double dir = (target > t) ? 1.0 : -1.0;
+        while (std::abs(target - t) > 1e-14 && stats_.num_steps < 1000000) {
+            double dt = estimate_step_size(q, p, std::abs(target - t));
+            symplectic_step(f, t, q, p, phi, dt * dir); t += dt * dir; stats_.num_steps++;
+        }
+        if (phi.size() == 36) { Eigen::VectorXd r(42); r << q, p, Eigen::Map<Eigen::VectorXd>(phi.data(), 36); results.push_back(r); }
+        else results.push_back(join_state(q, p));
+    }
     return results;
 }
 

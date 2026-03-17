@@ -73,117 +73,62 @@ public:
 
     std::shared_ptr<ResidualCalculator<Frame>> get_residual_calculator() const { return residual_calc_; }
 
-    DifferentialCorrectorResult<Frame> fit(
-        const std::vector<astdyn::observations::OpticalObservation>& observations,
-        const physics::CartesianStateTyped<Frame>& initial_guess,
-        const DifferentialCorrectorSettings& settings = {}) 
-    {
-        DifferentialCorrectorResult<Frame> result;
-        result.final_state = initial_guess;
-        
+    DifferentialCorrectorResult<Frame> fit(const std::vector<astdyn::observations::OpticalObservation>& observations, const physics::CartesianStateTyped<Frame>& initial_guess, const DifferentialCorrectorSettings& settings = {}) {
+        DifferentialCorrectorResult<Frame> res; res.final_state = initial_guess;
         std::vector<observations::OpticalObservation> sorted_obs = observations;
-        std::sort(sorted_obs.begin(), sorted_obs.end(), [](const auto& a, const auto& b) {
-            return a.time < b.time;
-        });
-
-        physics::CartesianStateTyped<Frame> current_state = initial_guess;
-        double prev_iter_rms = 1e18;
-        double current_sigma = std::max(settings.outlier_sigma, settings.outlier_max_sigma);
-
-        for (int iter = 0; iter < settings.max_iterations; ++iter) {
-            result.iterations = iter + 1;
-            
-            // 1. Compute residuals
-            std::vector<ObservationResidual> residuals = residual_calc_->compute_residuals(sorted_obs, current_state);
-            
-            // 2. Identify outliers (Carpentry)
-            if (settings.reject_outliers) {
-                auto stats = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
-                if (iter > 0 && stats.rms_total.to_arcsec() < 1000.0) {
-                    double t = (double)iter / (double)settings.max_iterations;
-                    current_sigma = settings.outlier_max_sigma + t * (settings.outlier_min_sigma - settings.outlier_max_sigma);
-                    ResidualCalculator<Frame>::identify_outliers(residuals, current_sigma);
-                }
-            }
-
-            // 3. Build Normal Equations
-            auto dm = build_design_matrix(sorted_obs, current_state, residuals);
-            if (dm.valid_indices.empty()) break;
-
-            Eigen::MatrixXd AtW = dm.A.transpose() * dm.weights.asDiagonal();
-            Eigen::MatrixXd NormalMat = AtW * dm.A;
-            Eigen::VectorXd RHS = AtW * dm.b;
-            Eigen::VectorXd correction = NormalMat.ldlt().solve(RHS);
-
-            // 4. Line Search
-            auto stats_before = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
-            double cur_rms = stats_before.rms_total.to_arcsec();
-            
-            if (settings.use_line_search) {
-                double alpha = 1.0;
-                bool success = false;
-                if (settings.verbose) std::cout << "    [LSQ] Line search (cur_rms=" << cur_rms << "\")" << std::endl;
-                while (alpha >= settings.line_search_min_alpha) {
-                    auto trial = apply_correction(current_state, correction, alpha);
-                    auto trial_res = residual_calc_->compute_residuals(sorted_obs, trial);
-                    for (size_t i=0; i<residuals.size(); ++i) trial_res[i].outlier = residuals[i].outlier;
-                    auto trial_stats = ResidualCalculator<Frame>::compute_statistics(trial_res, 6);
-                    double trial_rms = trial_stats.rms_total.to_arcsec();
-                    
-                    if (settings.verbose) std::cout << "      alpha=" << alpha << " -> trial_rms=" << trial_rms << "\"" << std::endl;
-
-                    if (trial_stats.rms_total.to_arcsec() < cur_rms) {
-                        current_state = trial;
-                        success = true;
-                        break;
-                    }
-                    alpha *= 0.5;
-                }
-                if (!success) {
-                    if (settings.verbose) std::cout << "    [LSQ] Line search failed (reached min alpha)." << std::endl;
-                    break;
-                }
-            } else {
-                current_state = apply_correction(current_state, correction, 1.0);
-            }
-
-            // 5. Convergence check
-            auto final_stats = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
-            double final_rms = final_stats.rms_total.to_arcsec();
-            if (settings.verbose) {
-                std::cout << "  - Iteration " << (iter+1) << ": RMS " << final_rms << "\"" 
-                          << " (correction norm: " << correction.norm() << ")" << std::endl;
-            }
-            if (iter > 0 && std::abs(prev_iter_rms - final_rms) < settings.rms_tolerance_arcsec) {
-                result.converged = true;
-                if (settings.verbose) std::cout << "    [LSQ] Converged by ΔRMS." << std::endl;
-                break;
-            }
-            if (correction.norm() < 1e-12) {
-                result.converged = true;
-                if (settings.verbose) std::cout << "    [LSQ] Converged by correction norm." << std::endl;
-                break;
-            }
-            prev_iter_rms = final_rms;
-            result.statistics = final_stats;
-            result.residuals = residuals;
+        std::sort(sorted_obs.begin(), sorted_obs.end(), [](const auto& a, const auto& b) { return a.time < b.time; });
+        physics::CartesianStateTyped<Frame> cur_state = initial_guess; double prev_rms = 1e18, cur_sig = std::max(settings.outlier_sigma, settings.outlier_max_sigma);
+        for (int i = 0; i < settings.max_iterations; ++i) {
+            res.iterations = i + 1; std::vector<ObservationResidual> residuals = residual_calc_->compute_residuals(sorted_obs, cur_state);
+            handle_carpentry_sigma(i, settings, cur_sig, residuals);
+            auto dm = build_design_matrix(sorted_obs, cur_state, residuals); if (dm.valid_indices.empty()) break;
+            Eigen::VectorXd corr = solve_normal_equations(dm); double cur_rms = ResidualCalculator<Frame>::compute_statistics(residuals, 6).rms_total.to_arcsec();
+            if (settings.use_line_search && !perform_line_search(sorted_obs, corr, settings, cur_state, residuals, cur_rms)) break;
+            else if (!settings.use_line_search) cur_state = apply_correction(cur_state, corr, 1.0);
+            res.statistics = ResidualCalculator<Frame>::compute_statistics(residuals, 6); res.residuals = residuals;
+            if (corr.norm() < 1e-12 || (i > 0 && std::abs(prev_rms - res.statistics.rms_total.to_arcsec()) < settings.rms_tolerance_arcsec)) { res.converged = true; break; }
+            prev_rms = res.statistics.rms_total.to_arcsec();
         }
-
-        result.final_state = current_state;
-        
-        if (settings.compute_covariance) {
-            result.covariance = compute_covariance_internal(sorted_obs, current_state, result.residuals);
-        }
-
-        return result;
+        res.final_state = cur_state; if (settings.compute_covariance) res.covariance = compute_covariance_internal(sorted_obs, cur_state, res.residuals);
+        return res;
     }
 
 private:
+    void handle_carpentry_sigma(int iter, const DifferentialCorrectorSettings& settings, double& current_sigma, std::vector<ObservationResidual>& residuals) {
+        if (!settings.reject_outliers) return;
+        auto stats = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
+        if (iter > 0 && stats.rms_total.to_arcsec() < 1000.0) {
+            double t = (double)iter / (double)settings.max_iterations;
+            current_sigma = settings.outlier_max_sigma + t * (settings.outlier_min_sigma - settings.outlier_max_sigma);
+            ResidualCalculator<Frame>::identify_outliers(residuals, current_sigma);
+        }
+    }
+
+    Eigen::VectorXd solve_normal_equations(const DesignMatrix& dm) {
+        Eigen::MatrixXd AtW = dm.A.transpose() * dm.weights.asDiagonal();
+        return (AtW * dm.A).ldlt().solve(AtW * dm.b);
+    }
+
+    bool perform_line_search(const std::vector<observations::OpticalObservation>& obs, const Eigen::VectorXd& correction, const DifferentialCorrectorSettings& settings, physics::CartesianStateTyped<Frame>& current_state, std::vector<ObservationResidual>& residuals, double& cur_rms) {
+        double alpha = 1.0;
+        while (alpha >= settings.line_search_min_alpha) {
+            auto trial = apply_correction(current_state, correction, alpha);
+            auto trial_res = residual_calc_->compute_residuals(obs, trial);
+            for (size_t i=0; i<residuals.size(); ++i) trial_res[i].outlier = residuals[i].outlier;
+            auto t_stats = ResidualCalculator<Frame>::compute_statistics(trial_res, 6);
+            if (t_stats.rms_total.to_arcsec() < cur_rms) { current_state = trial; residuals = trial_res; cur_rms = t_stats.rms_total.to_arcsec(); return true; }
+            alpha *= 0.5;
+        }
+        return false;
+    }
     physics::CartesianStateTyped<Frame> apply_correction(const physics::CartesianStateTyped<Frame>& s, const Eigen::VectorXd& c, double a) {
-        Eigen::VectorXd y = s.to_eigen_au_aud();
-        y += a * c;
+        Eigen::VectorXd y = s.to_eigen_au_aud(); y += a * c;
         return physics::CartesianStateTyped<Frame>::from_au_aud(s.epoch, y, s.gm);
     }
+
+    void handle_carpentry_sigma(int iter, const DifferentialCorrectorSettings& settings, double& current_sigma, std::vector<ObservationResidual>& residuals);
+    Eigen::VectorXd solve_normal_equations(const DesignMatrix& dm);
+    bool perform_line_search(const std::vector<observations::OpticalObservation>& obs, const Eigen::VectorXd& correction, const DifferentialCorrectorSettings& settings, physics::CartesianStateTyped<Frame>& current_state, std::vector<ObservationResidual>& residuals, double& cur_rms);
 
     struct DesignMatrix {
         Eigen::MatrixXd A;

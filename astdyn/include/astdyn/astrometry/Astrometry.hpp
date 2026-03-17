@@ -8,6 +8,13 @@
 #include <Eigen/Dense>
 #include <expected>
 
+#include <memory>
+
+namespace astdyn {
+    class AstDynEngine;
+    namespace ephemeris { class DE441Provider; }
+}
+
 namespace astdyn::astrometry {
 
 /**
@@ -67,7 +74,10 @@ public:
         const Eigen::Vector3d& earth_to_sun_eq);
 
 private:
-    /** @brief Step 1: Iterative Light-Time Correction Kernel. */
+    static std::shared_ptr<::astdyn::ephemeris::DE441Provider> sync_ephemeris(const std::string& path);
+
+    static Eigen::Vector3d compute_earth_helio(std::shared_ptr<::astdyn::ephemeris::DE441Provider> de441, const time::EpochTDB& t_obs);
+
     static Eigen::Vector3d compute_light_time_corrected_pos(
         const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
         const time::EpochTDB& t_elements,
@@ -75,14 +85,7 @@ private:
         const Eigen::Vector3d& earth_pos_helio_ecl,
         const AstDynConfig& cfg);
 
-    /** @brief Step 3: Frame Transformation (Ecliptic -> Equatorial). */
-    static Eigen::Vector3d convert_frame_if_needed(
-        const Eigen::Vector3d& vec,
-        const AstrometricSettings& settings);
-
-    /** @brief Step 4: Final RA/Dec/Distance conversion. */
-    static AstrometricObservation finalize_observation(
-        const Eigen::Vector3d& final_rho_eq);
+    static AstrometricObservation finalize_observation(const Eigen::Vector3d& final_rho_eq);
 };
 
 } // namespace astdyn::astrometry

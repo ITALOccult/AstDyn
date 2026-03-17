@@ -37,9 +37,9 @@ struct FitResult {
     int num_observations;
     int num_rejected;
     
-    double rms_ra_arcsec;
-    double rms_dec_arcsec;
-    double rms_total_arcsec;
+    astrometry::Angle rms_ra;
+    astrometry::Angle rms_dec;
+    astrometry::Angle rms_total;
     
     double chi_squared;
     bool converged;

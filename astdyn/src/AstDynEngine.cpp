@@ -54,127 +54,79 @@ AstDynEngine::AstDynEngine(const AstDynConfig& config)
     update_propagator();
 }
 
-void AstDynEngine::update_propagator() {
-    // Create integrator based on configuration
-    std::unique_ptr<Integrator> integrator;
-    
+std::unique_ptr<Integrator> AstDynEngine::create_integrator() {
     switch (config_.integrator_type) {
-        case IntegratorType::RKF78:
-            integrator = std::make_unique<RKF78Integrator>(
-                config_.initial_step_size,
-                config_.tolerance);
-            break;
-        case IntegratorType::RK4:
-            integrator = std::make_unique<RK4Integrator>(
-                config_.initial_step_size);
-            break;
-        case IntegratorType::SABA4: {
-            double saba_step = std::max(0.5, config_.initial_step_size);
-            integrator = std::make_unique<SABA4Integrator>(
-                saba_step,
-                config_.tolerance);
-            break;
-        }
-        case IntegratorType::GAUSS:
-            integrator = std::make_unique<GaussIntegrator>(
-                config_.initial_step_size,
-                config_.tolerance);
-            break;
-        case IntegratorType::RADAU:
-            integrator = std::make_unique<RadauIntegrator>(
-                config_.initial_step_size,
-                config_.tolerance);
-            break;
-        case IntegratorType::AAS: {
-            double mu_val = config_.propagator_settings.central_body_gm;
-            integrator = std::make_unique<AASIntegrator>(
-                config_.aas_precision, 
-                mu_val);
-            break;
-        }
-        default:
-            integrator = std::make_unique<RK4Integrator>(config_.initial_step_size);
-            break;
+        case IntegratorType::RKF78: return std::make_unique<RKF78Integrator>(config_.initial_step_size, config_.tolerance);
+        case IntegratorType::RK4: return std::make_unique<RK4Integrator>(config_.initial_step_size);
+        case IntegratorType::SABA4: return std::make_unique<SABA4Integrator>(std::max(0.5, config_.initial_step_size), config_.tolerance);
+        case IntegratorType::GAUSS: return std::make_unique<GaussIntegrator>(config_.initial_step_size, config_.tolerance);
+        case IntegratorType::RADAU: return std::make_unique<RadauIntegrator>(config_.initial_step_size, config_.tolerance);
+        case IntegratorType::AAS: return std::make_unique<AASIntegrator>(config_.aas_precision, config_.propagator_settings.central_body_gm);
+        default: return std::make_unique<RK4Integrator>(config_.initial_step_size);
     }
-    
-    // Update Ephemeris Provider based on config
-    if (config_.ephemeris_type == EphemerisType::DE441 && !config_.ephemeris_file.empty()) {
-        static std::mutex provider_mtx;
-        static std::string last_path;
-        static std::shared_ptr<ephemeris::EphemerisProvider> cached_provider;
+}
 
-        std::lock_guard<std::mutex> lock(provider_mtx);
-        if (last_path != config_.ephemeris_file) {
-            try {
-                if (config_.verbose) std::cout << "Loading DE441 Ephemeris: " << config_.ephemeris_file << "...\n";
-                auto provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
-                ephemeris_->setProvider(provider);
-                ephemeris::PlanetaryEphemeris::setGlobalProvider(provider); // For legacy static calls
-                cached_provider = provider;
-                last_path = config_.ephemeris_file;
-                ephemeris_loaded_ = true;
-            } catch (const std::exception& e) {
-                std::cerr << "Error loading DE441: " << e.what() << "\n";
-                ephemeris_->setProvider(nullptr);
-                ephemeris_loaded_ = false;
-            }
-        } else {
-            ephemeris_->setProvider(cached_provider);
-            ephemeris::PlanetaryEphemeris::setGlobalProvider(cached_provider);
-            ephemeris_loaded_ = true;
-        }
-    }
- else if (config_.ephemeris_type == EphemerisType::Analytical) {
+void AstDynEngine::load_ephemeris_provider() {
+    if (config_.ephemeris_type != EphemerisType::DE441 || config_.ephemeris_file.empty()) {
         ephemeris_->setProvider(nullptr);
         ephemeris::PlanetaryEphemeris::setGlobalProvider(nullptr);
         ephemeris_loaded_ = false;
+        return;
     }
-    
-    config_.propagator_settings.asteroid_ephemeris_file = config_.asteroid_ephemeris_file;
 
-    propagator_ = std::make_shared<Propagator>(
-        std::move(integrator),
-        ephemeris_,
-        config_.propagator_settings);
-    
+    static std::mutex mtx;
+    static std::string last_path;
+    static std::shared_ptr<ephemeris::EphemerisProvider> cache;
+    std::lock_guard lock(mtx);
+
+    if (last_path != config_.ephemeris_file) {
+        try {
+            auto provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
+            ephemeris_->setProvider(provider);
+            ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
+            cache = provider; last_path = config_.ephemeris_file; ephemeris_loaded_ = true;
+        } catch (...) { ephemeris_loaded_ = false; }
+    } else {
+        ephemeris_->setProvider(cache); ephemeris::PlanetaryEphemeris::setGlobalProvider(cache); ephemeris_loaded_ = true;
+    }
+}
+
+void AstDynEngine::update_propagator() {
+    load_ephemeris_provider();
+    config_.propagator_settings.asteroid_ephemeris_file = config_.asteroid_ephemeris_file;
+    propagator_ = std::make_shared<Propagator>(create_integrator(), ephemeris_, config_.propagator_settings);
     ca_detector_ = std::make_unique<CloseApproachDetector>(propagator_, ephemeris_, config_.ca_settings);
 }
 
-void AstDynEngine::load_config(const std::string& config_file) {
-    if (config_.verbose) std::cout << "Loading configuration (Advanced IOC) from: " << config_file << "\n";
-
-    core::IOCConfig ioc;
-    if (!ioc.load(config_file)) return;
-    
-    // Integrator
+void AstDynEngine::load_integrator_settings(const core::IOCConfig& ioc) {
     config_.integrator_type = string_to_integrator(ioc.get<std::string>("integrator.type", "RK4"));
     config_.initial_step_size = ioc.get<double>("integrator.step_size", 0.1);
     config_.tolerance = ioc.get<double>("integrator.tolerance", 1e-12);
     config_.aas_precision = ioc.get<double>("integrator.aas_precision", 1e-4);
-    
-    // Ephemeris
-    config_.ephemeris_type = string_to_ephemeris(ioc.get<std::string>("ephemeris.type", "DE441"));
-    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp");
-    config_.asteroid_ephemeris_file = ioc.get<std::string>("ephemeris.asteroid_file", "/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp");
-    
-    // Force Model Precision
+}
+
+void AstDynEngine::load_physics_settings(const core::IOCConfig& ioc) {
     auto& ps = config_.propagator_settings;
-    ps.include_sun_j2 = ioc.get<bool>("physics.sun_j2", true);
-    ps.include_earth_j2 = ioc.get<bool>("physics.earth_j2", true);
+    ps.include_sun_j2 = ioc.get<bool>("physics.sun_j2", true); ps.include_earth_j2 = ioc.get<bool>("physics.earth_j2", true);
     ps.include_asteroids = ioc.get<bool>("physics.asteroids.enabled", true);
     ps.use_default_asteroid_set = ioc.get<bool>("physics.asteroids.use_default_17", true);
     ps.use_default_30_set = ioc.get<bool>("physics.asteroids.use_default_30", false);
     ps.include_relativity = ioc.get<bool>("physics.relativity", true);
-    
-    // DiffCorr
+    config_.ephemeris_type = string_to_ephemeris(ioc.get<std::string>("ephemeris.type", "DE441"));
+    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", "ephemerides/de441.bsp");
+    config_.asteroid_ephemeris_file = ioc.get<std::string>("ephemeris.asteroid_file", "ephemerides/sb441.bsp");
+}
+
+void AstDynEngine::load_fitting_settings(const core::IOCConfig& ioc) {
     config_.max_iterations = ioc.get<int>("diffcorr.max_iter", 10);
     config_.convergence_threshold = ioc.get<double>("diffcorr.convergence", 1e-6);
     config_.outlier_sigma = ioc.get<double>("diffcorr.outlier_threshold", 3.0);
     config_.light_time_correction = ioc.get<bool>("diffcorr.light_time", true);
     config_.aberration_correction = ioc.get<bool>("diffcorr.aberration", true);
     config_.light_deflection = ioc.get<bool>("diffcorr.light_deflection", true);
+}
 
-    // Occultation
+void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {
     auto& occ = config_.occultation_settings;
     occ.min_sun_altitude = ioc.get<double>("occultation.min_sun_alt", -12.0);
     occ.min_object_altitude = ioc.get<double>("occultation.min_obj_alt", 10.0);
@@ -184,7 +136,15 @@ void AstDynEngine::load_config(const std::string& config_file) {
     occ.filter_daylight = ioc.get<bool>("occultation.filter_daylight", true);
     occ.use_proper_motion = ioc.get<bool>("occultation.use_proper_motion", true);
     occ.use_parallax = ioc.get<bool>("occultation.use_parallax", true);
+}
 
+void AstDynEngine::load_config(const std::string& config_file) {
+    if (config_.verbose) std::cout << "Loading configuration from: " << config_file << "\n";
+    core::IOCConfig ioc; if (!ioc.load(config_file)) return;
+    load_integrator_settings(ioc);
+    load_physics_settings(ioc);
+    load_fitting_settings(ioc);
+    load_occultation_settings(ioc);
     config_.verbose = ioc.get<bool>("verbose", true);
     update_propagator();
 }
@@ -213,65 +173,32 @@ void AstDynEngine::set_initial_orbit_ecl(const physics::KeplerianStateTyped<core
 }
 
 physics::KeplerianStateTyped<core::ECLIPJ2000> AstDynEngine::initial_orbit_determination() {
-    if (obs_context_.observations().size() < 3) {
-        throw std::runtime_error("Insufficient observations for IOD (need 3)");
-    }
-    
-    GaussIOD iod(ephemeris_);
-    auto iod_res = iod.compute(obs_context_.observations());
+    if (obs_context_.observations().size() < 3) throw std::runtime_error("Insufficient observations for IOD (need 3)");
+    GaussIOD iod(ephemeris_); auto iod_res = iod.compute(obs_context_.observations());
     if (!iod_res.success) throw std::runtime_error("IOD failed: " + iod_res.error_message);
-    
-    // GaussIOD returns GCRF heliocentric state. Convert to Ecliptic for AstDynEngine consistency.
     auto pos_e = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(iod_res.state.position, iod_res.state.epoch);
     auto vel_e = coordinates::ReferenceFrame::transform_vel<core::GCRF, core::ECLIPJ2000>(iod_res.state.position, iod_res.state.velocity, iod_res.state.epoch);
-    physics::CartesianStateTyped<core::ECLIPJ2000> state_e(iod_res.state.epoch, pos_e, vel_e, iod_res.state.gm);
-    
-    current_orbit_ = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(state_e);
-    has_orbit_ = true;
-    return current_orbit_;
+    current_orbit_ = propagation::cartesian_to_keplerian<core::ECLIPJ2000>({iod_res.state.epoch, pos_e, vel_e, iod_res.state.gm});
+    has_orbit_ = true; return current_orbit_;
 }
 
 OrbitDeterminationResult AstDynEngine::fit_orbit() {
-    if (!has_orbit_) throw std::runtime_error("No initial orbit for fitting");
-    if (obs_context_.observations().empty()) throw std::runtime_error("No observations loaded");
-
-    if (config_.verbose) {
-        std::cout << "\n=== Differential Correction ===\n";
-        std::cout << "Observations: " << obs_context_.observations().size() << "\n";
-    }
-
-    if (propagator_->settings().integrate_in_ecliptic) {
-        last_result_ = run_fit_in_frame<core::ECLIPJ2000>();
-    } else {
-        last_result_ = run_fit_in_frame<core::GCRF>();
-    }
-
+    if (!has_orbit_ || obs_context_.observations().empty()) throw std::runtime_error("No orbit or observations for fitting");
+    if (config_.verbose) std::cout << "\n=== Differential Correction ===\nObservations: " << obs_context_.observations().size() << "\n";
+    last_result_ = (propagator_->settings().integrate_in_ecliptic) ? run_fit_in_frame<core::ECLIPJ2000>() : run_fit_in_frame<core::GCRF>();
     return last_result_;
 }
 
-// ============================================================================
-// Ephemeris Generation
-// ============================================================================
-
-std::vector<physics::CartesianStateTyped<core::GCRF>> AstDynEngine::compute_ephemeris(
-    time::EpochTDB start_time, time::EpochTDB end_time, double step_days) 
-{
+std::vector<physics::CartesianStateTyped<core::GCRF>> AstDynEngine::compute_ephemeris(time::EpochTDB start_time, time::EpochTDB end_time, double step_days) {
     if (!has_orbit_) throw std::runtime_error("No orbit available");
-    
     std::vector<time::EpochTDB> times;
-    for (double mjd = start_time.mjd(); mjd <= end_time.mjd(); mjd += step_days) {
-        times.push_back(time::EpochTDB::from_mjd(mjd));
-    }
-    
-    auto cart0_ecl = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_);
-    auto res_ecl = propagator_->propagate_ephemeris(cart0_ecl, times);
-    
-    std::vector<physics::CartesianStateTyped<core::GCRF>> res_gcrf;
-    res_gcrf.reserve(res_ecl.size());
+    for (time::EpochTDB t = start_time; t <= end_time; t += time::TimeDuration::from_days(step_days)) times.push_back(t);
+    auto res_ecl = propagator_->propagate_ephemeris(propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_), times);
+    std::vector<physics::CartesianStateTyped<core::GCRF>> res_gcrf; res_gcrf.reserve(res_ecl.size());
     for (const auto& s : res_ecl) {
         auto p_g = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(s.position, s.epoch);
         auto v_g = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, core::GCRF>(s.position, s.velocity, s.epoch);
-        res_gcrf.push_back(physics::CartesianStateTyped<core::GCRF>(s.epoch, p_g, v_g, s.gm));
+        res_gcrf.push_back({s.epoch, p_g, v_g, s.gm});
     }
     return res_gcrf;
 }
@@ -303,12 +230,12 @@ double AstDynEngine::compute_moid(ephemeris::CelestialBody planet) {
 ApparentPlace AstDynEngine::compute_asteroid_apparent_place(time::EpochTDB t_occult, const std::string& observatory_code) {
     auto cart_target = propagate_to(t_occult);
     (void)cart_target; // Implementation of apparent place omitted for brevity
-    return {t_occult, 0.0, 0.0, 1.0};
+    return {t_occult, astrometry::RightAscension::from_rad(0.0), astrometry::Declination::from_rad(0.0), physics::Distance::from_au(1.0)};
 }
 
 ApparentPlace AstDynEngine::compute_star_apparent_place(double ra, double dec, double pm_ra, double pm_dec, time::EpochTDB t, const std::string& obs_code) {
     // (Implementation omitted)
-    return {t, ra, dec, 1000.0};
+    return {t, astrometry::RightAscension::from_rad(ra), astrometry::Declination::from_rad(dec), physics::Distance::from_au(1000.0)};
 }
 
 // ============================================================================

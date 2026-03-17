@@ -37,8 +37,8 @@ void GaussIODResult::print_summary() const {
     std::cout << "Observations used: #" << obs_index_1 << ", #" << obs_index_2 
               << ", #" << obs_index_3 << "\n";
     std::cout << "Iterations: " << iterations << "\n";
-    std::cout << "Slant ranges: " << slant_range_1 << ", " << slant_range_2 
-              << ", " << slant_range_3 << " AU\n";
+    std::cout << "Slant ranges: " << slant_range_1.to_au() << ", " << slant_range_2.to_au() 
+              << ", " << slant_range_3.to_au() << " AU\n";
     
     // Display position and velocity
     std::cout << "\nCartesian State:\n";
@@ -87,12 +87,10 @@ GaussIODResult GaussIOD::compute_from_three(
     result.success = false;
     
     // Time intervals (in days)
-    double t1 = obs1.time.mjd();
-    double t2 = obs2.time.mjd();
-    double t3 = obs3.time.mjd();
     
-    double tau1 = t1 - t2; 
-    double tau3 = t3 - t2; 
+    // Time intervals
+    time::TimeDuration tau1 = obs1.time - obs2.time; 
+    time::TimeDuration tau3 = obs3.time - obs2.time; 
     
     // Convert to TDB
     auto t1_tdb = astdyn::time::to_tdb(obs1.time);
@@ -131,9 +129,9 @@ GaussIODResult GaussIOD::compute_from_three(
     }
     
     if (settings_.verbose) {
-        std::cout << "  [DEBUG] R1: " << R1.x_si()/1.495978707e11 << ", " << R1.y_si()/1.495978707e11 << ", " << R1.z_si()/1.495978707e11 << " AU" << std::endl;
-        std::cout << "  [DEBUG] R2: " << R2.x_si()/1.495978707e11 << ", " << R2.y_si()/1.495978707e11 << ", " << R2.z_si()/1.495978707e11 << " AU" << std::endl;
-        std::cout << "  [DEBUG] R3: " << R3.x_si()/1.495978707e11 << ", " << R3.y_si()/1.495978707e11 << ", " << R3.z_si()/1.495978707e11 << " AU" << std::endl;
+        std::cout << "  [DEBUG] R1: " << R1.x_si()/1.495978707e11 << ", " << R1.y_si()/1.495978707e11 << ", " << R1.z_si()/1.495978707e11 << " AU" << "\n";
+        std::cout << "  [DEBUG] R2: " << R2.x_si()/1.495978707e11 << ", " << R2.y_si()/1.495978707e11 << ", " << R2.z_si()/1.495978707e11 << " AU" << "\n";
+        std::cout << "  [DEBUG] R3: " << R3.x_si()/1.495978707e11 << ", " << R3.y_si()/1.495978707e11 << ", " << R3.z_si()/1.495978707e11 << " AU" << "\n";
     }
 
     // Compute line-of-sight unit vectors (dimensionless)
@@ -142,13 +140,13 @@ GaussIODResult GaussIOD::compute_from_three(
     Eigen::Vector3d los3 = compute_line_of_sight(obs3.ra, obs3.dec);
     
     if (settings_.verbose) {
-        std::cout << "  [DEBUG] L1: " << los1.transpose() << std::endl;
-        std::cout << "  [DEBUG] L2: " << los2.transpose() << std::endl;
-        std::cout << "  [DEBUG] L3: " << los3.transpose() << std::endl;
+        std::cout << "  [DEBUG] L1: " << los1.transpose() << "\n";
+        std::cout << "  [DEBUG] L2: " << los2.transpose() << "\n";
+        std::cout << "  [DEBUG] L3: " << los3.transpose() << "\n";
     }
     
-    // Solve for slant ranges (in AU)
-    double rho1, rho2, rho3;
+    // Solve for slant ranges
+    physics::Distance rho1, rho2, rho3;
     int iterations;
     
     bool converged = solve_slant_ranges(tau1, tau3, los1, los2, los3, R1, R2, R3, rho1, rho2, rho3, iterations);
@@ -164,9 +162,9 @@ GaussIODResult GaussIOD::compute_from_three(
     result.iterations = iterations;
 
     // Use physics::Distance for radius vectors
-    double d1 = physics::Distance::from_au(rho1).to_m();
-    double d2 = physics::Distance::from_au(rho2).to_m();
-    double d3 = physics::Distance::from_au(rho3).to_m();
+    double d1 = rho1.to_m();
+    double d2 = rho2.to_m();
+    double d3 = rho3.to_m();
     
     auto radius1 = R1 + math::Vector3<core::GCRF, physics::Distance>::from_si(los1.x() * d1, los1.y() * d1, los1.z() * d1);
     auto radius2 = R2 + math::Vector3<core::GCRF, physics::Distance>::from_si(los2.x() * d2, los2.y() * d2, los2.z() * d2);
@@ -178,15 +176,17 @@ GaussIODResult GaussIOD::compute_from_three(
     double mu_au = settings_.mu.to_au3_d2();
     double u = mu_au / (r2_mag_au * r2_mag_au * r2_mag_au);
     
-    double f1 = 1.0 - 0.5 * u * tau1 * tau1;
-    double g1 = tau1 - (1.0/6.0) * u * tau1 * tau1 * tau1;
-    double f3 = 1.0 - 0.5 * u * tau3 * tau3;
-    double g3 = tau3 - (1.0/6.0) * u * tau3 * tau3 * tau3;
+    double tau1_days = tau1.to_days();
+    double tau3_days = tau3.to_days();
+    double f1 = 1.0 - 0.5 * u * tau1_days * tau1_days;
+    double g1 = tau1_days - (1.0/6.0) * u * tau1_days * tau1_days * tau1_days;
+    double f3 = 1.0 - 0.5 * u * tau3_days * tau3_days;
+    double g3 = tau3_days - (1.0/6.0) * u * tau3_days * tau3_days * tau3_days;
 
     double det = f1 * g3 - f3 * g1;
     // Current radius1, radius3 are math::Vector3<GCRF, Distance> (m)
     // Velocities must be in m per SECOND. Here det is in DAYS.
-    auto v2_vec = (radius3 * f1 - radius1 * f3) / det / 86400.0;
+    auto v2_vec = (radius3 * f1 - radius1 * f3) / det / constants::SECONDS_PER_DAY;
     
     result.state = physics::CartesianStateTyped<core::GCRF>::from_si(
         t2_tdb,
@@ -217,18 +217,17 @@ std::optional<std::array<int, 3>> GaussIOD::select_observations(
             
             // For Gauss IOD, total arc > 30-60 days usually fails due to Taylor series divergence.
             // Optimal arc is 5-20 days for most LEOS/NEOs.
-            if (total_arc >= 2.0 * settings_.min_separation_days && total_arc <= settings_.max_separation_days) {
+            if (total_arc >= 2.0 * settings_.min_separation.to_days() && total_arc <= settings_.max_separation.to_days()) {
                 // Find a middle observation close to center
-                double target_mjd = observations[i].time.mjd() + 0.5 * total_arc;
                 int j_best = -1;
                 double min_diff = 1e9;
                 
                 for (int j = i + 1; j < k; ++j) {
-                    double sep1 = observations[j].time.mjd() - observations[i].time.mjd();
-                    double sep2 = observations[k].time.mjd() - observations[j].time.mjd();
+                    time::TimeDuration sep1 = observations[j].time - observations[i].time;
+                    time::TimeDuration sep2 = observations[k].time - observations[j].time;
                     
-                    if (sep1 >= settings_.min_separation_days && sep2 >= settings_.min_separation_days) {
-                        double diff = std::abs(observations[j].time.mjd() - target_mjd);
+                    if (sep1 >= settings_.min_separation && sep2 >= settings_.min_separation) {
+                        double diff = std::abs((observations[j].time - observations[i].time).to_days() - 0.5 * total_arc);
                         if (diff < min_diff) {
                             min_diff = diff;
                             j_best = j;
@@ -257,30 +256,32 @@ Eigen::Vector3d GaussIOD::compute_line_of_sight(astrometry::RightAscension ra, a
 }
 
 bool GaussIOD::solve_slant_ranges(
-    double tau1, double tau3,
+    time::TimeDuration tau1, time::TimeDuration tau3,
     const Eigen::Vector3d& l1, 
     const Eigen::Vector3d& l2, 
     const Eigen::Vector3d& l3,
     const math::Vector3<core::GCRF, physics::Distance>& R1, 
     const math::Vector3<core::GCRF, physics::Distance>& R2, 
     const math::Vector3<core::GCRF, physics::Distance>& R3,
-    double& rho1, double& rho2, double& rho3,
+    physics::Distance& rho1, physics::Distance& rho2, physics::Distance& rho3,
     int& iterations) {
     
     // Everything here in AU for classical Gauss math
-    double au_m = physics::Distance::from_au(1.0).to_m();
-    auto r1_au = R1.to_eigen_si() / au_m;
-    auto r2_au = R2.to_eigen_si() / au_m;
-    auto r3_au = R3.to_eigen_si() / au_m;
+    double tau1_days = tau1.to_days();
+    double tau3_days = tau3.to_days();
 
-    rho2 = 1.0; 
+    auto r1_au = R1.to_eigen_si() / constants::AU;
+    auto r2_au = R2.to_eigen_si() / constants::AU;
+    auto r3_au = R3.to_eigen_si() / constants::AU;
+
+    double rho2_au = 1.0; 
     
     auto D0 = l1.dot(l2.cross(l3));
     if (std::abs(D0) < 1e-8) {
         return false;
     }
     
-    // D-matrix elements (raw, not divided by D0)
+    // D-matrix elements
     auto D11 = r1_au.dot(l2.cross(l3));
     auto D21 = r2_au.dot(l2.cross(l3));
     auto D31 = r3_au.dot(l2.cross(l3));
@@ -292,46 +293,42 @@ bool GaussIOD::solve_slant_ranges(
     auto D33 = r3_au.dot(l1.cross(l2));
 
     for (iterations = 0; iterations < settings_.max_iterations; ++iterations) {
-        auto r2_vec = r2_au + rho2 * l2;
+        auto r2_vec = r2_au + rho2_au * l2;
         double r2_mag = r2_vec.norm();
         if (r2_mag < 0.01) return false;
 
         double mu_au = settings_.mu.to_au3_d2();
         double u = mu_au / (r2_mag * r2_mag * r2_mag);
-        double f1 = 1.0 - 0.5 * u * tau1 * tau1;
-        double g1 = tau1 - (1.0/6.0) * u * tau1 * tau1 * tau1;
-        double f3 = 1.0 - 0.5 * u * tau3 * tau3;
-        double g3 = tau3 - (1.0/6.0) * u * tau3 * tau3 * tau3;
+        double f1 = 1.0 - 0.5 * u * tau1_days * tau1_days;
+        double g1 = tau1_days - (1.0/6.0) * u * tau1_days * tau1_days * tau1_days;
+        double f3 = 1.0 - 0.5 * u * tau3_days * tau3_days;
+        double g3 = tau3_days - (1.0/6.0) * u * tau3_days * tau3_days * tau3_days;
 
         double det = f1 * g3 - f3 * g1;
         if (std::abs(det) < 1e-15) return false;
         double c1 = g3 / det;
         double c3 = -g1 / det;
 
-        // Cramer's rule: [l1 | -l2 | l3] * [c1*rho1; rho2; c3*rho3]^T = R2 - c1*R1 - c3*R3
-        // det([l1|-l2|l3]) = -D0
-        // rho1: c1*rho1 = det([b|-l2|l3]) / (-D0) = (D21 - c1*D11 - c3*D31) / D0
-        // rho2:    rho2 = det([l1|b|l3])  / (-D0) = (D22 - c1*D12 - c3*D32) / D0
-        // rho3: c3*rho3 = det([l1|-l2|b]) / (-D0) = (D23 - c1*D13 - c3*D33) / D0
         if (std::abs(c1) < 1e-15 || std::abs(c3) < 1e-15) return false;
 
-        double rho1_new = (D21 - c1 * D11 - c3 * D31) / (c1 * D0);
-        double rho2_new = -(c1 * D12 - D22 + c3 * D32) / D0; // Bug fix: sign of Cramer determinant
-        double rho3_new = (D23 - c1 * D13 - c3 * D33) / (c3 * D0);
+        double rho1_new_au = (D21 - c1 * D11 - c3 * D31) / (c1 * D0);
+        double rho2_new_au = -(c1 * D12 - D22 + c3 * D32) / D0;
+        double rho3_new_au = (D23 - c1 * D13 - c3 * D33) / (c3 * D0);
 
-        double delta = std::abs(rho2_new - rho2);
-        rho1 = rho1_new; rho2 = rho2_new; rho3 = rho3_new;
+        double delta = std::abs(rho2_new_au - rho2_au);
+        rho2_au = rho2_new_au;
 
         if (delta < settings_.tolerance.to_au()) {
-            // Only reject unphysical solutions after convergence
-            if (rho1 < 0 || rho2 < 0 || rho3 < 0) return false;
+            if (rho1_new_au < 0 || rho2_new_au < 0 || rho3_new_au < 0) return false;
+            rho1 = physics::Distance::from_au(rho1_new_au);
+            rho2 = physics::Distance::from_au(rho2_new_au);
+            rho3 = physics::Distance::from_au(rho3_new_au);
             return true;
         }
     }
     
     return false;
 }
-
 std::pair<double, double> GaussIOD::compute_f_g_coefficients(
     const math::Vector3<core::GCRF, physics::Distance>& r, 
     const math::Vector3<core::GCRF, physics::Velocity>& v, 

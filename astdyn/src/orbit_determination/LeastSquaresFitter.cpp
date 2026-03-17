@@ -77,11 +77,9 @@ Eigen::MatrixXd LeastSquaresFitter::build_design_matrix(
         // STM scaling: The STM (phi) is integrated in internal units [AU, AU/day].
         // To build the design matrix in SI [meters, meters/second], we scale the 
         // time units in the cross-blocks (day -> seconds):
-        //  - Position/Velocity block: [AU] / [AU/day] = [day] -> convert to [s]
-        //  - Velocity/Position block: [AU/day] / [AU] = [1/day] -> convert to [1/s]
         astdyn::Matrix6d phi_si = stm;
-        phi_si.block<3, 3>(0, 3) *= 86400.0;
-        phi_si.block<3, 3>(3, 0) /= 86400.0;
+        phi_si.block<3, 3>(0, 3) *= constants::SECONDS_PER_DAY;
+        phi_si.block<3, 3>(3, 0) /= constants::SECONDS_PER_DAY;
         
         // Map to initial epoch: A_i = H_i * STM_si
         Eigen::Matrix<double, 2, 6> A_i = dRho_dx_state * phi_si;
@@ -181,18 +179,18 @@ void LeastSquaresFitter::compute_statistics(
                                         [](const auto& r) { return r.outlier; });
     
     if (count > 0) {
-        result.rms_ra_arcsec = std::sqrt(sum_ra_sq / count);
-        result.rms_dec_arcsec = std::sqrt(sum_dec_sq / count);
-        result.rms_total_arcsec = std::sqrt((sum_ra_sq + sum_dec_sq) / (2 * count));
+        result.rms_ra = astrometry::Angle::from_arcsec(std::sqrt(sum_ra_sq / count));
+        result.rms_dec = astrometry::Angle::from_arcsec(std::sqrt(sum_dec_sq / count));
+        result.rms_total = astrometry::Angle::from_arcsec(std::sqrt((sum_ra_sq + sum_dec_sq) / (2 * count)));
         
         // Reduced chi-squared
         if (2 * count > 6) {
            result.chi_squared /= (2 * count - 6);
         }
     } else {
-        result.rms_ra_arcsec = 0.0;
-        result.rms_dec_arcsec = 0.0;
-        result.rms_total_arcsec = 0.0;
+        result.rms_ra = astrometry::Angle::from_arcsec(0.0);
+        result.rms_dec = astrometry::Angle::from_arcsec(0.0);
+        result.rms_total = astrometry::Angle::from_arcsec(0.0);
         result.chi_squared = 0.0;
     }
 }

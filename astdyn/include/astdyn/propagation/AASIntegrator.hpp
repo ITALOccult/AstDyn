@@ -61,28 +61,15 @@ private:
     double d1, d2;
     double c1, c2;
 
-    double compute_modified_hamiltonian(const Eigen::VectorXd& q,
-                                        const Eigen::VectorXd& p,
-                                        double h) const;
-
-    void symplectic_step(const DerivativeFunction& f,
-                         double t,
-                         Eigen::VectorXd& q, 
-                         Eigen::VectorXd& p, 
-                         Eigen::MatrixXd& phi, // State Transition Matrix
-                         double ds);
-
+    double compute_modified_hamiltonian(const Eigen::VectorXd& q, const Eigen::VectorXd& p, double h) const;
+    void symplectic_step(const DerivativeFunction& f, double t, Eigen::VectorXd& q, Eigen::VectorXd& p, Eigen::MatrixXd& phi, double ds);
     Eigen::Matrix3d compute_hessian(const Eigen::VectorXd& q) const;
-
     double compute_force_gradient(const Eigen::VectorXd& q) const;
-    
     double compute_total_energy(const Eigen::VectorXd& q, const Eigen::VectorXd& p) const;
-
-    void split_state(const Eigen::VectorXd& y,
-                     Eigen::VectorXd& q, Eigen::VectorXd& p) const;
-                     
-    Eigen::VectorXd join_state(const Eigen::VectorXd& q,
-                               const Eigen::VectorXd& p) const;
+    double estimate_step_size(const Eigen::VectorXd& q, const Eigen::VectorXd& p, double target_dt) const;
+    void update_phi_kick(const DerivativeFunction& f, double t, double step, const Eigen::VectorXd& q, const Eigen::VectorXd& p, Eigen::MatrixXd& phi);
+    void split_state(const Eigen::VectorXd& y, Eigen::VectorXd& q, Eigen::VectorXd& p) const;
+    Eigen::VectorXd join_state(const Eigen::VectorXd& q, const Eigen::VectorXd& p) const;
 
     double precision_;
     double mu_;

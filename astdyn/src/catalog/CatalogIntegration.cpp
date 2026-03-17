@@ -16,14 +16,7 @@ namespace astdyn::catalog {
 // Constants
 // ============================================================================
 
-namespace {
-    // Gaia DR3 reference epoch: J2016.0 = JD 2457389.0 (TDB)
-    inline constexpr double GAIA_EPOCH_JD = 2457389.0;
-    // Julian year in days
-    inline constexpr double JY = 365.25;
-    // arcsec -> deg
-    inline constexpr double ARCSEC_TO_DEG = 1.0 / 3600.0;
-} // namespace
+// Local constants removed in favor of astdyn::constants
 
 // ============================================================================
 // to_sky_coord
@@ -221,9 +214,9 @@ ChebyshevSegment fit_chebyshev(
         if (obs) {
             jd_samples[i]  = jd;
             tau_samples[i] = tau;
-            ra_samples[i]  = obs->ra.value * c::RAD_TO_DEG;
-            dec_samples[i] = obs->dec.value * c::RAD_TO_DEG;
-            dist_samples[i] = obs->distance.value / (c::AU * 1000.0);
+            ra_samples[i]  = obs->ra.to_deg();
+            dec_samples[i] = obs->dec.to_deg();
+            dist_samples[i] = obs->distance.to_au();
         } else {
             // Degenerate or failure, should not happen in nominal conditions
             throw std::runtime_error("fit_chebyshev: propagation failed at JD " + std::to_string(jd));
@@ -264,7 +257,7 @@ ChebyshevSegment fit_chebyshev_spk(
         double tau = -1.0 + 2.0 * i / (N - 1);
         double jd  = t_start + (tau + 1.0) * (t_end - t_start) / 2.0;
         time::EpochTDB t_obs = time::EpochTDB::from_jd(jd);
-        double et_obs = (jd - c::JD2000) * 86400.0;
+        double et_obs = (jd - c::JD2000) * c::SECONDS_PER_DAY;
 
         // 1. Get Earth position at observation time
         auto actual_ephem = ephem ? ephem : std::make_shared<ephemeris::PlanetaryEphemeris>();
@@ -288,11 +281,11 @@ ChebyshevSegment fit_chebyshev_spk(
         
         // Use the rotation from AstrometryReducer if private access is problematic, 
         // we can do it manually here.
-        double eps = 23.439291 * c::DEG_TO_RAD;
+        double obliquity = c::OBLIQUITY_J2000;
         Eigen::Matrix3d rot;
         rot << 1, 0, 0,
-               0, std::cos(-eps), -std::sin(-eps),
-               0, std::sin(-eps),  std::cos(-eps);
+               0, std::cos(-obliquity), -std::sin(-obliquity),
+               0, std::sin(-obliquity),  std::cos(-obliquity);
         
         Eigen::Vector3d rho_eq = rot * rho_vec;
         
@@ -300,13 +293,13 @@ ChebyshevSegment fit_chebyshev_spk(
         double r = rho_eq.norm();
         double ra = std::atan2(rho_eq.y(), rho_eq.x()) * c::RAD_TO_DEG;
         double dec = std::asin(rho_eq.z() / r) * c::RAD_TO_DEG;
-        if (ra < 0) ra += 360.0;
+        if (ra < 0) ra += 2.0 * c::PI * c::RAD_TO_DEG;
 
         jd_samples[i]  = jd;
         tau_samples[i] = tau;
         ra_samples[i]  = ra;
         dec_samples[i] = dec;
-        dist_samples[i] = r / (c::AU / 1000.0);
+        dist_samples[i] = r / c::AU;
     }
 
     ChebyshevSegment seg;

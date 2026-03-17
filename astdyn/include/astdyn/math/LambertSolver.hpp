@@ -8,6 +8,10 @@
 
 #include <Eigen/Dense>
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/time/epoch.hpp"
+#include "astdyn/math/frame_algebra.hpp"
 
 namespace astdyn::math {
 
@@ -28,11 +32,11 @@ public:
      * @param retrograde Whether the motion is retrograde
      * @return Velocity vector v1 [AU/day]
      */
-    static Eigen::Vector3d solve(
-        const Eigen::Vector3d& r1_vec,
-        const Eigen::Vector3d& r2_vec,
-        double dt,
-        double mu = astdyn::constants::GMS,
+    static math::Vector3<core::GCRF, physics::Velocity> solve(
+        const math::Vector3<core::GCRF, physics::Distance>& r1_vec,
+        const math::Vector3<core::GCRF, physics::Distance>& r2_vec,
+        time::TimeDuration dt,
+        physics::GravitationalParameter mu = physics::GravitationalParameter::sun(),
         bool retrograde = false);
 
 private:

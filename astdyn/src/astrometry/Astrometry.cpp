@@ -20,76 +20,43 @@ namespace astdyn::astrometry {
 
 using namespace astdyn::constants;
 
-static std::shared_ptr<ephemeris::DE441Provider> get_cached_provider(const std::string& path) {
-    static std::mutex mtx;
-    static std::unordered_map<std::string, std::shared_ptr<ephemeris::DE441Provider>> cache;
+std::shared_ptr<::astdyn::ephemeris::DE441Provider> AstrometryReducer::sync_ephemeris(const std::string& path) {
     if (path.empty()) return nullptr;
-    std::lock_guard<std::mutex> lock(mtx);
-    if (cache.find(path) == cache.end()) {
-        cache[path] = std::make_shared<ephemeris::DE441Provider>(path);
-    }
+    static std::mutex mtx;
+    static std::unordered_map<std::string, std::shared_ptr<::astdyn::ephemeris::DE441Provider>> cache;
+    std::lock_guard lock(mtx);
+    if (!cache.contains(path)) cache[path] = std::make_shared<::astdyn::ephemeris::DE441Provider>(path);
+    ::astdyn::ephemeris::PlanetaryEphemeris::setGlobalProvider(cache[path]);
     return cache[path];
+}
+
+Eigen::Vector3d AstrometryReducer::compute_earth_helio(std::shared_ptr<::astdyn::ephemeris::DE441Provider> de441, const time::EpochTDB& t_obs) {
+    auto p_earth = de441->getPosition(::astdyn::ephemeris::CelestialBody::EARTH, t_obs);
+    auto p_sun = de441->getPosition(::astdyn::ephemeris::CelestialBody::SUN, t_obs);
+    auto p_earth_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(p_earth);
+    auto p_sun_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(p_sun);
+    return p_earth_ecl.to_eigen_si() - p_sun_ecl.to_eigen_si();
 }
 
 std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::compute_observation(
     const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
-    const time::EpochTDB& t_elements,
-    const time::EpochTDB& t_obs,
-    const AstDynConfig& e_cfg,
-    const AstrometricSettings& a_cfg) {
-    
-    // 1. Get Earth state at observation time (Cached Native DE441)
-    if (e_cfg.ephemeris_file.empty()) return std::unexpected(AstrometryError::EphemerisUnavailable);
-    auto de441 = get_cached_provider(e_cfg.ephemeris_file);
+    const time::EpochTDB& t_elements, const time::EpochTDB& t_obs,
+    const AstDynConfig& e_cfg, const AstrometricSettings& a_cfg) 
+{
+    auto de441 = AstrometryReducer::sync_ephemeris(e_cfg.ephemeris_file);
     if (!de441) return std::unexpected(AstrometryError::EphemerisUnavailable);
     
-    // Sync PlanetaryEphemeris provider too
-    ephemeris::PlanetaryEphemeris::setGlobalProvider(de441);
+    Eigen::Vector3d earth_helio = AstrometryReducer::compute_earth_helio(de441, t_obs);
+    Eigen::Vector3d ast_pos = compute_light_time_corrected_pos(initial, t_elements, t_obs, earth_helio, e_cfg);
+    
+    auto rho_ecl = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(ast_pos.x() - earth_helio.x(), ast_pos.y() - earth_helio.y(), ast_pos.z() - earth_helio.z());
+    auto rho_eq = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_ecl).to_eigen_si();
+    
+    Eigen::Vector3d q_sun = de441->getPosition(::astdyn::ephemeris::CelestialBody::SUN, t_obs).to_eigen_si() - de441->getPosition(::astdyn::ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si();
+    if (a_cfg.light_deflection) rho_eq = apply_light_deflection(rho_eq, q_sun);
+    if (a_cfg.stellar_aberration) rho_eq = apply_stellar_aberration(rho_eq, de441->getVelocity(::astdyn::ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si());
 
-    // Get Earth state in GCRF and transform to Ecliptic J2000
-    auto earth_p_eq = de441->getPosition(ephemeris::CelestialBody::EARTH, t_obs);
-    auto earth_v_eq = de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs);
-    
-    auto earth_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(earth_p_eq);
-    
-
-    // 2. SUN position (Barycentric for light deflection)
-    auto sun_p_eq = de441->getPosition(ephemeris::CelestialBody::SUN, t_obs);
-    auto sun_p_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(sun_p_eq);
-    
-    // Earth(helio) = Earth(SSB) - Sun(SSB).
-    Eigen::Vector3d earth_ssb_ecl = earth_p_ecl.to_eigen_si();
-    Eigen::Vector3d sun_ssb_ecl = sun_p_ecl.to_eigen_si();
-    Eigen::Vector3d earth_helio_ecl = earth_ssb_ecl - sun_ssb_ecl;
-
-    // 3. Light-time Iteration
-    auto ast_pos_ecl = compute_light_time_corrected_pos(initial, t_elements, t_obs, earth_helio_ecl, e_cfg);
-    
-    // DEBUG
-    if (e_cfg.verbose) {
-        std::cout << "    [DEBUG-ATR] Earth Helio (Ecl): " << (earth_helio_ecl.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
-        std::cout << "    [DEBUG-ATR] Ast   Helio (Ecl): " << (ast_pos_ecl.norm() / (constants::AU*1000.0)) << " AU" << std::endl;
-    }
-
-    auto raw_rho_ecl = ast_pos_ecl - earth_helio_ecl;
-
-    // 4. Aberration
-    // Aberration is usually computed in Equatorial frame using Velocity in GCRF
-    // Let's transform rho to Equatorial using typesafe API
-    auto rho_ecl_math = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(raw_rho_ecl.x(), raw_rho_ecl.y(), raw_rho_ecl.z());
-    auto raw_rho_eq_math = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_ecl_math);
-    auto raw_rho_eq = raw_rho_eq_math.to_eigen_si();
-    
-    auto earth_v_gcrf = earth_v_eq.to_eigen_si();
-    
-    // Proper Earth->Sun vector for light deflection
-    Eigen::Vector3d earth_to_sun_eq = sun_p_eq.to_eigen_si() - earth_p_eq.to_eigen_si();
-    
-    auto rho_deflected = a_cfg.light_deflection ? apply_light_deflection(raw_rho_eq, earth_to_sun_eq) : raw_rho_eq;
-    auto final_rho_eq = a_cfg.stellar_aberration ? apply_stellar_aberration(rho_deflected, earth_v_gcrf) : rho_deflected;
-
-    // 5. Build Result
-    return finalize_observation(final_rho_eq);
+    return finalize_observation(rho_eq);
 }
 
 std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::compute_observation_from_cartesian(
@@ -100,9 +67,8 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     const AstrometricSettings& a_cfg) {
     
     if (e_cfg.ephemeris_file.empty()) return std::unexpected(AstrometryError::EphemerisUnavailable);
-    auto de441 = get_cached_provider(e_cfg.ephemeris_file);
+    auto de441 = AstrometryReducer::sync_ephemeris(e_cfg.ephemeris_file);
     if (!de441) return std::unexpected(AstrometryError::EphemerisUnavailable);
-    ephemeris::PlanetaryEphemeris::setGlobalProvider(de441);
 
     // Transform initial state to Ecliptic properly
     auto pos_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(initial.position);
@@ -253,8 +219,12 @@ AstrometricObservation AstrometryReducer::finalize_observation(
     double ra = std::atan2(rho_eq(1), rho_eq(0)); 
     if (ra < 0) ra += constants::TWO_PI;
     double dec = std::asin(rho_eq(2) / r);
-    
-    return { core::Radian(ra), core::Radian(dec), core::Meter(r) };
+
+    AstrometricObservation obs;
+    obs.ra = RightAscension::from_rad(ra);
+    obs.dec = Declination::from_rad(dec);
+    obs.distance = physics::Distance::from_m(r);
+    return obs;
 }
 
 } // namespace astdyn::astrometry

@@ -1,7 +1,8 @@
 #ifndef ASTDYN_ASTROMETRY_TYPES_HPP
 #define ASTDYN_ASTROMETRY_TYPES_HPP
 
-#include "src/core/units.hpp"
+#include "astdyn/astrometry/sky_types.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 
 namespace astdyn::astrometry {
@@ -20,11 +21,15 @@ struct AstrometricSettings {
  * @brief Result of an astrometric observation computation.
  */
 struct AstrometricObservation {
-    core::Radian ra;
-    core::Radian dec;
-    core::Meter distance;
-    core::MilliArcSecond residual_ra{0.0};
-    core::MilliArcSecond residual_dec{0.0};
+    RightAscension ra;
+    Declination dec;
+    physics::Distance distance;
+    Angle residual_ra;
+    Angle residual_dec;
+
+    AstrometricObservation() : ra(), dec(), distance(physics::Distance::from_au(1.0)), residual_ra(), residual_dec() {}
+    AstrometricObservation(RightAscension r, Declination d, physics::Distance dist)
+        : ra(r), dec(d), distance(dist), residual_ra(), residual_dec() {}
 };
 
 /**

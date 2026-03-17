@@ -174,7 +174,7 @@ std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) 
         return obs;
         
     } catch (const std::exception& e) {
-        std::cerr << "Error parsing RWO line: " << e.what() << std::endl;
+        std::cerr << "Error parsing RWO line: " << e.what() << "\n";
         return std::nullopt;
     }
 }
@@ -222,7 +222,7 @@ time::EpochUTC RWOReader::parseDate(const std::string& date_str) {
     
     if (year < 1000 || year > 3000 || month < 1 || month > 12 || day < 1 || day > 32) {
         std::cerr << "WARNING: Invalid date parsed: " << year << "/" << month << "/" << day 
-                  << " from string: '" << date_str << "'" << std::endl;
+                  << " from string: '" << date_str << "'" << "\n";
     }
     
     // Convert to MJD

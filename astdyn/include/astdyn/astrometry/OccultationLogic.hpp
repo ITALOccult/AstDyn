@@ -122,6 +122,12 @@ private:
         const Angle& ast_dra_dt,
         const Angle& ast_ddec_dt);
 
+    static void compute_sub_asteroid_point(
+        OccultationParameters& params,
+        const time::EpochTDB& t_ca,
+        const RightAscension& ast_ra, const Declination& ast_dec,
+        const physics::Distance& ast_dist);
+
     static void compute_sky_conditions(
         OccultationParameters& params,
         const time::EpochTDB& t_ca,
@@ -129,6 +135,22 @@ private:
         const physics::Distance& ast_distance,
         const RightAscension& star_ra, const Declination& star_dec,
         std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem);
+
+    static void process_day_window(
+        std::vector<OccultationCandidate>& results,
+        double day_jd,
+        const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
+        const OccultationConfig& config,
+        AstDynEngine& engine,
+        double t_start_jd, double t_end_jd);
+
+    static void evaluate_candidate(
+        std::vector<OccultationCandidate>& results,
+        const catalog::ChebyshevSegment& segment,
+        const catalog::Star& star,
+        const OccultationConfig& config,
+        AstDynEngine& engine,
+        double t_start_jd, double t_end_jd);
 };
 
 struct OccultationConfig {

@@ -186,31 +186,16 @@ public:
     
 private:
     
-    /**
-     * @brief Compute two-body acceleration (central body only)
-     * 
-     * @param position Position vector [AU]
-     * @return Acceleration vector [AU/day²]
-     */
-    Eigen::Vector3d two_body_acceleration(const Eigen::Vector3d& position) const;
+    void update_force_cache(time::EpochTDB t);
     
-    /**
-     * @brief Compute planetary perturbations (Heliocentric frame corrected)
-     */
-    Eigen::Vector3d planetary_perturbations(const Eigen::Vector3d& position, 
-                                          time::EpochTDB t,
-                                          const Eigen::Vector3d& sun_pos_bary);
-                                          
-    /**
-     * @brief Compute asteroid perturbations (Heliocentric frame corrected)
-     */
-    Eigen::Vector3d asteroid_perturbations(const Eigen::Vector3d& position, 
-                                         time::EpochTDB t,
-                                         const Eigen::Vector3d& sun_pos_bary);
-                                         
-    // Relativistic correction (PPN)
+    Eigen::Vector3d compute_n_body_acceleration(const Eigen::Vector3d& position);
+    
+    Eigen::Vector3d compute_harmonic_acceleration(const Eigen::Vector3d& position, time::EpochTDB t);
+    
+    Eigen::Vector3d compute_non_gravitational_acceleration(const Eigen::Vector3d& position, const Eigen::Vector3d& velocity, time::EpochTDB t);
+
     Eigen::Vector3d relativistic_correction(const Eigen::Vector3d& position, 
-                                          const Eigen::Vector3d& velocity) const;
+                                           const Eigen::Vector3d& velocity) const;
     
     std::shared_ptr<Integrator> integrator_;
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;

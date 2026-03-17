@@ -38,8 +38,8 @@ namespace astdyn::orbit_determination {
 struct GaussIODSettings {
     int max_iterations = 50;
     physics::Distance tolerance = physics::Distance::from_au(1e-8);
-    double min_separation_days = 1.0;
-    double max_separation_days = 60.0;
+    time::TimeDuration min_separation = time::TimeDuration::from_days(1.0);
+    time::TimeDuration max_separation = time::TimeDuration::from_days(60.0);
     physics::GravitationalParameter mu = physics::GravitationalParameter::sun();
     bool use_light_time = true;
     bool verbose = false;
@@ -57,9 +57,9 @@ struct GaussIODResult {
     time::EpochTDB epoch;                           ///< Epoch of solution
     
     // Quality indicators
-    double slant_range_1;                ///< Distance to object [AU] at obs 1
-    double slant_range_2;                ///< Distance to object [AU] at obs 2
-    double slant_range_3;                ///< Distance to object [AU] at obs 3
+    physics::Distance slant_range_1;     ///< Distance to object at obs 1
+    physics::Distance slant_range_2;     ///< Distance to object at obs 2
+    physics::Distance slant_range_3;     ///< Distance to object at obs 3
     int iterations;                      ///< Iterations required
     
     // Indices of observations used
@@ -161,14 +161,14 @@ private:
      * @return true if converged
      */
     bool solve_slant_ranges(
-        double tau1, double tau3,
+        time::TimeDuration tau1, time::TimeDuration tau3,
         const Eigen::Vector3d& l1, 
         const Eigen::Vector3d& l2, 
         const Eigen::Vector3d& l3,
         const math::Vector3<core::GCRF, physics::Distance>& R1, 
         const math::Vector3<core::GCRF, physics::Distance>& R2, 
         const math::Vector3<core::GCRF, physics::Distance>& R3,
-        double& rho1, double& rho2, double& rho3,
+        physics::Distance& rho1, physics::Distance& rho2, physics::Distance& rho3,
         int& iterations);
     
     /**

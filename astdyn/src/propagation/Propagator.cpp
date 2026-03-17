@@ -25,247 +25,112 @@ using ephemeris::CelestialBody;
 Propagator::Propagator(std::shared_ptr<Integrator> integrator,
                       std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
                       const PropagatorSettings& settings)
-    : integrator_(std::move(integrator)),
-      ephemeris_(std::move(ephemeris)),
-      settings_(settings) {
-    
+    : integrator_(std::move(integrator)), ephemeris_(std::move(ephemeris)), settings_(settings) {
     mat_ecl_ = coordinates::ReferenceFrame::j2000_to_ecliptic();
-
     if (settings_.include_asteroids) {
         asteroids_ = std::make_shared<ephemeris::AsteroidPerturbations>();
-        
-        if (settings_.use_default_asteroid_set) {
-            asteroids_->loadAstDynDefaultSet();
-        } else if (settings_.use_default_30_set) {
-            asteroids_->loadDefault30Asteroids();
-        }
-        
-        if (!settings_.asteroid_ephemeris_file.empty()) {
-            asteroids_->loadSPK(settings_.asteroid_ephemeris_file);
-        }
-
-        // Apply filters if lists are provided
-        if (!settings_.include_asteroids_list.empty()) {
-            for (const auto& asteroid : asteroids_->getAsteroids()) {
-                bool found = false;
-                for (int id : settings_.include_asteroids_list) {
-                    if (asteroid.number == id) { found = true; break; }
-                }
-                asteroids_->setAsteroidEnabled(asteroid.number, found);
-            }
-        }
-
-        if (!settings_.exclude_asteroids_list.empty()) {
-            for (int id : settings_.exclude_asteroids_list) {
-                asteroids_->setAsteroidEnabled(id, false);
-            }
-        }
+        if (settings_.use_default_asteroid_set) asteroids_->loadAstDynDefaultSet();
+        else if (settings_.use_default_30_set) asteroids_->loadDefault30Asteroids();
+        if (!settings_.asteroid_ephemeris_file.empty()) asteroids_->loadSPK(settings_.asteroid_ephemeris_file);
     }
-
-    // Configure AAS integrator if present
     auto aas = std::dynamic_pointer_cast<AASIntegrator>(integrator_);
     if (aas) {
-        double j2 = 0.0;
-        double r_eq = constants::R_SUN_AU;
-        
-        // Detect central body for J2 configuration
-        if (std::abs(settings_.central_body_gm - constants::GMS) < 1.0e-5) {
-            // Heliocentric
-            j2 = settings_.include_sun_j2 ? constants::SUN_J2 : 0.0;
-            r_eq = constants::R_SUN_AU;
-        } else if (std::abs(settings_.central_body_gm - constants::GM_EARTH_AU) < 1.0e-7) {
-            // Geocentric
-            j2 = settings_.include_earth_j2 ? constants::EARTH_J2 : 0.0;
-            r_eq = constants::R_EARTH / constants::AU;
-        }
-        
+        bool sun = std::abs(settings_.central_body_gm - constants::GMS) < 1e-5;
+        double j2 = sun ? (settings_.include_sun_j2 ? constants::SUN_J2 : 0.0) : (settings_.include_earth_j2 ? constants::EARTH_J2 : 0.0);
+        double r_eq = sun ? constants::R_SUN_AU : (constants::R_EARTH/constants::AU);
         aas->set_central_body(settings_.central_body_gm, j2, r_eq);
     }
 }
 
-Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::VectorXd& state) {
-    Eigen::Vector3d position = state.head<3>();
-    Eigen::Vector3d velocity = state.tail<3>();
-    
-    // 1. Update/Check Cache
-    if (!cache_valid_ || std::abs(t.mjd() - last_t_cache_.mjd()) > 1e-13) {
-        last_t_cache_ = t;
-        
-        auto sun_pos_bary = ephemeris_->getSunBarycentricPosition(t);
-        last_sun_pos_bary_cache_ = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
-        if (settings_.integrate_in_ecliptic) {
-            last_sun_pos_bary_cache_ = mat_ecl_ * last_sun_pos_bary_cache_;
+void Propagator::update_force_cache(time::EpochTDB t) {
+    if (cache_valid_ && std::abs(t.mjd() - last_t_cache_.mjd()) < 1e-13) return;
+    last_t_cache_ = t;
+    auto sun_pos_bary = ephemeris_->getSunBarycentricPosition(t);
+    last_sun_pos_bary_cache_ = sun_pos_bary.to_eigen_si() / (constants::AU * 1000.0);
+    if (settings_.integrate_in_ecliptic) last_sun_pos_bary_cache_ = mat_ecl_ * last_sun_pos_bary_cache_;
+    num_planets_cached_ = 0;
+    auto provider = ephemeris_->getProvider();
+    if (settings_.include_planets && provider) {
+        static const CelestialBody b[] = { CelestialBody::MERCURY, CelestialBody::VENUS, CelestialBody::EARTH, CelestialBody::MARS, CelestialBody::JUPITER, CelestialBody::SATURN, CelestialBody::URANUS, CelestialBody::NEPTUNE, CelestialBody::MOON };
+        int count = settings_.include_moon ? 9 : 8;
+        for (int i = 0; i < count; ++i) {
+            Eigen::Vector3d p_bary = provider->getPosition(b[i], t).to_eigen_si() / (constants::AU * 1000.0);
+            if (settings_.integrate_in_ecliptic) p_bary = mat_ecl_ * p_bary;
+            planet_cache_[num_planets_cached_++] = {b[i], p_bary};
         }
-        
-        // Refresh planets
-        num_planets_cached_ = 0;
-        auto provider = ephemeris_->getProvider();
-        if (settings_.include_planets && provider) {
-            static const CelestialBody bodies[] = {
-                CelestialBody::MERCURY, CelestialBody::VENUS, CelestialBody::EARTH,
-                CelestialBody::MARS, CelestialBody::JUPITER, CelestialBody::SATURN,
-                CelestialBody::URANUS, CelestialBody::NEPTUNE, CelestialBody::MOON
-            };
-            int count = settings_.include_moon ? 9 : 8;
-            
-            for (int i = 0; i < count; ++i) {
-                auto p_pos_state = provider->getPosition(bodies[i], t);
-                Eigen::Vector3d p_pos_bary_au = p_pos_state.to_eigen_si() / (constants::AU * 1000.0);
-                if (settings_.integrate_in_ecliptic) p_pos_bary_au = mat_ecl_ * p_pos_bary_au;
-                planet_cache_[num_planets_cached_++] = {bodies[i], p_pos_bary_au};
-            }
-        }
-        cache_valid_ = true;
     }
-    
-    Eigen::Vector3d acc = Eigen::Vector3d::Zero();
+    cache_valid_ = true;
+}
 
+Eigen::Vector3d Propagator::compute_n_body_acceleration(const Eigen::Vector3d& position) {
+    Eigen::Vector3d acc = Eigen::Vector3d::Zero();
     if (settings_.baricentric_integration) {
-        // SSB: Acc = sum [ GM_k * (r_k - r) / |r_k - r|^3 ] including Sun
-        // Sun contribution
-        Eigen::Vector3d delta_sun = last_sun_pos_bary_cache_ - position;
-        double d_sun = delta_sun.norm();
-        acc += (constants::GMS / (d_sun * d_sun * d_sun)) * delta_sun;
-        
-        // Planets
-        for (int i = 0; i < num_planets_cached_; ++i) {
-            const auto& p = planet_cache_[i];
-            double gm = 0;
-            switch(p.body) {
-                case CelestialBody::MERCURY: gm = constants::GM_MERCURY_AU; break;
-                case CelestialBody::VENUS:   gm = constants::GM_VENUS_AU; break;
-                case CelestialBody::EARTH:   gm = constants::GM_EARTH_AU; break;
-                case CelestialBody::MARS:    gm = constants::GM_MARS_AU; break;
-                case CelestialBody::JUPITER: gm = constants::GM_JUPITER_AU; break;
-                case CelestialBody::SATURN:  gm = constants::GM_SATURN_AU; break;
-                case CelestialBody::URANUS:  gm = constants::GM_URANUS_AU; break;
-                case CelestialBody::NEPTUNE: gm = constants::GM_NEPTUNE_AU; break;
-                case CelestialBody::MOON:    gm = constants::GM_MOON_AU; break;
-                default: break;
-            }
-            Eigen::Vector3d delta = p.pos_bary_au - position;
-            double r2 = delta.squaredNorm();
-            acc += (gm / (r2 * std::sqrt(r2))) * delta;
-        }
+        Eigen::Vector3d ds = last_sun_pos_bary_cache_ - position;
+        acc += (constants::GMS / std::pow(ds.norm(), 3)) * ds;
     } else {
-        // Heliocentric: Main term is -mu*r/r^3
-        acc = two_body_acceleration(position);
-        
-        if (settings_.include_planets) {
-            for (int i = 0; i < num_planets_cached_; ++i) {
-                const auto& p = planet_cache_[i];
-                double gm = 0;
-                switch(p.body) {
-                    case CelestialBody::MERCURY: gm = constants::GM_MERCURY_AU; break;
-                    case CelestialBody::VENUS:   gm = constants::GM_VENUS_AU; break;
-                    case CelestialBody::EARTH:   gm = constants::GM_EARTH_AU; break;
-                    case CelestialBody::MARS:    gm = constants::GM_MARS_AU; break;
-                    case CelestialBody::JUPITER: gm = constants::GM_JUPITER_AU; break;
-                    case CelestialBody::SATURN:  gm = constants::GM_SATURN_AU; break;
-                    case CelestialBody::URANUS:  gm = constants::GM_URANUS_AU; break;
-                    case CelestialBody::NEPTUNE: gm = constants::GM_NEPTUNE_AU; break;
-                    case CelestialBody::MOON:    gm = constants::GM_MOON_AU; break;
-                    default: break;
-                }
-                Eigen::Vector3d planet_pos_helio_au = p.pos_bary_au - last_sun_pos_bary_cache_;
-                Eigen::Vector3d delta = planet_pos_helio_au - position;
-                
-                double r2_delta = delta.squaredNorm();
-                double r2_p = planet_pos_helio_au.squaredNorm();
-                acc += gm * (delta / (r2_delta * std::sqrt(r2_delta)) - planet_pos_helio_au / (r2_p * std::sqrt(r2_p)));
-            }
-        }
+        double r = position.norm();
+        acc = -settings_.central_body_gm * position / (r * r * r);
     }
-    
-    if (settings_.include_asteroids && asteroids_) {
-        acc += asteroids_->computePerturbationRaw(position, t.mjd(), last_sun_pos_bary_cache_, settings_.integrate_in_ecliptic);
+    for (int i = 0; i < num_planets_cached_; ++i) {
+        const auto& p = planet_cache_[i];
+        double gm = ephemeris::PlanetaryEphemeris::planet_gm(p.body);
+        Eigen::Vector3d target = settings_.baricentric_integration ? p.pos_bary_au : (p.pos_bary_au - last_sun_pos_bary_cache_);
+        Eigen::Vector3d delta = target - position;
+        acc += gm * (delta / std::pow(delta.norm(), 3));
+        if (!settings_.baricentric_integration) acc -= gm * target / std::pow(target.norm(), 3);
     }
-    
-    if (settings_.include_relativity) {
-        acc += relativistic_correction(position, velocity);
-    }
-    
-    // Earth J2
+    return acc;
+}
+
+Eigen::Vector3d Propagator::compute_harmonic_acceleration(const Eigen::Vector3d& position, time::EpochTDB t) {
+    Eigen::Vector3d acc = Eigen::Vector3d::Zero();
     if (settings_.include_earth_j2) {
         auto provider = ephemeris_->getProvider();
         if (provider) {
-            auto earth_state = provider->getPosition(CelestialBody::EARTH, t);
-            Eigen::Vector3d earth_pos_bary_au = earth_state.to_eigen_si() / (constants::AU * 1000.0);
-            if (settings_.integrate_in_ecliptic) earth_pos_bary_au = mat_ecl_ * earth_pos_bary_au;
-            
-            Eigen::Vector3d r_rel = position - earth_pos_bary_au;
-            double r = r_rel.norm();
-            if (r > 0) {
-                // Transform to Equatorial if integrating in Ecliptic
-                Eigen::Vector3d r_eq = r_rel;
-                if (settings_.integrate_in_ecliptic) r_eq = coordinates::ReferenceFrame::ecliptic_to_j2000() * r_rel;
-                
-                double r2 = r * r;
-                double r5 = r2 * r2 * r;
-                double j2_coeff = 1.5 * constants::EARTH_J2 * constants::GM_EARTH_AU * std::pow(constants::R_EARTH / constants::AU, 2);
-                
-                double z_r = r_eq.z() / r;
-                Eigen::Vector3d a_j2_eq;
-                a_j2_eq.x() = (j2_coeff / r5) * r_eq.x() * (5.0 * z_r * z_r - 1.0);
-                a_j2_eq.y() = (j2_coeff / r5) * r_eq.y() * (5.0 * z_r * z_r - 1.0);
-                a_j2_eq.z() = (j2_coeff / r5) * r_eq.z() * (5.0 * z_r * z_r - 3.0);
-                
-                if (settings_.integrate_in_ecliptic) {
-                    acc += coordinates::ReferenceFrame::j2000_to_ecliptic() * a_j2_eq;
-                } else {
-                    acc += a_j2_eq;
-                }
+            Eigen::Vector3d e_bary = provider->getPosition(CelestialBody::EARTH, t).to_eigen_si() / (constants::AU * 1000.0);
+            if (settings_.integrate_in_ecliptic) e_bary = mat_ecl_ * e_bary;
+            Eigen::Vector3d r_rel = position - e_bary; double r = r_rel.norm();
+            if (r > 1e-6) {
+                Eigen::Vector3d r_eq = settings_.integrate_in_ecliptic ? (coordinates::ReferenceFrame::ecliptic_to_j2000() * r_rel) : r_rel;
+                double j2_c = 1.5 * constants::EARTH_J2 * constants::GM_EARTH_AU * std::pow(constants::R_EARTH/constants::AU, 2);
+                double z_r = r_eq.z()/r, r5 = std::pow(r, 5);
+                Eigen::Vector3d a_j2; a_j2 << r_eq.x()*(5*z_r*z_r-1), r_eq.y()*(5*z_r*z_r-1), r_eq.z()*(5*z_r*z_r-3);
+                acc += (settings_.integrate_in_ecliptic ? coordinates::ReferenceFrame::j2000_to_ecliptic() : Eigen::Matrix3d::Identity()) * (j2_c/r5 * a_j2);
             }
         }
     }
-
-    // Sun J2 (Refined with IAU pole orientation)
     if (settings_.include_sun_j2) {
-        Eigen::Vector3d r_helio = position - last_sun_pos_bary_cache_;
-        double r = r_helio.norm();
-        if (r > 0) {
-            // Sun North Pole (IAU): RA = 286.13, DEC = 63.87 in GCRF
-            // We need the spin axis in the integration frame.
-            static const double alpha0 = 286.13 * constants::DEG_TO_RAD;
-            static const double delta0 = 63.87 * constants::DEG_TO_RAD;
-            
-            Eigen::Vector3d pole_gcrf(
-                std::cos(delta0) * std::cos(alpha0),
-                std::cos(delta0) * std::sin(alpha0),
-                std::sin(delta0)
-            );
-            
-            Eigen::Vector3d pole_frame = pole_gcrf;
-            if (settings_.integrate_in_ecliptic) {
-                pole_frame = mat_ecl_ * pole_gcrf;
-            }
-            
-            double r2 = r * r;
-            double r5 = r2 * r2 * r;
-            double j2_coeff = 1.5 * constants::SUN_J2 * constants::GMS * std::pow(constants::R_SUN_AU, 2);
-            
-            double z_r = r_helio.dot(pole_frame); // Projection onto spin axis
-            double z_norm = z_r / r;
-            
-            // a_j2 = (3/2 * J2 * mu * R^2 / r^4) * [ (5*z^2/r^2 - 1) * k_hat - 2*z/r * r_hat ]
-            Eigen::Vector3d a_j2 = (j2_coeff / r5) * ( (5.0 * z_norm * z_norm - 1.0) * pole_frame - (2.0 * z_norm) * (r_helio / r) );
-            acc += a_j2;
+        Eigen::Vector3d r_h = position - last_sun_pos_bary_cache_; double r = r_h.norm();
+        if (r > 1e-6) {
+            static const double a0 = 286.13 * constants::DEG_TO_RAD, d0 = 63.87 * constants::DEG_TO_RAD;
+            Eigen::Vector3d pole_f = Eigen::Vector3d(std::cos(d0)*std::cos(a0), std::cos(d0)*std::sin(a0), std::sin(d0));
+            if (settings_.integrate_in_ecliptic) pole_f = mat_ecl_ * pole_f;
+            double j2_c = 1.5 * constants::SUN_J2 * constants::GMS * std::pow(constants::R_SUN_AU, 2);
+            double z_n = r_h.dot(pole_f)/r;
+            acc += (j2_c / std::pow(r, 5)) * ((5.0*z_n*z_n - 1.0)*pole_f - (2.0*z_n)*(r_h/r));
         }
     }
-    
-    // Yarkovsky Effect
-    if (settings_.include_yarkovsky && std::abs(settings_.yarkovsky_a2) > 0.0) {
-        double r_au = position.norm();
-        double v_au_d = velocity.norm();
-        if (r_au > 1e-4 && v_au_d > 1e-6) {
-            double acc_val = settings_.yarkovsky_a2 / (r_au * r_au);
-            acc += acc_val * (velocity / v_au_d);
-        }
+    return acc;
+}
+
+Eigen::Vector3d Propagator::compute_non_gravitational_acceleration(const Eigen::Vector3d& position, const Eigen::Vector3d& velocity, time::EpochTDB t) {
+    Eigen::Vector3d acc = Eigen::Vector3d::Zero();
+    if (settings_.include_asteroids && asteroids_) acc += asteroids_->computePerturbationRaw(position, t.mjd(), last_sun_pos_bary_cache_, settings_.integrate_in_ecliptic);
+    if (settings_.include_relativity) acc += relativistic_correction(position, velocity);
+    if (settings_.include_yarkovsky && std::abs(settings_.yarkovsky_a2) > 1e-15) {
+        double r = position.norm(), v = velocity.norm();
+        if (r > 1e-4 && v > 1e-6) acc += (settings_.yarkovsky_a2 / (r*r)) * (velocity/v);
     }
-    
-    Eigen::VectorXd xdot(6);
-    xdot.head<3>() = velocity;
-    xdot.tail<3>() = acc;
+    return acc;
+}
+
+Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::VectorXd& state) {
+    Eigen::Vector3d position = state.head<3>(), velocity = state.tail<3>();
+    update_force_cache(t);
+    Eigen::Vector3d acc = compute_n_body_acceleration(position);
+    acc += compute_harmonic_acceleration(position, t);
+    acc += compute_non_gravitational_acceleration(position, velocity, t);
+    Eigen::VectorXd xdot(6); xdot << velocity, acc;
     return xdot;
 }
 

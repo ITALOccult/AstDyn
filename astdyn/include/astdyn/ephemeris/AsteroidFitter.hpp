@@ -240,7 +240,7 @@ public:
                  if (!temp_oop.empty()) {
                      oop_to_use = temp_oop;
                      using_temp = true;
-                     // std::cout << "[DEBUG] Generated temporary config: " << temp_oop << std::endl;
+                     // std::cout << "[DEBUG] Generated temporary config: " << temp_oop << "\n";
                  }
             }
 

@@ -124,16 +124,16 @@ struct RadarObservation {
     ObservationType type;            ///< RADAR_RANGE, RADAR_DOPPLER, or RADAR_RANGE_RATE
     
     // Range measurement
-    std::optional<double> range;     ///< Range [m] (round-trip time / 2c)
-    std::optional<double> sigma_range; ///< Range uncertainty [m]
+    std::optional<physics::Distance> range;           ///< Range [m] (round-trip time / 2c)
+    std::optional<physics::Distance> sigma_range;    ///< Range uncertainty [m]
     
     // Doppler measurement  
     std::optional<double> doppler;   ///< Doppler shift [Hz]
     std::optional<double> sigma_doppler; ///< Doppler uncertainty [Hz]
     
     // Range-rate measurement
-    std::optional<double> range_rate; ///< Range rate [m/s]
-    std::optional<double> sigma_range_rate; ///< Range rate uncertainty [m/s]
+    std::optional<physics::Velocity> range_rate;    ///< Range rate [m/s]
+    std::optional<physics::Velocity> sigma_range_rate; ///< Range rate uncertainty [m/s]
     
     // Frequency
     double frequency_mhz;            ///< Radar frequency [MHz]
@@ -198,8 +198,8 @@ struct OccultationObservation {
     
     // Star information
     std::string star_designation;
-    double star_ra;                  ///< Star RA [radians]
-    double star_dec;                 ///< Star Dec [radians]
+    astrometry::RightAscension star_ra;  ///< Star RA
+    astrometry::Declination    star_dec; ///< Star Dec
     
     /**
      * @brief Default constructor
@@ -209,7 +209,7 @@ struct OccultationObservation {
           time_start(time::EpochUTC::from_mjd(0.0)), 
           time_end(time::EpochUTC::from_mjd(0.0)), 
           sigma_time(0.001),
-          star_ra(0.0), star_dec(0.0) {}
+          star_ra(), star_dec() {}
 };
 
 /**
@@ -294,9 +294,9 @@ struct ObservationSet {
     void sortByTime();
     
     /**
-     * @brief Get time span [days]
+     * @brief Get time span
      */
-    double getTimeSpan() const;
+    time::TimeDuration getTimeSpan() const;
     
     /**
      * @brief Get optical observations only

@@ -122,6 +122,8 @@ private:
                                                    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem);
 
     // CFIYH Helpers
+    static double compute_era(const time::EpochUTC& t);
+
     static std::optional<GeoPoint> calculate_geopoint_at_epoch(
         const OccultationParameters& params,
         const RightAscension& star_ra,

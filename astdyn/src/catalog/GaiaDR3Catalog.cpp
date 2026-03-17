@@ -77,8 +77,8 @@ ioc::gaia::CorridorQueryParams to_upstream(const CorridorQuery& q) {
 
 ioc::gaia::OrbitQueryParams to_upstream(const OrbitQuery& q) {
     ioc::gaia::OrbitQueryParams p;
-    p.t_start       = q.t_start.mjd() + 2400000.5;
-    p.t_end         = q.t_end.mjd() + 2400000.5;
+    p.t_start       = q.t_start.jd();
+    p.t_end         = q.t_end.jd();
     p.width         = q.width.to_deg();
     p.max_magnitude = q.max_magnitude;
     p.step_size     = q.step_days;
@@ -100,50 +100,38 @@ ioc::gaia::OrbitQueryParams to_upstream(const OrbitQuery& q) {
 // ============================================================================
 
 SkyCoord<core::GCRF> Star::predict_at(time::EpochTDB target_time, const std::optional<Eigen::Vector3d>& observer_pos_ssb_m) const {
-    // 1. Setup Time and Distance
-    constexpr double GAIA_EPOCH_JD = 2457388.5; // J2016.0
-    double dt_years = (target_time.jd() - GAIA_EPOCH_JD) / 365.25;
+    // 1. Setup Time
+    double dt_years = (target_time.jd() - ::astdyn::constants::GAIA_EPOCH_JD) / ::astdyn::constants::DAYS_PER_YEAR;
     
-    double dist_pc = 1000.0; // Default if no parallax (broadly distant)
-    if (parallax.to_mas() > 1e-6) {
-        dist_pc = 1000.0 / parallax.to_mas();
+    // 2. Setup Distance
+    double dist_m = ::astdyn::constants::PARSEC_TO_M * 1000.0; // Default: 1kpc
+    if (parallax.to_mas() > ::astdyn::constants::EPSILON) {
+        dist_m = ::astdyn::constants::PARSEC_TO_M / (parallax.to_mas() / 1000.0);
     }
-    double dist_m = dist_pc * 3.085677581e16;
 
-    // 2. Compute 3D Position at Gaia Epoch (GCRF/ICRS)
+    // 3. Compute 3D Position at Gaia Epoch
     double r_a = ra.to_rad();
     double r_d = dec.to_rad();
-    Eigen::Vector3d pos0(
+    Eigen::Vector3d pos_epoch(
         dist_m * std::cos(r_a) * std::cos(r_d),
         dist_m * std::sin(r_a) * std::cos(r_d),
         dist_m * std::sin(r_d)
     );
 
-    // 3. Proper Motion Vector (Space Motion)
-    // pm_ra_cosdec and pm_dec are in mas/yr. 
-    // Tangential velocity: v = d * pm
-    double pm_ra_rad_yr = (pm_ra_cosdec.to_mas_yr() / 1000.0 / 3600.0) * (M_PI / 180.0);
-    double pm_dec_rad_yr = (pm_dec.to_mas_yr() / 1000.0 / 3600.0) * (M_PI / 180.0);
-    
+    // 4. Proper Motion Velocity (m/yr)
     // Basis vectors in spherical coordinates
     Eigen::Vector3d e_ra(-std::sin(r_a), std::cos(r_a), 0.0);
     Eigen::Vector3d e_dec(-std::sin(r_d) * std::cos(r_a), -std::sin(r_d) * std::sin(r_a), std::cos(r_d));
     
-    // Space motion velocity vector (m/yr)
-    // Assume radial velocity is zero for Gaia stars without it
-    Eigen::Vector3d vel = dist_m * (pm_ra_rad_yr * e_ra + pm_dec_rad_yr * e_dec);
+    double pm_ra_rad_yr  = pm_ra_cosdec.to_rad_yr();
+    double pm_dec_rad_yr = pm_dec.to_rad_yr();
+    Eigen::Vector3d vel_m_yr = dist_m * (pm_ra_rad_yr * e_ra + pm_dec_rad_yr * e_dec);
     
-    // 4. Propagate to target time
-    Eigen::Vector3d pos_star_ssb = pos0 + vel * dt_years;
+    // 5. Propagate and Apply Annual Parallax
+    Eigen::Vector3d pos_star_ssb = pos_epoch + vel_m_yr * dt_years;
+    Eigen::Vector3d rho_vec = observer_pos_ssb_m ? (pos_star_ssb - *observer_pos_ssb_m) : pos_star_ssb;
     
-    // 5. Apply Annual Parallax if observer position is provided
-    Eigen::Vector3d rho = pos_star_ssb;
-    if (observer_pos_ssb_m) {
-        rho = pos_star_ssb - (*observer_pos_ssb_m);
-    }
-    
-    // 6. Return as SkyCoord
-    return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho.x(), rho.y(), rho.z()));
+    return SkyCoord<core::GCRF>::from_vector(math::Vector3<core::GCRF, Distance>::from_si(rho_vec.x(), rho_vec.y(), rho_vec.z()));
 }
 
 // ============================================================================

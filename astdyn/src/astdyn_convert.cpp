@@ -47,7 +47,7 @@ Examples:
   # Process observations
   astdyn_convert --oef ceres.oef --obs ceres.rwo --output ./results
 
-)" << std::endl;
+)" << "\n";
 }
 
 struct ProgramOptions {

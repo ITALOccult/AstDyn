@@ -7,6 +7,7 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/astrometry/ChebyshevEphemerisManager.hpp"
 #include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/AstDynEngine.hpp"
 #include <cmath>
 #include <iostream>
@@ -17,6 +18,55 @@
 
 namespace astdyn::astrometry {
 
+namespace {
+
+    double compute_squared_angular_distance(double t, const astdyn::catalog::ChebyshevSegment& segment, double target_ra, double target_dec) {
+        auto [pos, vel] = segment.evaluate_full(t);
+        double dra = std::get<0>(pos) - target_ra;
+        double ddec = std::get<1>(pos) - target_dec;
+        if (dra > 180.0) dra -= 360.0;
+        if (dra < -180.0) dra += 360.0;
+        dra *= std::cos(std::get<1>(pos) * astdyn::constants::DEG_TO_RAD);
+        return dra*dra + ddec*ddec;
+    }
+
+    double find_tca(const astdyn::catalog::ChebyshevSegment& segment, const astdyn::catalog::Star& star, double t_start, double t_end) {
+        auto target_ra = star.ra.to_deg();
+        auto target_dec = star.dec.to_deg();
+        auto dist_sq = [&](double t) { return compute_squared_angular_distance(t, segment, target_ra, target_dec); };
+
+        double best_t = t_start + (t_end - t_start) / 2.0;
+        double min_d2 = 1e18;
+        int samples = 48; 
+        for (int i = 0; i <= samples; ++i) {
+            double t = t_start + (t_end - t_start) * i / samples;
+            double d2 = dist_sq(t);
+            if (d2 < min_d2) {
+                min_d2 = d2;
+                best_t = t;
+            }
+        }
+        
+        double step = (t_end - t_start) / samples / 2.0;
+        for (int iter = 0; iter < 10; ++iter) {
+            double t1 = best_t - step;
+            double t2 = best_t + step;
+            double d1 = (t1 >= t_start) ? dist_sq(t1) : 1e18;
+            double d2 = (t2 <= t_end) ? dist_sq(t2) : 1e18;
+            if (d1 < min_d2 && d1 < d2) {
+                min_d2 = d1;
+                best_t = t1;
+            } else if (d2 < min_d2) {
+                min_d2 = d2;
+                best_t = t2;
+            }
+            step /= 2.0;
+        }
+        return best_t;
+    }
+
+} // namespace
+
 OccultationParameters OccultationLogic::compute_parameters(
     const RightAscension& star_ra, const Declination& star_dec,
     const RightAscension& ast_ra, const Declination& ast_dec,
@@ -26,40 +76,39 @@ OccultationParameters OccultationLogic::compute_parameters(
     const time::EpochTDB& t_ca,
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem)
 {
-    // 1. Geometry - Fundamental Plane Projection
-    OccultationParameters params = compute_fundamental_plane_geometry(
-        star_ra, star_dec, ast_ra, ast_dec, ast_dist
-    );
+    OccultationParameters params = compute_fundamental_plane_geometry(star_ra, star_dec, ast_ra, ast_dec, ast_dist);
     params.t_ca = t_ca;
 
-    // 2. Velocity - Shadow Motion
     compute_shadow_velocity(params, star_dec, ast_dist, ast_dra_dt, ast_ddec_dt);
     
-    // 3. Rate and Duration
     params.total_apparent_rate = std::sqrt(ast_dra_dt.to_arcsec() * ast_dra_dt.to_arcsec() + 
                                            ast_ddec_dt.to_arcsec() * ast_ddec_dt.to_arcsec());
     
-    double v_ms = params.shadow_velocity.to_ms();
-    if (v_ms > 1.0) {
-        // Simple duration: diameter (km) / velocity (km/s)
-        // Note: we assume diameter is passed externally in candidates, 
-        // but here we can populate it if we had it. For now, max_duration will be 0 
-        // or we need asteroid diameter.
-        params.max_duration = time::TimeDuration::from_seconds(0.0);
-    }
-
-    // 4. Environment - Sky Conditions & Sub-Asteroid Point
     if (ephem) {
         compute_sky_conditions(params, t_ca, ast_ra, ast_dec, ast_dist, star_ra, star_dec, ephem);
-        
-        // Approximate center lat/lon at TCA
-        // Projecting (xi=0, eta=0) at TCA
-        params.center_lat = params.sun_altitude; // Placeholder logic until we move project_to_earth to a shared place
-        // Actually, let's just use the apparent coordinates if fundamental plane xi/eta are small
-        params.center_lat = Angle::from_deg(ast_dec.to_deg());
-        params.center_lon = Angle::from_deg(ast_ra.to_deg()); // WRONG (needs ERA), but avoids crash while testing
+        compute_sub_asteroid_point(params, t_ca, ast_ra, ast_dec, ast_dist);
     }
     return params;
+}
+
+void OccultationLogic::compute_sub_asteroid_point(
+    OccultationParameters& params,
+    const time::EpochTDB& t_ca,
+    const RightAscension& ast_ra, const Declination& ast_dec,
+    const physics::Distance& ast_dist)
+{
+    double a = ast_ra.to_rad();
+    double d = ast_dec.to_rad();
+    Eigen::Vector3d r_ast_vec = ast_dist.to_m() * Eigen::Vector3d(std::cos(d) * std::cos(a), std::cos(d) * std::sin(a), std::sin(d));
+    
+    auto pos_ast_gcrf = math::Vector3<core::GCRF, physics::Distance>::from_si(r_ast_vec.x(), r_ast_vec.y(), r_ast_vec.z());
+    auto pos_ast_itrf = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ITRF>(pos_ast_gcrf, t_ca);
+    
+    double r_itrf = pos_ast_itrf.norm().to_m();
+    if (r_itrf > 1.0) {
+        params.center_lat = Angle::from_rad(std::asin(pos_ast_itrf.z_si() / r_itrf));
+        params.center_lon = Angle::from_rad(std::atan2(pos_ast_itrf.y_si(), pos_ast_itrf.x_si()));
+    }
 }
 
 OccultationParameters OccultationLogic::compute_fundamental_plane_geometry(
@@ -97,12 +146,12 @@ void OccultationLogic::compute_shadow_velocity(
     const Angle& ast_ddec_dt)
 {
     double ds = star_dec.to_rad();
-    double dra = ast_dra_dt.to_rad();
-    double ddec = ast_ddec_dt.to_rad();
+    double dra_s = ast_dra_dt.to_rad() / 3600.0;
+    double ddec_s = ast_ddec_dt.to_rad() / 3600.0;
     double r_val = ast_dist.to_m();
     
-    params.dxi_dt = physics::Velocity::from_ms(r_val * dra * std::cos(ds));
-    params.deta_dt = physics::Velocity::from_ms(r_val * ddec);
+    params.dxi_dt = physics::Velocity::from_ms(r_val * dra_s * std::cos(ds));
+    params.deta_dt = physics::Velocity::from_ms(r_val * ddec_s);
     
     double vx = params.dxi_dt.to_ms();
     double vy = params.deta_dt.to_ms();
@@ -144,6 +193,60 @@ void OccultationLogic::compute_sky_conditions(
     params.moon_dist = Angle::from_rad(std::acos(std::clamp(k_star.dot(n_moon), -1.0, 1.0)));
 }
 
+void OccultationLogic::process_day_window(
+    std::vector<OccultationCandidate>& results,
+    double day_jd,
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
+    const OccultationConfig& config,
+    AstDynEngine& engine,
+    double t_start_jd, double t_end_jd)
+{
+    time::EpochTDB midnight = time::EpochTDB::from_jd(day_jd);
+    try {
+        auto segment = catalog::fit_chebyshev(initial_elements, midnight, 1.0, engine.config());
+        auto [pos, vel] = segment.evaluate_full(midnight.jd());
+        double dist_au = std::get<2>(pos);
+        if (dist_au < 1e-6) return;
+
+        Angle radius = Angle::from_rad(config.max_shadow_distance.to_m() / (dist_au * constants::AU * 1000.0));
+        auto stars = catalog::find_stars_near_segment(catalog::GaiaDR3Catalog::instance(), segment, radius, config.max_mag_star);
+        
+        for (const auto& star : stars) {
+            evaluate_candidate(results, segment, star, config, engine, t_start_jd, t_end_jd);
+        }
+    } catch (...) { }
+}
+
+void OccultationLogic::evaluate_candidate(
+    std::vector<OccultationCandidate>& results,
+    const astdyn::catalog::ChebyshevSegment& segment,
+    const astdyn::catalog::Star& star,
+    const OccultationConfig& config,
+    AstDynEngine& engine,
+    double t_start_jd, double t_end_jd)
+{
+    double t_ca_jd = find_tca(segment, star, segment.t_start, segment.t_end);
+    if (t_ca_jd < t_start_jd || t_ca_jd > t_end_jd) return;
+
+    time::EpochTDB t_ca = time::EpochTDB::from_jd(t_ca_jd);
+    auto [pos, vel] = segment.evaluate_full(t_ca_jd);
+    auto star_at_tca = star.predict_at(t_ca);
+    
+    OccultationParameters params = compute_parameters(
+        star_at_tca.ra(), star_at_tca.dec(),
+        RightAscension::from_deg(std::get<0>(pos)), Declination::from_deg(std::get<1>(pos)),
+        physics::Distance::from_au(std::get<2>(pos)),
+        Angle::from_arcsec((std::get<0>(vel) / 24.0) * 3600.0), 
+        Angle::from_arcsec((std::get<1>(vel) / 24.0) * 3600.0),
+        physics::Velocity::from_au_d(std::get<2>(vel)),
+        t_ca, engine.getEphemeris());
+
+    if (params.impact_parameter > config.max_shadow_distance) return;
+    if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) return;
+
+    results.push_back({"", star, params}); 
+}
+
 std::vector<OccultationCandidate> OccultationLogic::find_occultations(
     const std::string& asteroid_id,
     const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial_elements,
@@ -153,21 +256,10 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
     AstDynEngine& engine,
     OccultationRefinementMode mode)
 {
-    using namespace catalog;
     std::vector<OccultationCandidate> results;
-    auto& catalog_inst = GaiaDR3Catalog::instance();
-
-    // 1. Initial State Initialization
-    physics::KeplerianStateTyped<core::ECLIPJ2000> working_elements = initial_elements;
-
-    double t_start_jd = start.jd();
-    double t_end_jd = end.jd();
-
     std::vector<double> days;
-    for (double day_jd = std::floor(t_start_jd - 0.5) + 0.5; day_jd <= t_end_jd + 0.5; day_jd += 1.0) {
-        if (day_jd >= t_start_jd - 0.5 && day_jd <= t_end_jd + 0.5) {
-            days.push_back(day_jd);
-        }
+    for (double d = std::floor(start.jd() - 0.5) + 0.5; d <= end.jd() + 0.5; d += 1.0) {
+        if (d >= start.jd() - 0.5 && d <= end.jd() + 0.5) days.push_back(d);
     }
 
     #pragma omp parallel
@@ -175,24 +267,16 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
         std::vector<OccultationCandidate> thread_results;
         #pragma omp for schedule(dynamic)
         for (size_t i = 0; i < days.size(); ++i) {
-            double day_jd = days[i];
-            time::EpochTDB midnight = time::EpochTDB::from_jd(day_jd);
-
-            // Per-thread engine state management if needed. 
-            // In AstDyn 3.0, AstDynEngine computation methods are generally thread-safe 
-            // as internal state (propagator) is accessed via shared_ptr.
-            
-            try {
-                auto ephemeris = engine.compute_ephemeris(midnight - time::TimeDuration::from_hours(12), 
-                                                        midnight + time::TimeDuration::from_hours(12), 1.0/24.0);
-                
-                // (Logic for star proximity search would go here)
-            } catch (...) { }
+            process_day_window(thread_results, days[i], initial_elements, config, engine, start.jd(), end.jd());
         }
-        
         #pragma omp critical
         results.insert(results.end(), thread_results.begin(), thread_results.end());
     }
+
+    for (auto& cand : results) cand.asteroid_id = asteroid_id;
+    std::sort(results.begin(), results.end(), [](const OccultationCandidate& a, const OccultationCandidate& b) {
+        return a.params.t_ca.mjd() < b.params.t_ca.mjd();
+    });
 
     return results;
 }

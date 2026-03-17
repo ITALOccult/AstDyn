@@ -123,8 +123,8 @@ orbit_determination::GaussIODSettings Configurator::parseGaussIODSettings(const 
         auto g = j["gauss_iod"];
         if (g.contains("max_iterations")) s.max_iterations = g["max_iterations"].get<int>();
         if (g.contains("tolerance_au")) s.tolerance = physics::Distance::from_au(g["tolerance_au"].get<double>());
-        if (g.contains("min_separation_days")) s.min_separation_days = g["min_separation_days"].get<double>();
-        if (g.contains("max_separation_days")) s.max_separation_days = g["max_separation_days"].get<double>();
+        if (g.contains("min_separation_days")) s.min_separation = time::TimeDuration::from_days(g["min_separation_days"].get<double>());
+        if (g.contains("max_separation_days")) s.max_separation = time::TimeDuration::from_days(g["max_separation_days"].get<double>());
         if (g.contains("use_light_time")) s.use_light_time = g["use_light_time"].get<bool>();
         if (g.contains("verbose")) s.verbose = g["verbose"].get<bool>();
     }

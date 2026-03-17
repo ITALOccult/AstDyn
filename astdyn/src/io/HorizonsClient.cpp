@@ -181,9 +181,11 @@ HorizonsClient::query_observation(const std::string& target, const time::EpochTD
         double delta;
         iss >> delta;
 
-        return astrometry::AstrometricObservation{
-            core::Radian(ra), core::Radian(dec), core::Meter(delta * constants::AU * 1000.0)
-        };
+        return astrometry::AstrometricObservation(
+            astrometry::RightAscension::from_rad(ra),
+            astrometry::Declination::from_rad(dec),
+            physics::Distance::from_au(delta)
+        );
     } catch (...) {
         return std::unexpected(HorizonsError::ParsingError);
     }
