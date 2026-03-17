@@ -145,24 +145,29 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
     const int n = y.size();
     double direction = (h >= 0) ? 1.0 : -1.0;
     
-    // Compute Jacobian (numerical if not provided)
-    Eigen::MatrixXd jacobian;
-    if (jac) {
-        jacobian = jac(t, y);
-    } else {
-        jacobian = numerical_jacobian(f, t, y);
+    // Reuse or update Jacobian
+    if (jacobian_.rows() != n || stats_.num_steps % 10 == 0) {
+        if (jac) jacobian_ = jac(t, y);
+        else jacobian_ = numerical_jacobian(f, t, y);
     }
     
     // Stage derivatives
     std::vector<Eigen::VectorXd> k(num_stages_, Eigen::VectorXd::Zero(n));
-    
+    if (k_prev_.size() == (size_t)num_stages_) k = k_prev_;
+
     // Solve implicit system
-    bool converged = solve_implicit_system(f, jacobian, t, y, h, k);
+    bool converged = solve_implicit_system(f, jacobian_, t, y, h, k);
     
     if (!converged) {
-        // Newton didn't converge, reduce step size
+        // Retry with fresh Jacobian
+        if (jac) jacobian_ = jac(t, y);
+        else jacobian_ = numerical_jacobian(f, t, y);
+        converged = solve_implicit_system(f, jacobian_, t, y, h, k);
+    }
+
+    if (!converged) {
         h *= 0.5;
-        if (std::abs(h) < h_min_) h = direction * h_min_;
+        if (std::abs(h) < h_min_) return false;
         return false;
     }
     
@@ -188,13 +193,14 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
     const double fac_min = 0.2;
     const double fac_max = 6.0;
     
-    double fac = safety * std::pow(tolerance_ / rel_err, 1.0 / 15.0);
+    double fac = safety * std::pow(tolerance_ / (rel_err + 1e-20), 1.0 / 6.0); // Order 5 (3 stages) -> 1/6
     fac = std::min(fac_max, std::max(fac_min, fac));
     
-    if (rel_err <= tolerance_) {
+    if (rel_err <= tolerance_ && y_new.allFinite()) {
         // Accept step
         t += h;
         y = y_new;
+        k_prev_ = k;
         
         stats_.num_steps++;
         if (stats_.min_step_size == 0.0) {

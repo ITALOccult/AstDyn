@@ -160,11 +160,24 @@ Eigen::Vector3d Propagator::compute_non_gravitational_acceleration(const Eigen::
 }
 
 Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::VectorXd& state) {
+    if (!std::isfinite(t.mjd())) {
+        throw std::runtime_error("Propagator::compute_derivatives: time is NaN/Inf");
+    }
+    if (!state.allFinite()) {
+        throw std::runtime_error("Propagator::compute_derivatives: input state contains NaN/Inf");
+    }
+
     Eigen::Vector3d position = state.head<3>(), velocity = state.tail<3>();
     update_force_cache(t);
     Eigen::Vector3d acc = compute_n_body_acceleration(position);
     acc += compute_harmonic_acceleration(position, t);
     acc += compute_non_gravitational_acceleration(position, velocity, t);
+
+    if (!acc.allFinite()) {
+        // Detailed check to identify culprit
+        throw std::runtime_error("Propagator::compute_derivatives: Calculated acceleration contains NaN/Inf");
+    }
+
     Eigen::VectorXd xdot(6); xdot << velocity, acc;
     return xdot;
 }

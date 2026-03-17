@@ -314,6 +314,7 @@ Eigen::Vector3d AsteroidPerturbations::computePerturbationRaw(
 
             Eigen::Vector3d delta = ast_pos_frame_au - pos_au;
             double d_norm = delta.norm();
+            if (d_norm < 1e-4) continue; // Singularity protection (self-gravity or very close approach)
             double d_norm2 = d_norm * d_norm;
             double d3 = d_norm2 * d_norm;
             double gm_au_d2 = asteroid.gm.to_au3_d2();

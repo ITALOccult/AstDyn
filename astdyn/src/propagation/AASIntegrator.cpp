@@ -177,6 +177,8 @@ void AASIntegrator::symplectic_step(const DerivativeFunction& f, double t, Eigen
 
 double AASIntegrator::estimate_step_size(const Eigen::VectorXd& q, const Eigen::VectorXd& p, double target_dt) const {
     double r = q.norm();
+    if (!std::isfinite(r)) return 1e-8; // Default safe step on failure
+    
     // Scale precision to be more practical for O(4) symplectic integration
     // 1e-6 typically would result in extremely small steps (0.01 days), 
     // we want 1e-6 to map to something like 0.1-0.5 days for Ceres.

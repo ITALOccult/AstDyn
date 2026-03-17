@@ -22,6 +22,7 @@
 #include <cmath>
 #include <vector>
 #include <filesystem>
+#include <thread>
 
 using namespace astdyn;
 using namespace astdyn::propagation;
@@ -128,27 +129,30 @@ int main(int argc, char** argv) {
         settings.baricentric_integration = true;
     }
 
-    std::cout << "[trajectory_export] Fetching initial states for " << asteroid_ids.size() << " asteroids using Horizons...\n";
+    std::cout << "[trajectory_export] Fetching initial states for " << asteroid_ids.size() << " asteroids using Horizons (serial)...\n";
     struct AsteroidJob {
         std::string id;
         Eigen::VectorXd y0;
         double t0;
     };
     std::vector<AsteroidJob> jobs;
-    std::mutex jobs_mutex;
 
-    #pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < (int)asteroid_ids.size(); ++i) {
-        std::string id = asteroid_ids[i];
+    for (const auto& id : asteroid_ids) {
         time::EpochTDB t0 = time::EpochTDB::from_mjd(t0_mjd);
         HorizonsClient horizons_local;
-        auto state_res = horizons_local.query_vectors(id, t0, "@0");
         
-        if (state_res) {
-            std::lock_guard<std::mutex> lock(jobs_mutex);
-            jobs.push_back({id, state_res->to_eigen_au_aud(), t0_mjd});
-        } else {
-            #pragma omp critical
+        bool success = false;
+        for (int retry = 0; retry < 3; ++retry) {
+            auto res = horizons_local.query_vectors(id, t0, "@0");
+            if (res) {
+                jobs.push_back({id, res->to_eigen_au_aud(), t0_mjd});
+                success = true;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
+        
+        if (!success) {
             std::cerr << "Warning: Failed to fetch state for " << id << "\n";
         }
     }
@@ -186,12 +190,22 @@ int main(int argc, char** argv) {
             if (integrator_name == "AAS") integrator = std::make_shared<AASIntegrator>(tol);
             else if (integrator_name == "RKF78") integrator = std::make_shared<RKF78Integrator>(0.1, tol);
             else if (integrator_name == "GL8") integrator = std::make_shared<GaussIntegrator>(0.01, tol); // Smaller initial step for stability
-            else if (integrator_name == "GRKN") integrator = std::make_shared<GRKNIntegrator>(tol, 0.01);
+            else if (integrator_name == "GRKN") integrator = std::make_shared<GRKNIntegrator>(tol, 0.001); // Even smaller for GRKN
             else if (integrator_name == "SABA4") integrator = std::make_shared<SABA4Integrator>(0.01, tol);
+            else if (integrator_name == "SABA2") integrator = std::make_shared<SABA4Integrator>(0.01, tol); 
             else if (integrator_name == "IAS15") integrator = std::make_shared<RadauIntegrator>(0.01, tol);
             else continue;
 
-            Propagator propagator(integrator, local_ephem, settings);
+            PropagatorSettings local_settings = settings;
+            // Avoid self-perturbation if target is an asteroid in the default list
+            try {
+                if (!asteroid_id.empty() && std::isdigit(asteroid_id[0])) {
+                    int ast_num = std::stoi(asteroid_id);
+                    local_settings.exclude_asteroids_list.push_back(ast_num);
+                }
+            } catch (...) {}
+
+            Propagator propagator(integrator, local_ephem, local_settings);
             
             auto compute_h = [&](const Eigen::VectorXd& state, double mjd) {
                 Eigen::Vector3d r = state.head<3>(), v = state.segment<3>(3);

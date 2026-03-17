@@ -116,7 +116,8 @@ if(ASTDYN_USE_OPENMP)
     if(APPLE)
         # Search for Homebrew libomp
         if(EXISTS "/opt/homebrew/opt/libomp")
-            set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+            set(OpenMP_CXX_FLAGS "-Xpreprocessor;-fopenmp")
+            set(OpenMP_CXX_INCLUDE_DIRS "/opt/homebrew/opt/libomp/include")
             set(OpenMP_CXX_LIB_NAMES "omp")
             set(OpenMP_omp_LIBRARY "/opt/homebrew/opt/libomp/lib/libomp.dylib")
             set(OpenMP_FOUND TRUE)
@@ -134,6 +135,7 @@ if(ASTDYN_USE_OPENMP)
             add_library(OpenMP::OpenMP_CXX INTERFACE IMPORTED)
             set_target_properties(OpenMP::OpenMP_CXX PROPERTIES
                 INTERFACE_COMPILE_OPTIONS "${OpenMP_CXX_FLAGS}"
+                INTERFACE_INCLUDE_DIRECTORIES "${OpenMP_CXX_INCLUDE_DIRS}"
                 INTERFACE_LINK_LIBRARIES "${OpenMP_omp_LIBRARY}"
             )
         endif()

@@ -53,7 +53,7 @@ double GRKNIntegrator::pi_controller(double err, double h) const {
     const double alpha = 0.7 / p;
     const double beta = 0.4 / p;
     
-    double fac = safety * std::pow(err, -alpha) * std::pow(err_prev_, beta);
+    double fac = safety * std::pow(std::max(err, 1e-18), -alpha) * std::pow(std::max(err_prev_, 1e-18), beta);
     fac = std::clamp(fac, 0.1, 5.0);
     return h * fac;
 }
@@ -161,6 +161,7 @@ void GRKNIntegrator::adaptive_loop(const DerivativeFunction& f, Vec3& r, Vec3& v
     double h = h_initial_ * ((t_end > t) ? 1.0 : -1.0);
     int cp_idx = 0;
     Stages K;
+    err_prev_ = 1.0;
     bool first_step = true;
 
     while (std::abs(t_end - t) > 1e-14) {
@@ -169,6 +170,13 @@ void GRKNIntegrator::adaptive_loop(const DerivativeFunction& f, Vec3& r, Vec3& v
         Vec3 r6, v6, r4, v4;
         rkn_step(f, t, r, v, h, r6, v6, r4, v4, K);
         
+        if (!r6.allFinite() || !v6.allFinite()) {
+            stats_.num_rejected_steps++;
+            h *= 0.5;
+            if (std::abs(h) < h_min_) break;
+            continue;
+        }
+
         double err = error_norm(r, r6, r4);
         if (err <= 1.0 || std::abs(h) <= h_min_) {
             // Accepted

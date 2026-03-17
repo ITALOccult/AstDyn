@@ -83,13 +83,20 @@ private:
     static const double b_[num_stages_];      ///< Weights
     
     /**
-     * @brief Solve implicit Gauss system (simplified Newton)
+     * @brief Solve implicit Gauss system (simplified Newton / Picard)
      */
     bool solve_implicit_system(const DerivativeFunction& f,
                                double t,
                                const Eigen::VectorXd& y,
                                double h,
                                std::vector<Eigen::VectorXd>& k);
+
+    bool solve_implicit_system_with_iters(const DerivativeFunction& f,
+                               double t,
+                               const Eigen::VectorXd& y,
+                               double h,
+                               std::vector<Eigen::VectorXd>& k,
+                               int& iters);
     
     /**
      * @brief Compute energy for Hamiltonian systems (monitoring)
