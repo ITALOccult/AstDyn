@@ -136,43 +136,37 @@ double AASIntegrator::compute_modified_hamiltonian(const Eigen::VectorXd& q,
     // H_shadow = H + h^4 * [ sigma_V * {V,{V,{V,{V,T}}}} + sigma_T * {T,{T,{T,{T,V}}}} ]
     // where {T,{T,{T,{T,V}}}} relates to the Hessian and velocities.
     
-    // exact coefficient for Yoshida-4 (sigma_yoshida)
-    const double sigma_exact = (2.0 * std::pow(w1, 5) + std::pow(w0, 5)) / 720.0;
+    // exact coefficient for Yoshida-4 (Shadow Hamiltonian lead term)
+    // Yoshida 1990, eq. (3.7)
+    const double sigma_4 = (2.0 * std::pow(w1, 4) + std::pow(w0, 4)) / 24.0;
     
     const double r = q.norm();
     const double r3 = r * r * r;
     const double V_pp = mu_ / r3; // V'' for point mass
     
     // Poisson bracket terms (Order h^4)
-    // {V,{V,{V,{V,T}}}} ~ (gradV)^2 * V'' / V ~ gradV^2 * (1/r^2)
     const double gradV = mu_ / (r * r);
     const double term_V = (gradV * gradV) * V_pp;
     
-    // {T,{T,{T,{T,V}}}} ~ v^4 * V''''' is too high, but p^T * Hess(V) * p is better for h^2
-    // For h^4, we use the square of the Hessian term for metric consistency:
     const Eigen::Matrix3d H_hess = compute_hessian(q);
     const double pHp = p.dot(H_hess * p);
     const double term_T = pHp * V_pp; 
     
-    // Correction must have units of Energy (L^2/T^2)
-    // term_V: (L/T^2)^2 * (1/T^2) = L^2/T^6. Multiply by h^4 (T^4) -> L^2/T^2. OK.
-    // term_T: (L^2/T^4) * (1/T^2) = L^2/T^6. Multiply by h^4 (T^4) -> L^2/T^2. OK.
-    const double correction = std::pow(h, 4) * sigma_exact * (term_V + term_T);
+    const double correction = std::pow(h, 4) * sigma_4 * (term_V + term_T);
     
     return H0 + correction;
 }
 
-void AASIntegrator::update_phi_kick(const DerivativeFunction& f, double t, double step, const Eigen::VectorXd& q, const Eigen::VectorXd& p, Eigen::MatrixXd& phi) {
+void AASIntegrator::update_phi_kick(const DerivativeFunction&, double, double step, const Eigen::VectorXd& q, const Eigen::VectorXd&, Eigen::MatrixXd& phi) {
     if (phi.size() == 0) return;
-    const double h_fd = 1e-7; Eigen::Matrix3d JF, JV; Eigen::VectorXd y = join_state(q, p);
-    for (int i = 0; i < 3; ++i) {
-        double d_q = h_fd * std::max(std::abs(y[i]), 1.0), d_v = h_fd * std::max(std::abs(y[3+i]), 1.0);
-        Eigen::VectorXd y_pq = y; y_pq[i] += d_q; Eigen::VectorXd y_mq = y; y_mq[i] -= d_q;
-        JF.col(i) = (f(t, y_pq).tail(3) - f(t, y_mq).tail(3)) / (2.0 * d_q);
-        Eigen::VectorXd y_pv = y; y_pv[3+i] += d_v; Eigen::VectorXd y_mv = y; y_mv[3+i] -= d_v;
-        JV.col(i) = (f(t, y_pv).tail(3) - f(t, y_mv).tail(3)) / (2.0 * d_v);
-    }
-    phi.block<3, 6>(3, 0) += step * (JF * phi.block<3, 6>(0, 0) + JV * phi.block<3, 6>(3, 0));
+    
+    // Gravitational force model: f only depends on position q.
+    // JV (Jacobian w.r.t velocity) is zero.
+    // JF (Jacobian w.r.t position) is the Hessian of the potential.
+    Eigen::Matrix3d JF = compute_hessian(q);
+    
+    // Symplectic update of the Momentum-Position and Momentum-Momentum STM blocks
+    phi.block<3, 6>(3, 0) += step * JF * phi.block<3, 6>(0, 0);
 }
 
 void AASIntegrator::symplectic_step(const DerivativeFunction& f, double t, Eigen::VectorXd& q, Eigen::VectorXd& p, Eigen::MatrixXd& phi, double ds) {
@@ -182,15 +176,33 @@ void AASIntegrator::symplectic_step(const DerivativeFunction& f, double t, Eigen
 }
 
 double AASIntegrator::estimate_step_size(const Eigen::VectorXd& q, const Eigen::VectorXd& p, double target_dt) const {
-    double r = q.norm(), g_n = precision_ / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
+    double r = q.norm();
+    double g_n = precision_ / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
     double g_avg = g_n;
+    
+    // Symmetrization loop for temporal reversibility
     for (int i = 0; i < 2; ++i) {
+        // Point on trajectory shifted by Sundman step
         Eigen::VectorXd q_next = q + p * g_avg;
         double g_p = precision_ / std::sqrt(std::max(compute_force_gradient(q_next), 1e-20));
-        g_avg = 0.5 * (g_n + g_p);
+        
+        // Use harmonic mean for time-reversibility preservation
+        g_avg = 2.0 * g_n * g_p / (g_n + g_p);
     }
-    g_avg = std::clamp(g_avg, 1e-5, 20.0);
-    if (r < 0.0093) g_avg = std::min(g_avg, 1.0/1440.0);
+    
+    // Apply physical constraints
+    // 1. Limit step to 1/20th of local orbital period
+    double T_local = 2.0 * constants::PI * std::sqrt(r * r * r / mu_);
+    g_avg = std::min(g_avg, T_local / 20.0);
+    
+    // 2. Global bounds
+    g_avg = std::clamp(g_avg, 1e-8, 50.0);
+    
+    // Perihelion protection (r < 2 Solar Radii)
+    if (r < 0.0093) {
+        g_avg = std::min(g_avg, 1.0 / 1440.0); // 1 minute limit (hardcoded for stability)
+    }
+    
     return std::min(g_avg, target_dt);
 }
 

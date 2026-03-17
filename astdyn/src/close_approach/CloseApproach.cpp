@@ -114,9 +114,13 @@ std::vector<CloseApproach> CloseApproachDetector::detect(
     time::EpochTDB t_start,
     time::EpochTDB t_end)
 {
-    // Convert orbit to Cartesian state for propagation using existing converters
-    auto cart_legacy = propagation::keplerian_to_cartesian<core::GCRF>(initial_orbit);
-    return detect(cart_legacy, t_start, t_end);
+    // Convert orbit to Cartesian state and transform to GCRF
+    auto cart_ecl = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(initial_orbit);
+    auto pos_gcrf = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(cart_ecl.position, cart_ecl.epoch);
+    auto vel_gcrf = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, core::GCRF>(cart_ecl.position, cart_ecl.velocity, cart_ecl.epoch);
+    
+    physics::CartesianStateTyped<core::GCRF> cart_gcrf(cart_ecl.epoch, pos_gcrf, vel_gcrf, cart_ecl.gm);
+    return detect(cart_gcrf, t_start, t_end);
 }
 
 double CloseApproachDetector::compute_distance(

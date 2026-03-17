@@ -176,7 +176,6 @@ constexpr double GM_PLUTO = 975.500000;
 // Planetary Radii [km] (IAU 2015 reference values)
 // ============================================================================
 
-constexpr double R_SUN     = 695700.0;   // Sun (nominal)
 constexpr double R_MERCURY = 2439.7;     // Mercury
 constexpr double R_VENUS   = 6051.8;     // Venus
 constexpr double R_EARTH   = 6371.0084;  // Earth (nominal mean volumetric)

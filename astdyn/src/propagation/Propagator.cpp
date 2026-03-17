@@ -39,6 +39,22 @@ void Propagator::setup_asteroid_perturbations() {
     if (!settings_.asteroid_ephemeris_file.empty()) {
         asteroids_->loadSPK(settings_.asteroid_ephemeris_file);
     }
+    
+    // Apply filters from include/exclude lists
+    if (!settings_.include_asteroids_list.empty()) {
+        // First disable all, then enable only listed
+        for (const auto& ast : asteroids_->getAsteroids()) {
+            asteroids_->setAsteroidEnabled(ast.number, false);
+        }
+        for (int num : settings_.include_asteroids_list) {
+            asteroids_->setAsteroidEnabled(num, true);
+        }
+    }
+    
+    // Apply exclusion list (if any)
+    for (int num : settings_.exclude_asteroids_list) {
+        asteroids_->setAsteroidEnabled(num, false);
+    }
 }
 
 void Propagator::setup_aas_parameters() {

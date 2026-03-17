@@ -23,6 +23,7 @@
 #include "astdyn/propagation/RadauIntegrator.hpp"
 #include "astdyn/propagation/saba4_integrator.hpp"
 #include "astdyn/propagation/AASIntegrator.hpp"
+#include "astdyn/propagation/GRKNIntegrator.hpp"
 #include "astdyn/core/IOCConfig.hpp"
 #include <nlohmann/json.hpp>
 #include <iostream>
@@ -65,6 +66,7 @@ std::unique_ptr<Integrator> AstDynEngine::create_integrator() {
         case IntegratorType::GAUSS: return std::make_unique<GaussIntegrator>(config_.initial_step_size, config_.tolerance);
         case IntegratorType::RADAU: return std::make_unique<RadauIntegrator>(config_.initial_step_size, config_.tolerance);
         case IntegratorType::AAS: return std::make_unique<AASIntegrator>(config_.aas_precision, config_.propagator_settings.central_body_gm);
+        case IntegratorType::GRKN64: return std::make_unique<GRKNIntegrator>(config_.tolerance, config_.initial_step_size);
         default: return std::make_unique<RK4Integrator>(config_.initial_step_size);
     }
 }

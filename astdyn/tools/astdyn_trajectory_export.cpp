@@ -192,12 +192,24 @@ int main(int argc, char** argv) {
             double h0 = compute_h(current_y, current_t);
             out << current_t << "," << current_y[0] << "," << current_y[1] << "," << current_y[2] << "," << current_y[3] << "," << current_y[4] << "," << current_y[5] << ",0.0,1.0\n";
 
-            while (current_t < tf_mjd) {
-                double next_t = std::min(current_t + step_days, tf_mjd);
-                current_y = propagator.integrate_raw_au(current_y, current_t, next_t);
-                current_t = next_t;
-                double h = compute_h(current_y, current_t);
-                out << current_t << "," << current_y[0] << "," << current_y[1] << "," << current_y[2] << "," << current_y[3] << "," << current_y[4] << "," << current_y[5] << "," << std::abs((h - h0) / h0) << ",1.0\n";
+            // Batch integration for maximum performance and flow continuity
+            std::vector<double> target_mjds;
+            double t_target = current_t + step_days;
+            while (t_target < tf_mjd + 1e-10) {
+                target_mjds.push_back(std::min(t_target, tf_mjd));
+                t_target += step_days;
+            }
+            if (target_mjds.empty() || target_mjds.back() < tf_mjd - 1e-10) {
+                target_mjds.push_back(tf_mjd);
+            }
+
+            if (!target_mjds.empty()) {
+                auto results = propagator.integrate_raw_au_batch(current_y, current_t, target_mjds);
+                for (size_t j = 0; j < target_mjds.size(); ++j) {
+                    double h = compute_h(results[j], target_mjds[j]);
+                    out << target_mjds[j] << "," << results[j][0] << "," << results[j][1] << "," << results[j][2] << "," 
+                        << results[j][3] << "," << results[j][4] << "," << results[j][5] << "," << std::abs((h - h0) / h0) << ",1.0\n";
+                }
             }
             #pragma omp critical
             std::cout << "[trajectory_export]   -> Asteroid " << asteroid_id << " complete.\n";

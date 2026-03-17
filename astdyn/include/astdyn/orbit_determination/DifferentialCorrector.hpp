@@ -114,6 +114,8 @@ public:
         return res;
     }
 
+    std::shared_ptr<ResidualCalculator<Frame>> get_residual_calculator() const { return residual_calc_; }
+
 private:
     struct DesignMatrix {
         Eigen::MatrixXd A; Eigen::VectorXd b; Eigen::VectorXd weights; std::vector<size_t> valid_indices;
@@ -196,10 +198,7 @@ private:
         return (AtW * dm.A).inverse();
     }
 
-    std::shared_ptr<ResidualCalculator<Frame>> residual_calc_;
-    std::shared_ptr<StateTransitionMatrix<Frame>> stm_computer_;
-};
-
+private:
     std::shared_ptr<ResidualCalculator<Frame>> residual_calc_;
     std::shared_ptr<StateTransitionMatrix<Frame>> stm_computer_;
 };

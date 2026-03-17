@@ -56,7 +56,8 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     Eigen::Vector3d earth_helio = compute_earth_helio(de441, t_obs);
     Eigen::Vector3d ast_pos = compute_light_time_corrected_pos(initial, t_elements, t_obs, earth_helio, e_cfg);
     
-    auto rho_ecl = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(ast_pos - earth_helio);
+    Eigen::Vector3d diff = ast_pos - earth_helio;
+    auto rho_ecl = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(diff.x(), diff.y(), diff.z());
     auto rho_eq = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_ecl).to_eigen_si();
     
     Eigen::Vector3d q_sun = de441->getPosition(ephemeris::CelestialBody::SUN, t_obs).to_eigen_si() - 

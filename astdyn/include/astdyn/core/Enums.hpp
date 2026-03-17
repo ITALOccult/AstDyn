@@ -14,7 +14,8 @@ enum class IntegratorType {
     SABA4,  ///< Symplectic SABA4 (Yoshida-based)
     AAS,    ///< Adaptive Symplectic (AstDyn Precision-based)
     GAUSS,  ///< Gauss-Jackson (Legacy/Specialized)
-    RADAU   ///< Radau-IIA (Implicit for stiff problems)
+    RADAU,  ///< Radau-IIA (Implicit for stiff problems)
+    GRKN64  ///< Generalized Runge-Kutta-Nyström 6(4)6FM87 (Adaptive)
 };
 
 /**
@@ -36,6 +37,7 @@ inline IntegratorType string_to_integrator(const std::string& s) {
     if (s == "RK4") return IntegratorType::RK4;
     if (s == "GAUSS") return IntegratorType::GAUSS;
     if (s == "RADAU") return IntegratorType::RADAU;
+    if (s == "GRKN64" || s == "GRKN") return IntegratorType::GRKN64;
     return IntegratorType::RK4;
 }
 
