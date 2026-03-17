@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
         if (jobs.size() > 1 && vm.count("output")) output_file = vm["output"].as<std::string>() + "_" + asteroid_id + ".csv";
 
         try {
-            // Local providers per asteroid to avoid lock contention in SPKReader
+            // Local providers per asteroid to avoid lock contention
             auto local_de441 = std::make_shared<ephemeris::DE441Provider>(bsp_path);
             auto local_ephem = std::make_shared<ephemeris::PlanetaryEphemeris>(local_de441);
 
@@ -170,8 +170,7 @@ int main(int argc, char** argv) {
             else continue;
 
             Propagator propagator(integrator, local_ephem, settings);
-            #pragma omp critical
-            std::cout << "[trajectory_export]   -> Asteroid " << asteroid_id << " starts integration (tf=" << tf_mjd << ")...\n";
+            
             auto compute_h = [&](const Eigen::VectorXd& state, double mjd) {
                 Eigen::Vector3d r = state.head<3>(), v = state.segment<3>(3);
                 time::EpochTDB t = time::EpochTDB::from_mjd(mjd);
@@ -192,30 +191,44 @@ int main(int argc, char** argv) {
             double h0 = compute_h(current_y, current_t);
             out << current_t << "," << current_y[0] << "," << current_y[1] << "," << current_y[2] << "," << current_y[3] << "," << current_y[4] << "," << current_y[5] << ",0.0,1.0\n";
 
-            // Batch integration for maximum performance and flow continuity
-            std::vector<double> target_mjds;
+            static std::atomic<long> total_steps_done{0};
+            static std::mutex progress_mutex;
+            static auto start_time = std::chrono::steady_clock::now();
+
+            // Sliced integration for progress reporting
             double t_target = current_t + step_days;
             while (t_target < tf_mjd + 1e-10) {
-                target_mjds.push_back(std::min(t_target, tf_mjd));
+                double target = std::min(t_target, tf_mjd);
+                current_y = propagator.integrate_raw_au(current_y, current_t, target);
+                current_t = target;
+                
+                double h = compute_h(current_y, current_t);
+                out << current_t << "," << current_y[0] << "," << current_y[1] << "," << current_y[2] << "," 
+                    << current_y[3] << "," << current_y[4] << "," << current_y[5] << "," << std::abs((h - h0) / h0) << ",1.0\n";
+                
+                total_steps_done++;
+                
+                // Report progress periodically (every 100 global steps or so)
+                if (total_steps_done % 100 == 0 || total_steps_done == (long)(jobs.size() * ((tf_mjd - job.t0) / step_days))) {
+                    std::lock_guard<std::mutex> lock(progress_mutex);
+                    auto now = std::chrono::steady_clock::now();
+                    double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() / 1000.0;
+                    long total_planned = (long)jobs.size() * (long)((tf_mjd - job.t0) / step_days);
+                    double percent = 100.0 * total_steps_done / total_planned;
+                    double eta = (percent > 0.1) ? (elapsed / percent * (100.0 - percent)) : 0.0;
+                    
+                    std::cout << "\r[Batch Progress] " << std::fixed << std::setprecision(1) << percent << "% "
+                              << "| Elapsed: " << (int)elapsed << "s "
+                              << "| ETA: " << (int)eta << "s   " << std::flush;
+                }
+                
                 t_target += step_days;
             }
-            if (target_mjds.empty() || target_mjds.back() < tf_mjd - 1e-10) {
-                target_mjds.push_back(tf_mjd);
-            }
-
-            if (!target_mjds.empty()) {
-                auto results = propagator.integrate_raw_au_batch(current_y, current_t, target_mjds);
-                for (size_t j = 0; j < target_mjds.size(); ++j) {
-                    double h = compute_h(results[j], target_mjds[j]);
-                    out << target_mjds[j] << "," << results[j][0] << "," << results[j][1] << "," << results[j][2] << "," 
-                        << results[j][3] << "," << results[j][4] << "," << results[j][5] << "," << std::abs((h - h0) / h0) << ",1.0\n";
-                }
-            }
             #pragma omp critical
-            std::cout << "[trajectory_export]   -> Asteroid " << asteroid_id << " complete.\n";
+            std::cout << "\r[trajectory_export]   -> Asteroid " << asteroid_id << " complete.                                \n";
         } catch (const std::exception& e) {
             #pragma omp critical
-            std::cerr << "[trajectory_export]   -> Error in " << asteroid_id << ": " << e.what() << "\n";
+            std::cerr << "\n[trajectory_export]   -> Error in " << asteroid_id << ": " << e.what() << "\n";
         }
     }
 
