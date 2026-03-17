@@ -65,9 +65,15 @@ private:
     void readHeader();
     void loadIndex();
     void seekToRecord(int record_idx);
-    
-    
+    int get_first_summary_record(const std::vector<char>& file_record);
+    int process_summary_record(const std::vector<char>& record);
+    void process_segment(const std::vector<char>& record, int i);
+    void init_type2_segment(SPKSegment& seg);
+
     Eigen::Matrix<double, 6, 1> evaluateType2(const SPKSegment& seg, double et);
+    void refresh_type2_cache(const SPKSegment& seg, int idx, Type2Cache& cache);
+    void compute_chebyshev(double x, int n, std::vector<double>& T, std::vector<double>& U);
+    Eigen::Matrix<double, 6, 1> finalize_type2_state(const std::vector<double>& c, const std::vector<double>& T, const std::vector<double>& U, int n, double rad);
     Eigen::Matrix<double, 6, 1> evaluateType13(const SPKSegment& seg, double et);
 
 };

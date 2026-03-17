@@ -70,6 +70,7 @@ private:
     void update_phi_kick(const DerivativeFunction& f, double t, double step, const Eigen::VectorXd& q, const Eigen::VectorXd& p, Eigen::MatrixXd& phi);
     void split_state(const Eigen::VectorXd& y, Eigen::VectorXd& q, Eigen::VectorXd& p) const;
     Eigen::VectorXd join_state(const Eigen::VectorXd& q, const Eigen::VectorXd& p) const;
+    Eigen::VectorXd finalize_state_phi(const Eigen::VectorXd& y0, const Eigen::VectorXd& q, const Eigen::VectorXd& p, const Eigen::MatrixXd& phi);
 
     double precision_;
     double mu_;

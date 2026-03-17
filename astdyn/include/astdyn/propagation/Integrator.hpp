@@ -265,6 +265,7 @@ public:
 private:
     void compute_stages(const DerivativeFunction& f, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k);
     double estimate_error(const Eigen::VectorXd& y, const Eigen::VectorXd& y7, const Eigen::VectorXd& y8, double h) const;
+    void verify_iteration_limits(int count, int rejections, double t, double h) const;
 
     double h_initial_;
     double tolerance_;

@@ -150,6 +150,10 @@ private:
                                const Eigen::VectorXd& y,
                                double h,
                                std::vector<Eigen::VectorXd>& k);
+
+    std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>> setup_lu_solvers(const Eigen::MatrixXd& jac, int n, double h);
+    void setup_initial_guess(const DerivativeFunction& f, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k);
+    bool solve_newton_iterations(const DerivativeFunction& f, const std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>>& solvers, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k);
 };
 
 } // namespace astdyn::propagation

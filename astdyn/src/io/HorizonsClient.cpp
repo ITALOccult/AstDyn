@@ -71,86 +71,40 @@ std::expected<std::string, HorizonsError> HorizonsClient::fetch_url(const std::s
 
 // --- Query Implementations ---
 
-std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, HorizonsError> 
-HorizonsClient::query_elements(const std::string& target, const time::EpochTDB& epoch) {
-    auto url = build_elements_url(target, epoch);
-    auto raw = fetch_url(url);
+std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, HorizonsError> HorizonsClient::query_elements(const std::string& target, const time::EpochTDB& epoch) {
+    auto raw = fetch_url(build_elements_url(target, epoch));
     if (!raw) return std::unexpected(raw.error());
-
     try {
-        auto data = json::parse(*raw);
-        std::string result = data["result"];
-        
-        auto find_val = [&](const std::string& token) -> double {
-            size_t pos = result.find(token);
-            if (pos == std::string::npos) throw std::runtime_error("Token not found: " + token);
-            size_t val_pos = result.find_first_of("0123456789+-.", pos + token.length());
-            if (val_pos == std::string::npos) throw std::runtime_error("Value not found for: " + token);
-            return std::stod(result.substr(val_pos));
-        };
-
-        double a_au = find_val("A =");
-        double e = find_val("EC=");
-        double i = find_val("IN=");
-        double om = find_val("OM=");
-        double w = find_val("W =");
-        double ma = find_val("MA=");
-
+        auto res = json::parse(*raw)["result"].get<std::string>();
         return physics::KeplerianStateTyped<core::ECLIPJ2000>{
-            epoch,
-            physics::Distance::from_au(a_au),
-            e,
-            astrometry::Angle::from_deg(i),
-            astrometry::Angle::from_deg(om),
-            astrometry::Angle::from_deg(w),
-            astrometry::Angle::from_deg(ma),
+            epoch, physics::Distance::from_au(parse_token(res, "A =")), parse_token(res, "EC="),
+            astrometry::Angle::from_deg(parse_token(res, "IN=")), astrometry::Angle::from_deg(parse_token(res, "OM=")),
+            astrometry::Angle::from_deg(parse_token(res, "W =")), astrometry::Angle::from_deg(parse_token(res, "MA=")),
             physics::GravitationalParameter::sun()
         };
-    } catch (...) {
-        return std::unexpected(HorizonsError::ParsingError);
-    }
+    } catch (...) { return std::unexpected(HorizonsError::ParsingError); }
 }
 
-std::expected<physics::CartesianStateTyped<core::GCRF>, HorizonsError> 
-HorizonsClient::query_vectors(const std::string& target, const time::EpochTDB& epoch, const std::string& center) {
-    auto url = build_vectors_url(target, epoch, center);
-    auto raw = fetch_url(url);
+double HorizonsClient::parse_token(const std::string& text, const std::string& token) {
+    size_t pos = text.find(token);
+    if (pos == std::string::npos) throw std::runtime_error("Horizons token not found");
+    return std::stod(text.substr(text.find_first_of("0123456789+-.", pos + token.length())));
+}
+
+std::expected<physics::CartesianStateTyped<core::GCRF>, HorizonsError> HorizonsClient::query_vectors(const std::string& target, const time::EpochTDB& epoch, const std::string& center) {
+    auto raw = fetch_url(build_vectors_url(target, epoch, center));
     if (!raw) return std::unexpected(raw.error());
-
     try {
-        auto data = json::parse(*raw);
-        std::string result = data["result"];
-        
-        // Search for the Start of the Data block $$SOE
-        size_t start = result.find("$$SOE");
+        auto res = json::parse(*raw)["result"].get<std::string>();
+        size_t start = res.find("$$SOE");
         if (start == std::string::npos) return std::unexpected(HorizonsError::TargetNotFound);
-        
-        std::string block = result.substr(start);
-        auto find_coord = [&](const std::string& token) -> double {
-            size_t pos = block.find(token);
-            if (pos == std::string::npos) throw std::runtime_error("Coord not found: " + token);
-            size_t val_pos = block.find_first_of("0123456789+-.", pos + token.length());
-            return std::stod(block.substr(val_pos));
-        };
-
-        // Horizons VECTOR ephemeris returns positions in km, velocities in km/s.
-        // Standardize to meters and m/s to match convention. Return type is MeterTag.
-        // Determine GM based on center (simplified)
-        double gm = constants::GM_SUN;
-        if (center.find("399") != std::string::npos || center.find("Earth") != std::string::npos) {
-            gm = constants::GM_EARTH;
-        }
-
-        constexpr double KM_TO_M = 1000.0;
-        return physics::CartesianStateTyped<core::GCRF>::from_si(
-            epoch,
-            find_coord(" X =") * KM_TO_M, find_coord(" Y =") * KM_TO_M, find_coord(" Z =") * KM_TO_M,
-            find_coord(" VX=") * KM_TO_M, find_coord(" VY=") * KM_TO_M, find_coord(" VZ=") * KM_TO_M,
-            gm * 1e9 // GM in m^3/s^2
-        );
-    } catch (...) {
-        return std::unexpected(HorizonsError::ParsingError);
-    }
+        std::string block = res.substr(start);
+        double gm = (center.find("399") != std::string::npos) ? constants::GM_EARTH : constants::GM_SUN;
+        return physics::CartesianStateTyped<core::GCRF>::from_si(epoch,
+            parse_token(block, " X =") * 1000.0, parse_token(block, " Y =") * 1000.0, parse_token(block, " Z =") * 1000.0,
+            parse_token(block, " VX=") * 1000.0, parse_token(block, " VY=") * 1000.0, parse_token(block, " VZ=") * 1000.0,
+            gm * 1e9);
+    } catch (...) { return std::unexpected(HorizonsError::ParsingError); }
 }
 
 std::expected<astrometry::AstrometricObservation, HorizonsError> 

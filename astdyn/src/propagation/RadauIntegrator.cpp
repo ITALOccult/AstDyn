@@ -67,35 +67,16 @@ RadauIntegrator::RadauIntegrator(double initial_step,
     max_newton_iter_ = std::min(std::max(max_newton_iter_, 2), 10);
 }
 
-Eigen::VectorXd RadauIntegrator::integrate(const DerivativeFunction& f,
-                                           const Eigen::VectorXd& y0,
-                                           double t0,
-                                           double tf) {
+Eigen::VectorXd RadauIntegrator::integrate(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf) {
     stats_.reset();
-    
-    double t = t0;
+    double t = t0, h = ((tf > t0) ? 1.0 : -1.0) * std::abs(h_initial_);
     Eigen::VectorXd y = y0;
-    double h = h_initial_;
-    
-    // Adaptive integration loop
-    double direction = (tf > t0) ? 1.0 : -1.0;
-    h = std::abs(h) * direction;
-
     while (std::abs(tf - t) > 1e-14) {
-        if (std::abs(tf - t) < std::abs(h)) {
-            h = tf - t;
-        }
-        
-        // Attempt step with error control
-        bool accepted = adaptive_step(f, nullptr, t, y, h, tf);
-        
-        if (!accepted) {
-            stats_.num_rejected_steps++;
-        }
+        double current_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
+        if (!adaptive_step(f, nullptr, t, y, current_h, tf)) stats_.num_rejected_steps++;
+        h = current_h;
     }
-    
-    stats_.final_time = t;
-    return y;
+    stats_.final_time = t; return y;
 }
 
 void RadauIntegrator::integrate_steps(const DerivativeFunction& f,
@@ -138,40 +119,21 @@ void RadauIntegrator::integrate_steps(const DerivativeFunction& f,
     stats_.final_time = t;
 }
 
-std::vector<Eigen::VectorXd> RadauIntegrator::integrate_at(const DerivativeFunction& f,
-                                                       const Eigen::VectorXd& y0,
-                                                       double t0,
-                                                       const std::vector<double>& t_targets) {
+std::vector<Eigen::VectorXd> RadauIntegrator::integrate_at(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, const std::vector<double>& t_targets) {
     stats_.reset();
-    std::vector<Eigen::VectorXd> results;
-    results.reserve(t_targets.size());
-    
-    double t = t0;
+    std::vector<Eigen::VectorXd> res; res.reserve(t_targets.size());
+    double t = t0, h = ((t_targets.empty() || t_targets[0] >= t0) ? 1.0 : -1.0) * std::abs(h_initial_);
     Eigen::VectorXd y = y0;
-    double h = h_initial_;
-    
     for (double tf : t_targets) {
-        if (std::abs(tf - t) < 1e-14) {
-            results.push_back(y);
-            continue;
-        }
-        
         while (std::abs(tf - t) > 1e-14) {
-            if (std::abs(tf - t) < std::abs(h)) h = tf - t;
-            
-            bool accepted = adaptive_step(f, nullptr, t, y, h, tf);
-            if (!accepted) {
-                // h is reduced inside adaptive_step
-                if (std::abs(h) < h_min_) {
-                    throw std::runtime_error("RadauIntegrator: Step size below h_min in integrate_at");
-                }
-            }
+            double current_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
+            if (!adaptive_step(f, nullptr, t, y, current_h, tf) && std::abs(current_h) < h_min_) 
+                throw std::runtime_error("Radau: Step below h_min");
+            h = current_h;
         }
-        results.push_back(y);
+        res.push_back(y);
     }
-    
-    stats_.final_time = t;
-    return results;
+    stats_.final_time = t; return res;
 }
 
 bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
@@ -281,73 +243,40 @@ Eigen::MatrixXd RadauIntegrator::numerical_jacobian(const DerivativeFunction& f,
     return jac;
 }
 
-bool RadauIntegrator::solve_implicit_system(const DerivativeFunction& f,
-                                            const Eigen::MatrixXd& jacobian,
-                                            double t,
-                                            const Eigen::VectorXd& y,
-                                            double h,
-                                            std::vector<Eigen::VectorXd>& k) {
+bool RadauIntegrator::solve_implicit_system(const DerivativeFunction& f, const Eigen::MatrixXd& jac, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k) {
     const int n = y.size();
-    
-    // OPTIMIZATION 1: Pre-compute and cache LU decompositions for all stages
-    std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>> lu_solvers;
-    lu_solvers.reserve(num_stages_);
-    
-    for (int i = 0; i < num_stages_; ++i) {
-        Eigen::MatrixXd system_matrix = Eigen::MatrixXd::Identity(n, n) - h * a_[i][i] * jacobian;
-        lu_solvers.emplace_back(system_matrix);
-    }
-    
-    // OPTIMIZATION 2: Better initial guess using extrapolation from previous step
-    // For now, use explicit Euler (can be improved with predictor)
+    std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>> solvers = setup_lu_solvers(jac, n, h);
+    setup_initial_guess(f, t, y, h, k);
+    return solve_newton_iterations(f, solvers, t, y, h, k);
+}
+
+std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>> RadauIntegrator::setup_lu_solvers(const Eigen::MatrixXd& jac, int n, double h) {
+    std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>> solvers; solvers.reserve(num_stages_);
+    for (int i = 0; i < num_stages_; ++i) solvers.emplace_back(Eigen::MatrixXd::Identity(n, n) - h * a_[i][i] * jac);
+    return solvers;
+}
+
+void RadauIntegrator::setup_initial_guess(const DerivativeFunction& f, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k) {
     for (int i = 0; i < num_stages_; ++i) {
         Eigen::VectorXd y_stage = y;
-        for (int j = 0; j < i; ++j) {
-            y_stage += h * a_[i][j] * k[j];
-        }
-        k[i] = f(t + c_[i] * h, y_stage);
-        stats_.num_function_evals++;
+        for (int j = 0; j < i; ++j) y_stage += h * a_[i][j] * k[j];
+        k[i] = f(t + c_[i] * h, y_stage); stats_.num_function_evals++;
     }
-    
-    // OPTIMIZATION 3: Reduced Newton iterations (4 instead of 7)
-    const int max_iter = std::min(max_newton_iter_, 4);
-    
-    for (int iter = 0; iter < max_iter; ++iter) {
-        double max_correction = 0.0;
-        
-        // OPTIMIZATION 4: Process all stages in one pass
-        for (int i = 0; i < num_stages_; ++i) {
-            // Compute stage value
-            Eigen::VectorXd y_stage = y;
-            for (int j = 0; j < num_stages_; ++j) {
-                y_stage += h * a_[i][j] * k[j];
-            }
-            
-            // Residual
-            Eigen::VectorXd f_stage = f(t + c_[i] * h, y_stage);
-            stats_.num_function_evals++;
-            
-            Eigen::VectorXd residual = k[i] - f_stage;
-            
-            // OPTIMIZATION 5: Use cached LU solver
-            Eigen::VectorXd delta_k = lu_solvers[i].solve(residual);
-            
-            k[i] -= delta_k;
+}
 
-            // Component-wise relative correction check
-            for (int l = 0; l < delta_k.size(); ++l) {
-                const double scale_l = std::max({std::abs(k[i][l]), 1.0e-10});
-                max_correction = std::max(max_correction, std::abs(delta_k[l]) / scale_l);
-            }
+bool RadauIntegrator::solve_newton_iterations(const DerivativeFunction& f, const std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>>& solvers, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k) {
+    for (int iter = 0; iter < std::min(max_newton_iter_, 4); ++iter) {
+        double max_corr = 0.0;
+        for (int i = 0; i < num_stages_; ++i) {
+            Eigen::VectorXd y_s = y;
+            for (int j = 0; j < num_stages_; ++j) y_s += h * a_[i][j] * k[j];
+            Eigen::VectorXd residual = k[i] - f(t + c_[i] * h, y_s); stats_.num_function_evals++;
+            Eigen::VectorXd delta = solvers[i].solve(residual);
+            k[i] -= delta;
+            for (int l = 0; l < delta.size(); ++l) max_corr = std::max(max_corr, std::abs(delta[l]) / std::max(std::abs(k[i][l]), 1e-10));
         }
-        
-        // OPTIMIZATION 6: Relaxed convergence criterion
-        if (max_correction < tolerance_ * 0.1) {
-            return true;
-        }
+        if (max_corr < tolerance_ * 0.1) return true;
     }
-    
-    // Newton didn't converge - but accept if close enough
     return false;
 }
 

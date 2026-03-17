@@ -27,19 +27,28 @@ Propagator::Propagator(std::shared_ptr<Integrator> integrator,
                       const PropagatorSettings& settings)
     : integrator_(std::move(integrator)), ephemeris_(std::move(ephemeris)), settings_(settings) {
     mat_ecl_ = coordinates::ReferenceFrame::j2000_to_ecliptic();
-    if (settings_.include_asteroids) {
-        asteroids_ = std::make_shared<ephemeris::AsteroidPerturbations>();
-        if (settings_.use_default_asteroid_set) asteroids_->loadAstDynDefaultSet();
-        else if (settings_.use_default_30_set) asteroids_->loadDefault30Asteroids();
-        if (!settings_.asteroid_ephemeris_file.empty()) asteroids_->loadSPK(settings_.asteroid_ephemeris_file);
+    setup_asteroid_perturbations();
+    setup_aas_parameters();
+}
+
+void Propagator::setup_asteroid_perturbations() {
+    if (!settings_.include_asteroids) return;
+    asteroids_ = std::make_shared<ephemeris::AsteroidPerturbations>();
+    if (settings_.use_default_asteroid_set) asteroids_->loadAstDynDefaultSet();
+    else if (settings_.use_default_30_set) asteroids_->loadDefault30Asteroids();
+    if (!settings_.asteroid_ephemeris_file.empty()) {
+        asteroids_->loadSPK(settings_.asteroid_ephemeris_file);
     }
+}
+
+void Propagator::setup_aas_parameters() {
     auto aas = std::dynamic_pointer_cast<AASIntegrator>(integrator_);
-    if (aas) {
-        bool sun = std::abs(settings_.central_body_gm - constants::GMS) < 1e-5;
-        double j2 = sun ? (settings_.include_sun_j2 ? constants::SUN_J2 : 0.0) : (settings_.include_earth_j2 ? constants::EARTH_J2 : 0.0);
-        double r_eq = sun ? constants::R_SUN_AU : (constants::R_EARTH/constants::AU);
-        aas->set_central_body(settings_.central_body_gm, j2, r_eq);
-    }
+    if (!aas) return;
+    bool sun = std::abs(settings_.central_body_gm - constants::GMS) < 1e-5;
+    double j2 = sun ? (settings_.include_sun_j2 ? constants::SUN_J2 : 0.0) 
+                    : (settings_.include_earth_j2 ? constants::EARTH_J2 : 0.0);
+    double r_eq = sun ? constants::R_SUN_AU : (constants::R_EARTH / constants::AU);
+    aas->set_central_body(settings_.central_body_gm, j2, r_eq);
 }
 
 void Propagator::update_force_cache(time::EpochTDB t) {
@@ -82,35 +91,45 @@ Eigen::Vector3d Propagator::compute_n_body_acceleration(const Eigen::Vector3d& p
     return acc;
 }
 
-Eigen::Vector3d Propagator::compute_harmonic_acceleration(const Eigen::Vector3d& position, time::EpochTDB t) {
+Eigen::Vector3d Propagator::compute_harmonic_acceleration(const Eigen::Vector3d& pos, time::EpochTDB t) {
     Eigen::Vector3d acc = Eigen::Vector3d::Zero();
-    if (settings_.include_earth_j2) {
-        auto provider = ephemeris_->getProvider();
-        if (provider) {
-            Eigen::Vector3d e_bary = provider->getPosition(CelestialBody::EARTH, t).to_eigen_si() / (constants::AU * 1000.0);
-            if (settings_.integrate_in_ecliptic) e_bary = mat_ecl_ * e_bary;
-            Eigen::Vector3d r_rel = position - e_bary; double r = r_rel.norm();
-            if (r > 1e-6) {
-                Eigen::Vector3d r_eq = settings_.integrate_in_ecliptic ? (coordinates::ReferenceFrame::ecliptic_to_j2000() * r_rel) : r_rel;
-                double j2_c = 1.5 * constants::EARTH_J2 * constants::GM_EARTH_AU * std::pow(constants::R_EARTH/constants::AU, 2);
-                double z_r = r_eq.z()/r, r5 = std::pow(r, 5);
-                Eigen::Vector3d a_j2; a_j2 << r_eq.x()*(5*z_r*z_r-1), r_eq.y()*(5*z_r*z_r-1), r_eq.z()*(5*z_r*z_r-3);
-                acc += (settings_.integrate_in_ecliptic ? coordinates::ReferenceFrame::j2000_to_ecliptic() : Eigen::Matrix3d::Identity()) * (j2_c/r5 * a_j2);
-            }
-        }
-    }
-    if (settings_.include_sun_j2) {
-        Eigen::Vector3d r_h = position - last_sun_pos_bary_cache_; double r = r_h.norm();
-        if (r > 1e-6) {
-            static const double a0 = 286.13 * constants::DEG_TO_RAD, d0 = 63.87 * constants::DEG_TO_RAD;
-            Eigen::Vector3d pole_f = Eigen::Vector3d(std::cos(d0)*std::cos(a0), std::cos(d0)*std::sin(a0), std::sin(d0));
-            if (settings_.integrate_in_ecliptic) pole_f = mat_ecl_ * pole_f;
-            double j2_c = 1.5 * constants::SUN_J2 * constants::GMS * std::pow(constants::R_SUN_AU, 2);
-            double z_n = r_h.dot(pole_f)/r;
-            acc += (j2_c / std::pow(r, 5)) * ((5.0*z_n*z_n - 1.0)*pole_f - (2.0*z_n)*(r_h/r));
-        }
-    }
+    if (settings_.include_earth_j2) acc += compute_earth_j2(pos, t);
+    if (settings_.include_sun_j2) acc += compute_sun_j2(pos);
     return acc;
+}
+
+Eigen::Vector3d Propagator::compute_earth_j2(const Eigen::Vector3d& pos, time::EpochTDB t) {
+    auto provider = ephemeris_->getProvider();
+    if (!provider) return Eigen::Vector3d::Zero();
+    
+    Eigen::Vector3d e_bary = provider->getPosition(CelestialBody::EARTH, t).to_eigen_si() / (constants::AU * 1000.0);
+    if (settings_.integrate_in_ecliptic) e_bary = mat_ecl_ * e_bary;
+    
+    Eigen::Vector3d r_rel = pos - e_bary;
+    double r = r_rel.norm();
+    if (r < 1e-6) return Eigen::Vector3d::Zero();
+
+    Eigen::Vector3d r_eq = settings_.integrate_in_ecliptic ? (coordinates::ReferenceFrame::ecliptic_to_j2000() * r_rel) : r_rel;
+    double j2_c = 1.5 * constants::EARTH_J2 * constants::GM_EARTH_AU * std::pow(constants::R_EARTH / constants::AU, 2);
+    double z_r = r_eq.z() / r, r5 = std::pow(r, 5);
+    Eigen::Vector3d a_j2; a_j2 << r_eq.x() * (5 * z_r * z_r - 1), r_eq.y() * (5 * z_r * z_r - 1), r_eq.z() * (5 * z_r * z_r - 3);
+    
+    Eigen::Matrix3d R = settings_.integrate_in_ecliptic ? coordinates::ReferenceFrame::j2000_to_ecliptic() : Eigen::Matrix3d::Identity();
+    return R * (j2_c / r5 * a_j2);
+}
+
+Eigen::Vector3d Propagator::compute_sun_j2(const Eigen::Vector3d& pos) {
+    Eigen::Vector3d r_h = pos - last_sun_pos_bary_cache_;
+    double r = r_h.norm();
+    if (r < 1e-6) return Eigen::Vector3d::Zero();
+
+    static const double a0 = 286.13 * constants::DEG_TO_RAD, d0 = 63.87 * constants::DEG_TO_RAD;
+    Eigen::Vector3d pole_f = Eigen::Vector3d(std::cos(d0) * std::cos(a0), std::cos(d0) * std::sin(a0), std::sin(d0));
+    if (settings_.integrate_in_ecliptic) pole_f = mat_ecl_ * pole_f;
+    
+    double j2_c = 1.5 * constants::SUN_J2 * constants::GMS * std::pow(constants::R_SUN_AU, 2);
+    double z_n = r_h.dot(pole_f) / r;
+    return (j2_c / std::pow(r, 5)) * ((5.0 * z_n * z_n - 1.0) * pole_f - (2.0 * z_n) * (r_h / r));
 }
 
 Eigen::Vector3d Propagator::compute_non_gravitational_acceleration(const Eigen::Vector3d& position, const Eigen::Vector3d& velocity, time::EpochTDB t) {

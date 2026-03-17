@@ -41,11 +41,12 @@ Eigen::VectorXd RK4Integrator::step(const DerivativeFunction& f,
 Eigen::VectorXd RK4Integrator::integrate(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf) {
     stats_.reset();
     double t = t0; Eigen::VectorXd y = y0;
-    double h = ((tf > t0) ? 1.0 : -1.0) * std::abs(h_);
-    stats_.min_step_size = stats_.max_step_size = std::abs(h);
+    double h_dir = ((tf > t0) ? 1.0 : -1.0) * std::abs(h_);
+    stats_.min_step_size = stats_.max_step_size = std::abs(h_);
     while (std::abs(tf - t) > 1e-14) {
-        double current_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
-        y = step(f, t, y, current_h); t += current_h; stats_.num_steps++;
+        double current_h = (std::abs(tf - t) < std::abs(h_dir)) ? (tf - t) : h_dir;
+        y = step(f, t, y, current_h);
+        t += current_h; stats_.num_steps++;
     }
     stats_.final_time = t; return y;
 }
@@ -187,66 +188,26 @@ bool RKF78Integrator::adaptive_step(const DerivativeFunction& f, double& t, Eige
     return true;
 }
 
-Eigen::VectorXd RKF78Integrator::integrate(const DerivativeFunction& f,
-                                            const Eigen::VectorXd& y0,
-                                            double t0,
-                                            double tf) {
+Eigen::VectorXd RKF78Integrator::integrate(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf) {
     stats_.reset();
-    stats_.min_step_size = std::abs(h_initial_);
-    stats_.max_step_size = std::abs(h_initial_);
-    
-    double t = t0;
+    double t = t0, h = ((tf > t0) ? 1.0 : -1.0) * std::abs(h_initial_);
     Eigen::VectorXd y = y0;
-    
-    double direction = (tf > t0) ? 1.0 : -1.0;
-    double h = direction * std::abs(h_initial_);
-    
-    // Safety limit to prevent infinite loops
-    const int max_iterations = 1000000;  // 1 million iterations
-    int iteration_count = 0;
-    int consecutive_rejections = 0;
-    
+    int iteration_count = 0, consecutive_rejections = 0;
     while (std::abs(tf - t) > 1e-14) {
-        // Check iteration limit
-        if (++iteration_count > max_iterations) {
-            throw std::runtime_error(
-                "RKF78Integrator: Maximum iterations (" + std::to_string(max_iterations) + 
-                ") exceeded. Integration from t=" + std::to_string(t0) + 
-                " to t=" + std::to_string(tf) + " failed at t=" + std::to_string(t) + 
-                ". Steps: " + std::to_string(stats_.num_steps) + 
-                ", Rejections: " + std::to_string(stats_.num_rejected_steps) +
-                ", Current h: " + std::to_string(h));
-        }
-        
-        // Don't overshoot target
-        if (std::abs(tf - t) < std::abs(h)) {
-            h = tf - t;
-        }
-        
-        // Attempt step (may be rejected)
-        bool accepted = adaptive_step(f, t, y, h, tf);
-        
-        if (accepted) {
-            consecutive_rejections = 0;
+        verify_iteration_limits(++iteration_count, consecutive_rejections, t, h);
+        double step_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
+        if (adaptive_step(f, t, y, step_h, tf)) {
+            consecutive_rejections = 0; h = step_h;
         } else {
-            consecutive_rejections++;
-            
-            // Warn if too many consecutive rejections (likely a problem)
-            if (consecutive_rejections >= 1000) {
-                throw std::runtime_error(
-                    "RKF78Integrator: Too many consecutive step rejections (" + 
-                    std::to_string(consecutive_rejections) + 
-                    "). Integration may be stuck. Current t=" + std::to_string(t) + 
-                    ", h=" + std::to_string(h) + ", h_min=" + std::to_string(h_min_));
-            }
+            consecutive_rejections++; h = step_h;
         }
-        
-        // If step was rejected, t and y are unchanged, h is reduced
-        // Loop will retry with smaller h
     }
-    
-    stats_.final_time = t;
-    return y;
+    stats_.final_time = t; return y;
+}
+
+void RKF78Integrator::verify_iteration_limits(int count, int rejections, double t, double h) const {
+    if (count > 1000000) throw std::runtime_error("RKF78Integrator: Max iterations exceeded");
+    if (rejections >= 1000) throw std::runtime_error("RKF78Integrator: Too many consecutive rejections");
 }
 
 void RKF78Integrator::integrate_steps(const DerivativeFunction& f,
@@ -346,63 +307,20 @@ std::vector<Eigen::VectorXd> RKF78Integrator::integrate_at(const DerivativeFunct
                                                        double t0,
                                                        const std::vector<double>& t_targets) {
     stats_.reset();
-    std::vector<Eigen::VectorXd> results;
-    results.reserve(t_targets.size());
-    
-    double t = t0;
-    Eigen::VectorXd y = y0;
-    
-    // Initial guess for step size
-    double h = (t_targets.empty() || t_targets[0] >= t0) ? std::abs(h_initial_) : -std::abs(h_initial_);
-    
-    const int max_iterations = 1000000;
-    int total_iterations = 0;
-
+    std::vector<Eigen::VectorXd> results; results.reserve(t_targets.size());
+    double t = t0, h = ((t_targets.empty() || t_targets[0] >= t0) ? 1.0 : -1.0) * std::abs(h_initial_);
+    Eigen::VectorXd y = y0; int total_iterations = 0;
     for (double tf : t_targets) {
-        if (std::abs(tf - t) < 1e-14) {
-            results.push_back(y);
-            continue;
-        }
-        
-        // Adjust direction if necessary
-        double direction = (tf > t) ? 1.0 : -1.0;
-        if (direction * h < 0) h = -h;
-
-        int consecutive_rejections = 0;
-        
+        int rejections = 0;
         while (std::abs(tf - t) > 1e-14) {
-            if (++total_iterations > max_iterations) {
-                throw std::runtime_error("RKF78Integrator: Maximum iterations exceeded in integrate_at");
-            }
-            
-            // Don't overshoot target, but save old h to restore it after hitting the target
-            double old_h = h;
-            bool target_limited = false;
-            if (std::abs(tf - t) < std::abs(h)) {
-                h = tf - t;
-                target_limited = true;
-            }
-            
-            bool accepted = adaptive_step(f, t, y, h, tf);
-            
-            if (accepted) {
-                consecutive_rejections = 0;
-                // If we were target-limited, we might want to scale h back up for the next target
-                // but adaptive_step already suggests a new h. 
-                // However, h was tf-t. So suggested_h might be small.
-                // For now, let's just let adaptive_step do its thing.
-            } else {
-                consecutive_rejections++;
-                if (consecutive_rejections >= 1000) {
-                    throw std::runtime_error("RKF78Integrator: Too many consecutive rejections in integrate_at");
-                }
-            }
+            verify_iteration_limits(++total_iterations, rejections, t, h);
+            double step_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
+            if (adaptive_step(f, t, y, step_h, tf)) { rejections = 0; h = step_h; }
+            else { rejections++; h = step_h; }
         }
         results.push_back(y);
     }
-    
     stats_.final_time = t;
-    results.shrink_to_fit();
     return results;
 }
 

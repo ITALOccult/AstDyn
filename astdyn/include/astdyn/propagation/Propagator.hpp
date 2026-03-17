@@ -188,10 +188,15 @@ private:
     
     void update_force_cache(time::EpochTDB t);
     
+    void setup_asteroid_perturbations();
+    void setup_aas_parameters();
+
     Eigen::Vector3d compute_n_body_acceleration(const Eigen::Vector3d& position);
     
     Eigen::Vector3d compute_harmonic_acceleration(const Eigen::Vector3d& position, time::EpochTDB t);
-    
+    Eigen::Vector3d compute_earth_j2(const Eigen::Vector3d& pos, time::EpochTDB t);
+    Eigen::Vector3d compute_sun_j2(const Eigen::Vector3d& pos);
+
     Eigen::Vector3d compute_non_gravitational_acceleration(const Eigen::Vector3d& position, const Eigen::Vector3d& velocity, time::EpochTDB t);
 
     Eigen::Vector3d relativistic_correction(const Eigen::Vector3d& position, 

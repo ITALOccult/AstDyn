@@ -199,16 +199,21 @@ Eigen::VectorXd AASIntegrator::integrate(const DerivativeFunction& f, const Eige
     double t = t0, dir = (tf > t0) ? 1.0 : -1.0;
     Eigen::VectorXd q, p; split_state(y0, q, p);
     Eigen::MatrixXd phi; if (y0.size() == 42) { phi.resize(6, 6); for (int i=0; i<36; ++i) phi(i/6, i%6) = y0[6+i]; }
-    double H_i = compute_total_energy(q, p), h_last = 0.0;
+    double H_i = compute_total_energy(q, p);
     while (std::abs(tf - t) > 1e-14 && stats_.num_steps < 1000000) {
         double dt = estimate_step_size(q, p, std::abs(tf - t));
         symplectic_step(f, t, q, p, phi, dt * dir);
-        t += dt * dir; h_last = dt; stats_.num_steps++;
+        t += dt * dir; stats_.num_steps++;
     }
     stats_.hamiltonian_drift = std::abs((compute_total_energy(q, p) - H_i) / H_i);
     stats_.final_time = t;
-    if (phi.size() == 36) { Eigen::VectorXd r(42); r << q, p, Eigen::Map<Eigen::VectorXd>(phi.data(), 36); return r; }
-    return join_state(q, p);
+    return (phi.size() == 36) ? finalize_state_phi(y0, q, p, phi) : join_state(q, p);
+}
+
+Eigen::VectorXd AASIntegrator::finalize_state_phi(const Eigen::VectorXd& y0, const Eigen::VectorXd& q, const Eigen::VectorXd& p, const Eigen::MatrixXd& phi) {
+    Eigen::VectorXd r(42);
+    r << q, p, Eigen::Map<const Eigen::VectorXd>(phi.data(), 36);
+    return r;
 }
 
 void AASIntegrator::integrate_steps(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf, std::vector<double>& t_out, std::vector<Eigen::VectorXd>& y_out) {
@@ -227,7 +232,8 @@ void AASIntegrator::integrate_steps(const DerivativeFunction& f, const Eigen::Ve
 }
 
 std::vector<Eigen::VectorXd> AASIntegrator::integrate_at(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, const std::vector<double>& t_targets) {
-    stats_.reset(); std::vector<Eigen::VectorXd> results; results.reserve(t_targets.size());
+    stats_.reset();
+    std::vector<Eigen::VectorXd> res; res.reserve(t_targets.size());
     double t = t0; Eigen::VectorXd q, p; split_state(y0, q, p);
     Eigen::MatrixXd phi; if (y0.size() == 42) { phi.resize(6, 6); for (int i=0; i<36; ++i) phi(i/6, i%6) = y0[6+i]; }
     for (double target : t_targets) {
@@ -236,10 +242,9 @@ std::vector<Eigen::VectorXd> AASIntegrator::integrate_at(const DerivativeFunctio
             double dt = estimate_step_size(q, p, std::abs(target - t));
             symplectic_step(f, t, q, p, phi, dt * dir); t += dt * dir; stats_.num_steps++;
         }
-        if (phi.size() == 36) { Eigen::VectorXd r(42); r << q, p, Eigen::Map<Eigen::VectorXd>(phi.data(), 36); results.push_back(r); }
-        else results.push_back(join_state(q, p));
+        res.push_back((phi.size() == 36) ? finalize_state_phi(y0, q, p, phi) : join_state(q, p));
     }
-    return results;
+    return res;
 }
 
 } // namespace astdyn::propagation
