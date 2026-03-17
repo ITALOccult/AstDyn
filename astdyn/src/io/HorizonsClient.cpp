@@ -5,8 +5,14 @@
 #include <sstream>
 #include <iomanip>
 #include <regex>
+#include <mutex>
 
 namespace astdyn::io {
+
+static std::once_flag curl_init_flag;
+static void global_curl_init() {
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+}
 
 using json = nlohmann::json;
 
@@ -40,11 +46,10 @@ static std::string format_command(const std::string& target) {
 }
 
 HorizonsClient::HorizonsClient(const Config& config) : config_(config) {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
+    std::call_once(curl_init_flag, global_curl_init);
 }
 
 HorizonsClient::~HorizonsClient() {
-    curl_global_cleanup();
 }
 
 std::expected<std::string, HorizonsError> HorizonsClient::fetch_url(const std::string& url) {

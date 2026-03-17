@@ -139,7 +139,7 @@ public:
     
     std::vector<close_approach::CloseApproach> find_close_approaches(time::EpochTDB start_time, time::EpochTDB end_time);
     ApparentPlace compute_asteroid_apparent_place(time::EpochTDB t_occult, const std::string& observatory_code);
-    ApparentPlace compute_star_apparent_place(double ra_j2000, double dec_j2000, double pm_ra, double pm_dec, time::EpochTDB t_occult, const std::string& observatory_code);
+    ApparentPlace compute_star_apparent_place(const catalog::Star& star, time::EpochTDB t_occult, const std::string& observatory_code);
     double compute_moid(ephemeris::CelestialBody planet);
     
     void set_config(const AstDynConfig& config) { config_ = config; update_propagator(); }

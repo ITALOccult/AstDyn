@@ -5,6 +5,7 @@
 
 #include <astdyn/io/AstDysOrbitFitter.hpp>
 #include <astdyn/observations/MPCReader.hpp>
+#include <curl/curl.h>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -12,6 +13,26 @@
 #include <cmath>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
+
+namespace {
+    size_t write_data(void* ptr, size_t size, size_t nmemb, FILE* stream) {
+        return fwrite(ptr, size, nmemb, stream);
+    }
+
+    bool download_file(const std::string& url, const std::string& path) {
+        CURL* curl = curl_easy_init();
+        if (!curl) return false;
+        FILE* fp = fopen(path.c_str(), "wb");
+        if (!fp) { curl_easy_cleanup(curl); return false; }
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        CURLcode res = curl_easy_perform(curl);
+        fclose(fp); curl_easy_cleanup(curl);
+        return (res == CURLE_OK);
+    }
+}
 
 namespace astdyn {
 namespace io {
@@ -362,29 +383,14 @@ AstDysFitResult AstDysOrbitFitter::fit_from_astdys(
     
     std::cout << "\n=== Downloading from AstDyS ===\n";
     std::cout << "Object: " << object_name << " (" << obj_num << ")\n";
-    std::cout << "Elements URL: " << oel_url << "\n";
-    std::cout << "Observations URL: " << rwo_url << "\n";
     
-    // Download files using curl or wget
-    // For now, provide instructions and throw
-    std::string instructions = 
-        "\nTo use fit_from_astdys(), please download files manually:\n"
-        "  wget " + oel_url + " -O " + oel_file + "\n"
-        "  wget " + rwo_url + " -O " + rwo_file + "\n"
-        "\nThen use:\n"
-        "  fitter.set_observations_file(\"" + rwo_file + "\", \"rwo\");\n"
-        "  fitter.set_elements_file(\"" + oel_file + "\", \"oel\");\n"
-        "  auto result = fitter.fit();\n";
-    
-    throw std::runtime_error("fit_from_astdys: Automatic download not yet implemented.\n" + 
-                            instructions);
-    
-    // Future implementation would use libcurl:
-    // 1. Download .oel file
-    // 2. Download .rwo file  
-    // 3. Call set_observations_file() and set_elements_file()
-    // 4. Call fit()
-    // 5. Return result
+    if (!download_file(oel_url, oel_file)) throw std::runtime_error("Failed to download elements from: " + oel_url);
+    if (!download_file(rwo_url, rwo_file)) throw std::runtime_error("Failed to download observations from: " + rwo_url);
+
+    AstDysOrbitFitter instance;
+    instance.set_observations_file(rwo_file, "rwo");
+    instance.set_elements_file(oel_file, "oel");
+    return instance.fit();
 }
 
 } // namespace io

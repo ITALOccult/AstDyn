@@ -47,6 +47,16 @@ public:
         const AstDynConfig& engine_cfg,
         const AstrometricSettings& a_cfg);
 
+    /**
+     * @brief Computes a topocentric RA/Dec observation from an observatory code.
+     */
+    static std::expected<AstrometricObservation, AstrometryError> compute_topocentric_observation(
+        const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
+        const time::EpochTDB& t_elements,
+        const time::EpochTDB& t_obs,
+        const std::string& obs_code,
+        const AstDynConfig& engine_cfg);
+
     static Eigen::Vector3d apply_stellar_aberration(
         const Eigen::Vector3d& rho_eq,
         const Eigen::Vector3d& earth_velocity_eq);

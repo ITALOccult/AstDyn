@@ -44,46 +44,39 @@ target_link_libraries(fitorb_api_demo PRIVATE astdyn)
 # add_executable(propagation_example propagation_example.cpp)
 # target_link_libraries(propagation_example PRIVATE astdyn)
 
-add_executable(fitting_comparison_34713 fitting_comparison_34713.cpp)
-target_link_libraries(fitting_comparison_34713 PRIVATE astdyn)
-
-# add_executable(check_de441_positions check_de441_positions.cpp)
-# target_link_libraries(check_de441_positions PRIVATE astdyn)
+# add_executable(fitting_comparison_34713 fitting_comparison_34713.cpp)
+# target_link_libraries(fitting_comparison_34713 PRIVATE astdyn)
 
 # JPL Horizons API Query Example
-add_executable(horizons_query horizons_query.cpp)
-target_link_libraries(horizons_query PRIVATE astdyn)
+# add_executable(horizons_query horizons_query.cpp)
+# target_link_libraries(horizons_query PRIVATE astdyn)
 
 # Test asteroid 79518 for specific date
-add_executable(test_79518 test_79518.cpp)
-target_link_libraries(test_79518 PRIVATE astdyn)
-
-# Benchmark Integrators and Models (Moved to /benchmarks)
-# add_executable(benchmark_integrators benchmark_integrators.cpp)
-# target_link_libraries(benchmark_integrators PRIVATE astdyn)
+# add_executable(test_79518 test_79518.cpp)
+# target_link_libraries(test_79518 PRIVATE astdyn)
 
 # Gaia Occultation Search Test
-add_executable(gaia_occultation_test gaia_occultation_test.cpp)
-target_link_libraries(gaia_occultation_test PRIVATE astdyn Eigen3::Eigen)
+# add_executable(gaia_occultation_test gaia_occultation_test.cpp)
+# target_link_libraries(gaia_occultation_test PRIVATE astdyn Eigen3::Eigen)
 
-add_executable(full_od_workflow full_od_workflow.cpp)
-target_link_libraries(full_od_workflow PRIVATE astdyn Eigen3::Eigen)
+# add_executable(full_od_workflow full_od_workflow.cpp)
+# target_link_libraries(full_od_workflow PRIVATE astdyn Eigen3::Eigen)
 
-add_executable(critical_validation critical_validation.cpp)
-target_link_libraries(critical_validation PRIVATE astdyn Eigen3::Eigen)
+# add_executable(critical_validation critical_validation.cpp)
+# target_link_libraries(critical_validation PRIVATE astdyn Eigen3::Eigen)
 
 add_executable(debug_hzn debug_hzn.cpp)
 target_link_libraries(debug_hzn PRIVATE astdyn curl)
 
-add_executable(debug_engine debug_engine.cpp)
-target_link_libraries(debug_engine PRIVATE astdyn curl Eigen3::Eigen)
+# add_executable(debug_engine debug_engine.cpp)
+# target_link_libraries(debug_engine PRIVATE astdyn curl Eigen3::Eigen)
 
 add_executable(scientific_validation scientific_validation.cpp)
 target_link_libraries(scientific_validation PRIVATE astdyn Eigen3::Eigen curl)
 
 # AAS Propagation Demo
-add_executable(aas_propagation_demo aas_propagation_demo.cpp)
-target_link_libraries(aas_propagation_demo PRIVATE astdyn Eigen3::Eigen)
+# add_executable(aas_propagation_demo aas_propagation_demo.cpp)
+# target_link_libraries(aas_propagation_demo PRIVATE astdyn Eigen3::Eigen)
 
 # Install examples (optional)
 install(TARGETS example_basic

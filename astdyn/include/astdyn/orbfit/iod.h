@@ -198,8 +198,8 @@ inline GaussSolution laplace_iod(const Observation& obs1,
         r = std::max(r, 0.1);
     }
 
-    double rho = Dc; // placeholder; real derivation needs full solve
-    // Fall back to Gauss which is more robust
+    // Placeholder solve for rho is currently bypassed by the robust Gauss fallback.
+    // Future work will implement the direct solution of the eighth-degree equation.
     return gauss_iod(obs1, obs2, obs3);
 }
 

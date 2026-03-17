@@ -4,8 +4,14 @@
 #include <sstream>
 #include <iostream>
 #include <regex>
+#include <mutex>
 
 namespace astdyn::io {
+
+static std::once_flag mpc_curl_init_flag;
+static void global_mpc_curl_init() {
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+}
 
 // --- CURL Helpers ---
 static size_t mpc_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -14,13 +20,12 @@ static size_t mpc_write_callback(void* contents, size_t size, size_t nmemb, void
 }
 
 MPCClient::MPCClient(const Config& config) : config_(config) {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
+    std::call_once(mpc_curl_init_flag, global_mpc_curl_init);
     curl_handle_ = curl_easy_init();
 }
 
 MPCClient::~MPCClient() {
     if (curl_handle_) curl_easy_cleanup(curl_handle_);
-    curl_global_cleanup();
 }
 
 std::expected<std::vector<observations::OpticalObservation>, MPCError> 

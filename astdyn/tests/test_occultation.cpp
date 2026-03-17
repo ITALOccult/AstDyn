@@ -31,7 +31,8 @@ TEST(OccultationTest, BasicLogic) {
         ast_ra, ast_dec,
         dist,
         dra_dt, ddec_dt, ddist_dt,
-        t_ca
+        t_ca,
+        nullptr
     );
 
     // Expected:

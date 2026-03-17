@@ -26,7 +26,7 @@ int main() {
 
     try {
         auto provider = std::make_shared<astdyn::ephemeris::DE441Provider>(bsp_path);
-        astdyn::ephemeris::PlanetaryEphemeris::setProvider(provider);
+        astdyn::ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
     } catch (...) {}
 
     // --- 2. Multiple Asteroids Configuration ---

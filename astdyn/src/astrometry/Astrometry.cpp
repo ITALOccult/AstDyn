@@ -3,6 +3,7 @@
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/time/TimeScale.hpp"
+#include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
@@ -96,6 +97,41 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     );
 
     return compute_observation(initial_state_kep_ecl, t_elements, t_obs, e_cfg, a_cfg);
+}
+
+std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::compute_topocentric_observation(
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
+    const time::EpochTDB& t_elements, const time::EpochTDB& t_obs,
+    const std::string& obs_code, const AstDynConfig& engine_cfg) 
+{
+    auto de441 = AstrometryReducer::sync_ephemeris(engine_cfg.ephemeris_file);
+    if (!de441) return std::unexpected(AstrometryError::EphemerisUnavailable);
+
+    // Fetch observatory position
+    Eigen::Vector3d obs_pos_gcrf = Eigen::Vector3d::Zero();
+    if (!obs_code.empty() && obs_code != "500" && obs_code != "@ssb") {
+        auto& db = observations::ObservatoryDatabase::getInstance();
+        auto obs = db.getObservatory(obs_code);
+        if (obs) obs_pos_gcrf = obs->getPositionGCRF(time::to_utc(t_obs)).to_eigen_si();
+    }
+
+    Eigen::Vector3d earth_bary = de441->getState(ephemeris::CelestialBody::EARTH, t_obs).position.to_eigen_si();
+    Eigen::Vector3d sun_bary = de441->getState(ephemeris::CelestialBody::SUN, t_obs).position.to_eigen_si();
+    Eigen::Vector3d observer_bary = earth_bary + obs_pos_gcrf;
+    Eigen::Vector3d observer_helio_ecl = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(
+        math::Vector3<core::GCRF, physics::Distance>::from_si(observer_bary.x() - sun_bary.x(), observer_bary.y() - sun_bary.y(), observer_bary.z() - sun_bary.z())
+    ).to_eigen_si();
+
+    Eigen::Vector3d ast_pos_helio = compute_light_time_corrected_pos(initial, t_elements, t_obs, observer_helio_ecl, engine_cfg);
+    
+    auto rho_helio_ecl = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(ast_pos_helio.x() - observer_helio_ecl.x(), ast_pos_helio.y() - observer_helio_ecl.y(), ast_pos_helio.z() - observer_helio_ecl.z());
+    auto rho_eq = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_helio_ecl).to_eigen_si();
+    
+    Eigen::Vector3d q_sun = sun_bary - (earth_bary + obs_pos_gcrf);
+    if (engine_cfg.light_deflection) rho_eq = apply_light_deflection(rho_eq, q_sun);
+    if (engine_cfg.aberration_correction) rho_eq = apply_stellar_aberration(rho_eq, de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si());
+
+    return finalize_observation(rho_eq);
 }
 
 Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(

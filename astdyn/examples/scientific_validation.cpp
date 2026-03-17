@@ -9,6 +9,7 @@
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/propagation/AASIntegrator.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
+#include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -21,7 +22,7 @@ using namespace astdyn;
 // Helper to compute position error in meters
 double pos_error_m(const physics::CartesianStateTyped<core::GCRF>& s1, 
                    const physics::CartesianStateTyped<core::GCRF>& s2) {
-    return (s1.position - s2.position).norm();
+    return (s1.position - s2.position).norm().to_m();
 }
 
 void run_convergence_test(const physics::KeplerianStateTyped<core::ECLIPJ2000>& start_orbit, 
@@ -32,7 +33,7 @@ void run_convergence_test(const physics::KeplerianStateTyped<core::ECLIPJ2000>& 
 
     // Propagate for 1 period
     double period = start_orbit.period_days();
-    time::EpochTDB end_time = start_orbit.epoch + period;
+    time::EpochTDB end_time = start_orbit.epoch + time::TimeDuration::from_days(period);
     
     // Get true final state from Horizons
     auto horizons_final = client.query_vectors("1566", end_time); 
@@ -44,10 +45,10 @@ void run_convergence_test(const physics::KeplerianStateTyped<core::ECLIPJ2000>& 
     AstDynEngine engine;
     for (double prec = 1e-2; prec >= 1e-8; prec /= 10.0) {
         AstDynConfig config;
-        config.integrator_type = "AAS";
+        config.integrator_type = IntegratorType::AAS;
         config.aas_precision = prec;
         config.propagator_settings.include_planets = false; // Pure Keplerian for slope test accuracy
-        engine.load_config(config);
+        engine.set_config(config);
         
         engine.set_initial_orbit(start_orbit);
         auto final_state_ecl = engine.propagate_to(end_time);
@@ -73,20 +74,20 @@ void run_work_precision_comparison(const physics::KeplerianStateTyped<core::ECLI
     std::ofstream csv("work_precision.csv");
     csv << "method,parameter,nfe,error_m\n";
 
-    time::EpochTDB end_time = start_orbit.epoch + 365.25; // 1 year
+    time::EpochTDB end_time = start_orbit.epoch + time::TimeDuration::from_days(365.25); // 1 year
     auto horizons_ref = client.query_vectors("1566", end_time);
 
     // AAS test
     AstDynEngine engine;
     for (double prec = 1e-3; prec >= 1e-7; prec /= 10.0) {
         AstDynConfig config;
-        config.integrator_type = "AAS";
+        config.integrator_type = IntegratorType::AAS;
         config.aas_precision = prec;
-        engine.load_config(config);
+        engine.set_config(config);
         engine.set_initial_orbit(start_orbit);
         
         auto final_ecl = engine.propagate_to(end_time);
-        auto final_gcrf = coordinates::ReferenceFrame::transform_state<core::ECLIPJ2000, core::GCRF>(propagation::keplerian_to_cartesian(final_ecl));
+        auto final_gcrf = propagation::keplerian_to_cartesian(final_ecl).template cast_frame<core::GCRF>();
         
         double err = pos_error_m(final_gcrf, *horizons_ref);
         csv << "AAS," << prec << "," << engine.propagator()->statistics().num_function_evals << "," << err << "\n";
@@ -95,13 +96,13 @@ void run_work_precision_comparison(const physics::KeplerianStateTyped<core::ECLI
     // RK4 test
     for (double step = 1.0; step >= 0.01; step /= 2.0) {
         AstDynConfig config;
-        config.integrator_type = "RK4";
+        config.integrator_type = IntegratorType::RK4;
         config.initial_step_size = step;
-        engine.load_config(config);
+        engine.set_config(config);
         engine.set_initial_orbit(start_orbit);
         
         auto final_ecl = engine.propagate_to(end_time);
-        auto final_gcrf = coordinates::ReferenceFrame::transform_state<core::ECLIPJ2000, core::GCRF>(propagation::keplerian_to_cartesian(final_ecl));
+        auto final_gcrf = propagation::keplerian_to_cartesian(final_ecl).template cast_frame<core::GCRF>();
         
         double err = pos_error_m(final_gcrf, *horizons_ref);
         csv << "RK4," << step << "," << engine.propagator()->statistics().num_function_evals << "," << err << "\n";
@@ -116,9 +117,9 @@ void run_energy_conservation_test(const physics::KeplerianStateTyped<core::ECLIP
 
     AstDynEngine engine;
     AstDynConfig config;
-    config.integrator_type = "AAS";
+    config.integrator_type = IntegratorType::AAS;
     config.aas_precision = 1e-4;
-    engine.load_config(config);
+    engine.set_config(config);
     engine.set_initial_orbit(start_orbit);
 
     // Propagate for 100 periods (shortened from 10k for time)
@@ -126,7 +127,7 @@ void run_energy_conservation_test(const physics::KeplerianStateTyped<core::ECLIP
     double period = start_orbit.period_days();
     
     for (int i = 1; i <= num_periods; ++i) {
-        time::EpochTDB t = start_orbit.epoch + (i * period);
+        time::EpochTDB t = start_orbit.epoch + time::TimeDuration::from_days(i * period);
         engine.propagate_to(t);
         auto stats = engine.propagator()->statistics();
         csv << (i * period) << "," << stats.hamiltonian_drift << "," << stats.shadow_hamiltonian_drift << "\n";
@@ -141,46 +142,37 @@ void run_stm_validation(const physics::KeplerianStateTyped<core::ECLIPJ2000>& st
     
     AstDynEngine engine;
     AstDynConfig config;
-    config.integrator_type = "AAS";
+    config.integrator_type = IntegratorType::AAS;
     config.aas_precision = 1e-4;
-    engine.load_config(config);
+    engine.set_config(config);
 
-    time::EpochTDB target_time = start_orbit.epoch + 100.0; // 100 days
+    time::EpochTDB target_time = start_orbit.epoch + time::TimeDuration::from_days(100.0); // 100 days
 
-    // Initialize state with identity STM
-    Eigen::VectorXd y0(42);
+    // Initialize state
     auto cart0 = propagation::keplerian_to_cartesian(start_orbit);
-    y0.segment<3>(0) = cart0.position.to_eigen_si();
-    y0.segment<3>(3) = cart0.velocity.to_eigen_si();
-    y0.segment<36>(6).setZero();
-    for(int i=0; i<6; ++i) y0[6 + i*7] = 1.0; // Identity
-
-    // Propagate
-    auto y_final = engine.propagator()->integrate_raw(
-        [&](double t, const Eigen::VectorXd& y){ return engine.propagator()->derivative(t, y); },
-        y0, start_orbit.epoch.mjd(), target_time.mjd()
-    );
-
-    // Extract STM
-    Eigen::MatrixXd phi(6, 6);
-    for(int i=0; i<6; ++i) {
-        for(int j=0; j<6; ++j) phi(i, j) = y_final[6 + i*6 + j];
-    }
+    
+    // Use the official STM engine
+    using namespace orbit_determination;
+    StateTransitionMatrix<core::ECLIPJ2000> stm_engine(engine.propagator());
+    auto stm_res = stm_engine.compute(cart0, target_time);
+    
+    Eigen::MatrixXd phi = stm_res.phi;
 
     double det = phi.determinant();
     std::cout << "STM Determinant: " << det << " (Error: " << std::abs(det - 1.0) << ")" << std::endl;
 
     // Small perturbation for FD check
     double eps = 1e-7;
-    Eigen::VectorXd y_pert = y0.head(6);
-    y_pert[0] += eps; // Perturb X
-    
-    auto y_pert_final = engine.propagator()->integrate_raw(
-        [&](double t, const Eigen::VectorXd& y){ return engine.propagator()->derivative(t, y); },
-        y_pert, start_orbit.epoch.mjd(), target_time.mjd()
+    auto cart_pert = cart0;
+    cart_pert.position = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(
+        cart0.position.x_si() + eps * constants::AU * 1000.0,
+        cart0.position.y_si(),
+        cart0.position.z_si()
     );
+    
+    auto cart_pert_final = engine.propagator()->propagate_cartesian(cart_pert, target_time);
 
-    double fd_phi_0_0 = (y_pert_final[0] - y_final[0]) / eps;
+    double fd_phi_0_0 = (cart_pert_final.position.x_si() - stm_res.final_state.position.x_si()) / (eps * constants::AU * 1000.0);
     std::cout << "STM(0,0) - Analytic: " << phi(0,0) << " | Finite Difference: " << fd_phi_0_0 << " | Diff: " << std::abs(phi(0,0) - fd_phi_0_0) << std::endl;
 }
 

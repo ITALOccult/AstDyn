@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     try {
         // Essential: Provider must be set for planetary ephemerides
         auto provider = std::make_shared<astdyn::ephemeris::DE441Provider>(bsp_path);
-        astdyn::ephemeris::PlanetaryEphemeris::setProvider(provider);
+        astdyn::ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
     } catch (const std::exception& e) {
         std::cerr << "Warning: Could not load DE441: " << e.what() << "\n";
     }
@@ -89,8 +89,8 @@ int main(int argc, char** argv) {
             
             if (!res) continue;
             
-            double truth_ra_deg = res->ra.value * 180.0 / M_PI;
-            double truth_dec_deg = res->dec.value * 180.0 / M_PI;
+            double truth_ra_deg = res->ra.to_deg();
+            double truth_dec_deg = res->dec.to_deg();
             
             double cos_dec = std::cos(truth_dec_deg * M_PI / 180.0);
             double error_arcsec = std::abs(c_ra - truth_ra_deg) * 3600.0 * cos_dec;

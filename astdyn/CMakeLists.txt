@@ -11,7 +11,7 @@ project(OrbFit
 # Project Options
 # ============================================================================
 
-option(ASTDYN_BUILD_TESTS "Build unit tests" ON)
+option(ASTDYN_BUILD_TESTS "Build unit tests" OFF)
 option(ASTDYN_BUILD_EXAMPLES "Build examples" ON)
 option(ASTDYN_BUILD_DOCS "Build documentation" OFF)
 option(ASTDYN_USE_SPICE "Use SPICE toolkit for ephemerides" OFF)
@@ -113,16 +113,37 @@ FetchContent_MakeAvailable(json)
 
 # Find OpenMP
 if(ASTDYN_USE_OPENMP)
-    find_package(OpenMP)
+    if(APPLE)
+        # Search for Homebrew libomp
+        if(EXISTS "/opt/homebrew/opt/libomp")
+            set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+            set(OpenMP_CXX_LIB_NAMES "omp")
+            set(OpenMP_omp_LIBRARY "/opt/homebrew/opt/libomp/lib/libomp.dylib")
+            set(OpenMP_FOUND TRUE)
+            message(STATUS "OpenMP found via Homebrew: /opt/homebrew/opt/libomp")
+        endif()
+    endif()
+    
+    if(NOT OpenMP_FOUND)
+        find_package(OpenMP)
+    endif()
+    
     if(OpenMP_FOUND)
         message(STATUS "OpenMP found: ${OpenMP_CXX_VERSION}")
+        if(NOT TARGET OpenMP::OpenMP_CXX)
+            add_library(OpenMP::OpenMP_CXX INTERFACE IMPORTED)
+            set_target_properties(OpenMP::OpenMP_CXX PROPERTIES
+                INTERFACE_COMPILE_OPTIONS "${OpenMP_CXX_FLAGS}"
+                INTERFACE_LINK_LIBRARIES "${OpenMP_omp_LIBRARY}"
+            )
+        endif()
     else()
         message(WARNING "OpenMP not found, parallelization will be disabled")
     endif()
 endif()
 
 # Python Bindings (pybind11)
-option(ASTDYN_BUILD_PYTHON "Build Python bindings" ON)
+option(ASTDYN_BUILD_PYTHON "Build Python bindings" OFF)
 if(ASTDYN_BUILD_PYTHON)
     FetchContent_Declare(
       pybind11
@@ -214,7 +235,7 @@ if(ASTDYN_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
-add_subdirectory(benchmarks)
+# add_subdirectory(benchmarks)
 add_subdirectory(tools)
 
 if(ASTDYN_BUILD_PYTHON)

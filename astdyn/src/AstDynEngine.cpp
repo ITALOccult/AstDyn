@@ -12,6 +12,9 @@
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/observations/MPCReader.hpp"
 #include "astdyn/coordinates/KeplerianElements.hpp"
+#include "astdyn/astrometry/Astrometry.hpp"
+#include "astdyn/astrometry/sky_types.hpp"
+#include "astdyn/catalog/CatalogTypes.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/time/TimeScale.hpp"
 #include "astdyn/io/AstDynConfig.hpp"
@@ -228,14 +231,31 @@ double AstDynEngine::compute_moid(ephemeris::CelestialBody planet) {
 }
 
 ApparentPlace AstDynEngine::compute_asteroid_apparent_place(time::EpochTDB t_occult, const std::string& observatory_code) {
-    auto cart_target = propagate_to(t_occult);
-    (void)cart_target; // Implementation of apparent place omitted for brevity
-    return {t_occult, astrometry::RightAscension::from_rad(0.0), astrometry::Declination::from_rad(0.0), physics::Distance::from_au(1.0)};
+    if (!has_orbit_) throw std::runtime_error("No orbit available for apparent place");
+    auto obs_res = astrometry::AstrometryReducer::compute_topocentric_observation(current_orbit_, current_orbit_.epoch, t_occult, observatory_code, config_);
+    if (!obs_res) return {t_occult, astrometry::RightAscension::from_rad(0.0), astrometry::Declination::from_rad(0.0), physics::Distance::from_au(1.0)};
+    return {t_occult, obs_res->ra, obs_res->dec, obs_res->distance};
 }
 
-ApparentPlace AstDynEngine::compute_star_apparent_place(double ra, double dec, double pm_ra, double pm_dec, time::EpochTDB t, const std::string& obs_code) {
-    // (Implementation omitted)
-    return {t, astrometry::RightAscension::from_rad(ra), astrometry::Declination::from_rad(dec), physics::Distance::from_au(1000.0)};
+ApparentPlace AstDynEngine::compute_star_apparent_place(const catalog::Star& star, time::EpochTDB t, const std::string& obs_code) {
+    Eigen::Vector3d obs_pos_gcrf = Eigen::Vector3d::Zero();
+    if (!obs_code.empty() && obs_code != "500" && obs_code != "@ssb") {
+        auto& db = observations::ObservatoryDatabase::getInstance();
+        auto obs = db.getObservatory(obs_code);
+        if (obs) {
+            obs_pos_gcrf = obs->getPositionGCRF(time::to_utc(t)).to_eigen_si();
+        }
+    }
+    
+    std::optional<Eigen::Vector3d> observer_bary = std::nullopt;
+    if (ephemeris_) {
+        auto earth_h = ephemeris_->getState(ephemeris::CelestialBody::EARTH, t);
+        auto earth_b = ephemeris_->heliocentricToBarycentric(earth_h, t);
+        observer_bary = earth_b.position.to_eigen_si() + obs_pos_gcrf;
+    }
+
+    auto star_at_t = star.predict_at(t, observer_bary);
+    return {t, star_at_t.ra(), star_at_t.dec(), physics::Distance::from_au(1000.0)};
 }
 
 // ============================================================================

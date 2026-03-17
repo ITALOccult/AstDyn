@@ -290,7 +290,17 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
     AstDynEngine& engine)
 {
     std::vector<OccultationSystemCandidate> results;
-    // Implementation would use engine.getEphemeris()
+    try {
+        io::SPKReader spk(bsp_path);
+        for (const auto& id : body_ids) {
+            int naif_id = std::stoi(id);
+            for (time::EpochTDB t = start; t <= end; t += time::TimeDuration::from_seconds(3600.0)) {
+                double et = (t.mjd() - 51544.5) * 86400.0;
+                auto state = spk.getState(naif_id, et);
+                (void)state; // Placeholder search logic
+            }
+        }
+    } catch (...) {}
     return results;
 }
 
@@ -303,7 +313,16 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
     AstDynEngine& engine)
 {
     std::vector<OccultationCandidate> results;
-    // Implementation would use engine.getEphemeris()
+    for (const auto& id : asteroid_ids) {
+        if (!manager.has_body(id)) continue;
+        
+        // Use a 1-hour step for initial search
+        for (time::EpochTDB t = start; t <= end; t += time::TimeDuration::from_seconds(3600.0)) {
+            auto [pos, vel] = manager.evaluate_full(id, t);
+            (void)pos; (void)vel; // Placeholder usage
+            // logic to check stars in the area would go here
+        }
+    }
     return results;
 }
 
