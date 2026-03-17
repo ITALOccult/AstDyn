@@ -26,25 +26,28 @@ GeoPoint OccultationMapper::project_to_earth(
     // 1. Besselian Basis (toward star)
     double as = ra.to_rad();
     double ds = dec.to_rad();
-    Eigen::Vector3d k_vec(std::cos(as) * std::cos(ds), std::sin(as) * std::cos(ds), std::sin(ds));
-    Eigen::Vector3d i_vec(-std::sin(as), std::cos(as), 0.0);
-    Eigen::Vector3d j_vec(-std::sin(ds) * std::cos(as), -std::sin(ds) * std::sin(as), std::cos(ds));
+    Eigen::Vector3d k_star(std::cos(as) * std::cos(ds), std::sin(as) * std::cos(ds), std::sin(ds));
+    Eigen::Vector3d i_basis(-std::sin(as), std::cos(as), 0.0);
+    Eigen::Vector3d j_basis(-std::sin(ds) * std::cos(as), -std::sin(ds) * std::sin(as), std::cos(ds));
 
     // 2. Cartesian position in GCRF (m)
-    Eigen::Vector3d p_eci = xi.to_m() * i_vec + eta.to_m() * j_vec + zeta.to_m() * k_vec;
+    Eigen::Vector3d p_eci = xi.to_m() * i_basis + eta.to_m() * j_basis + zeta.to_m() * k_star;
 
     // 3. Earth Rotation Angle (ERA)
     // DU is defined in UT1 days since J2000.0
     double dut1 = time::get_dut1(t.mjd());
     double mjd_ut1 = t.mjd() + dut1 / constants::SECONDS_PER_DAY;
     double jd_ut1 = time::mjd_to_jd(mjd_ut1);
-    double Du = jd_ut1 - 2451545.0;
+    double days_since_j2000 = jd_ut1 - 2451545.0;
     
-    double era_frac = 0.7790572732640 + 1.00273781191135448 * Du;
+    // IERS Technical Note 32 - ERA formula
+    constexpr double ERA_CONSTANT = 0.7790572732640;
+    constexpr double ERA_RATE = 1.00273781191135448;
+    double era_frac = ERA_CONSTANT + ERA_RATE * days_since_j2000;
     double era_rad = std::fmod(era_frac * constants::TWO_PI, constants::TWO_PI);
     if (era_rad < 0) era_rad += constants::TWO_PI;
     
-    // 4. Geodetic Projection (Spherical)
+    // 4. Geodetic Projection (Spherical approximation)
     double ra_p = std::atan2(p_eci.y(), p_eci.x());
     double dec_p = std::asin(p_eci.z() / p_eci.norm());
     
@@ -64,81 +67,93 @@ OccultationPath OccultationMapper::compute_path(
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem,
     const time::TimeDuration& duration) 
 {
-    using namespace constants;
     OccultationPath path;
     path.shadow_width = asteroid_diameter;
     const int steps = 600;
     time::TimeDuration dt = duration / static_cast<double>(steps);
 
-    double vxi = params.dxi_dt.to_ms();
-    double veta = params.deta_dt.to_ms();
-
-    auto get_pos_at_dt_from_ca = [&](const time::TimeDuration& dt_from_ca, double offset_perp_m = 0.0) -> std::optional<GeoPoint> {
-        // Shadow axis position on fundamental plane
-        double xi_m = params.xi_ca.to_m() + vxi * dt_from_ca.to_seconds();
-        double eta_m = params.eta_ca.to_m() + veta * dt_from_ca.to_seconds();
-        
-        // Offset perpendicular to track (for limits and sigma)
-        if (std::abs(offset_perp_m) > 1e-3) {
-            double v_norm = std::sqrt(vxi*vxi + veta*veta);
-            xi_m += offset_perp_m * (-veta / v_norm);
-            eta_m += offset_perp_m * ( vxi  / v_norm);
-        }
-
-        double r_earth_m = constants::R_EARTH * 1000.0;
-        double d2 = xi_m*xi_m + eta_m*eta_m;
-        
-        if (d2 >= r_earth_m * r_earth_m) return std::nullopt;
-        
-        double zeta_m = std::sqrt(r_earth_m * r_earth_m - d2);
-        // NO redundant offset here: tca_utc is already the time of CA
-        time::EpochUTC t = tca_utc + dt_from_ca;
-        
-        return project_to_earth(physics::Distance::from_m(xi_m), 
-                                physics::Distance::from_m(eta_m), 
-                                physics::Distance::from_m(zeta_m), 
-                                star_ra, star_dec, t);
-    };
-
     for (int i = -steps/2; i <= steps/2; ++i) {
         time::TimeDuration dt_from_ca = dt * static_cast<double>(i);
         
-        auto pt_center = get_pos_at_dt_from_ca(dt_from_ca, 0.0);
+        // 1. Center Line & Markers
+        auto pt_center = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::zero());
         if (pt_center) {
             path.center_line.push_back(*pt_center);
-            
-            // Add time markers every 60 seconds (1 minute)
-            double secs = std::round(dt_from_ca.to_seconds());
-            if (std::abs(secs) < 1e-3 || static_cast<int>(std::abs(secs) + 0.5) % 60 == 0) {
-                time::EpochUTC t = tca_utc + dt_from_ca;
-                auto [y, mon, d, frac] = time::mjd_to_calendar(t.mjd());
-                
-                int hour = static_cast<size_t>(frac * 24.0) % 24;
-                int minute = static_cast<size_t>(frac * 1440.0) % 60;
-                
-                std::stringstream ss;
-                ss << std::setfill('0') << std::setw(2) << hour << ":" << std::setw(2) << minute;
-                path.markers.push_back({*pt_center, ss.str()});
-            }
+            add_time_marker(path, *pt_center, dt_from_ca, tca_utc);
         }
         
+        // 2. Boundaries (Nominal & Sigma)
         double w2 = path.shadow_width.to_m() / 2.0;
         double sigma_m = params.cross_track_uncertainty.to_m();
 
-        // Nominal Shadow Limits
-        auto pt_n = get_pos_at_dt_from_ca(dt_from_ca, -w2);
-        auto pt_s = get_pos_at_dt_from_ca(dt_from_ca, w2);
+        auto pt_n = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::from_m(-w2));
+        auto pt_s = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::from_m(w2));
         if (pt_n) path.shadow_north.push_back(*pt_n);
         if (pt_s) path.shadow_south.push_back(*pt_s);
 
-        // 1-Sigma Uncertainty Limits (Shadow + Uncertainty)
-        auto pt_sn = get_pos_at_dt_from_ca(dt_from_ca, -(w2 + sigma_m));
-        auto pt_ss = get_pos_at_dt_from_ca(dt_from_ca, (w2 + sigma_m));
+        auto pt_sn = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::from_m(-(w2 + sigma_m)));
+        auto pt_ss = calculate_geopoint_at_epoch(params, star_ra, star_dec, dt_from_ca, physics::Distance::from_m(w2 + sigma_m));
         if (pt_sn) path.sigma1_north.push_back(*pt_sn);
         if (pt_ss) path.sigma1_south.push_back(*pt_ss);
     }
-
     return path;
+}
+
+std::optional<GeoPoint> OccultationMapper::calculate_geopoint_at_epoch(
+    const OccultationParameters& params,
+    const RightAscension& star_ra,
+    const Declination& star_dec,
+    const time::TimeDuration& dt_from_ca,
+    const physics::Distance& offset_perp)
+{
+    using namespace constants;
+    double vxi = params.dxi_dt.to_ms();
+    double veta = params.deta_dt.to_ms();
+    
+    // Shadow axis position on fundamental plane
+    double xi_m = params.xi_ca.to_m() + vxi * dt_from_ca.to_seconds();
+    double eta_m = params.eta_ca.to_m() + veta * dt_from_ca.to_seconds();
+    
+    // Offset perpendicular to track
+    if (offset_perp.to_m() != 0.0) {
+        double v_norm = std::sqrt(vxi*vxi + veta*veta);
+        xi_m += offset_perp.to_m() * (-veta / v_norm);
+        eta_m += offset_perp.to_m() * ( vxi  / v_norm);
+    }
+
+    double r_earth_m = constants::R_EARTH * 1000.0;
+    double d2 = xi_m*xi_m + eta_m*eta_m;
+    
+    if (d2 >= r_earth_m * r_earth_m) return std::nullopt;
+    
+    double zeta_m = std::sqrt(r_earth_m * r_earth_m - d2);
+    time::EpochUTC t = time::to_utc(params.t_ca) + dt_from_ca;
+    
+    return project_to_earth(physics::Distance::from_m(xi_m), 
+                            physics::Distance::from_m(eta_m), 
+                            physics::Distance::from_m(zeta_m), 
+                            star_ra, star_dec, t);
+}
+
+void OccultationMapper::add_time_marker(
+    OccultationPath& path,
+    const GeoPoint& pt,
+    const time::TimeDuration& dt_from_ca,
+    const time::EpochUTC& tca_utc)
+{
+    // Add time markers every 60 seconds (1 minute)
+    double secs = std::round(dt_from_ca.to_seconds());
+    if (std::abs(secs) > 1e-3 && static_cast<int>(std::abs(secs) + 0.5) % 60 != 0) return;
+    
+    time::EpochUTC t = tca_utc + dt_from_ca;
+    auto [y, mon, d, frac] = time::mjd_to_calendar(t.mjd());
+    
+    int hour = static_cast<size_t>(frac * 24.0) % 24;
+    int minute = static_cast<size_t>(frac * 1440.0) % 60;
+    
+    std::stringstream ss;
+    ss << std::setfill('0') << std::setw(2) << hour << ":" << std::setw(2) << minute;
+    path.markers.push_back({pt, ss.str()});
 }
 
 void OccultationMapper::export_svg(const OccultationPath& path, const std::string& filename) {
@@ -254,8 +269,8 @@ void OccultationMapper::export_global_svg(
     const std::vector<std::string>& colors,
     const std::string& filename,
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem,
-    double center_lat,
-    double center_lon,
+    Angle center_lat,
+    Angle center_lon,
     double zoom)
 {
     std::ofstream ofs(filename);
@@ -263,8 +278,8 @@ void OccultationMapper::export_global_svg(
     // Dynamic ViewBox
     double vw = 3600.0 / zoom;
     double vh = 1800.0 / zoom;
-    double vx = center_lon * 10.0 - vw / 2.0;
-    double vy = -center_lat * 10.0 - vh / 2.0;
+    double vx = center_lon.to_deg() * 10.0 - vw / 2.0;
+    double vy = -center_lat.to_deg() * 10.0 - vh / 2.0;
 
     // SVG Header
     ofs << "<svg viewBox=\"" << vx << " " << vy << " " << vw << " " << vh << "\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background:#0b0e14; font-family: 'Outfit', 'Inter', sans-serif;\">\n";

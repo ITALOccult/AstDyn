@@ -26,12 +26,16 @@ struct OccultationParameters {
     Angle position_angle;                 
     physics::Velocity relative_velocity_mag;
     time::EpochTDB t_ca;                  
-    double sun_altitude;                  
-    double moon_altitude;                 
-    double moon_dist;                     
+    Angle sun_altitude;                  
+    Angle moon_altitude;                 
+    Angle moon_dist;                     
+    Angle center_lat;                  
+    Angle center_lon;                  
     double star_mag;                      
     double mag_drop;                      
     bool is_daylight;                     
+    double total_apparent_rate; // arcsec/hr
+    time::TimeDuration max_duration;
     std::string star_id;
     
     physics::Distance cross_track_uncertainty;
@@ -104,6 +108,27 @@ public:
         const Eigen::Matrix<double, 6, 6>& covariance_t0,
         const physics::CartesianStateTyped<core::GCRF>& initial_state,
         AstDynEngine& engine);
+
+private:
+    static OccultationParameters compute_fundamental_plane_geometry(
+        const RightAscension& star_ra, const Declination& star_dec,
+        const RightAscension& ast_ra, const Declination& ast_dec,
+        const physics::Distance& ast_dist);
+
+    static void compute_shadow_velocity(
+        OccultationParameters& params,
+        const Declination& star_dec,
+        const physics::Distance& ast_dist,
+        const Angle& ast_dra_dt,
+        const Angle& ast_ddec_dt);
+
+    static void compute_sky_conditions(
+        OccultationParameters& params,
+        const time::EpochTDB& t_ca,
+        const RightAscension& ast_ra, const Declination& ast_dec,
+        const physics::Distance& ast_distance,
+        const RightAscension& star_ra, const Declination& star_dec,
+        std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem);
 };
 
 struct OccultationConfig {

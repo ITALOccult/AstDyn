@@ -71,5 +71,16 @@ AstDyn C++ is a modern, high-precision orbital mechanics library. This plan trac
 | Occultation Time | Vesta 2026 | ✅ PASS | < 0.001s |
 | IOD Accuracy | Apophis | ✅ PASS | < 1e-6 (Residuals) |
 
+### Refactoring Status (17/Mar/26)
+
+| Target | Rule | Status | Action Taken |
+| :--- | :--- | :--- | :--- |
+| `OccultationLogic` | R1, R4 | ✅ COMPLETED | Split monolyth into 3 sub-functions. |
+| `OccultationLogic` | R6 | ✅ COMPLETED | Replaced raw doubles with `Angle`. |
+| `OccultationMapper` | R1, R4 | ✅ COMPLETED | Extracted projection and marker logic. |
+| `OccultationMapper` | R5 | ✅ COMPLETED | Named constants for ERA coefficients. |
+| `ioccultcalc.cpp` | Boy Scout | ✅ COMPLETED | Refactored main flow and logic. |
+| `LeastSquaresOD` | R2, R6 | 🕒 PENDING | Convert residuals to `Angle` and matrix SI. |
+
 ---
 *Last Updated: 2026-03-17*

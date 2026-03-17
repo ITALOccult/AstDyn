@@ -87,8 +87,8 @@ public:
         const std::vector<std::string>& colors,
         const std::string& filename,
         std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem,
-        double center_lat = 0.0,
-        double center_lon = 0.0,
+        Angle center_lat = Angle::from_deg(0.0),
+        Angle center_lon = Angle::from_deg(0.0),
         double zoom = 1.0);
 
     /**
@@ -120,6 +120,20 @@ private:
      */
     static std::vector<GeoPoint> compute_terminator(const time::EpochTDB& t, 
                                                    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem);
+
+    // CFIYH Helpers
+    static std::optional<GeoPoint> calculate_geopoint_at_epoch(
+        const OccultationParameters& params,
+        const RightAscension& star_ra,
+        const Declination& star_dec,
+        const time::TimeDuration& dt_from_ca,
+        const physics::Distance& offset_perp);
+
+    static void add_time_marker(
+        OccultationPath& path,
+        const GeoPoint& pt,
+        const time::TimeDuration& dt_from_ca,
+        const time::EpochUTC& tca_utc);
 };
 
 } // namespace astdyn::astrometry
