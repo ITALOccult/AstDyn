@@ -186,25 +186,25 @@ double AASIntegrator::estimate_step_size(const Eigen::VectorXd& q, const Eigen::
     double g_n = scaled_precision / std::sqrt(std::max(compute_force_gradient(q), 1e-20));
     double g_avg = g_n;
     
-    // Symmetrization loop (1 iteration is sufficient for most cases)
-    // Point on trajectory shifted by Sundman step
+    // Symmetrization logic to preserve time-reversibility:
+    // We calculate the potential gradient at a future point predicted by a Sundman-like step
+    // and use the harmonic mean of the current and next metrics.
     Eigen::VectorXd q_next = q + p * g_avg;
     double g_p = scaled_precision / std::sqrt(std::max(compute_force_gradient(q_next), 1e-20));
     
-    // Use harmonic mean for time-reversibility preservation
+    // Harmonic mean ensures the integrator remains invariant under time-reversal
     g_avg = 2.0 * g_n * g_p / (g_n + g_p);
     
-    // Apply physical constraints
-    // 1. Limit step to 1/20th of local orbital period
+    // Physical bounds: avoid steps exceeding 5% of the local orbital period
     double T_local = 2.0 * constants::PI * std::sqrt(r * r * r / mu_);
     g_avg = std::min(g_avg, T_local / 20.0);
     
-    // 2. Global bounds
+    // Global safety clamp: avoid absurdly large or small steps
     g_avg = std::clamp(g_avg, 1e-8, 100.0);
     
-    // Perihelion protection (r < 2 Solar Radii)
+    // Perihelion protection (r < 2 Solar Radii): enforce micro-stepping for close approaches
     if (r < 0.0093) {
-        g_avg = std::min(g_avg, 1.0 / 1440.0); // 1 minute limit (hardcoded for stability)
+        g_avg = std::min(g_avg, 1.0 / 1440.0); // 1 minute limit
     }
     
     return std::min(g_avg, target_dt);
@@ -251,13 +251,18 @@ std::vector<Eigen::VectorXd> AASIntegrator::integrate_at(const DerivativeFunctio
     stats_.reset();
     std::vector<Eigen::VectorXd> res; res.reserve(t_targets.size());
     double t = t0; Eigen::VectorXd q, p; split_state(y0, q, p);
+    
+    // Handle State Transition Matrix (STM) if input vector has size 42 (6 state + 36 STM)
     Eigen::MatrixXd phi; if (y0.size() == 42) { phi.resize(6, 6); for (int i=0; i<36; ++i) phi(i/6, i%6) = y0[6+i]; }
+    
     for (double target : t_targets) {
         double dir = (target > t) ? 1.0 : -1.0;
+        // Step forward until the precise target epoch is reached
         while (std::abs(target - t) > 1e-14 && stats_.num_steps < 1000000) {
             double dt = estimate_step_size(q, p, std::abs(target - t));
             symplectic_step(f, t, q, p, phi, dt * dir); t += dt * dir; stats_.num_steps++;
         }
+        // Pack state and optional STM into the output vector
         res.push_back((phi.size() == 36) ? finalize_state_phi(y0, q, p, phi) : join_state(q, p));
     }
     return res;

@@ -9,9 +9,11 @@
 #include "astdyn/orbit_determination/StateTransitionMatrix.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/AstDynEngine.hpp"
+#include "astdyn/astrometry/SPKChebyshevEphemeris.hpp"
 #include <cmath>
 #include <iostream>
 #include <algorithm>
+#include <map>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -295,15 +297,64 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
     std::vector<OccultationSystemCandidate> results;
     try {
         io::SPKReader spk(bsp_path);
+        // Map to group occultations by the background star, as multiple bodies (e.g. Jovian moons)
+        // might occult the same star during the same period.
+        std::map<unsigned long long, OccultationSystemCandidate> star_map;
+
         for (const auto& id : body_ids) {
             int naif_id = std::stoi(id);
-            for (time::EpochTDB t = start; t <= end; t += time::TimeDuration::from_seconds(3600.0)) {
-                double et = (t.mjd() - 51544.5) * 86400.0;
-                auto state = spk.getState(naif_id, et);
-                (void)state; // Placeholder search logic
+            // Convert SPK orbital data into daily Chebyshev segments for high-speed geometric search.
+            SPKChebyshevEphemeris eph(naif_id, spk, start, end);
+            
+            // Loop through the search window (day by day)
+            for (double jd = std::floor(start.jd() - 0.5) + 0.5; jd <= end.jd() + 0.5; jd += 1.0) {
+                time::EpochTDB t = time::EpochTDB::from_jd(jd);
+                // Ensure we stay within the ephemeris temporal bounds
+                if (t.jd() + 1.0 < eph.start_epoch().jd() || t.jd() > eph.end_epoch().jd()) continue;
+
+                try {
+                    // Evaluate path for the current period
+                    const auto& segment = eph.get_segment(t);
+                    auto [pos, vel] = segment.evaluate_full(t.jd());
+                    double dist_au = std::get<2>(pos);
+                    if (dist_au < 1e-6) continue;
+
+                    // Compute search radius in the sky based on maximum shadow distance (FP)
+                    Angle radius = Angle::from_rad(config.max_shadow_distance.to_m() / (dist_au * constants::AU * 1000.0));
+                    
+                    // Bulk query against the Gaia database for stars near the body path
+                    auto stars = catalog::find_stars_near_segment(catalog::GaiaDR3Catalog::instance(), segment, radius, config.max_mag_star);
+                    
+                    for (const auto& star : stars) {
+                        std::vector<OccultationCandidate> temp_results;
+                        // Refine the candidate to find the exact TCA and fundamental plane parameters
+                        evaluate_candidate(temp_results, segment, star, config, engine, start.jd(), end.jd());
+                        
+                        for (const auto& cand : temp_results) {
+                            // If this star wasn't seen before, initialize a new system candidate
+                            if (star_map.find(star.source_id) == star_map.end()) {
+                                star_map[star.source_id].star = star;
+                            }
+                            // Store the specific body interaction
+                            BodyOccultation body;
+                            body.name = id;
+                            body.params = cand.params;
+                            body.diameter = physics::Distance::from_km(100.0); // Default placeholder; usually fetched via physical properties tool
+                            star_map[star.source_id].bodies.push_back(body);
+                        }
+                    }
+                } catch (...) {
+                    // Ignore transient errors for specific segments
+                }
             }
         }
-    } catch (...) {}
+        // Collect all unique star candidates found
+        for (auto& pair : star_map) {
+            results.push_back(pair.second);
+        }
+    } catch (...) {
+        // Log or handle SPK load errors
+    }
     return results;
 }
 
@@ -316,14 +367,37 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
     AstDynEngine& engine)
 {
     std::vector<OccultationCandidate> results;
+    // Iterate over the list of managed asteroids (pre-calculated with polynomials)
     for (const auto& id : asteroid_ids) {
         if (!manager.has_body(id)) continue;
         
-        // Use a 1-hour step for initial search
-        for (time::EpochTDB t = start; t <= end; t += time::TimeDuration::from_seconds(3600.0)) {
-            auto [pos, vel] = manager.evaluate_full(id, t);
-            (void)pos; (void)vel; // Placeholder usage
-            // logic to check stars in the area would go here
+        const auto& eph = manager.get_ephemeris(id);
+        // Sweep JD by JD for star intersections
+        for (double jd = std::floor(start.jd() - 0.5) + 0.5; jd <= end.jd() + 0.5; jd += 1.0) {
+            time::EpochTDB t = time::EpochTDB::from_jd(jd);
+            if (t.jd() + 1.0 < eph.start_epoch().jd() || t.jd() > eph.end_epoch().jd()) continue;
+
+            try {
+                // High-performance polynomial evaluation
+                const auto& segment = eph.get_segment(t);
+                auto [pos, vel] = segment.evaluate_full(t.jd());
+                double dist_au = std::get<2>(pos);
+                if (dist_au < 1e-6) continue;
+
+                // corridor logic similar to single asteroid search
+                Angle radius = Angle::from_rad(config.max_shadow_distance.to_m() / (dist_au * constants::AU * 1000.0));
+                auto stars = catalog::find_stars_near_segment(catalog::GaiaDR3Catalog::instance(), segment, radius, config.max_mag_star);
+                
+                for (const auto& star : stars) {
+                    evaluate_candidate(results, segment, star, config, engine, start.jd(), end.jd());
+                    // Assign proper ID to results
+                    if (!results.empty() && results.back().asteroid_id.empty()) {
+                        results.back().asteroid_id = id;
+                    }
+                }
+            } catch (...) {
+                // Skip segment if data is unavailable
+            }
         }
     }
     return results;
