@@ -9,13 +9,15 @@
 #include "astdyn/ephemeris/DE441Provider.hpp"
 #include "astdyn/propagation/AASIntegrator.hpp"
 #include <boost/program_options.hpp>
+#include <chrono>
+#include <atomic>
+#include <mutex>
+#include <iomanip>
 #include <iostream>
 #include <fstream>
-#include <iomanip>
 #include <cmath>
 #include <vector>
 #include <filesystem>
-#include <mutex>
 
 using namespace astdyn;
 using namespace astdyn::propagation;
@@ -149,6 +151,18 @@ int main(int argc, char** argv) {
 
     std::cout << "[trajectory_export] Processing " << jobs.size() << " asteroids in parallel...\n";
 
+    std::atomic<long> total_steps_done{0};
+    std::mutex progress_mutex;
+    auto start_time = std::chrono::steady_clock::now();
+    
+    long total_planned = 0;
+    for (const auto& job : jobs) {
+        total_planned += (long)((tf_mjd - job.t0) / step_days);
+    }
+    if (total_planned == 0) total_planned = 1; // Avoid div by zero
+
+    std::cout << "[Batch Progress] 0.0% | Elapsed: 0s | ETA: ---s" << std::flush;
+
     #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < (int)jobs.size(); ++i) {
         const auto& job = jobs[i];
@@ -208,14 +222,14 @@ int main(int argc, char** argv) {
                 
                 total_steps_done++;
                 
-                // Report progress periodically (every 100 global steps or so)
-                if (total_steps_done % 100 == 0 || total_steps_done == (long)(jobs.size() * ((tf_mjd - job.t0) / step_days))) {
+                // Report progress frequently (every step)
+                {
                     std::lock_guard<std::mutex> lock(progress_mutex);
                     auto now = std::chrono::steady_clock::now();
                     double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() / 1000.0;
-                    long total_planned = (long)jobs.size() * (long)((tf_mjd - job.t0) / step_days);
                     double percent = 100.0 * total_steps_done / total_planned;
-                    double eta = (percent > 0.1) ? (elapsed / percent * (100.0 - percent)) : 0.0;
+                    if (percent > 100.0) percent = 100.0;
+                    double eta = (percent > 0.01) ? (elapsed / percent * (100.0 - percent)) : 0.0;
                     
                     std::cout << "\r[Batch Progress] " << std::fixed << std::setprecision(1) << percent << "% "
                               << "| Elapsed: " << (int)elapsed << "s "
