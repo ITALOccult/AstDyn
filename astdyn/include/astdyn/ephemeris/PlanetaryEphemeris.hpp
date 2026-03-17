@@ -22,8 +22,8 @@
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/epoch.hpp"
 #include "astdyn/math/frame_algebra.hpp"
-#include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
 #include "astdyn/ephemeris/PlanetaryData.hpp"
@@ -98,6 +98,13 @@ public:
 
     void setProvider(std::shared_ptr<EphemerisProvider> provider);
     std::shared_ptr<EphemerisProvider> getProvider() const { return provider_; }
+    
+    /**
+     * @brief Get gravitational parameter of a planet in AU^3/day^2
+     */
+    static double planet_gm(CelestialBody body) {
+        return physics::GravitationalParameter::from_km3_s2(PlanetaryData::getGM(body)).to_au3_d2();
+    }
 
 private:
     std::shared_ptr<EphemerisProvider> provider_;

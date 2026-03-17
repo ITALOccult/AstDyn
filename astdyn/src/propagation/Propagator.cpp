@@ -6,8 +6,8 @@
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/orbit_determination/Residuals.hpp"
-#include "src/core/frame_tags.hpp"
-#include "src/propagation/kepler_propagator.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/propagation/kepler_propagator.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/propagation/AASIntegrator.hpp"
 #include <cmath>
@@ -134,65 +134,6 @@ Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::V
     return xdot;
 }
 
-Eigen::Vector3d Propagator::two_body_acceleration(const Eigen::Vector3d& position) const {
-    double r = position.norm();
-    double r3 = r * r * r;
-    // central_body_gm is configured in AU^3/d^2
-    double mu = settings_.central_body_gm;
-    return -mu * position / r3;
-}
-
-Eigen::Vector3d Propagator::planetary_perturbations(const Eigen::Vector3d& position,
-                                                  time::EpochTDB t,
-                                                  const Eigen::Vector3d& sun_pos_bary) {
-    Eigen::Vector3d perturbation = Eigen::Vector3d::Zero();
-    auto provider = ephemeris_->getProvider();
-    const double au_m = constants::AU * 1000.0;
-
-    auto add_planet_perturbation = [&]( CelestialBody planet, double planet_gm_au) {
-        // Direct AU barycentric position
-        auto p_pos_state = provider->getPosition(planet, t);
-        Eigen::Vector3d p_pos_bary_au = p_pos_state.to_eigen_si() / (constants::AU * 1000.0);
-
-        if (settings_.integrate_in_ecliptic) {
-            p_pos_bary_au = mat_ecl_ * p_pos_bary_au;
-        }
-        
-        Eigen::Vector3d planet_pos_helio_au = p_pos_bary_au - sun_pos_bary;
-        Eigen::Vector3d delta = planet_pos_helio_au - position;
-        
-        const double d_norm = delta.norm();
-        const double d3 = d_norm * d_norm * d_norm;
-        const double p_dist = planet_pos_helio_au.norm();
-        const double p_dist3 = p_dist * p_dist * p_dist;
-        
-        perturbation += planet_gm_au * (delta / d3 - planet_pos_helio_au / p_dist3);
-    };
-    
-    if (settings_.perturb_mercury) add_planet_perturbation(CelestialBody::MERCURY, constants::GM_MERCURY_AU);
-    if (settings_.perturb_venus)   add_planet_perturbation(CelestialBody::VENUS,   constants::GM_VENUS_AU);
-    if (settings_.perturb_earth)   add_planet_perturbation(CelestialBody::EARTH,   constants::GM_EARTH_AU);
-    if (settings_.perturb_mars)    add_planet_perturbation(CelestialBody::MARS,    constants::GM_MARS_AU);
-    if (settings_.perturb_jupiter) add_planet_perturbation(CelestialBody::JUPITER, constants::GM_JUPITER_AU);
-    if (settings_.perturb_saturn)  add_planet_perturbation(CelestialBody::SATURN,  constants::GM_SATURN_AU);
-    if (settings_.perturb_uranus)  add_planet_perturbation(CelestialBody::URANUS,  constants::GM_URANUS_AU);
-    if (settings_.perturb_neptune) add_planet_perturbation(CelestialBody::NEPTUNE, constants::GM_NEPTUNE_AU);
-    
-    if (settings_.include_moon) {
-        double moon_gm_au = physics::GravitationalParameter::from_km3_s2(constants::GM_MOON).to_au3_d2();
-        add_planet_perturbation(CelestialBody::MOON, moon_gm_au);
-    }
-    
-    return perturbation;
-}
-
-Eigen::Vector3d Propagator::asteroid_perturbations(const Eigen::Vector3d& position,
-                                                 time::EpochTDB t,
-                                                 const Eigen::Vector3d& sun_pos_bary) {
-    // Asteroids library assumes AU and returns AU/day^2.
-    // Use the raw interface to avoid state creation overhead during integration.
-    return asteroids_->computePerturbationRaw(position, t.mjd(), sun_pos_bary, settings_.integrate_in_ecliptic);
-}
 
 Eigen::Vector3d Propagator::relativistic_correction(const Eigen::Vector3d& position,
                                                    const Eigen::Vector3d& velocity) const {

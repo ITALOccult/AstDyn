@@ -18,7 +18,7 @@
 
 #include "astdyn/astrometry/sky_types.hpp"
 #include "astdyn/time/TimeScale.hpp"
-#include "src/core/frame_tags.hpp"
+#include "astdyn/core/frame_tags.hpp"
 
 namespace astdyn::catalog {
 

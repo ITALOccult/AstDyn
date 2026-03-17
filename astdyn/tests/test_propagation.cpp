@@ -11,7 +11,7 @@
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/core/physics_types.hpp"
-#include "src/core/frame_tags.hpp"
+#include "astdyn/core/frame_tags.hpp"
 #include <cmath>
 
 using namespace astdyn;

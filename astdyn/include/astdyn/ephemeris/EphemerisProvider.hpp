@@ -15,8 +15,8 @@
 #include "astdyn/ephemeris/CelestialBody.hpp"
 #include "astdyn/time/epoch.hpp"
 #include "astdyn/math/frame_algebra.hpp"
-#include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include <Eigen/Dense>

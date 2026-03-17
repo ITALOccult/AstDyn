@@ -1,28 +1,28 @@
 /**
- * @file OrbitFitAPI.hpp
+ * @file OrbFitAPI.hpp
  * @brief Simple API for OrbFit-style orbit fitting workflow
  * @author ITALOccult AstDyn Team
  * @date 2025-12-13
  */
 
-#ifndef ASTDYN_API_ORBITFITAPI_HPP
-#define ASTDYN_API_ORBITFITAPI_HPP
+#ifndef ASTDYN_ORBIT_DETERMINATION_ORBFITAPI_HPP
+#define ASTDYN_ORBIT_DETERMINATION_ORBFITAPI_HPP
 
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/propagation/OrbitalElements.hpp"
-#include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
-#include "src/types/orbital_state.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
+#include "astdyn/types/orbital_state.hpp"
 #include <string>
 #include <optional>
 
 namespace astdyn {
-namespace api {
+namespace orbit_determination {
 
 /**
- * @brief Result structure for OrbitFitAPI
+ * @brief Result structure for OrbFitAPI
  */
-struct OrbitFitResult {
+struct OrbFitResult {
     bool success = false;
     std::string message;
     
@@ -41,13 +41,13 @@ struct OrbitFitResult {
     double delta_a_km = 0.0;
     double delta_e = 0.0;
 
-    OrbitFitResult() = default;
+    OrbFitResult() = default;
 };
 
 /**
  * @brief Simplified API for performing orbit fits using OrbFit file formats
  */
-class OrbitFitAPI {
+class OrbFitAPI {
 public:
     /**
      * @brief Run a complete orbit fit using .eq1 and .rwo files
@@ -63,9 +63,9 @@ public:
      * @param rwo_file Path to OrbFit .rwo file (observations)
      * @param config_file Path to configuration file (.json), optional
      * @param verbose  Enable verbose output to stdout
-     * @return OrbitFitResult structure containing fit statistics and final orbit
+     * @return OrbFitResult structure containing fit statistics and final orbit
      */
-    static OrbitFitResult run_fit(
+    static OrbFitResult run_fit(
         const std::string& eq1_file,
         const std::string& rwo_file,
         const std::string& config_file = "",
@@ -91,7 +91,7 @@ private:
     static std::string ltrim(const std::string& s);
 };
 
-} // namespace api
+} // namespace orbit_determination
 } // namespace astdyn
 
-#endif // ASTDYN_API_ORBITFITAPI_HPP
+#endif // ASTDYN_ORBIT_DETERMINATION_ORBFITAPI_HPP

@@ -14,8 +14,8 @@
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/math/frame_algebra.hpp"
-#include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
 #include <cmath>
 #include <optional>
 

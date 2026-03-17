@@ -27,10 +27,10 @@
 #include "astdyn/core/Constants.hpp"
 
 // New AstDyn Architecture (CTFYH)
-#include "src/core/units.hpp"
-#include "src/types/orbital_state.hpp"
-#include "src/utils/time_types.hpp"
-#include "src/io/oel_parser.hpp"
+#include "astdyn/core/units.hpp"
+#include "astdyn/types/orbital_state.hpp"
+#include "astdyn/utils/time_types.hpp"
+#include "astdyn/io/oel_parser.hpp"
 
 namespace astdyn {
 using namespace astdyn::constants;

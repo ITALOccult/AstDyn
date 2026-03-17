@@ -16,7 +16,7 @@ using namespace astdyn::orbit_determination;
 using namespace astdyn::io;
 
 int main() {
-    std::cout << "=== AstDyn 3.0: Full Orbit Determination Workflow ===\n" << std::endl;
+    std::cout << "=== AstDyn beta 0.9: Full Orbit Determination Workflow ===\n" << std::endl;
 
     // 1. Load Observations (MPC Format)
     std::string mpc_data = 

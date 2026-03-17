@@ -23,7 +23,7 @@ int main() {
     std::string config_path = "/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/external/ioc_gaialib/config_online.json";
     std::string bsp_path = "/Users/michelebigi/.ioccultcalc/ephemerides/de441_part-2.bsp";
     
-    std::cout << "--- Gaia/AstDyn 3.0 Integration Test ---" << std::endl;
+    std::cout << "--- Gaia/AstDyn beta 0.9 Integration Test ---" << std::endl;
     
     // 1. Initialize Catalog (Online Mode)
     try {

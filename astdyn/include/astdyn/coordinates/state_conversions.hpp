@@ -1,9 +1,9 @@
 #ifndef ASTDYN_COORDINATES_STATE_CONVERSIONS_HPP
 #define ASTDYN_COORDINATES_STATE_CONVERSIONS_HPP
 
-#include "src/types/orbital_state.hpp"
-#include "src/math/kepler_solver.hpp"
-#include "src/math/anomaly_conversions.hpp"
+#include "astdyn/types/orbital_state.hpp"
+#include "astdyn/math/kepler_solver.hpp"
+#include "astdyn/math/anomaly_conversions.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/math/frame_algebra.hpp"
 #include "rotation_matrices.hpp"

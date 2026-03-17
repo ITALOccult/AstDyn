@@ -1,7 +1,7 @@
 #ifndef ASTDYN_IO_LOGGER_HPP
 #define ASTDYN_IO_LOGGER_HPP
 
-#include "src/core/messages.hpp"
+#include "astdyn/core/messages.hpp"
 #include <iostream>
 
 namespace astdyn::io {

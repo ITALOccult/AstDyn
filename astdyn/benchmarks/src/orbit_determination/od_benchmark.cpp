@@ -1,5 +1,5 @@
 // =============================================================================
-//  od_benchmark.cpp  —  AstDyn 3.0  Orbit Determination Benchmark
+//  od_benchmark.cpp  —  AstDyn beta 0.9  Orbit Determination Benchmark
 //
 //  Tests GaussIOD → DifferentialCorrector → ExtendedKalmanFilter pipeline
 //  on three targets: (99942) Apophis, (4) Vesta, (3200) Phaethon
@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
         }
     }
     
-    std::cout << "=== AstDyn 3.0  OD Benchmark (Build 1130) ===" << std::endl;
+    std::cout << "=== AstDyn beta 0.9  OD Benchmark (Build 1130) ===" << std::endl;
     if (!filter.empty()) {
         std::cout << "Target Filter Active: [" << filter << "]" << std::endl;
     }

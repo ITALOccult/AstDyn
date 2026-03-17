@@ -94,6 +94,13 @@ public:
     }
 
 private:
+    struct DesignMatrix {
+        Eigen::MatrixXd A;
+        Eigen::VectorXd b;
+        Eigen::VectorXd weights;
+        std::vector<size_t> valid_indices;
+    };
+
     void handle_carpentry_sigma(int iter, const DifferentialCorrectorSettings& settings, double& current_sigma, std::vector<ObservationResidual>& residuals) {
         if (!settings.reject_outliers) return;
         auto stats = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
@@ -126,16 +133,8 @@ private:
         return physics::CartesianStateTyped<Frame>::from_au_aud(s.epoch, y, s.gm);
     }
 
-    void handle_carpentry_sigma(int iter, const DifferentialCorrectorSettings& settings, double& current_sigma, std::vector<ObservationResidual>& residuals);
-    Eigen::VectorXd solve_normal_equations(const DesignMatrix& dm);
-    bool perform_line_search(const std::vector<observations::OpticalObservation>& obs, const Eigen::VectorXd& correction, const DifferentialCorrectorSettings& settings, physics::CartesianStateTyped<Frame>& current_state, std::vector<ObservationResidual>& residuals, double& cur_rms);
 
-    struct DesignMatrix {
-        Eigen::MatrixXd A;
-        Eigen::VectorXd b;
-        Eigen::VectorXd weights;
-        std::vector<size_t> valid_indices;
-    };
+
 
     DesignMatrix build_design_matrix(const std::vector<observations::OpticalObservation>& obs, const physics::CartesianStateTyped<Frame>& s, const std::vector<ObservationResidual>& res) {
         DesignMatrix dm;

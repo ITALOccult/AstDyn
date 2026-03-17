@@ -1,8 +1,8 @@
 #ifndef ASTDYN_COORDINATES_ROTATION_MATRICES_HPP
 #define ASTDYN_COORDINATES_ROTATION_MATRICES_HPP
 
-#include "src/core/units.hpp"
-#include "src/types/matrices.hpp"
+#include "astdyn/core/units.hpp"
+#include "astdyn/types/matrices.hpp"
 #include <cmath>
 
 namespace astdyn::coordinates {

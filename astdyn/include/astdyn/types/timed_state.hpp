@@ -1,7 +1,7 @@
 #ifndef ASTDYN_TYPES_TIMED_STATE_HPP
 #define ASTDYN_TYPES_TIMED_STATE_HPP
 
-#include "src/types/orbital_state.hpp"
+#include "astdyn/types/orbital_state.hpp"
 #include "astdyn/time/epoch.hpp"
 
 namespace astdyn::types {

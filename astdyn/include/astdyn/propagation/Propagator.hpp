@@ -265,7 +265,7 @@ public:
 };
 
 // ============================================================================
-// Template Implementations (AstDyn 3.0 wrappers)
+// Template Implementations (AstDyn beta 0.9 wrappers)
 // ============================================================================
 
 template <typename Frame>

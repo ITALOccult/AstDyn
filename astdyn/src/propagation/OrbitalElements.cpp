@@ -7,11 +7,11 @@
 #include "astdyn/propagation/PlanetaryPeriodicPerturbations.hpp"
 
 // New AstDyn Architecture (CTFYH)
-#include "src/core/units.hpp"
-#include "src/types/orbital_state.hpp"
-#include "src/math/kepler_solver.hpp"
-#include "src/math/anomaly_conversions.hpp"
-#include "src/coordinates/state_conversions.hpp"
+#include "astdyn/core/units.hpp"
+#include "astdyn/types/orbital_state.hpp"
+#include "astdyn/math/kepler_solver.hpp"
+#include "astdyn/math/anomaly_conversions.hpp"
+#include "astdyn/coordinates/state_conversions.hpp"
 #include "astdyn/core/Constants.hpp"
 
 #include <cmath>

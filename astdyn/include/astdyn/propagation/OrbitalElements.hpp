@@ -16,9 +16,9 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/time/epoch.hpp"
-#include "src/types/vectors.hpp"
-#include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
+#include "astdyn/types/vectors.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include <string>
 #include <optional>

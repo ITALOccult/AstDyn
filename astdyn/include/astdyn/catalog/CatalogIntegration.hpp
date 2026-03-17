@@ -21,7 +21,7 @@
 #include "astdyn/time/epoch.hpp"
 #include "astdyn/io/SPKReader.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
-#include "src/core/frame_tags.hpp"
+#include "astdyn/core/frame_tags.hpp"
 #include <vector>
 
 namespace astdyn { struct AstDynConfig; }

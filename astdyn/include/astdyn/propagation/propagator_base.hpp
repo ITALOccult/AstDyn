@@ -1,8 +1,8 @@
 #ifndef ASTDYN_PROPAGATION_PROPAGATOR_BASE_HPP
 #define ASTDYN_PROPAGATION_PROPAGATOR_BASE_HPP
 
-#include "src/types/timed_state.hpp"
-#include "src/core/messages.hpp"
+#include "astdyn/types/timed_state.hpp"
+#include "astdyn/core/messages.hpp"
 #include <optional>
 
 /** 

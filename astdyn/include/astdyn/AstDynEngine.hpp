@@ -18,6 +18,7 @@
 #include "astdyn/core/Enums.hpp"
 #include "astdyn/close_approach/CloseApproach.hpp"
 #include "astdyn/astrometry/OccultationLogic.hpp"
+#include "astdyn/core/IOCConfig.hpp"
 #include <memory>
 #include <vector>
 #include <string>

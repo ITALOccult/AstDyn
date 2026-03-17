@@ -1,8 +1,8 @@
 #ifndef ASTDYN_IO_OEL_PARSER_HPP
 #define ASTDYN_IO_OEL_PARSER_HPP
 
-#include "src/types/orbital_state.hpp"
-#include "src/core/messages.hpp"
+#include "astdyn/types/orbital_state.hpp"
+#include "astdyn/core/messages.hpp"
 #include <string_view>
 #include <expected>
 #include <fstream>

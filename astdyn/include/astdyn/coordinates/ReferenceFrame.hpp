@@ -441,7 +441,7 @@ public:
         return gmst_rad;
     }
     // ========================================================================
-    // Type-Safe Frame Transformations (AstDyn 3.0)
+    // Type-Safe Frame Transformations (AstDyn beta 0.9)
     // ========================================================================
     // These template methods encode the frame in the types, so the compiler
     // prevents mixing frames at compile-time.

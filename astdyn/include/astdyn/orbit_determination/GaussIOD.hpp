@@ -26,7 +26,7 @@
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/math/frame_algebra.hpp"
 #include "astdyn/astrometry/sky_types.hpp"
-#include "src/core/frame_tags.hpp"
+#include "astdyn/core/frame_tags.hpp"
 #include <vector>
 #include <optional>
 

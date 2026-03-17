@@ -29,8 +29,8 @@ target_link_libraries(example_basic PRIVATE astdyn)
 # target_link_libraries(simple_pompeja_fit PRIVATE astdyn)
 
 # Fitorb API Demo
-# add_executable(fitorb_api_demo fitorb_api_demo.cpp)
-# target_link_libraries(fitorb_api_demo PRIVATE astdyn)
+add_executable(fitorb_api_demo fitorb_api_demo.cpp)
+target_link_libraries(fitorb_api_demo PRIVATE astdyn)
 
 # Example: Configurable parsers system
 # add_executable(example_configurable_parsers example_configurable_parsers.cpp)
@@ -44,8 +44,8 @@ target_link_libraries(example_basic PRIVATE astdyn)
 # add_executable(propagation_example propagation_example.cpp)
 # target_link_libraries(propagation_example PRIVATE astdyn)
 
-# add_executable(fitting_comparison_34713 fitting_comparison_34713.cpp)
-# target_link_libraries(fitting_comparison_34713 PRIVATE astdyn)
+add_executable(fitting_comparison_34713 fitting_comparison_34713.cpp)
+target_link_libraries(fitting_comparison_34713 PRIVATE astdyn)
 
 # add_executable(check_de441_positions check_de441_positions.cpp)
 # target_link_libraries(check_de441_positions PRIVATE astdyn)

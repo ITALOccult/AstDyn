@@ -18,7 +18,7 @@
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/orbit_determination/DifferentialCorrector.hpp"
-#include "astdyn/api/OrbitFitAPI.hpp"
+#include "astdyn/orbit_determination/OrbFitAPI.hpp"
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/astrometry/Astrometry.hpp"
 #include "astdyn/astrometry/OccultationLogic.hpp"
@@ -27,7 +27,7 @@ namespace py = pybind11;
 using namespace astdyn;
 
 PYBIND11_MODULE(pyastdyn, m) {
-    m.doc() = "Python bindings for AstDyn 3.0 - High-precision Asteroid Dynamics";
+    m.doc() = "Python bindings for AstDyn beta 0.9 - High-precision Asteroid Dynamics";
 
     // --- Time Module ---
     py::class_<time::EpochTDB>(m, "EpochTDB")
@@ -195,8 +195,8 @@ PYBIND11_MODULE(pyastdyn, m) {
         .def("fit_orbit", &AstDynEngine::fit_orbit)
         .def("compute_ephemeris", &AstDynEngine::compute_ephemeris);
 
-    py::class_<api::OrbitFitAPI>(m, "OrbitFitAPI")
-        .def_static("run_fit", &api::OrbitFitAPI::run_fit);
+    py::class_<orbit_determination::OrbFitAPI>(m, "OrbFitAPI")
+        .def_static("run_fit", &orbit_determination::OrbFitAPI::run_fit);
 
     m.def("analyze_orbit", [](const physics::CartesianStateTyped<core::GCRF>& state, 
                                const std::vector<observations::OpticalObservation>& obs) {

@@ -2,7 +2,7 @@
 #define ASTDYN_MATH_TRIGONOMETRY_HPP
 
 #include "astdyn/core/Constants.hpp"
-#include "src/core/units.hpp"
+#include "astdyn/core/units.hpp"
 #include <cmath>
 
 namespace astdyn::math {

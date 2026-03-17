@@ -16,7 +16,7 @@
 #include <cstdlib>
 #include <stdexcept>
 
-#include "astdyn/api/OrbitFitAPI.hpp"
+#include "astdyn/orbit_determination/OrbFitAPI.hpp"
 #include "astdyn/observations/RWOReader.hpp"
 #include "astdyn/ephemeris/PositionCalculator.hpp"
 #include "astdyn/ephemeris/AsteroidFitConfig.hpp"
@@ -25,9 +25,9 @@
 #include "astdyn/coordinates/CartesianState.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/epoch.hpp"
-#include "src/types/vectors.hpp"
-#include "src/core/frame_tags.hpp"
-#include "src/core/units.hpp"
+#include "astdyn/types/vectors.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
 #include <iostream>
 #include <fstream>
 
@@ -63,7 +63,7 @@ public:
                                  const std::string& rwo_file,
                                  const std::string& oop_file = "",
                                  bool verbose = true) {
-        auto api_result = api::OrbitFitAPI::run_fit(eq1_file, rwo_file, oop_file, verbose);
+        auto api_result = orbit_determination::OrbFitAPI::run_fit(eq1_file, rwo_file, oop_file, verbose);
         AsteroidFitResult result;
         result.success = api_result.success;
         result.message = api_result.message;
@@ -74,7 +74,7 @@ public:
 
         // Populate typed fitted_orbit
         const auto& state = *api_result.fitted_state;
-        auto eq1_data = api::OrbitFitAPI::parse_eq1(eq1_file);
+        auto eq1_data = orbit_determination::OrbFitAPI::parse_eq1(eq1_file);
         
         result.fitted_orbit = physics::KeplerianStateTyped<core::GCRF>::from_traditional(
             eq1_data.epoch,

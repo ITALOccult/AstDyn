@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(OrbFit
-    VERSION 1.0.0
-    DESCRIPTION "High-precision Asteroid Dynamics Library"
+    VERSION 0.9.0
+    DESCRIPTION "High-precision Asteroid Dynamics Library (beta 0.9)"
     HOMEPAGE_URL "https://github.com/ITALOccult/AstDyn"
     LANGUAGES CXX C
 )
@@ -265,7 +265,7 @@ message(STATUS "")
 message(STATUS "╔════════════════════════════════════════════════════════════╗")
 message(STATUS "║              OrbFit C++ Configuration Summary              ║")
 message(STATUS "╠════════════════════════════════════════════════════════════╣")
-message(STATUS "║ Version:          ${PROJECT_VERSION}")
+message(STATUS "║ Version:          beta 0.9")
 message(STATUS "║ Build Type:       ${CMAKE_BUILD_TYPE}")
 message(STATUS "║ C++ Standard:     C++${CMAKE_CXX_STANDARD}")
 message(STATUS "║ Compiler:         ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
