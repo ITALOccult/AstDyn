@@ -345,6 +345,13 @@ ROUND-TRIP TEST:
 | RKF45 | 4(5) | 6 | Sì | ★★★★ | ★★★★ |
 | **RKF78** | **7(8)** | **13** | **Sì** | **★★★★★** | **★★★★** |
 | Bulirsch-Stoer | Variabile | Variabile | Sì | ★★★★★ | ★★★ |
+| **IAS15 (Radau)**| **15** | **15+** | **Sì** | **★★★★★★** | ★★★ |
+
+### Quando NON usare RKF78
+Sebbene RKF78 sia un eccellente integratore "general purpose", AstDyn include ora alternative specializzate:
+- **IAS15 (Radau15)**: Raccomandato per massima precisione scientifica e problemi "stiff".
+- **SABA4**: Ottimale per integrazioni hamiltoniane a lungo termine dove la conservazione dell'energia è critica.
+- **Gauss-Legendre (GL8)**: Metodo implicito stabile per archi temporali molto lunghi con perturbazioni planetarie.
 
 ### Vantaggi RKF78
 

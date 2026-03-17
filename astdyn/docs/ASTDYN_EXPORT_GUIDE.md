@@ -381,4 +381,17 @@ AstDynPropagator fa parte di **ITALOccultLibrary**
 
 ---
 
-*Ultima modifica: 30 novembre 2025*
+## 🚀 Novità: astdyn_trajectory_export (Tool ad Alta Precisione)
+
+Per casi di ricerca scientifica che richiedono integratori impliciti o simplettici (Gauss, SABA4, IAS15), utilizzare il nuovo tool `astdyn_trajectory_export.cpp` situato in `astdyn/tools/`.
+
+### Esempio: Esportare traiettoria ad alta fedeltà
+```bash
+# Esempio per Ceres usando IAS15 (Radau di ordine 15)
+./bin/astdyn_trajectory_export --asteroid 1 --t0 60000 --tf 61000 --integrator IAS15 --tolerance 1e-12 --output ceres_ias15.csv
+```
+
+---
+
+**© 2026 AstDyS Team - Dipartimento di Matematica, Università di Pisa**
+*Ultima modifica: 17 marzo 2026*

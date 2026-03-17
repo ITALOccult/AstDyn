@@ -13,7 +13,8 @@ AstDyn C++ is a complete rewrite of the original Fortran 90 AstDyn software, bri
 
 - ✅ **Core Infrastructure & Performance**
   - Modern CMake build system with **OpenMP** parallelization
-  - High-precision N-body propagation (AAS/RKF78/Gauss/SABA/RADAU)
+  - **High-Precision Integrator Suite**: AAS, RKF78, Gauss-Legendre (GL8), SABA4, and Radau15 (IAS15).
+  - **Stability & Precision**: Optimized step-control (Picard/Sundman) for non-conservative systems and Jacobian caching for implicit methods.
   - Native C++ SPK (SPICE) reader: **stateless and thread-safe** (no CSPICE needed)
   - JPL DE441 integration via native reader
 
@@ -327,7 +328,9 @@ Original Fortran AstDyn © 1997-2020 AstDyn Consortium
 - [x] **Phase 5**: Orbital Elements *(Complete)*
 - [x] **Phase 6**: Propagation Core *(Complete)*
 - [x] **Phase 7**: Orbit Determination & Uncertainty *(Complete)*
-- [x] **Phase 8**: Close Approaches & Occultations *(Complete)*
+- [x] **Phase 8**: Close Approaches & Occultations *(Validated)*
+  - Stabilized Gauss and SABA step-control for solar system propagation
+  - Optimized Radau15 (IAS15) with Jacobian caching
 - [ ] **Phase 9**: Advanced Fitter (Global Batch)
 - [ ] **Phase 10**: Cloud/Parallel Cluster Support
 - [ ] **Phase 11**: Final Documentation & Release
