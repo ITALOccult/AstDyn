@@ -8,6 +8,10 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
 #include "astdyn/propagation/AASIntegrator.hpp"
+#include "astdyn/propagation/GRKNIntegrator.hpp"
+#include "astdyn/propagation/GaussIntegrator.hpp"
+#include "astdyn/propagation/saba4_integrator.hpp"
+#include "astdyn/propagation/RadauIntegrator.hpp"
 #include <boost/program_options.hpp>
 #include <chrono>
 #include <atomic>
@@ -49,7 +53,7 @@ int main(int argc, char** argv) {
         ("t0", po::value<double>()->default_value(60310.0), "initial epoch (MJD TDB)")
         ("tf", po::value<double>(), "final epoch (MJD TDB)")
         ("step", po::value<double>()->default_value(30.0), "output step (days)")
-        ("integrator", po::value<std::string>()->default_value("AAS"), "AAS | RKF78 | GL8")
+        ("integrator", po::value<std::string>()->default_value("AAS"), "AAS | RKF78 | GL8 | GRKN | SABA4 | IAS15")
         ("tolerance", po::value<double>()->default_value(1e-4), "tolerance (for RKF78/GL8) or precision (for AAS)")
         ("forces", po::value<std::string>(), "full | twobody (shortcut to toggle all)")
         ("output", po::value<std::string>(), "output CSV file (or prefix for multiple asteroids)")
@@ -181,6 +185,10 @@ int main(int argc, char** argv) {
             std::shared_ptr<Integrator> integrator;
             if (integrator_name == "AAS") integrator = std::make_shared<AASIntegrator>(tol);
             else if (integrator_name == "RKF78") integrator = std::make_shared<RKF78Integrator>(0.1, tol);
+            else if (integrator_name == "GL8") integrator = std::make_shared<GaussIntegrator>(0.01, tol); // Smaller initial step for stability
+            else if (integrator_name == "GRKN") integrator = std::make_shared<GRKNIntegrator>(tol, 0.01);
+            else if (integrator_name == "SABA4") integrator = std::make_shared<SABA4Integrator>(0.01, tol);
+            else if (integrator_name == "IAS15") integrator = std::make_shared<RadauIntegrator>(0.01, tol);
             else continue;
 
             Propagator propagator(integrator, local_ephem, settings);
