@@ -206,6 +206,10 @@ private:
     
     // Optional SPK Reader for precise positions
     std::unique_ptr<io::SPKReader> spk_reader_;
+
+    // Cache for same-time evaluations
+    mutable double last_mjd_cached_ = -1.0;
+    mutable std::vector<Eigen::Vector3d> pos_cache_ecl_au_;
 };
 
 /**

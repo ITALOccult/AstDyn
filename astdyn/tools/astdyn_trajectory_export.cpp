@@ -151,15 +151,15 @@ int main(int argc, char** argv) {
 
     std::cout << "[trajectory_export] Processing " << jobs.size() << " asteroids in parallel...\n";
 
-    std::atomic<long> total_steps_done{0};
-    std::mutex progress_mutex;
-    auto start_time = std::chrono::steady_clock::now();
-    
     long total_planned = 0;
     for (const auto& job : jobs) {
         total_planned += (long)((tf_mjd - job.t0) / step_days);
     }
-    if (total_planned == 0) total_planned = 1; // Avoid div by zero
+    if (total_planned == 0) total_planned = 1;
+
+    std::atomic<long> total_steps_done{0};
+    std::mutex progress_mutex;
+    auto start_time = std::chrono::steady_clock::now();
 
     std::cout << "[Batch Progress] 0.0% | Elapsed: 0s | ETA: ---s" << std::flush;
 
@@ -205,10 +205,6 @@ int main(int argc, char** argv) {
             double h0 = compute_h(current_y, current_t);
             out << current_t << "," << current_y[0] << "," << current_y[1] << "," << current_y[2] << "," << current_y[3] << "," << current_y[4] << "," << current_y[5] << ",0.0,1.0\n";
 
-            static std::atomic<long> total_steps_done{0};
-            static std::mutex progress_mutex;
-            static auto start_time = std::chrono::steady_clock::now();
-
             // Sliced integration for progress reporting
             double t_target = current_t + step_days;
             while (t_target < tf_mjd + 1e-10) {
@@ -223,13 +219,13 @@ int main(int argc, char** argv) {
                 total_steps_done++;
                 
                 // Report progress frequently (every step)
-                {
+                if (total_steps_done % 1 == 0) { // Report every step for better feedback
                     std::lock_guard<std::mutex> lock(progress_mutex);
                     auto now = std::chrono::steady_clock::now();
                     double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count() / 1000.0;
                     double percent = 100.0 * total_steps_done / total_planned;
                     if (percent > 100.0) percent = 100.0;
-                    double eta = (percent > 0.01) ? (elapsed / percent * (100.0 - percent)) : 0.0;
+                    double eta = (percent > 0.1) ? (elapsed / percent * (100.0 - percent)) : 0.0;
                     
                     std::cout << "\r[Batch Progress] " << std::fixed << std::setprecision(1) << percent << "% "
                               << "| Elapsed: " << (int)elapsed << "s "
@@ -246,6 +242,7 @@ int main(int argc, char** argv) {
         }
     }
 
+    std::cout << "\r[Batch Progress] 100.0% | Elapsed: " << (int)(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time).count() / 1000.0) << "s | ETA: 0s      \n";
     std::cout << "[trajectory_export] All exports complete.\n";
     return 0;
 }

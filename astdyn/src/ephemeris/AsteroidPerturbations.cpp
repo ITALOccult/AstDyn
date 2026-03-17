@@ -229,27 +229,19 @@ math::Vector3<Frame, physics::Acceleration> AsteroidPerturbations::computePertur
 {
     math::Vector3<Frame, physics::Acceleration> total_acc = math::Vector3<Frame, physics::Acceleration>::from_si(0,0,0);
     
-    // Transform Sun position to integration frame
-    auto sun_pos_frame = coordinates::ReferenceFrame::transform_pos<core::GCRF, Frame>(sun_pos_bary, state.epoch);
+    // Transform Sun position to integration frame (not used currently, but kept for future use)
+    // auto sun_pos_frame = coordinates::ReferenceFrame::transform_pos<core::GCRF, Frame>(sun_pos_bary, state.epoch);
 
-    // For few asteroids, overhead might exceed benefit, but it enables scaling.
-    #pragma omp parallel
-    {
-        math::Vector3<Frame, physics::Acceleration> thread_acc = math::Vector3<Frame, physics::Acceleration>::from_si(0,0,0);
-        #pragma omp for nowait
-        for (size_t i = 0; i < asteroids_.size(); ++i) {
-            if (!enabled_flags_[i]) continue;
-            
-            const auto& asteroid = asteroids_[i];
-            
-            try {
-                auto ast_pos_ecl = getPosition(asteroid, state.epoch);
-                auto ast_pos_frame = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, Frame>(ast_pos_ecl, state.epoch);
-                thread_acc = thread_acc + computeSinglePerturbation<Frame>(state.position, ast_pos_frame, asteroid.gm);
-            } catch (...) { }
-        }
-        #pragma omp critical
-        total_acc = total_acc + thread_acc;
+    for (size_t i = 0; i < asteroids_.size(); ++i) {
+        if (!enabled_flags_[i]) continue;
+        
+        const auto& asteroid = asteroids_[i];
+        
+        try {
+            auto ast_pos_ecl = getPosition(asteroid, state.epoch);
+            auto ast_pos_frame = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, Frame>(ast_pos_ecl, state.epoch);
+            total_acc = total_acc + computeSinglePerturbation<Frame>(state.position, ast_pos_frame, asteroid.gm);
+        } catch (...) { }
     }
     
     return total_acc;
@@ -298,40 +290,40 @@ Eigen::Vector3d AsteroidPerturbations::computePerturbationRaw(
     Eigen::Vector3d total_acc_au_d2 = Eigen::Vector3d::Zero();
     time::EpochTDB t = time::EpochTDB::from_mjd(mjd);
 
-    // We need to know the frame for 'getPosition' and 'coordinates::ReferenceFrame'
-    // Internal getPosition returns Heliorcentric ECLIPJ2000.
-    
-    #pragma omp parallel
-    {
-        Eigen::Vector3d thread_acc = Eigen::Vector3d::Zero();
-        #pragma omp for nowait
+    // Update cache if time changed
+    if (std::abs(mjd - last_mjd_cached_) > 1e-14 || pos_cache_ecl_au_.size() != asteroids_.size()) {
+        last_mjd_cached_ = mjd;
+        pos_cache_ecl_au_.resize(asteroids_.size());
         for (size_t i = 0; i < asteroids_.size(); ++i) {
             if (!enabled_flags_[i]) continue;
-            
-            const auto& asteroid = asteroids_[i];
-            
-            try {
-                auto ast_pos_ecl_math = getPosition(asteroid, t);
-                Eigen::Vector3d ast_pos_ecl_au = ast_pos_ecl_math.to_eigen_si() / (constants::AU * 1000.0);
-                
-                Eigen::Vector3d ast_pos_frame_au = ast_pos_ecl_au;
-                if (!in_ecliptic) {
-                    ast_pos_frame_au = coordinates::ReferenceFrame::ecliptic_to_j2000() * ast_pos_ecl_au;
-                }
-
-                Eigen::Vector3d delta = ast_pos_frame_au - pos_au;
-                double d_norm = delta.norm();
-                double d3 = d_norm * d_norm * d_norm;
-                double gm_au_d2 = asteroid.gm.to_au3_d2();
-                
-                thread_acc += gm_au_d2 * delta / d3;
-                double r_ast = ast_pos_frame_au.norm();
-                thread_acc -= gm_au_d2 * ast_pos_frame_au / (r_ast * r_ast * r_ast);
-                
-            } catch (...) { }
+            auto ast_pos_ecl_math = getPosition(asteroids_[i], t);
+            pos_cache_ecl_au_[i] = ast_pos_ecl_math.to_eigen_si() / (constants::AU * 1000.0);
         }
-        #pragma omp critical
-        total_acc_au_d2 += thread_acc;
+    }
+
+    for (size_t i = 0; i < asteroids_.size(); ++i) {
+        if (!enabled_flags_[i]) continue;
+        
+        const auto& asteroid = asteroids_[i];
+        
+        try {
+            Eigen::Vector3d ast_pos_frame_au = pos_cache_ecl_au_[i];
+            if (!in_ecliptic) {
+                ast_pos_frame_au = coordinates::ReferenceFrame::ecliptic_to_j2000() * ast_pos_frame_au;
+            }
+
+            Eigen::Vector3d delta = ast_pos_frame_au - pos_au;
+            double d_norm = delta.norm();
+            double d_norm2 = d_norm * d_norm;
+            double d3 = d_norm2 * d_norm;
+            double gm_au_d2 = asteroid.gm.to_au3_d2();
+            
+            total_acc_au_d2 += gm_au_d2 * delta / d3;
+            
+            double r_ast = ast_pos_frame_au.norm();
+            total_acc_au_d2 -= gm_au_d2 * ast_pos_frame_au / (r_ast * r_ast * r_ast);
+            
+        } catch (...) { }
     }
     
     return total_acc_au_d2;
