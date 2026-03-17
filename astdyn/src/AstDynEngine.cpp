@@ -225,9 +225,21 @@ std::vector<CloseApproach> AstDynEngine::find_close_approaches(time::EpochTDB st
 }
 
 double AstDynEngine::compute_moid(ephemeris::CelestialBody planet) {
-    if (!has_orbit_) return 1.0;
-    // (Actual MOID logic would go here, omitting for brevity in rewrite)
-    return 0.1; 
+    if (!has_orbit_) return 1e9;
+    
+    // Bridge to propagation::KeplerianElements for MOID calculator
+    auto els = current_orbit_;
+    propagation::KeplerianElements legacy;
+    legacy.semi_major_axis = els.a.to_au();
+    legacy.eccentricity = els.e;
+    legacy.inclination = els.i.to_rad();
+    legacy.longitude_ascending_node = els.node.to_rad();
+    legacy.argument_perihelion = els.omega.to_rad();
+    legacy.mean_anomaly = els.M.to_rad();
+    legacy.gravitational_parameter = els.gm.to_au3_d2();
+
+    close_approach::BodyType b_type = static_cast<close_approach::BodyType>(planet);
+    return close_approach::MOIDCalculator::compute_moid(legacy, b_type);
 }
 
 ApparentPlace AstDynEngine::compute_asteroid_apparent_place(time::EpochTDB t_occult, const std::string& observatory_code) {

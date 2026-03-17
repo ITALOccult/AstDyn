@@ -178,7 +178,7 @@ void OccultationLogic::compute_sky_conditions(
     );
     
     params.sun_altitude = Angle::from_rad(std::asin(std::clamp(n_ast.dot(n_sun), -1.0, 1.0)));
-    params.is_daylight = params.sun_altitude.to_deg() > -0.83; // Standard refraction/disk correction
+    params.is_daylight = params.sun_altitude.to_deg() > constants::SUN_ALTITUDE_LIMIT_DEG;
 
     // Moon Geometry
     auto moon_ssb = ephem->getState(ephemeris::CelestialBody::MOON, t_ca);
@@ -219,8 +219,8 @@ void OccultationLogic::process_day_window(
 
 void OccultationLogic::evaluate_candidate(
     std::vector<OccultationCandidate>& results,
-    const astdyn::catalog::ChebyshevSegment& segment,
-    const astdyn::catalog::Star& star,
+    const catalog::ChebyshevSegment& segment,
+    const catalog::Star& star,
     const OccultationConfig& config,
     AstDynEngine& engine,
     double t_start_jd, double t_end_jd)
@@ -232,12 +232,15 @@ void OccultationLogic::evaluate_candidate(
     auto [pos, vel] = segment.evaluate_full(t_ca_jd);
     auto star_at_tca = star.predict_at(t_ca);
     
+    // Rates from Chebyshev (deg/day) to arcsec/hr
+    double dra_hr = (std::get<0>(vel) / 24.0) * 3600.0;
+    double ddec_hr = (std::get<1>(vel) / 24.0) * 3600.0;
+
     OccultationParameters params = compute_parameters(
         star_at_tca.ra(), star_at_tca.dec(),
         RightAscension::from_deg(std::get<0>(pos)), Declination::from_deg(std::get<1>(pos)),
         physics::Distance::from_au(std::get<2>(pos)),
-        Angle::from_arcsec((std::get<0>(vel) / 24.0) * 3600.0), 
-        Angle::from_arcsec((std::get<1>(vel) / 24.0) * 3600.0),
+        Angle::from_arcsec(dra_hr), Angle::from_arcsec(ddec_hr),
         physics::Velocity::from_au_d(std::get<2>(vel)),
         t_ca, engine.getEphemeris());
 

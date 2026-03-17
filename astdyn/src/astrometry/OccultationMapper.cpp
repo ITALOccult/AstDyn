@@ -97,7 +97,7 @@ std::optional<GeoPoint> OccultationMapper::calculate_geopoint_at_epoch(
         eta_m += offset_perp.to_m() * ( vxi  / v_norm);
     }
 
-    double r_earth_m = constants::R_EARTH * 1000.0;
+    double r_earth_m = constants::R_EARTH_EQUATORIAL * 1000.0;
     double d2 = xi_m*xi_m + eta_m*eta_m;
     
     if (d2 >= r_earth_m * r_earth_m) return std::nullopt;

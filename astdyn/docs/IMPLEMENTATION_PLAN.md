@@ -41,10 +41,10 @@ AstDyn C++ is a modern, high-precision orbital mechanics library. This plan trac
 - [x] Covariance propagation and mapping
 - [x] Outlier rejection (Sigma-clipping)
 
-### Phase 8: Occultations & Close Approaches
 - [x] Bessel Fundamental Plane occultation engine
+- [x] Optimized Close Approach detector (Numerical TCA refinement)
+- [x] High-precision MOID calculator (2-stage grid refinement)
 - [x] Validated against Occult4 benchmarks (Vesta 2026, Nireus 2026)
-- [x] Parallel batch discovery for multi-asteroid campaigns
 
 ## 🛠️ Upcoming Milestones
 
@@ -80,6 +80,7 @@ AstDyn C++ is a modern, high-precision orbital mechanics library. This plan trac
 | `OccultationMapper` | R1, R4 | ✅ COMPLETED | Extracted projection and marker logic. |
 | `OccultationMapper` | R5 | ✅ COMPLETED | Named constants for ERA coefficients. |
 | `ioccultcalc.cpp` | Boy Scout | ✅ COMPLETED | Refactored main flow and logic. |
+| `CloseApproach` | CFIYH | ✅ COMPLETED | Added MOID refinement and golden search for TCA. |
 | `LeastSquaresOD` | R2, R6 | 🕒 PENDING | Convert residuals to `Angle` and matrix SI. |
 
 ---

@@ -110,7 +110,7 @@ Eigen::Vector3d Propagator::compute_earth_j2(const Eigen::Vector3d& pos, time::E
     if (r < 1e-6) return Eigen::Vector3d::Zero();
 
     Eigen::Vector3d r_eq = settings_.integrate_in_ecliptic ? (coordinates::ReferenceFrame::ecliptic_to_j2000() * r_rel) : r_rel;
-    double j2_c = 1.5 * constants::EARTH_J2 * constants::GM_EARTH_AU * std::pow(constants::R_EARTH / constants::AU, 2);
+    double j2_c = 1.5 * constants::EARTH_J2 * constants::GM_EARTH_AU * std::pow(constants::R_EARTH_EQUATORIAL / constants::AU, 2);
     double z_r = r_eq.z() / r, r5 = std::pow(r, 5);
     Eigen::Vector3d a_j2; a_j2 << r_eq.x() * (5 * z_r * z_r - 1), r_eq.y() * (5 * z_r * z_r - 1), r_eq.z() * (5 * z_r * z_r - 3);
     

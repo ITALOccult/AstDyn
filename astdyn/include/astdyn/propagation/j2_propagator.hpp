@@ -22,7 +22,7 @@ struct J2Rates {
     /** @brief Computes secular rates based on Earth J2 model. */
     static constexpr J2Rates compute(const double a, const double e, const double i, const double mu) noexcept {
         const double J2 = constants::EARTH_J2;
-        const double RE = constants::R_EARTH;
+        const double RE = constants::R_EARTH_EQUATORIAL;
         
         const double p = a * (1.0 - e * e);
         const double n = std::sqrt(mu / (a * a * a));

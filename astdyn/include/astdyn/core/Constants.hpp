@@ -104,7 +104,7 @@ constexpr double R_SUN = 695700.0;
 constexpr double R_SUN_AU = R_SUN / AU;
 
 /// Earth equatorial radius [km] (WGS84)
-constexpr double R_EARTH = 6378.137;
+constexpr double R_EARTH_EQUATORIAL = 6378.137;
 
 /// Earth flattening (WGS84)
 constexpr double EARTH_FLATTENING = 1.0 / 298.257223563;
@@ -119,6 +119,18 @@ constexpr double SUN_J2 = 2.2e-7;
 /// This is the fixed value at J2000.0.  For a time-varying value use
 /// coordinates::ReferenceFrame::mean_obliquity(epoch).
 constexpr double OBLIQUITY_J2000 = 84381.406 * ARCSEC_TO_RAD;
+
+// ============================================================================
+// Sky Geometry Constants
+// ============================================================================
+
+/// standard Sun altitude limit for daylight [deg] (refraction + disk radius ~ 50')
+constexpr double SUN_ALTITUDE_LIMIT_DEG = -0.833;
+
+/// twilight limits [deg]
+constexpr double TWILIGHT_CIVIL_DEG = -6.0;
+constexpr double TWILIGHT_NAUTICAL_DEG = -12.0;
+constexpr double TWILIGHT_ASTRONOMICAL_DEG = -18.0;
 
 // ============================================================================
 // Gravitational Parameters [km^3/s^2] (from JPL DE431)
@@ -159,6 +171,22 @@ constexpr double GM_NEPTUNE = 6836527.100580;
 
 /// GM Pluto system
 constexpr double GM_PLUTO = 975.500000;
+
+// ============================================================================
+// Planetary Radii [km] (IAU 2015 reference values)
+// ============================================================================
+
+constexpr double R_SUN     = 695700.0;   // Sun (nominal)
+constexpr double R_MERCURY = 2439.7;     // Mercury
+constexpr double R_VENUS   = 6051.8;     // Venus
+constexpr double R_EARTH   = 6371.0084;  // Earth (nominal mean volumetric)
+constexpr double R_MARS    = 3389.5;     // Mars
+constexpr double R_JUPITER = 69911.0;    // Jupiter
+constexpr double R_SATURN  = 58232.0;    // Saturn
+constexpr double R_URANUS  = 25362.0;    // Uranus
+constexpr double R_NEPTUNE = 24622.0;    // Neptune
+constexpr double R_PLUTO   = 1188.3;     // Pluto
+constexpr double R_MOON    = 1737.4;     // Moon
 
 // ============================================================================
 // Gravitational Parameters in AU³/day² (for orbit propagation)

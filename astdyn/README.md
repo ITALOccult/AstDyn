@@ -20,13 +20,14 @@ AstDyn C++ is a complete rewrite of the original Fortran 90 AstDyn software, bri
 - ✅ **Astrometry & Occultations**
   - High-precision Occultation Engine (Bessel Fundamental Plane)
   - Validated against Occult4 (precision < 1 mas)
-  - Parallel batch searching for multi-asteroid occultations
-  - Gaia DR3 integration for stellar positions, proper motion, and parallax
+  - **Relativistic Aberration & Light Deflection** (IAU 2000 compliant)
+  - Advanced stellar correctors for Gaia DR3 (Proper Motion, Parallax)
 
 - ✅ **Dynamics & Perturbations**
-  - Default 17-asteroid perturbation set (16 massive + Pluto)
-  - Relativistic corrections and J2 harmonics (Sun/Earth)
-  - Advanced Orbit Determination (Initial & Least Squares)
+  - **Optimized Close Approach Engine**: Sub-millimeter TCA refinement via golden-section search
+  - **High-Precision MOID**: Optimized 2-stage grid search for Minimum Orbit Intersection Distance
+  - Native Force Model: 17 massive asteroids, relativity, and J2 (Sun/Earth)
+  - **IAU 2015 Standards**: Standardized GM and physical radii repository
 
 ## 🛠️ Requirements
 

@@ -196,59 +196,20 @@ private:
     CloseApproachSettings settings_;
     
     /**
-     * @brief Monitor distance during propagation step
-     * 
-     * @param t Time [MJD TDB]
-     * @param state Current state
-     * @param body Body to check
-     * @return Distance to body [AU]
+     * @brief Process a single body for close approaches during a step
      */
-    double compute_distance(
-        time::EpochTDB t,
-        const physics::CartesianStateTyped<core::GCRF>& state,
-        BodyType body) const;
-    
-    /**
-     * @brief Refine time of closest approach
-     * 
-     * Uses root finding (bisection/Brent) to accurately determine
-     * the time when distance is minimized.
-     * 
-     * @param state_t1 State at time t1
-     * @param state_t2 State at time t2
-     * @param t1 Earlier time [MJD TDB]
-     * @param t2 Later time [MJD TDB]
-     * @param body Target body
-     * @return Time of closest approach [MJD TDB]
-     */
-    time::EpochTDB detect_approach_time(
-        const physics::CartesianStateTyped<core::GCRF>& state_t1,
-        const physics::CartesianStateTyped<core::GCRF>& state_t2,
-        time::EpochTDB t1,
-        time::EpochTDB t2,
-        BodyType body) const;
-    
-    /**
-     * @brief Build CloseApproach structure
-     * 
-     * @param t Time [MJD TDB]
-     * @param state Object state
-     * @param body Target body
-     * @return Complete CloseApproach structure
-     */
-    CloseApproach build_approach(
-        time::EpochTDB t,
-        const physics::CartesianStateTyped<core::GCRF>& state,
-        BodyType body) const;
-    
-    /**
-     * @brief Get body from celestial body enum
-     */
+    void check_body_approaches(BodyType body, time::EpochTDB t_next, 
+                               const physics::CartesianStateTyped<core::GCRF>& current_state,
+                               const physics::CartesianStateTyped<core::GCRF>& prev_state,
+                               double t_prev_val,
+                               std::map<BodyType, double>& prev_distances,
+                               std::vector<CloseApproach>& approaches);
+
+    double compute_distance(time::EpochTDB t, const physics::CartesianStateTyped<core::GCRF>& state, BodyType body) const;
+    time::EpochTDB detect_approach_time(const physics::CartesianStateTyped<core::GCRF>& s1, const physics::CartesianStateTyped<core::GCRF>& s2,
+                                         time::EpochTDB t1, time::EpochTDB t2, BodyType body) const;
+    CloseApproach build_approach(time::EpochTDB t, const physics::CartesianStateTyped<core::GCRF>& state, BodyType body) const;
     ephemeris::CelestialBody to_celestial_body(BodyType body) const;
-    
-    /**
-     * @brief Get planet radius in AU
-     */
     double get_planet_radius(BodyType body) const;
 };
 
@@ -286,6 +247,12 @@ public:
         const propagation::KeplerianElements& orbit2);
 
 private:
+    /**
+     * @brief Get mean orbital elements for a planet
+     * These elements are J2000 approximations useful for MOID estimation.
+     */
+    static propagation::KeplerianElements get_planet_mean_elements(BodyType planet);
+
     /**
      * @brief Objective function for MOID optimization
      * 

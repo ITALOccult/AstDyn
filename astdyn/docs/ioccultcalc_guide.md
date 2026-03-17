@@ -13,10 +13,12 @@ To run a basic search with organized workspace output:
 ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 30.0 --out-dir campaign_2026 --prefix v_test
 ```
 
-### v0.7 Features (Latest)
-- **OpenMP Acceleration**: Automatically scales search tasks across all CPU cores.
-- **CSPICE-Free Engine**: No external dependencies required for high-precision ephemeris.
-- **Bessel-FP Refinement**: Validated occultation logic with milli-arcsecond accuracy.
+### v0.7 Features (Current Highlights)
+- **IAU 2015 High-Precision Constants**: Standardized planetary radii and GMs for physical consistency.
+- **Relativistic Precision**: IAU 2000 compliant stellar aberration and gravitational light deflection.
+- **Sub-Millisecond TCA**: Refined Closest Approach timing via golden-section searching.
+- **OpenMP Acceleration**: Fully parallelized discovery corridor scans.
+- **Stateless SPK Reader**: High-performance planetary and asteroid ephemeris access.
 
 ### Essential Command Line Arguments
 
