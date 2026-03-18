@@ -118,8 +118,8 @@ void AstDynEngine::load_physics_settings(const core::IOCConfig& ioc) {
     ps.use_default_30_set = ioc.get<bool>("physics.asteroids.use_default_30", false);
     ps.include_relativity = ioc.get<bool>("physics.relativity", true);
     config_.ephemeris_type = string_to_ephemeris(ioc.get<std::string>("ephemeris.type", "DE441"));
-    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", "ephemerides/de441.bsp");
-    config_.asteroid_ephemeris_file = ioc.get<std::string>("ephemeris.asteroid_file", "ephemerides/sb441.bsp");
+    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp");
+    config_.asteroid_ephemeris_file = ioc.get<std::string>("ephemeris.asteroid_file", "");
 }
 
 void AstDynEngine::load_fitting_settings(const core::IOCConfig& ioc) {

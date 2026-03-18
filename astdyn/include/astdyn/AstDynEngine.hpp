@@ -41,8 +41,8 @@ struct AstDynConfig {
 
     // Ephemeris Configuration
     EphemerisType ephemeris_type = EphemerisType::DE441; ///< Analytical, DE441 (Default to high precision)
-    std::string ephemeris_file = "ephemerides/de441.bsp";
-    std::string asteroid_ephemeris_file = "ephemerides/sb441.bsp";
+    std::string ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp";
+    std::string asteroid_ephemeris_file = "";
     
     // Differential correction settings
     int max_iterations = 10;                 ///< Maximum DC iterations

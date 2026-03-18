@@ -258,7 +258,7 @@ void OccultationMapper::export_global_svg(
     double vy = -center_lat.to_deg() * 10.0 - vh / 2.0;
 
     // SVG Header
-    ofs << "<svg viewBox=\"" << vx << " " << vy << " " << vw << " " << vh << "\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background:#0b0e14; font-family: 'Outfit', 'Inter', sans-serif;\">\n";
+    ofs << "<svg viewBox=\"" << vx << " " << vy << " " << vw << " " << vh << "\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background-color:#020617; font-family: 'Outfit', 'Inter', sans-serif;\">\n";
     
     // Defs
     ofs << "  <defs>\n";
@@ -280,24 +280,24 @@ void OccultationMapper::export_global_svg(
     auto lon_to_svg = [&](double lon) { return lon * 10.0; };
     auto lat_to_svg = [&](double lat) { return -lat * 10.0; };
 
-    // 1. Sea
-    ofs << "  <rect x=\"-1800\" y=\"-900\" width=\"3600\" height=\"1800\" fill=\"#0b0e14\" />\n";
+    // 1. Sea - Deep Navy Gradient or solid
+    ofs << "  <rect x=\"-1800\" y=\"-900\" width=\"3600\" height=\"1800\" fill=\"#020617\" />\n";
 
     // 2. Graticule
-    ofs << "  <g stroke=\"#1e293b\" stroke-width=\"" << 1.0 / zoom << "\" stroke-dasharray=\"" << 10.0/zoom << "," << 10.0/zoom << "\" opacity=\"0.5\">\n";
+    ofs << "  <g stroke=\"#1e293b\" stroke-width=\"" << 0.8 / zoom << "\" stroke-dasharray=\"" << 15.0/zoom << "," << 10.0/zoom << "\" opacity=\"0.4\">\n";
     for (int lat = -90; lat <= 90; lat += 15) ofs << "    <line x1=\"-1800\" y1=\"" << lat_to_svg(lat) << "\" x2=\"1800\" y2=\"" << lat_to_svg(lat) << "\" />\n";
     for (int lon = -180; lon <= 180; lon += 15) ofs << "    <line x1=\"" << lon_to_svg(lon) << "\" y1=\"-900\" x2=\"" << lon_to_svg(lon) << "\" y2=\"900\" />\n";
     ofs << "  </g>\n";
 
-    // 3. Detailed World Map - Coastlines
-    ofs << "  <g fill=\"#1e293b\" stroke=\"#334155\" stroke-width=\"" << 0.8 / zoom << "\" transform=\"scale(10, -10)\">\n";
+    // 3. Detailed World Map - Coastlines (Slightly lighter than sea)
+    ofs << "  <g fill=\"#0f172a\" stroke=\"#334155\" stroke-width=\"" << 0.6 / zoom << "\" transform=\"scale(10, -10)\">\n";
     for (const auto& d : WorldMapData::get_coastlines()) {
         ofs << "    <path d=\"" << d << "\" />\n";
     }
     ofs << "  </g>\n";
 
     // 3.1 Political Boundaries
-    ofs << "  <g fill=\"none\" stroke=\"#475569\" stroke-width=\"" << 0.5 / zoom << "\" stroke-dasharray=\"" << 1.0/zoom << "," << 1.0/zoom << "\" transform=\"scale(10, -10)\" opacity=\"0.7\">\n";
+    ofs << "  <g fill=\"none\" stroke=\"#475569\" stroke-width=\"" << 0.4 / zoom << "\" stroke-dasharray=\"" << 2.0/zoom << "," << 2.0/zoom << "\" transform=\"scale(10, -10)\" opacity=\"0.6\">\n";
     for (const auto& d : WorldMapData::get_borders()) {
         ofs << "    <path d=\"" << d << "\" />\n";
     }
@@ -308,8 +308,9 @@ void OccultationMapper::export_global_svg(
     for (const auto& city : WorldMapData::get_major_cities()) {
         double cx = lon_to_svg(city.lon);
         double cy = lat_to_svg(city.lat);
-        ofs << "    <circle cx=\"" << cx << "\" cy=\"" << cy << "\" r=\"" << 5.0 / zoom << "\" fill=\"#94a3b8\" opacity=\"0.6\" />\n";
-        ofs << "    <text x=\"" << cx + 10.0/zoom << "\" y=\"" << cy + 5.0/zoom << "\" fill=\"#64748b\" font-size=\"" << 20.0 / zoom << "\" opacity=\"0.5\">" << city.name << "</text>\n";
+        // Better City markers (Small dot + light glow background for text readability)
+        ofs << "    <circle cx=\"" << cx << "\" cy=\"" << cy << "\" r=\"" << 4.0 / zoom << "\" fill=\"#e2e8f0\" opacity=\"0.8\" />\n";
+        ofs << "    <text x=\"" << cx + 12.0/zoom << "\" y=\"" << cy + 4.0/zoom << "\" fill=\"#94a3b8\" font-size=\"" << 18.0 / zoom << "\" font-weight=\"500\" opacity=\"0.6\" stroke=\"#020617\" stroke-width=\"" << 2.0/zoom << "\" paint-order=\"stroke\">" << city.name << "</text>\n";
     }
     ofs << "  </g>\n";
 
@@ -372,10 +373,9 @@ void OccultationMapper::export_global_svg(
     double margin = 50.0 * ui_scale;
     double lx = vx + margin;
     double ly = vy + margin;
-
-    ofs << "  <rect x=\"" << lx << "\" y=\"" << ly << "\" width=\"" << 850 * ui_scale << "\" height=\"" << 200 * ui_scale << "\" rx=\"" << 25 * ui_scale << "\" fill=\"#1e293b\" fill-opacity=\"0.95\" stroke=\"#334155\" stroke-width=\"" << 2 * ui_scale << "\" />\n";
+    ofs << "  <rect x=\"" << lx << "\" y=\"" << ly << "\" width=\"" << 850 * ui_scale << "\" height=\"" << 200 * ui_scale << "\" rx=\"" << 25 * ui_scale << "\" fill=\"#0f172a\" fill-opacity=\"0.95\" stroke=\"#334155\" stroke-width=\"" << 2 * ui_scale << "\" />\n";
     ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 65 * ui_scale << "\" fill=\"#f8fafc\" font-size=\"" << 65 * ui_scale << "\" font-weight=\"900\">ASTDYN PRECISION MAP</text>\n";
-    ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 130 * ui_scale << "\" fill=\"#94a3b8\" font-size=\"" << 42 * ui_scale << "\">Beta 0.5 - High-Fidelity Projection</text>\n";
+    ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 130 * ui_scale << "\" fill=\"#0ea5e9\" font-size=\"" << 42 * ui_scale << "\">High-Fidelity Multi-Body Dynamics</text>\n";
 
     for (size_t i = 0; i < paths.size(); ++i) {
         std::string label = (i < labels.size()) ? labels[i] : "Path " + std::to_string(i);

@@ -60,7 +60,7 @@ struct PropagatorSettings {
 
     // Optional: Path to Asteroid SPK kernel (e.g. codes_300ast.bsp)
     // If empty, uses analytical approximation (AST17 constants)
-    std::string asteroid_ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp";
+    std::string asteroid_ephemeris_file = "";
 
     // Frame Settings
     bool integrate_in_ecliptic = true; ///< Forced true to match propagate_cartesian requirement.
