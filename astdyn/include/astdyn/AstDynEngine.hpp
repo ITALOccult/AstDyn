@@ -58,9 +58,9 @@ struct AstDynConfig {
     astrometry::OccultationConfig occultation_settings;
     
     // Residual calculation settings
-    bool aberration_correction = true;       ///< Apply annual aberration
+    bool aberrazione_differenziale = true;   ///< Apply annual aberration
     bool light_time_correction = true;       ///< Apply light-time correction
-    bool light_deflection = true;            ///< Apply light deflection (GR)
+    bool deflessione_relativistica = true;   ///< Apply light deflection (GR)
     
     // Output settings
     bool verbose = true;                     ///< Verbose output
@@ -185,7 +185,7 @@ template <typename Frame>
 OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
     using namespace orbit_determination;
     OrbitFitter<Frame> fitter(ephemeris_, propagator_);
-    fitter.set_corrections(config_.aberration_correction, config_.light_time_correction);
+    fitter.set_corrections(config_.aberrazione_differenziale, config_.light_time_correction);
     DifferentialCorrectorSettings dc_settings;
     dc_settings.max_iterations = config_.max_iterations;
     dc_settings.convergence_tolerance = physics::Distance::from_au(config_.convergence_threshold);

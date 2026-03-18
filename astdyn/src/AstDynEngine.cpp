@@ -127,8 +127,8 @@ void AstDynEngine::load_fitting_settings(const core::IOCConfig& ioc) {
     config_.convergence_threshold = ioc.get<double>("diffcorr.convergence", 1e-6);
     config_.outlier_sigma = ioc.get<double>("diffcorr.outlier_threshold", 3.0);
     config_.light_time_correction = ioc.get<bool>("diffcorr.light_time", true);
-    config_.aberration_correction = ioc.get<bool>("diffcorr.aberration", true);
-    config_.light_deflection = ioc.get<bool>("diffcorr.light_deflection", true);
+    config_.aberrazione_differenziale = ioc.get<bool>("diffcorr.aberration", true);
+    config_.deflessione_relativistica = ioc.get<bool>("diffcorr.light_deflection", true);
 }
 
 void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {
@@ -141,6 +141,7 @@ void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {
     occ.filter_daylight = ioc.get<bool>("occultation.filter_daylight", true);
     occ.use_proper_motion = ioc.get<bool>("occultation.use_proper_motion", true);
     occ.use_parallax = ioc.get<bool>("occultation.use_parallax", true);
+    occ.max_shadow_distance = physics::Distance::from_km(ioc.get<double>("occultation.max_shadow_dist", 10000.0));
 }
 
 void AstDynEngine::load_config(const std::string& config_file) {

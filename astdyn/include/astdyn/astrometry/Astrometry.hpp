@@ -57,7 +57,12 @@ public:
         const std::string& obs_code,
         const AstDynConfig& engine_cfg);
 
-    static Eigen::Vector3d apply_stellar_aberration(
+    /**
+     * @brief Applica l'aberrazione differenziale (Stellar/Planetary Aberration).
+     * Deve essere applicata DOPO la correzione del tempo di luce.
+     * Corregge lo spostamento apparente dovuto al moto dell'osservatore durante il tragitto dei fotoni.
+     */
+    static Eigen::Vector3d aberrazione_differenziale(
         const Eigen::Vector3d& rho_eq,
         const Eigen::Vector3d& earth_velocity_eq);
 
@@ -78,8 +83,12 @@ public:
         double star_ra_rad,
         double star_dec_rad);
 
-    /** @brief Step 2b: Gravitational Light Deflection (Sun). */
-    static Eigen::Vector3d apply_light_deflection(
+    /**
+     * @brief Applica la deflessione relativistica (Gravitational Light Deflection).
+     * Deve essere applicata su coordinate già corrette per il tempo di luce.
+     * Modella la curvatura dello spazio-tempo causata dalla massa del Sole (effetto Schwarzschild).
+     */
+    static Eigen::Vector3d deflessione_relativistica(
         const Eigen::Vector3d& rho_eq,
         const Eigen::Vector3d& earth_to_sun_eq);
 

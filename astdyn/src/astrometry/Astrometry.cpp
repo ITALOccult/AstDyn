@@ -11,6 +11,8 @@
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/io/SPKReader.hpp"
 #include "astdyn/ephemeris/AsteroidPerturbations.hpp"
+#include "astdyn/astrometry/AstrometricCorrections.hpp"
+#include "astdyn/astrometry/AstrometricCorrector.hpp"
 #include <cmath>
 #include <mutex>
 #include <unordered_map>
@@ -62,8 +64,8 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     
     Eigen::Vector3d q_sun = de441->getPosition(ephemeris::CelestialBody::SUN, t_obs).to_eigen_si() - 
                             de441->getPosition(ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si();
-    if (a_cfg.light_deflection) rho_eq = apply_light_deflection(rho_eq, q_sun);
-    if (a_cfg.stellar_aberration) rho_eq = apply_stellar_aberration(rho_eq, de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si());
+    Eigen::Vector3d v_earth = de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si();
+    rho_eq = AstrometricCorrector(a_cfg).apply(rho_eq, v_earth, q_sun);
 
     return finalize_observation(rho_eq);
 }
@@ -112,8 +114,13 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     auto rho_eq = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_helio_ecl).to_eigen_si();
     
     Eigen::Vector3d q_sun = sun_bary - (earth_bary + obs_pos_gcrf);
-    if (engine_cfg.light_deflection) rho_eq = apply_light_deflection(rho_eq, q_sun);
-    if (engine_cfg.aberration_correction) rho_eq = apply_stellar_aberration(rho_eq, de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si());
+    Eigen::Vector3d v_earth = de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si();
+    
+    AstrometricSettings a_settings;
+    a_settings.aberrazione_differenziale = engine_cfg.aberrazione_differenziale;
+    a_settings.deflessione_relativistica = engine_cfg.deflessione_relativistica;
+    
+    rho_eq = AstrometricCorrector(a_settings).apply(rho_eq, v_earth, q_sun);
 
     return finalize_observation(rho_eq);
 }
@@ -137,22 +144,9 @@ Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     return p_ast;
 }
 
-Eigen::Vector3d AstrometryReducer::apply_stellar_aberration(
+Eigen::Vector3d AstrometryReducer::aberrazione_differenziale(
     const Eigen::Vector3d& rho_eq, const Eigen::Vector3d& earth_vel_eq) {
-    
-    double r = rho_eq.norm();
-    Eigen::Vector3d p = rho_eq / r;
-    Eigen::Vector3d v = earth_vel_eq / (C_LIGHT * 1000.0); // beta vector
-    
-    double p_dot_v = p.dot(v);
-    double v2 = v.squaredNorm();
-    double inv_gamma = std::sqrt(1.0 - v2);
-    
-    // Rigorous relativistic formula
-    double denom = 1.0 + p_dot_v;
-    Eigen::Vector3d p_prime = (inv_gamma * p + (1.0 + p_dot_v / (1.0 + inv_gamma)) * v) / denom;
-    
-    return p_prime * r;
+    return ::astdyn::astrometry::aberrazione_differenziale(rho_eq, earth_vel_eq);
 }
 
 double AstrometryReducer::compute_cross_track_uncertainty(
@@ -199,20 +193,10 @@ double AstrometryReducer::compute_cross_track_uncertainty(
     return std::sqrt(sigma2);
 }
 
-Eigen::Vector3d AstrometryReducer::apply_light_deflection(
+Eigen::Vector3d AstrometryReducer::deflessione_relativistica(
     const Eigen::Vector3d& rho_eq, const Eigen::Vector3d& earth_to_sun_eq) 
 {
-    double r = rho_eq.norm();
-    Eigen::Vector3d u = rho_eq / r;
-    Eigen::Vector3d q = earth_to_sun_eq;
-    double q_dist = q.norm();
-    if (q_dist < 1000.0) return rho_eq; 
-    
-    Eigen::Vector3d e = q / q_dist;
-    double u_dot_e = u.dot(e);
-    double fac = SCHWARZSCHILD_SUN / q_dist * (1.0 + u_dot_e);
-    
-    return (u + fac * (e - u_dot_e * u)).normalized() * r;
+    return ::astdyn::astrometry::deflessione_relativistica(rho_eq, earth_to_sun_eq);
 }
 
 AstrometricObservation AstrometryReducer::finalize_observation(

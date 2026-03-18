@@ -46,3 +46,17 @@ set_target_properties(astdyn_multi_chebyshev_demo PROPERTIES RUNTIME_OUTPUT_DIRE
 
 # Installation
 install(TARGETS ioccultcalc astdyn_trajectory_export astdyn_chebyshev_demo astdyn_multi_chebyshev_demo RUNTIME DESTINATION bin)
+add_executable(haumea_star_search haumea_star_search.cpp)
+target_link_libraries(haumea_star_search PRIVATE ${OCCULT_LIBS} Boost::program_options)
+add_executable(haumea_prediction_test haumea_prediction_test.cpp)
+target_link_libraries(haumea_prediction_test PRIVATE ${OCCULT_LIBS} Boost::program_options)
+add_executable(haumea_mapper haumea_mapper.cpp)
+target_link_libraries(haumea_mapper PRIVATE ${OCCULT_LIBS} Boost::program_options)
+add_executable(haumea_system_integrator haumea_system_integrator.cpp)
+target_link_libraries(haumea_system_integrator PRIVATE ${OCCULT_LIBS} Boost::program_options)
+add_executable(haumea_occult_finder haumea_occult_finder.cpp)
+target_link_libraries(haumea_occult_finder PRIVATE ${OCCULT_LIBS} Boost::program_options)
+add_executable(bsp_info bsp_info.cpp)
+target_link_libraries(bsp_info PRIVATE ${OCCULT_LIBS} Boost::program_options)
+add_executable(namaka_mapper namaka_mapper.cpp)
+target_link_libraries(namaka_mapper PRIVATE ${OCCULT_LIBS} Boost::program_options)
