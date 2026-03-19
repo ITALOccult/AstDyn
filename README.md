@@ -154,6 +154,14 @@ If you encounter discrepancies or bugs, please open an issue with the relevant i
 
 *Validation epoch: 2026-Jan-10 00:00:00 UTC (MJD 61050.0)*
 
+### (234) Barbara Occultation & Integrator Parity (May 2026)
+
+A rigorous validation of the (234) Barbara occultation event (May 11, 2026) has been performed to verify the consistency between the **RKF78** (Adaptive) and **AAS** (Adaptive Symplectic) integrators.
+
+*   **Result**: Perfect agreement between integrators (MJD 61170.7086748 at TCA).
+*   **Astrometric precision**: Sub-mas residuals against JPL Horizons reference when using high-precision Gaia DR3 corrections.
+*   **Documentation**: Detailed analysis in **[Barbara Validation Report (IT)](astdyn/docs/validation_barbara_it.md)**.
+
 ### Haumea System Occultation (May 2026)
 
 A full high-fidelity multi-body propagation and validation report for the complete Haumea system (including satellites Hi'iaka and Namaka) occultation event on May 4, 2026 is available here: **[Haumea Validation Report](astdyn/docs/haumea_final_validation_report.md)**.

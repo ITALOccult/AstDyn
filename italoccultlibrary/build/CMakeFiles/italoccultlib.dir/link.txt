@@ -1,2 +1,0 @@
-/usr/bin/ar qc libitaloccultlib.a CMakeFiles/italoccultlib.dir/src/eq1_parser.cpp.o CMakeFiles/italoccultlib.dir/src/orbital_conversions.cpp.o CMakeFiles/italoccultlib.dir/src/astdyn_wrapper.cpp.o CMakeFiles/italoccultlib.dir/src/chebyshev_approximation.cpp.o CMakeFiles/italoccultlib.dir/src/chebyshev_rkf78_propagation.cpp.o
-/usr/bin/ranlib libitaloccultlib.a
