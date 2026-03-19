@@ -9,10 +9,11 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include <fstream>
 #include <cmath>
+#include <iostream>
 #include <iomanip>
 
 namespace astdyn::astrometry {
-
+ 
 double OccultationMapper::compute_era(const time::EpochUTC& t) {
     double dut1 = time::get_dut1(t.mjd());
     double jd_ut1 = time::mjd_to_jd(t.mjd() + dut1 / constants::SECONDS_PER_DAY);
@@ -27,18 +28,41 @@ GeoPoint OccultationMapper::project_to_earth(
 {
     double as = ra.to_rad();
     double ds = dec.to_rad();
-    Eigen::Vector3d k_star(std::cos(as) * std::cos(ds), std::sin(as) * std::cos(ds), std::sin(ds));
-    Eigen::Vector3d i_basis(-std::sin(as), std::cos(as), 0.0);
-    Eigen::Vector3d j_basis(-std::sin(ds) * std::cos(as), -std::sin(ds) * std::sin(as), std::cos(ds));
-
-    Eigen::Vector3d p_eci = xi.to_m() * i_basis + eta.to_m() * j_basis + zeta.to_m() * k_star;
-    double era_rad = compute_era(t);
     
-    double lon = std::atan2(p_eci.y(), p_eci.x()) - era_rad;
-    while (lon > constants::PI) lon -= constants::TWO_PI;
-    while (lon <= -constants::PI) lon += constants::TWO_PI;
+    // 1. Basis vectors in GCRF (Mean Equator J2000)
+    // k_star points from Earth center to Star
+    Eigen::Vector3d k_star(std::cos(as) * std::cos(ds), std::sin(as) * std::cos(ds), std::sin(ds));
+    // i_basis points East on Equator
+    Eigen::Vector3d i_basis(-std::sin(as), std::cos(as), 0.0);
+    // j_basis points North on Fundamental Plane
+    Eigen::Vector3d j_basis = k_star.cross(i_basis).normalized();
 
-    return {Angle::from_rad(std::asin(p_eci.z() / p_eci.norm())), Angle::from_rad(lon)};
+    // 2. Geocentric Shadow Point in GCRF
+    // p_eci = xi*i + eta*j + zeta*k (zeta is depth facing the star)
+    Eigen::Vector3d p_eci = xi.to_m() * i_basis + eta.to_m() * j_basis + zeta.to_m() * k_star;
+    
+    // 3. Rotate to ECEF using ERA
+    double era = compute_era(t);
+    double cos_e = std::cos(era);
+    double sin_e = std::sin(era);
+    
+    // Rz(-ERA) rotation matrix
+    double x_ecef =  p_eci.x() * cos_e + p_eci.y() * sin_e;
+    double y_ecef = -p_eci.x() * sin_e + p_eci.y() * cos_e;
+    double z_ecef =  p_eci.z();
+
+    // DIAGNOSTIC LOG (First call only to avoid spam)
+    static bool logged = false;
+    if (!logged) {
+        std::cout << "DIAG: k_star=" << k_star.transpose() << " | p_eci=" << p_eci.transpose() << " | p_ecef=" << x_ecef << "," << y_ecef << "," << z_ecef << "\n";
+        logged = true;
+    }
+
+    double dist_xy = std::sqrt(x_ecef*x_ecef + y_ecef*y_ecef);
+    double lat = std::atan2(z_ecef, dist_xy);
+    double lon = std::atan2(y_ecef, x_ecef);
+
+    return {Angle::from_rad(lat), Angle::from_rad(lon)};
 }
 
 OccultationPath OccultationMapper::compute_path(
@@ -258,7 +282,7 @@ void OccultationMapper::export_global_svg(
     double vy = -center_lat.to_deg() * 10.0 - vh / 2.0;
 
     // SVG Header
-    ofs << "<svg viewBox=\"" << vx << " " << vy << " " << vw << " " << vh << "\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background-color:#020617; font-family: 'Outfit', 'Inter', sans-serif;\">\n";
+    ofs << "<svg viewBox=\"" << vx << " " << vy << " " << vw << " " << vh << "\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background-color:#f8fafc; font-family: 'Outfit', 'Inter', sans-serif;\">\n";
     
     // Defs
     ofs << "  <defs>\n";
@@ -280,24 +304,24 @@ void OccultationMapper::export_global_svg(
     auto lon_to_svg = [&](double lon) { return lon * 10.0; };
     auto lat_to_svg = [&](double lat) { return -lat * 10.0; };
 
-    // 1. Sea - Deep Navy Gradient or solid
-    ofs << "  <rect x=\"-1800\" y=\"-900\" width=\"3600\" height=\"1800\" fill=\"#020617\" />\n";
+    // 1. Sea - Clean Light Blue/Gray
+    ofs << "  <rect x=\"-1800\" y=\"-900\" width=\"3600\" height=\"1800\" fill=\"#f8fafc\" />\n";
 
     // 2. Graticule
-    ofs << "  <g stroke=\"#1e293b\" stroke-width=\"" << 0.8 / zoom << "\" stroke-dasharray=\"" << 15.0/zoom << "," << 10.0/zoom << "\" opacity=\"0.4\">\n";
+    ofs << "  <g stroke=\"#cbd5e1\" stroke-width=\"" << 0.8 / zoom << "\" stroke-dasharray=\"" << 15.0/zoom << "," << 10.0/zoom << "\" opacity=\"0.6\">\n";
     for (int lat = -90; lat <= 90; lat += 15) ofs << "    <line x1=\"-1800\" y1=\"" << lat_to_svg(lat) << "\" x2=\"1800\" y2=\"" << lat_to_svg(lat) << "\" />\n";
     for (int lon = -180; lon <= 180; lon += 15) ofs << "    <line x1=\"" << lon_to_svg(lon) << "\" y1=\"-900\" x2=\"" << lon_to_svg(lon) << "\" y2=\"900\" />\n";
     ofs << "  </g>\n";
 
-    // 3. Detailed World Map - Coastlines (Slightly lighter than sea)
-    ofs << "  <g fill=\"#0f172a\" stroke=\"#334155\" stroke-width=\"" << 0.6 / zoom << "\" transform=\"scale(10, -10)\">\n";
+    // 3. Detailed World Map - Coastlines (Slate-100 fill, slate-400 stroke)
+    ofs << "  <g fill=\"#f1f5f9\" stroke=\"#94a3b8\" stroke-width=\"" << 0.6 / zoom << "\" transform=\"scale(10, -10)\">\n";
     for (const auto& d : WorldMapData::get_coastlines()) {
         ofs << "    <path d=\"" << d << "\" />\n";
     }
     ofs << "  </g>\n";
 
     // 3.1 Political Boundaries
-    ofs << "  <g fill=\"none\" stroke=\"#475569\" stroke-width=\"" << 0.4 / zoom << "\" stroke-dasharray=\"" << 2.0/zoom << "," << 2.0/zoom << "\" transform=\"scale(10, -10)\" opacity=\"0.6\">\n";
+    ofs << "  <g fill=\"none\" stroke=\"#94a3b8\" stroke-width=\"" << 0.4 / zoom << "\" stroke-dasharray=\"" << 2.0/zoom << "," << 2.0/zoom << "\" transform=\"scale(10, -10)\" opacity=\"0.8\">\n";
     for (const auto& d : WorldMapData::get_borders()) {
         ofs << "    <path d=\"" << d << "\" />\n";
     }
@@ -309,8 +333,8 @@ void OccultationMapper::export_global_svg(
         double cx = lon_to_svg(city.lon);
         double cy = lat_to_svg(city.lat);
         // Better City markers (Small dot + light glow background for text readability)
-        ofs << "    <circle cx=\"" << cx << "\" cy=\"" << cy << "\" r=\"" << 4.0 / zoom << "\" fill=\"#e2e8f0\" opacity=\"0.8\" />\n";
-        ofs << "    <text x=\"" << cx + 12.0/zoom << "\" y=\"" << cy + 4.0/zoom << "\" fill=\"#94a3b8\" font-size=\"" << 18.0 / zoom << "\" font-weight=\"500\" opacity=\"0.6\" stroke=\"#020617\" stroke-width=\"" << 2.0/zoom << "\" paint-order=\"stroke\">" << city.name << "</text>\n";
+        ofs << "    <circle cx=\"" << cx << "\" cy=\"" << cy << "\" r=\"" << 4.0 / zoom << "\" fill=\"#334155\" opacity=\"0.8\" />\n";
+        ofs << "    <text x=\"" << cx + 12.0/zoom << "\" y=\"" << cy + 4.0/zoom << "\" fill=\"#334155\" font-size=\"" << 18.0 / zoom << "\" font-weight=\"600\" opacity=\"0.8\" stroke=\"#ffffff\" stroke-width=\"" << 3.0/zoom << "\" paint-order=\"stroke\">" << city.name << "</text>\n";
     }
     ofs << "  </g>\n";
 
@@ -364,7 +388,7 @@ void OccultationMapper::export_global_svg(
             double mx = lon_to_svg(m.point.lon.to_deg());
             double my = lat_to_svg(m.point.lat.to_deg());
             ofs << "  <circle cx=\"" << mx << "\" cy=\"" << my << "\" r=\"" << 8.0 / zoom << "\" fill=\"" << color << "\" />\n";
-            ofs << "  <text x=\"" << mx + 15.0/zoom << "\" y=\"" << my + 5.0/zoom << "\" fill=\"#f8fafc\" font-size=\"" << 25.0 / zoom << "\" font-weight=\"bold\" stroke=\"#0b0e14\" stroke-width=\"" << 4.0/zoom << "\" paint-order=\"stroke\">" << m.label << "</text>\n";
+            ofs << "  <text x=\"" << mx + 15.0/zoom << "\" y=\"" << my + 5.0/zoom << "\" fill=\"#0f172a\" font-size=\"" << 25.0 / zoom << "\" font-weight=\"bold\" stroke=\"#ffffff\" stroke-width=\"" << 5.0/zoom << "\" paint-order=\"stroke\">" << m.label << "</text>\n";
         }
     }
 
@@ -373,20 +397,20 @@ void OccultationMapper::export_global_svg(
     double margin = 50.0 * ui_scale;
     double lx = vx + margin;
     double ly = vy + margin;
-    ofs << "  <rect x=\"" << lx << "\" y=\"" << ly << "\" width=\"" << 850 * ui_scale << "\" height=\"" << 200 * ui_scale << "\" rx=\"" << 25 * ui_scale << "\" fill=\"#0f172a\" fill-opacity=\"0.95\" stroke=\"#334155\" stroke-width=\"" << 2 * ui_scale << "\" />\n";
-    ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 65 * ui_scale << "\" fill=\"#f8fafc\" font-size=\"" << 65 * ui_scale << "\" font-weight=\"900\">ASTDYN PRECISION MAP</text>\n";
-    ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 130 * ui_scale << "\" fill=\"#0ea5e9\" font-size=\"" << 42 * ui_scale << "\">High-Fidelity Multi-Body Dynamics</text>\n";
+    ofs << "  <rect x=\"" << lx << "\" y=\"" << ly << "\" width=\"" << 850 * ui_scale << "\" height=\"" << 200 * ui_scale << "\" rx=\"" << 25 * ui_scale << "\" fill=\"#ffffff\" fill-opacity=\"0.95\" stroke=\"#cbd5e1\" stroke-width=\"" << 2 * ui_scale << "\" />\n";
+    ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 65 * ui_scale << "\" fill=\"#0f172a\" font-size=\"" << 65 * ui_scale << "\" font-weight=\"900\">ASTDYN PRECISION MAP</text>\n";
+    ofs << "  <text x=\"" << lx + 40 * ui_scale << "\" y=\"" << ly + 130 * ui_scale << "\" fill=\"#0284c7\" font-size=\"" << 42 * ui_scale << "\">High-Fidelity Multi-Body Dynamics</text>\n";
 
     for (size_t i = 0; i < paths.size(); ++i) {
         std::string label = (i < labels.size()) ? labels[i] : "Path " + std::to_string(i);
-        std::string color = (i < colors.size()) ? colors[i] : "#ffffff";
+        std::string color = (i < colors.size()) ? colors[i] : "#0f172a";
         double y_coord = ly + 220 * ui_scale + static_cast<double>(i) * 110.0 * ui_scale;
         
         ofs << "  <rect x=\"" << lx << "\" y=\"" << y_coord - 30 * ui_scale << "\" width=\"" << 45 * ui_scale << "\" height=\"" << 45 * ui_scale << "\" rx=\"" << 8 * ui_scale << "\" fill=\"" << color << "\" />\n";
-        ofs << "  <text x=\"" << lx + 65 * ui_scale << "\" y=\"" << y_coord + 10 * ui_scale << "\" fill=\"#f8fafc\" font-size=\"" << 38 * ui_scale << "\">" << label << "</text>\n";
+        ofs << "  <text x=\"" << lx + 65 * ui_scale << "\" y=\"" << y_coord + 10 * ui_scale << "\" fill=\"#0f172a\" font-size=\"" << 38 * ui_scale << "\">" << label << "</text>\n";
         
-        ofs << "  <rect x=\"" << lx << "\" y=\"" << y_coord + 25 * ui_scale << "\" width=\"" << 45 * ui_scale << "\" height=\"" << 15 * ui_scale << "\" rx=\"" << 4 * ui_scale << "\" fill=\"" << color << "\" fill-opacity=\"0.3\" stroke=\"#f8fafc\" stroke-width=\"" << 1.0*ui_scale << "\" stroke-dasharray=\"" << 5*ui_scale << "," << 3*ui_scale << "\" />\n";
-        ofs << "  <text x=\"" << lx + 65 * ui_scale << "\" y=\"" << y_coord + 40 * ui_scale << "\" fill=\"#94a3b8\" font-size=\"" << 30 * ui_scale << "\">1-sigma Uncertainty Corridor</text>\n";
+        ofs << "  <rect x=\"" << lx << "\" y=\"" << y_coord + 25 * ui_scale << "\" width=\"" << 45 * ui_scale << "\" height=\"" << 15 * ui_scale << "\" rx=\"" << 4 * ui_scale << "\" fill=\"" << color << "\" fill-opacity=\"0.3\" stroke=\"#0f172a\" stroke-width=\"" << 1.0*ui_scale << "\" stroke-dasharray=\"" << 5*ui_scale << "," << 3*ui_scale << "\" />\n";
+        ofs << "  <text x=\"" << lx + 65 * ui_scale << "\" y=\"" << y_coord + 40 * ui_scale << "\" fill=\"#475569\" font-size=\"" << 30 * ui_scale << "\">1-sigma Uncertainty Corridor</text>\n";
     }
 
     ofs << "</svg>\n";

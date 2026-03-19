@@ -154,6 +154,10 @@ If you encounter discrepancies or bugs, please open an issue with the relevant i
 
 *Validation epoch: 2026-Jan-10 00:00:00 UTC (MJD 61050.0)*
 
+### Haumea System Occultation (May 2026)
+
+A full high-fidelity multi-body propagation and validation report for the complete Haumea system (including satellites Hi'iaka and Namaka) occultation event on May 4, 2026 is available here: **[Haumea Validation Report](astdyn/docs/haumea_final_validation_report.md)**.
+
 ## 🚀 Development Roadmap (Towards v1.0)
 
 AstDyn is currently in an active developmental phase. Below is the strategic plan for the IOccultCalc tool and core library:
