@@ -135,7 +135,10 @@ int main(int argc, char** argv) {
     try {
         po::store(po::parse_command_line(argc, argv, desc), vm);
         po::notify(vm);
-    } catch (...) { return 1; }
+    } catch (const std::exception& e) { 
+        std::cerr << "Error parsing options: " << e.what() << "\n";
+        return 1; 
+    }
 
     // --- 1. Load Configuration ---
     core::IOCConfig adv_cfg;
@@ -153,7 +156,7 @@ int main(int argc, char** argv) {
         AstDynConfig cfg;
         cfg.ephemeris_file = bsp_path;
         cfg.ephemeris_type = EphemerisType::DE441;
-        cfg.verbose = false;
+        cfg.verbose = true;
         cfg.preferred_catalog = vm["catalog"].as<std::string>();
         engine.set_config(cfg);
     }
@@ -164,7 +167,10 @@ int main(int argc, char** argv) {
         ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
         ephem_ptr = std::make_shared<ephemeris::PlanetaryEphemeris>(provider);
         catalog::GaiaDR3Catalog::initialize(R"({"catalog_type":"online_esa"})");
-    } catch (...) { return 1; }
+    } catch (const std::exception& e) { 
+        std::cerr << "Error initializing engine: " << e.what() << "\n";
+        return 1; 
+    }
 
     // --- 3. Preparing Asteroids & Polynomials ---
     std::vector<std::string> asteroid_ids;
@@ -212,12 +218,15 @@ int main(int argc, char** argv) {
     if (!asteroid_ids.empty()) {
         std::cout << "[ioccultcalc] Pre-calcolo polinomi per " << asteroid_ids.size() << " corpi over " << duration << " giorni...\n";
         for (const auto& id : asteroid_ids) {
-            auto state_vec = horizons.query_vectors(id, start_epoch, "@10"); // Heliocentric
-            if (state_vec) {
-                auto elements = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(state_vec->cast_frame<core::ECLIPJ2000>());
+            auto elements_opt = horizons.query_elements(id, start_epoch);
+            if (elements_opt) {
+                auto elements = *elements_opt;
                 manager.add_asteroid(id, elements, start_epoch, end_epoch);
                 stored_elements[id] = elements;
-                stored_states[id] = state_vec->cast_frame<core::GCRF>();
+                
+                // Convert Keplerian elements to Cartesian state in GCRF for uncertainty calculation
+                auto state_eclip = propagation::keplerian_to_cartesian(elements);
+                stored_states[id] = state_eclip.cast_frame<core::GCRF>();
                 
                 auto props = horizons.query_physical_properties(id);
                 if (props) {
@@ -266,9 +275,11 @@ int main(int argc, char** argv) {
                 results.push_back(cand);
             }
         }
+        std::cout << "[ioccultcalc] Trovate " << results.size() << " potenziali occultazioni." << std::endl;
     } else {
         std::cout << "[ioccultcalc] Ricerca occultazioni con magnitudine < " << occ_config.max_mag_star << "..." << std::endl;
         results = OccultationLogic::find_multi_asteroid_occultations(asteroid_ids, manager, start_epoch, end_epoch, occ_config, engine);
+        std::cout << "[ioccultcalc] Trovate " << results.size() << " potenziali occultazioni." << std::endl;
     }
     
     // --- 3d. Apply Uncertainty (if requested) ---

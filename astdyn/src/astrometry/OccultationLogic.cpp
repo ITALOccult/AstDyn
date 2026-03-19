@@ -10,6 +10,7 @@
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/AstDynEngine.hpp"
 #include "astdyn/astrometry/SPKChebyshevEphemeris.hpp"
+#include "astdyn/astrometry/ClosestApproachFinder.hpp"
 #include <cmath>
 #include <iostream>
 #include <algorithm>
@@ -227,29 +228,45 @@ void OccultationLogic::evaluate_candidate(
     AstDynEngine& engine,
     double t_start_jd, double t_end_jd)
 {
-    double t_ca_jd = find_tca(segment, star, segment.t_start, segment.t_end);
-    if (t_ca_jd < t_start_jd || t_ca_jd > t_end_jd) return;
+    // Use the high-precision ClosestApproachFinder
+    auto [pos_center, vel_center] = segment.evaluate_full((segment.t_start + segment.t_end) / 2.0);
+    double dist_au = std::get<2>(pos_center);
+    Angle max_sep_angle = Angle::from_rad((config.max_shadow_distance.to_m() * 1.5) / (dist_au * constants::AU * 1000.0));
 
-    time::EpochTDB t_ca = time::EpochTDB::from_jd(t_ca_jd);
-    auto [pos, vel] = segment.evaluate_full(t_ca_jd);
-    auto star_at_tca = star.predict_at(t_ca);
-    
-    // Rates from Chebyshev (deg/day) to arcsec/hr
-    double dra_hr = (std::get<0>(vel) / 24.0) * 3600.0;
-    double ddec_hr = (std::get<1>(vel) / 24.0) * 3600.0;
+    auto ca_results = ClosestApproachFinder::find_in_segment(
+        segment, star, 
+        time::EpochTDB::from_jd(std::max(segment.t_start, t_start_jd)),
+        time::EpochTDB::from_jd(std::min(segment.t_end, t_end_jd)),
+        max_sep_angle,
+        720); // 2-minute sampling for a 1-day segment is enough for detection
 
-    OccultationParameters params = compute_parameters(
-        star_at_tca.ra(), star_at_tca.dec(),
-        RightAscension::from_deg(std::get<0>(pos)), Declination::from_deg(std::get<1>(pos)),
-        physics::Distance::from_au(std::get<2>(pos)),
-        Angle::from_arcsec(dra_hr), Angle::from_arcsec(ddec_hr),
-        physics::Velocity::from_au_d(std::get<2>(vel)),
-        t_ca, engine.getEphemeris());
+    for (const auto& ca : ca_results) {
+        // Map ClosestApproachResult to OccultationParameters
+        auto [pos, vel] = segment.evaluate_full(ca.t_ca.jd());
+        double dist_au_at_ca = std::get<2>(pos);
+        
+        physics::Distance impact_dist = physics::Distance::from_m(
+            ca.separation.to_rad() * dist_au_at_ca * constants::AU * 1000.0);
 
-    if (params.impact_parameter > config.max_shadow_distance) return;
-    if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) return;
+        if (impact_dist > config.max_shadow_distance) continue;
 
-    results.push_back({"", star, params}); 
+        auto star_at_tca = star.predict_at(ca.t_ca);
+        
+        double dra_hr = (std::get<0>(vel) / 24.0) * 3600.0;
+        double ddec_hr = (std::get<1>(vel) / 24.0) * 3600.0;
+
+        OccultationParameters params = compute_parameters(
+            star_at_tca.ra(), star_at_tca.dec(),
+            RightAscension::from_deg(std::get<0>(pos)), Declination::from_deg(std::get<1>(pos)),
+            physics::Distance::from_au(std::get<2>(pos)),
+            Angle::from_arcsec(dra_hr), Angle::from_arcsec(ddec_hr),
+            physics::Velocity::from_au_d(std::get<2>(vel)),
+            ca.t_ca, engine.getEphemeris());
+
+        if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) continue;
+
+        results.push_back({"", star, params}); 
+    }
 }
 
 std::vector<OccultationCandidate> OccultationLogic::find_occultations(
@@ -263,22 +280,46 @@ std::vector<OccultationCandidate> OccultationLogic::find_occultations(
 {
     std::vector<OccultationCandidate> results;
     std::vector<double> days;
-    for (double d = std::floor(start.jd() - 0.5) + 0.5; d <= end.jd() + 0.5; d += 1.0) {
-        if (d >= start.jd() - 0.5 && d <= end.jd() + 0.5) days.push_back(d);
+    std::vector<double> segment_starts;
+    for (double jd = start.jd(); jd < end.jd(); jd += 1.0) {
+        segment_starts.push_back(jd);
     }
 
     #pragma omp parallel
     {
         std::vector<OccultationCandidate> thread_results;
         #pragma omp for schedule(dynamic)
-        for (size_t i = 0; i < days.size(); ++i) {
-            process_day_window(thread_results, days[i], initial_elements, config, engine, start.jd(), end.jd());
+        for (size_t i = 0; i < segment_starts.size(); ++i) {
+            try {
+                double jd = segment_starts[i];
+                double segment_duration = std::min(jd + 1.0, end.jd()) - jd;
+                time::EpochTDB t_center = time::EpochTDB::from_jd(jd + segment_duration / 2.0);
+                
+                auto segment = catalog::fit_chebyshev(initial_elements, t_center, segment_duration, engine.config());
+                
+                auto [pos, vel] = segment.evaluate_full(jd + segment_duration / 2.0);
+                double dist_au = std::get<2>(pos);
+                if (dist_au < 1e-6) continue;
+
+                Angle radius = Angle::from_rad((config.max_shadow_distance.to_m() * 1.5) / (dist_au * constants::AU * 1000.0));
+                auto stars = catalog::find_stars_near_segment(catalog::GaiaDR3Catalog::instance(), segment, radius, config.max_mag_star);
+                
+                for (const auto& star : stars) {
+                    evaluate_candidate(thread_results, segment, star, config, engine, start.jd(), end.jd());
+                    for (auto& cand : thread_results) {
+                        if (cand.asteroid_id.empty()) cand.asteroid_id = asteroid_id;
+                    }
+                }
+            } catch (...) {
+                // Skip segment
+            }
         }
         #pragma omp critical
         results.insert(results.end(), thread_results.begin(), thread_results.end());
     }
 
-    for (auto& cand : results) cand.asteroid_id = asteroid_id;
+    // The asteroid_id is already assigned within the loop for each candidate
+    // for (auto& cand : results) cand.asteroid_id = asteroid_id; 
     std::sort(results.begin(), results.end(), [](const OccultationCandidate& a, const OccultationCandidate& b) {
         return a.params.t_ca.mjd() < b.params.t_ca.mjd();
     });
@@ -306,18 +347,22 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
             // Convert SPK orbital data into daily Chebyshev segments for high-speed geometric search.
             SPKChebyshevEphemeris eph(naif_id, spk, start, end);
             
-            // Loop through the search window (day by day)
-            for (double jd = std::floor(start.jd() - 0.5) + 0.5; jd <= end.jd() + 0.5; jd += 1.0) {
-                time::EpochTDB t = time::EpochTDB::from_jd(jd);
-                // Ensure we stay within the ephemeris temporal bounds
-                if (t.jd() + 1.0 < eph.start_epoch().jd() || t.jd() > eph.end_epoch().jd()) continue;
-
+            // Use a more robust way to iterate over the time window: 
+            // Iterate through all 1-day segments of the asteroid's ephemeris
+            // and find stars for each.
+            double jd = start.jd();
+            while (jd < end.jd()) {
                 try {
-                    // Evaluate path for the current period
+                    time::EpochTDB t = time::EpochTDB::from_jd(jd);
                     const auto& segment = eph.get_segment(t);
-                    auto [pos, vel] = segment.evaluate_full(t.jd());
+                    
+                    // Evaluate path for the current period
+                    auto [pos, vel] = segment.evaluate_full(std::clamp(jd, segment.t_start, segment.t_end));
                     double dist_au = std::get<2>(pos);
-                    if (dist_au < 1e-6) continue;
+                    if (dist_au < 1e-6) {
+                        jd = segment.t_end;
+                        continue;
+                    }
 
                     // Compute search radius in the sky based on maximum shadow distance (FP)
                     Angle radius = Angle::from_rad(config.max_shadow_distance.to_m() / (dist_au * constants::AU * 1000.0));
@@ -339,12 +384,15 @@ std::vector<OccultationSystemCandidate> OccultationLogic::find_system_occultatio
                             BodyOccultation body;
                             body.name = id;
                             body.params = cand.params;
-                            body.diameter = physics::Distance::from_km(100.0); // Default placeholder; usually fetched via physical properties tool
+                            body.diameter = physics::Distance::from_km(100.0); // Default placeholder
                             star_map[star.source_id].bodies.push_back(body);
                         }
                     }
+                    
+                    // Advance to next segment
+                    jd = segment.t_end;
                 } catch (...) {
-                    // Ignore transient errors for specific segments
+                    jd += 1.0; // Fallback
                 }
             }
         }
@@ -372,22 +420,34 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
         if (!manager.has_body(id)) continue;
         
         const auto& eph = manager.get_ephemeris(id);
-        // Sweep JD by JD for star intersections
-        for (double jd = std::floor(start.jd() - 0.5) + 0.5; jd <= end.jd() + 0.5; jd += 1.0) {
-            time::EpochTDB t = time::EpochTDB::from_jd(jd);
-            if (t.jd() + 1.0 < eph.start_epoch().jd() || t.jd() > eph.end_epoch().jd()) continue;
-
+        
+        // Use a more robust way to iterate over the time window: 
+        // Iterate through all 1-day segments of the asteroid's ephemeris
+        // and find stars for each.
+        double jd = start.jd();
+        while (jd < end.jd()) {
             try {
-                // High-performance polynomial evaluation
+                time::EpochTDB t = time::EpochTDB::from_jd(jd);
                 const auto& segment = eph.get_segment(t);
-                auto [pos, vel] = segment.evaluate_full(t.jd());
+                
+                // Identify stars near this segment
+                auto [pos, vel] = segment.evaluate_full(std::clamp(jd, segment.t_start, segment.t_end));
                 double dist_au = std::get<2>(pos);
-                if (dist_au < 1e-6) continue;
+                if (dist_au < 1e-6) {
+                    jd = segment.t_end;
+                    continue;
+                }
 
-                // corridor logic similar to single asteroid search
-                Angle radius = Angle::from_rad(config.max_shadow_distance.to_m() / (dist_au * constants::AU * 1000.0));
+                Angle radius = Angle::from_rad((config.max_shadow_distance.to_m() * 1.5) / (dist_au * constants::AU * 1000.0));
+                
+                std::cout << "[OccultationLogic] Segment check at JD " << jd << std::endl;
+                std::cout << "  - Pos: RA=" << std::get<0>(pos) << " deg, Dec=" << std::get<1>(pos) << " deg" << std::endl;
+                std::cout << "  - Search Radius: " << radius.to_arcsec() << " arcsec" << std::endl;
+
                 auto stars = catalog::find_stars_near_segment(catalog::GaiaDR3Catalog::instance(), segment, radius, config.max_mag_star);
                 
+                std::cout << "[OccultationLogic] Found " << stars.size() << " stars near segment." << std::endl;
+
                 for (const auto& star : stars) {
                     evaluate_candidate(results, segment, star, config, engine, start.jd(), end.jd());
                     // Assign proper ID to results
@@ -395,8 +455,11 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
                         results.back().asteroid_id = id;
                     }
                 }
+                
+                // Advance to next segment
+                jd = segment.t_end;
             } catch (...) {
-                // Skip segment if data is unavailable
+                jd += 1.0; // Fallback
             }
         }
     }
