@@ -7,7 +7,7 @@ RelativeMultiBodyPropagator::RelativeMultiBodyPropagator(std::shared_ptr<Integra
                                                          std::shared_ptr<ForceField> force_field)
     : integrator_(std::move(integrator)), force_field_(std::move(force_field)) {}
 
-Eigen::VectorXd RelativeMultiBodyPropagator::RelativeDynamics::operator()(double t_sec, const Eigen::VectorXd& y) const {
+Eigen::VectorXd RelativeDynamics::operator()(double t_sec, const Eigen::VectorXd& y) const {
     // y structure: [r0, v0, rho1, d_rho1, ... rhoN, d_rhoN]
     // r0, v0 (6): Primary Absolute Helio/SSB
     // rho_i, d_rho_i (6): Satellite relative to Primary
@@ -15,35 +15,45 @@ Eigen::VectorXd RelativeMultiBodyPropagator::RelativeDynamics::operator()(double
     Eigen::VectorXd dy(n_bodies * 6);
     time::EpochTDB t = time::EpochTDB::from_mjd(t0.mjd() + t_sec / 86400.0);
     
-    // 1. Primary absolute acceleration
+    // 1. Primary absolute acceleration (External forces only: Sun + Planets)
     Eigen::Vector3d r0 = y.segment<3>(0);
     Eigen::Vector3d v0 = y.segment<3>(3);
-    Eigen::Vector3d a0 = force_field->total_acceleration(t, r0, v0);
+    Eigen::Vector3d a0_ext = force_field->total_acceleration(t, r0, v0);
     
-    // Apply mutual attraction from satellites on primary (Reflex motion)
+    // 1.1 Compute full Reflex acceleration on primary from ALL satellites
+    Eigen::Vector3d ref0 = Eigen::Vector3d::Zero();
     for (size_t i = 1; i < n_bodies; ++i) {
         Eigen::Vector3d rho_i = y.segment<3>(i * 6);
         double dist = rho_i.norm();
         if (dist > 1e-12) {
-            a0 += gms[i] * rho_i / (dist * dist * dist);
+            ref0 += gms[i] * rho_i / (dist * dist * dist);
         }
     }
+    
+    // Absolute primary acceleration
+    Eigen::Vector3d a0 = a0_ext + ref0;
     
     dy.segment<3>(0) = v0 / 86400.0;
     dy.segment<3>(3) = a0 / (86400.0 * 86400.0);
     
-    //  satellite relative accelerations
+    // 2. Satellite relative accelerations
     for (size_t i = 1; i < n_bodies; ++i) {
         Eigen::Vector3d rho_i = y.segment<3>(i * 6);
         Eigen::Vector3d v_rho_i = y.segment<3>(i * 6 + 3);
         
         Eigen::Vector3d ri = r0 + rho_i; // Absolute satellite
         Eigen::Vector3d vi = v0 + v_rho_i;
+        double dist_0i = rho_i.norm();
         
-        // Total absolute acceleration of satellite
+        // Total external acceleration of satellite (Sun + Planets)
         Eigen::Vector3d ai = force_field->total_acceleration(t, ri, vi);
         
-        // Add mutual attraction from other satellites
+        // 2.1 Add attraction from the PRIMARY body on satellite i
+        if (dist_0i > 1e-12) {
+            ai += -gms[0] * rho_i / (dist_0i * dist_0i * dist_0i);
+        }
+        
+        // 2.2 Add mutual attraction from other satellites j on satellite i
         for (size_t j = 1; j < n_bodies; ++j) {
             if (i == j) continue;
             Eigen::Vector3d rho_j = y.segment<3>(j * 6);
@@ -54,7 +64,8 @@ Eigen::VectorXd RelativeMultiBodyPropagator::RelativeDynamics::operator()(double
             }
         }
         
-        // Equation: d^2(ri - r0)/dt^2 = ai - a0
+        // Equation of Relative Motion: rho_ddot_i = ai - a0
+        // (ai contains internal forces on i, a0 contains all forces on primary 0)
         dy.segment<3>(i * 6) = v_rho_i / 86400.0;
         dy.segment<3>(i * 6 + 3) = (ai - a0) / (86400.0 * 86400.0);
     }

@@ -56,7 +56,7 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     if (!de441) return std::unexpected(AstrometryError::EphemerisUnavailable);
     
     Eigen::Vector3d earth_helio = compute_earth_helio(de441, t_obs);
-    Eigen::Vector3d ast_pos = compute_light_time_corrected_pos(initial, t_elements, t_obs, earth_helio, e_cfg);
+    Eigen::Vector3d ast_pos = compute_light_time_corrected_pos(initial, t_elements, t_obs, earth_helio, e_cfg, de441);
     
     Eigen::Vector3d diff = ast_pos - earth_helio;
     auto rho_ecl = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(diff.x(), diff.y(), diff.z());
@@ -108,10 +108,26 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
         math::Vector3<core::GCRF, physics::Distance>::from_si(observer_bary.x() - sun_bary.x(), observer_bary.y() - sun_bary.y(), observer_bary.z() - sun_bary.z())
     ).to_eigen_si();
 
-    Eigen::Vector3d ast_pos_helio = compute_light_time_corrected_pos(initial, t_elements, t_obs, observer_helio_ecl, engine_cfg);
+    if (engine_cfg.verbose) {
+        std::cout << "[Astrometry] Observer Helio Ecl Position Norm: " << observer_helio_ecl.norm() / 1.496e11 << " AU\n";
+        std::cout << "[Astrometry] Observer Bary Position: " << (earth_bary + obs_pos_gcrf).transpose() / 1.496e11 << " AU\n";
+    }
+    Eigen::Vector3d ast_pos_helio = compute_light_time_corrected_pos(initial, t_elements, t_obs, observer_helio_ecl, engine_cfg, de441);
     
     auto rho_helio_ecl = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(ast_pos_helio.x() - observer_helio_ecl.x(), ast_pos_helio.y() - observer_helio_ecl.y(), ast_pos_helio.z() - observer_helio_ecl.z());
+    if (engine_cfg.verbose) {
+        double r = rho_helio_ecl.norm().to_m();
+        double lon = std::atan2(rho_helio_ecl.y_si(), rho_helio_ecl.x_si());
+        if (lon < 0) lon += 2.0 * 3.14159265;
+        std::cout << "[Astrometry] Ecliptic Lon: " << lon * 180.0/3.14159265 << " deg\n";
+    }
     auto rho_eq = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_helio_ecl).to_eigen_si();
+    if (engine_cfg.verbose) {
+        double r = rho_eq.norm();
+        double ra = std::atan2(rho_eq(1), rho_eq(0));
+        if (ra < 0) ra += 2.0 * 3.14159265;
+        std::cout << "[Astrometry] Equatorial RA (Geometric): " << ra * 180.0/3.14159265 << " deg\n";
+    }
     
     Eigen::Vector3d q_sun = sun_bary - (earth_bary + obs_pos_gcrf);
     Eigen::Vector3d v_earth = de441->getVelocity(ephemeris::CelestialBody::EARTH, t_obs).to_eigen_si();
@@ -128,18 +144,26 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
 Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
     const time::EpochTDB& t_elements, const time::EpochTDB& t_obs,
-    const Eigen::Vector3d& obs_helio, const AstDynConfig& cfg) 
+    const Eigen::Vector3d& earth_pos_helio_ecl,
+    const AstDynConfig& cfg,
+    std::shared_ptr<ephemeris::DE441Provider> de441) 
 {
-    AstDynEngine engine(cfg);
-    engine.set_initial_orbit(initial);
+    auto cart0 = propagation::keplerian_to_cartesian(initial);
+    auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
+    ephem->setProvider(de441);
+
+    auto propagator = std::make_shared<propagation::Propagator>(
+        std::make_unique<propagation::RKF78Integrator>(0.1, 1e-12),
+        ephem,
+        cfg.propagator_settings
+    );
+
     double tau = 0.0; Eigen::Vector3d p_ast;
-    
-    // 5 iterations for high precision (usually 3 is enough for asteroids, 5 for comets/close approaches)
     for (int i = 0; i < 5; ++i) {
         time::EpochTDB t_emit = time::EpochTDB::from_mjd(t_obs.mjd() - tau);
-        auto els = engine.propagate_to(t_emit);
-        p_ast = propagation::keplerian_to_cartesian(els).position.to_eigen_si();
-        tau = (p_ast - obs_helio).norm() / (C_LIGHT * SECONDS_PER_DAY);
+        auto cart_emit = propagator->propagate_cartesian(cart0, t_emit);
+        p_ast = cart_emit.position.to_eigen_si();
+        tau = (p_ast - earth_pos_helio_ecl).norm() / (constants::C_LIGHT * 86400.0 * 1000.0);
     }
     return p_ast;
 }

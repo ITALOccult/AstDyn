@@ -33,9 +33,9 @@ public:
      * @param R_eq Equatorial radius for J2 calculation [AU]
      */
     AASIntegrator(double precision = 1e-4, 
-                  double mu = 0.0002959122082855911,  // constants::GMS
+                  std::vector<double> gms = {0.0002959122082855911},
                   double J2 = 0.0,
-                  double R_eq = 0.004650467261);      // constants::R_SUN_AU
+                  double R_eq = 0.004650467261);
 
     Eigen::VectorXd integrate(const DerivativeFunction& f,
                               const Eigen::VectorXd& y0,
@@ -53,6 +53,7 @@ public:
                                              const std::vector<double>& t_targets) override;
 
     void set_precision(double p) { precision_ = p; }
+    void set_system_gms(const std::vector<double>& gms) { gms_ = gms; n_bodies_ = gms.size(); }
     void set_central_body(double mu, double J2 = 0.0, double R_eq = 6378137.0);
 
 private:
@@ -73,7 +74,8 @@ private:
     Eigen::VectorXd finalize_state_phi(const Eigen::VectorXd& y0, const Eigen::VectorXd& q, const Eigen::VectorXd& p, const Eigen::MatrixXd& phi);
 
     double precision_;
-    double mu_;
+    std::vector<double> gms_;
+    size_t n_bodies_ = 1;
     double j2_;
     double r_eq_;
 };

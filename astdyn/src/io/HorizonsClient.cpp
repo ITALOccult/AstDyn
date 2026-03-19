@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <iomanip>
+#include <iostream>
 #include <regex>
 #include <mutex>
 
@@ -37,11 +38,6 @@ static std::string url_encode(const std::string& value) {
 }
 
 static std::string format_command(const std::string& target) {
-    // If target is purely numeric, append a semicolon to force small-body search
-    // to avoid ambiguity with planetary satellites (e.g., 704 is Oberon).
-    if (!target.empty() && std::all_of(target.begin(), target.end(), ::isdigit)) {
-        return target + ";";
-    }
     return target;
 }
 
@@ -165,10 +161,13 @@ std::string HorizonsClient::build_elements_url(const std::string& target, const 
 std::string HorizonsClient::build_vectors_url(const std::string& target, const time::EpochTDB& epoch, const std::string& center) {
     std::stringstream ss;
     ss << config_.base_url << "?format=json&COMMAND='" << url_encode(format_command(target)) << "'"
-       << "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='VECTORS'&CENTER='" << center << "'"
+       << "&OBJ_DATA='YES'&MAKE_EPHEM='YES'&EPHEM_TYPE='VECTORS'"
+       << "&CENTER='" << url_encode(center) << "'"
        << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.5) << "'"
-       << "&STOP_TIME='JD" << (epoch.mjd() + 2400000.6) << "'"
-       << "&STEP_SIZE='1d'&CSV_FORMAT='NO'&REF_PLANE='FRAME'&OUT_UNITS='KM-S'&VEC_TABLE='3'";
+       << "&STOP_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.6) << "'"
+       << "&STEP_SIZE='1d'&REF_PLANE='ECLIPTIC'&REF_SYSTEM='ICRF'&CSV_FORMAT='NO'&VEC_TABLE='1'";
+    
+    std::cout << "[Horizons] Query URL: " << ss.str() << "\n";
     return ss.str();
 }
 

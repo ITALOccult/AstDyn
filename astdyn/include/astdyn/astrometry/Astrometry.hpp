@@ -102,7 +102,8 @@ private:
         const time::EpochTDB& t_elements,
         const time::EpochTDB& t_obs,
         const Eigen::Vector3d& earth_pos_helio_ecl,
-        const AstDynConfig& cfg);
+        const AstDynConfig& cfg,
+        std::shared_ptr<::astdyn::ephemeris::DE441Provider> de441);
 
     static AstrometricObservation finalize_observation(const Eigen::Vector3d& final_rho_eq);
 };

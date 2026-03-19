@@ -65,7 +65,7 @@ std::unique_ptr<Integrator> AstDynEngine::create_integrator() {
         case IntegratorType::SABA4: return std::make_unique<SABA4Integrator>(std::max(0.5, config_.initial_step_size), config_.tolerance);
         case IntegratorType::GAUSS: return std::make_unique<GaussIntegrator>(config_.initial_step_size, config_.tolerance);
         case IntegratorType::RADAU: return std::make_unique<RadauIntegrator>(config_.initial_step_size, config_.tolerance);
-        case IntegratorType::AAS: return std::make_unique<AASIntegrator>(config_.aas_precision, config_.propagator_settings.central_body_gm);
+        case IntegratorType::AAS: return std::make_unique<AASIntegrator>(config_.aas_precision, std::vector<double>{config_.propagator_settings.central_body_gm});
         case IntegratorType::GRKN64: return std::make_unique<GRKNIntegrator>(config_.tolerance, config_.initial_step_size);
         default: return std::make_unique<RK4Integrator>(config_.initial_step_size);
     }

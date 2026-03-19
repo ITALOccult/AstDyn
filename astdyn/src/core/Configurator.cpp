@@ -171,7 +171,7 @@ astrometry::AstrometricSettings Configurator::parseAstrometricSettings(const jso
     if (j.contains("astrometry")) {
         auto a = j["astrometry"];
         if (a.contains("light_time_correction")) s.light_time_correction = a["light_time_correction"];
-        if (a.contains("stellar_aberration")) s.stellar_aberration = a["stellar_aberration"];
+        if (a.contains("stellar_aberration")) s.aberrazione_differenziale = a["stellar_aberration"];
         if (a.contains("frame_conversion_to_equatorial")) s.frame_conversion_to_equatorial = a["frame_conversion_to_equatorial"];
     }
     return s;

@@ -18,19 +18,6 @@ namespace astdyn::io {
  */
 class SPKReader {
 public:
-    explicit SPKReader(const std::string& filename);
-    ~SPKReader();
-
-    /**
-     * @brief Get state vector (Pos, Vel) for target body at time ET
-     * @param target_id NAIF ID of the body
-     * @param et Ephemeris time (seconds from J2000 epoch)
-     * @return 6D vector [km, km/s] in Ecliptic J2000 frame
-     */
-    Eigen::Matrix<double, 6, 1> getState(int target_id, double et);
-    int getCenter(int target_id) const;
-
-private:
     struct SPKSegment {
         int body_id;
         int center_id;
@@ -48,6 +35,26 @@ private:
         int order = 0;
         int n_comp = 3;
     };
+
+    explicit SPKReader(const std::string& filename);
+    ~SPKReader();
+
+    /**
+     * @brief Get state vector (Pos, Vel) for target body at time ET
+     * @param target_id NAIF ID of the body
+     * @param et Ephemeris time (seconds from J2000 epoch)
+     * @return 6D vector [km, km/s] in Ecliptic J2000 frame
+     */
+    Eigen::Matrix<double, 6, 1> getState(int target_id, double et);
+    int getCenter(int target_id) const;
+    std::vector<int> getAvailableIDs() const;
+    std::vector<SPKSegment> getSegments() const;
+    
+    // Type 21 handling
+    Eigen::Matrix<double, 6, 1> evaluateType21(const SPKSegment& seg, double et);
+
+private:
+    // MOVED Publicly
 
     struct Type2Cache {
         const SPKSegment* seg = nullptr;

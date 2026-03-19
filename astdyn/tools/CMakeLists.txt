@@ -54,6 +54,14 @@ add_executable(haumea_mapper haumea_mapper.cpp)
 target_link_libraries(haumea_mapper PRIVATE ${OCCULT_LIBS} Boost::program_options)
 add_executable(haumea_system_integrator haumea_system_integrator.cpp)
 target_link_libraries(haumea_system_integrator PRIVATE ${OCCULT_LIBS} Boost::program_options)
+add_executable(haumea_system_final haumea_system_final.cpp)
+target_link_libraries(haumea_system_final PRIVATE astdyn)
+
+add_executable(haumea_baseline
+    haumea_baseline.cpp
+)
+target_link_libraries(haumea_baseline PRIVATE astdyn)
+
 add_executable(haumea_occult_finder haumea_occult_finder.cpp)
 target_link_libraries(haumea_occult_finder PRIVATE ${OCCULT_LIBS} Boost::program_options)
 add_executable(bsp_info bsp_info.cpp)

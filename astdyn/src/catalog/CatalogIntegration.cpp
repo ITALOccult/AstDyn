@@ -199,7 +199,7 @@ ChebyshevSegment fit_chebyshev(
 
     astrometry::AstrometricSettings a_settings;
     a_settings.light_time_correction = true;
-    a_settings.stellar_aberration     = false;
+    a_settings.aberrazione_differenziale = false;
     a_settings.frame_conversion_to_equatorial = true;
 
     for (int i = 0; i < N; ++i) {
@@ -250,7 +250,7 @@ ChebyshevSegment fit_chebyshev_spk(
     // Settings for the reduction
     astrometry::AstrometricSettings a_settings;
     a_settings.light_time_correction = true;
-    a_settings.stellar_aberration     = false; 
+    a_settings.aberrazione_differenziale = false; 
     a_settings.frame_conversion_to_equatorial = true;
 
     for (int i = 0; i < N; ++i) {

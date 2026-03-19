@@ -103,13 +103,17 @@ find_package(Boost 1.70 REQUIRED COMPONENTS
 # Find CURL for networking
 find_package(CURL REQUIRED)
 
-# Fetch nlohmann/json for JPL Horizons API parsing
-include(FetchContent)
-FetchContent_Declare(
-    json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-)
-FetchContent_MakeAvailable(json)
+# Find or fetch nlohmann/json
+find_package(nlohmann_json QUIET)
+if(NOT nlohmann_json_FOUND)
+    message(STATUS "nlohmann_json not found, fetching...")
+    include(FetchContent)
+    FetchContent_Declare(
+        json
+        URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    )
+    FetchContent_MakeAvailable(json)
+endif()
 
 # Find OpenMP
 if(ASTDYN_USE_OPENMP)

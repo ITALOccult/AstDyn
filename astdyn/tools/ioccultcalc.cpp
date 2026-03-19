@@ -128,6 +128,7 @@ int main(int argc, char** argv) {
         ("catalog", po::value<std::string>()->default_value("gaia_dr3"), "stellar catalog to use (gaia_dr3, legacy)")
         ("multibody", po::bool_switch()->default_value(false), "use high-precision multibody propagator for refinement")
         ("star-offset-mas", po::value<double>()->default_value(0.0), "apply RA offset to star in mas (e.g. for duplicity correction)")
+        ("star", po::value<std::string>(), "filter by star source ID")
     ;
 
     po::variables_map vm;
@@ -311,6 +312,8 @@ int main(int argc, char** argv) {
         std::vector<std::string> colors = {"#ef4444", "#3b82f6", "#22c55e", "#eab308", "#8b5cf6"};
 
         for (auto& res : results) {
+            if (vm.count("star") && std::to_string(res.star.source_id) != vm["star"].as<std::string>()) continue;
+
             if (vm["star-offset-mas"].as<double>() != 0.0) {
                 double offset_deg = vm["star-offset-mas"].as<double>() / 3600000.0;
                 res.star.ra = RightAscension::from_deg(res.star.ra.to_deg() + offset_deg / std::cos(res.star.dec.to_rad()));

@@ -1,12 +1,27 @@
 #ifndef ASTDYN_PROPAGATION_RELATIVE_MULTI_BODY_PROPAGATOR_HPP
 #define ASTDYN_PROPAGATION_RELATIVE_MULTI_BODY_PROPAGATOR_HPP
 
-#include "astdyn/propagation/MultiBodyPropagator.hpp"
+#include "astdyn/propagation/MultiBodyTypes.hpp"
 #include "astdyn/propagation/ForceField.hpp"
+#include "astdyn/propagation/Integrator.hpp"
 #include <memory>
 #include <vector>
+#include <Eigen/Dense>
 
 namespace astdyn::propagation {
+
+/**
+ * @brief High-precision multi-body dynamic model using relative vectors.
+ * y format: [r0, v0, rho1, drho1, ... rhoN, drhoN]
+ */
+struct RelativeDynamics {
+    std::shared_ptr<ForceField> force_field;
+    std::vector<double> gms; // [gm0, gm1, ... gmN]
+    size_t n_bodies;
+    time::EpochTDB t0;
+
+    Eigen::VectorXd operator()(double t_sec, const Eigen::VectorXd& y) const;
+};
 
 /**
  * @brief High-precision multi-body propagator using relative vectors (CTFYH Standard)
@@ -14,8 +29,6 @@ namespace astdyn::propagation {
  * Instead of absolute heliocentric coordinates, this class integrates:
  * 1. The primary body's absolute position.
  * 2. The relative vectors of satellites relative to the primary.
- * 
- * This prevents precision loss due to large coordinate values in deep space.
  */
 class RelativeMultiBodyPropagator {
 public:
@@ -34,15 +47,6 @@ public:
         time::EpochTDB target_time);
 
 private:
-    struct RelativeDynamics {
-        std::shared_ptr<ForceField> force_field;
-        std::vector<double> gms;
-        size_t n_bodies;
-        time::EpochTDB t0;
-
-        Eigen::VectorXd operator()(double t_sec, const Eigen::VectorXd& y) const;
-    };
-
     std::shared_ptr<Integrator> integrator_;
     std::shared_ptr<ForceField> force_field_;
 };

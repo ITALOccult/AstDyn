@@ -29,7 +29,7 @@ int main() {
         auto integrator = std::make_shared<RKF78Integrator>(30.0, 1e-15);
         RelativeMultiBodyPropagator rel_prop(integrator, force_field);
         
-        double s_ra = 220.2437083;
+        double s_ra = 220.2437083 + (8.5 / 3600000.0) / std::cos(14.6737777 * constants::DEG_TO_RAD); // Apply 8.5 mas RA offset
         double s_dec = 14.6737777;
         auto star_ra = RightAscension::from_deg(s_ra);
         auto star_dec = Declination::from_deg(s_dec);
@@ -85,14 +85,14 @@ int main() {
             return OccultationMapper::compute_path(params, star_ra, star_dec, physics::Distance::from_km(diam_km), time::to_utc(ep_tca), de441);
         };
         
-        auto path_h = get_path(0, 61164.84742, 1100.0);
+        auto path_h = get_path(0, 61164.84742, 2224.0);
         auto path_n = get_path(1, 61164.85141, 170.0);
         
         std::vector<OccultationPath> paths = {path_h, path_n};
         std::vector<std::string> labels = {"Haumea (136108)", "Namaka Shadow"};
         std::vector<std::string> colors = {"#f43f5e", "#0ea5e9"};
         
-        OccultationMapper::export_global_svg(paths, labels, colors, "haumea_system_occultation.svg", de441, Angle::from_deg(15), Angle::from_deg(30), 2.5);
+        OccultationMapper::export_global_svg(paths, labels, colors, "haumea_system_aligned_final.svg", de441, Angle::from_deg(15), Angle::from_deg(30), 2.5);
         OccultationMapper::export_kml(paths, labels, "haumea_system_occultation.kml");
         
         std::cout << "Relative high-precision map generated with corrected ForceField.\n";
