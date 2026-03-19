@@ -1,0 +1,27 @@
+# Configurazione ioccultcalc per (234) Barbara con integratore RKF78 (formato OOP)
+asteroid = 234
+jd-start = 2461171.1
+duration = 0.2
+mag = 15.0
+
+ephemeris {
+  file = /Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp
+}
+
+integrator {
+  type = RKF78
+  tolerance = 1e-12
+}
+
+astrometry {
+  catalog = online_esa
+  verbose = true
+}
+
+occultation {
+  filter_daylight = false
+  max_shadow_dist = 20000.0
+}
+
+out-dir = barbara_rkf78_test
+prefix = rkf78

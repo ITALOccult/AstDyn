@@ -347,6 +347,19 @@ int main(int argc, char** argv) {
             labels.push_back(res.asteroid_id + " - " + std::to_string(res.star.source_id));
         }
 
+        std::string xml_file = vm.count("xml-output") ? vm["xml-output"].as<std::string>() : adv_cfg.get<std::string>("xml-output", "");
+        if (!xml_file.empty()) {
+            std::vector<OccultationEvent> events;
+            for (const auto& res : results) {
+                physics::KeplerianStateTyped<core::ECLIPJ2000> el; // Placeholder or retrieve from engine
+                if (engine.has_orbit()) el = engine.orbit();
+                events.push_back(candidate_to_event(res, res.asteroid_id, el));
+            }
+            std::filesystem::path p = std::filesystem::path(out_dir) / xml_file;
+            OccultationXMLIO::write_file(events, p.string());
+            std::cout << "[ioccultcalc] Saved 1-sigma results to " << p.string() << std::endl;
+        }
+
         std::string svg_file = vm.count("svg-output") ? vm["svg-output"].as<std::string>() : adv_cfg.get<std::string>("svg-output", "");
         if (!svg_file.empty()) {
             std::filesystem::path p = std::filesystem::path(out_dir) / svg_file;
