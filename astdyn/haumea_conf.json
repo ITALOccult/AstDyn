@@ -1,0 +1,18 @@
+{
+    "physics": {
+        "asteroids": {
+            "enabled": false
+        }
+    },
+    "ephemeris": {
+        "type": "DE441",
+        "file": "ephemerides/de441.bsp"
+    },
+    "occultation": {
+        "max_mag_star": 18.0,
+        "filter_daylight": false,
+        "max_shadow_dist": 1000000.0
+    },
+    "mag": 18.0,
+    "duration": 1.0
+}

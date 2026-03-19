@@ -29,3 +29,8 @@ astdyn/benchmark_extended_results/
 astdyn/benchmarks/results/
 astdyn/od_benchmark_log.txt
 astdyn/benchmark_output*.log
+astdyn.tgz
+cmake_output.txt
+*.csv
+results_*/
+ephemerides/
