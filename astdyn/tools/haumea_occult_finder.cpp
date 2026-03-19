@@ -1,7 +1,7 @@
 #include <astdyn/AstDynEngine.hpp>
 #include <astdyn/core/Constants.hpp>
 #include <astdyn/propagation/Integrator.hpp>
-#include <astdyn/propagation/MultiBodyPropagator.hpp>
+#include <astdyn/propagation/RelativeMultiBodyPropagator.hpp>
 #include <astdyn/astrometry/OccultationLogic.hpp>
 #include <iostream>
 #include <iomanip>
@@ -25,8 +25,9 @@ int main() {
         auto de441 = engine.getEphemeris();
         auto provider = de441->getProvider();
         auto integrator = std::make_shared<RKF78Integrator>(60.0, 1e-14);
+        auto field = std::make_shared<ForceField>(cfg.propagator_settings, de441);
         
-        MultiBodyPropagator mb_prop(integrator, de441);
+        RelativeMultiBodyPropagator mb_prop(integrator, field);
         auto start_time = time::EpochTDB::from_mjd(61164.0);
         
         std::vector<MultiBodyState> initial;

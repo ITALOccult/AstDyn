@@ -40,6 +40,7 @@ public:
     void set_elements(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
     
     void set_config_file(const std::string& filename);
+    void set_config(const AstDynConfig& config) { config_ = config; }
     void set_reference_orbit(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
     
     void set_verbose(bool verbose) { verbose_ = verbose; }

@@ -206,9 +206,9 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
         if (stats_.min_step_size == 0.0) {
             stats_.min_step_size = std::abs(h);
         } else {
-            astdyn::utils::atomic_min(stats_.min_step_size, std::abs(h));
+            stats_.min_step_size = std::min(stats_.min_step_size, std::abs(h));
         }
-        astdyn::utils::atomic_max(stats_.max_step_size, std::abs(h));
+        stats_.max_step_size = std::max(stats_.max_step_size, std::abs(h));
         
         // Increase step size for next step
         h *= fac;

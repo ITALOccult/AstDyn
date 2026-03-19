@@ -183,7 +183,8 @@ bool RKF78Integrator::adaptive_step(const DerivativeFunction& f, double& t, Eige
         stats_.num_rejected_steps++; return false;
     }
     y = y8; t += h; stats_.num_steps++;
-    atomic_min(stats_.min_step_size, std::abs(h)); atomic_max(stats_.max_step_size, std::abs(h));
+    stats_.min_step_size = std::min(stats_.min_step_size, std::abs(h));
+    stats_.max_step_size = std::max(stats_.max_step_size, std::abs(h));
     h = dir * std::clamp(0.9 * std::abs(h) * std::pow(tolerance_/std::max(rel_err, 1e-20), 0.125), h_min_, h_max_);
     return true;
 }

@@ -3,7 +3,8 @@
 #include <astdyn/propagation/Integrator.hpp>
 #include <astdyn/propagation/RelativeMultiBodyPropagator.hpp>
 #include <astdyn/astrometry/OccultationLogic.hpp>
-#include <astdyn/astrometry/OccultationMapper.hpp>
+#include "astdyn/astrometry/OccultationMapper.hpp"
+#include "astdyn/io/AstDysOrbitFitter.hpp"
 #include <astdyn/io/EQ1Parser.hpp>
 #include <astdyn/coordinates/KeplerianElements.hpp>
 #include <iostream>
@@ -24,6 +25,27 @@ int main() {
         AstDynEngine engine(cfg);
         auto de441 = engine.getEphemeris();
         
+        std::cout << "\nStarting RWO FIT for Haumea...\n";
+        astdyn::io::AstDysOrbitFitter fitter;
+        fitter.set_elements_file("136108.eq1", "eq1");
+        fitter.set_observations_file("136108_recent.rwo", "rwo");
+        cfg.max_iterations = 1;
+        fitter.set_config(cfg);
+        fitter.set_verbose(false);
+        try {
+            auto fit_res = fitter.fit();
+            std::cout << "\n=== ORBIT FITTING RESULTS (RWO) ===\n";
+            std::cout << "Observations loaded: " << fit_res.num_observations_loaded << "\n";
+            std::cout << "Observations valid/used: " << fit_res.num_observations_used << "\n";
+            std::cout << "RMS RA:  " << fit_res.rms_ra << " arcsec\n";
+            std::cout << "RMS Dec: " << fit_res.rms_dec << " arcsec\n";
+            std::cout << "Chi-squared: " << fit_res.chi_squared << "\n";
+            std::cout << "Converged: " << (fit_res.converged ? "YES" : "NO") << "\n";
+            std::cout << "=====================================\n";
+        } catch (const std::exception& e) {
+            std::cout << "Orbit Fitter Exception: " << e.what() << "\n";
+        }
+
         // 1. Load AstDys Equinoctial Elements from BUILD dir
         auto eq = io::EQ1Parser::parse("/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/build/136108.eq1");
         double a_au, e, i, Omega, omega, M;

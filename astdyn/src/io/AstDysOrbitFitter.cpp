@@ -215,14 +215,26 @@ void AstDysOrbitFitter::load_rwo_file(const std::string& filename) {
     
     std::string line;
     while (std::getline(file, line)) {
-        if (line.length() >= 80) {
-            temp << line.substr(0, 80) << "\n";
+        // RWO lines often start with a space. The MPC record (80 chars) starts after that.
+        if (line.empty()) continue;
+        size_t start = 0;
+        if (line[0] == ' ') start = 1;
+        
+        if (line.length() >= start + 80) {
+            temp << line.substr(start, 80) << "\n";
         }
     }
     temp.close();
     
-    // Parse with MPCReader
-    observations_ = observations::MPCReader::readFile(temp_file);
+    // Parse with MPCReader and filter for post-1970 observations to avoid EOP issues
+    auto all_obs = observations::MPCReader::readFile(temp_file);
+    observations_.clear();
+    for (const auto& obs : all_obs) {
+        auto [y, m, d, f] = time::mjd_to_calendar(obs.time.mjd());
+        if (y >= 1970) {
+            observations_.push_back(obs);
+        }
+    }
 }
 
 void AstDysOrbitFitter::load_mpc_file(const std::string& filename) {
@@ -244,16 +256,16 @@ void AstDysOrbitFitter::load_eq1_file(const std::string& filename) {
         
         std::istringstream iss(line);
         std::string key;
-        double value;
         
-        if (iss >> key >> value) {
-            if (key == "a") a = value;
-            else if (key == "h") h = value;
-            else if (key == "k") k = value;
-            else if (key == "p") p = value;
-            else if (key == "q") q = value;
-            else if (key == "lambda") lambda = value;
-            else if (key == "MJD") mjd = value;
+        if (iss >> key) {
+            if (key == "EQU") {
+                iss >> a >> h >> k >> p >> q >> lambda;
+            } else if (key == "MJD") {
+                double val;
+                std::string tdt;
+                iss >> val >> tdt;
+                mjd = val;
+            }
         }
     }
     
@@ -321,7 +333,7 @@ physics::KeplerianStateTyped<core::ECLIPJ2000> AstDysOrbitFitter::equinoctial_to
     
     return physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
         epoch,
-        a, e, i_rad * constants::RAD_TO_DEG,
+        a * constants::AU, e, i_rad * constants::RAD_TO_DEG,
         Omega * constants::RAD_TO_DEG,
         omega * constants::RAD_TO_DEG,
         M * constants::RAD_TO_DEG,

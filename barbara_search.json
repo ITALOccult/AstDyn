@@ -1,0 +1,29 @@
+{
+    "occultation_settings": {
+        "max_mag_star": 15.0,
+        "filter_daylight": false,
+        "max_shadow_distance": 500000.0,
+        "min_mag_drop": 0.0,
+        "use_proper_motion": true,
+        "use_parallax": true
+    },
+    "integrator": {
+        "type": "RKF78",
+        "initial_step_size": 0.1,
+        "tolerance": 1e-13
+    },
+    "physics": {
+        "asteroids": {
+            "enabled": true,
+            "use_default_17": true
+        },
+        "relativity": true,
+        "sun_j2": true,
+        "earth_j2": true
+    },
+    "ephemeris": {
+        "type": "DE441",
+        "file": "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp"
+    },
+    "verbose": true
+}

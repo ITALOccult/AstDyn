@@ -14,9 +14,9 @@ int main() {
         auto& cat = catalog::GaiaDR3Catalog::instance();
         
         catalog::ConeQuery query;
-        query.ra = Angle::from_deg(220.24375);
-        query.dec = Angle::from_deg(14.673888);
-        query.radius = Angle::from_arcsec(60.0);
+        query.ra = astrometry::RightAscension::from_deg(220.24375);
+        query.dec = astrometry::Declination::from_deg(14.673888);
+        query.radius = astrometry::Angle::from_arcsec(60.0);
         query.max_magnitude = 15.5;
         
         auto stars = cat.query_cone(query);

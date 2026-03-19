@@ -323,7 +323,7 @@ std::vector<Star> find_stars_near_segment(
     oq.segments    = { segment };
     oq.width       = width;
     oq.max_magnitude = max_magnitude;
-    oq.step_days     = (segment.t_end - segment.t_start) / std::max((int)segment.ra_coeffs.size(), 5);
+    oq.step_days     = 0.005; // Force high granularity (every ~7 minutes)
     
     return catalog.query_orbit(oq);
 }

@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
     if (!asteroid_ids.empty()) {
         std::cout << "[ioccultcalc] Pre-calcolo polinomi per " << asteroid_ids.size() << " corpi over " << duration << " giorni...\n";
         for (const auto& id : asteroid_ids) {
-            auto state_vec = horizons.query_vectors(id, start_epoch);
+            auto state_vec = horizons.query_vectors(id, start_epoch, "@10"); // Heliocentric
             if (state_vec) {
                 auto elements = propagation::cartesian_to_keplerian<core::ECLIPJ2000>(state_vec->cast_frame<core::ECLIPJ2000>());
                 manager.add_asteroid(id, elements, start_epoch, end_epoch);

@@ -72,12 +72,17 @@ std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, HorizonsError> Hor
     if (!raw) return std::unexpected(raw.error());
     try {
         auto res = json::parse(*raw)["result"].get<std::string>();
-        return physics::KeplerianStateTyped<core::ECLIPJ2000>{
-            epoch, physics::Distance::from_au(parse_token(res, "A =")), parse_token(res, "EC="),
-            astrometry::Angle::from_deg(parse_token(res, "IN=")), astrometry::Angle::from_deg(parse_token(res, "OM=")),
-            astrometry::Angle::from_deg(parse_token(res, "W =")), astrometry::Angle::from_deg(parse_token(res, "MA=")),
+        size_t start = res.find("$$SOE");
+        if (start == std::string::npos) return std::unexpected(HorizonsError::TargetNotFound);
+        std::string block = res.substr(start);
+        
+        return physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+            epoch, 
+            parse_token(block, "A ="), parse_token(block, "EC="),
+            parse_token(block, "IN="), parse_token(block, "OM="),
+            parse_token(block, "W ="), parse_token(block, "MA="),
             physics::GravitationalParameter::sun()
-        };
+        );
     } catch (...) { return std::unexpected(HorizonsError::ParsingError); }
 }
 
@@ -165,7 +170,7 @@ std::string HorizonsClient::build_vectors_url(const std::string& target, const t
        << "&CENTER='" << url_encode(center) << "'"
        << "&START_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.5) << "'"
        << "&STOP_TIME='JD" << std::fixed << std::setprecision(6) << (epoch.mjd() + 2400000.6) << "'"
-       << "&STEP_SIZE='1d'&REF_PLANE='ECLIPTIC'&REF_SYSTEM='ICRF'&CSV_FORMAT='NO'&VEC_TABLE='1'";
+       << "&STEP_SIZE='1d'&REF_PLANE='FRAME'&REF_SYSTEM='ICRF'&CSV_FORMAT='NO'&VEC_TABLE='2'";
     
     std::cout << "[Horizons] Query URL: " << ss.str() << "\n";
     return ss.str();

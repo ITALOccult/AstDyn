@@ -5,6 +5,8 @@
 #include "astdyn/time/TimeScale.hpp"
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
+#include "astdyn/propagation/AASIntegrator.hpp"
+#include "astdyn/propagation/saba4_integrator.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/astrometry/AstrometricTypes.hpp"
@@ -152,8 +154,23 @@ Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
     ephem->setProvider(de441);
 
+    std::shared_ptr<propagation::Integrator> integrator;
+    switch (cfg.integrator_type) {
+        case IntegratorType::AAS:
+            integrator = std::make_unique<propagation::AASIntegrator>(cfg.aas_precision, std::vector<double>{cfg.propagator_settings.central_body_gm});
+            break;
+        case IntegratorType::RKF78:
+            integrator = std::make_unique<propagation::RKF78Integrator>(cfg.initial_step_size, cfg.tolerance);
+            break;
+        case IntegratorType::SABA4:
+            integrator = std::make_unique<propagation::SABA4Integrator>(std::max(0.5, cfg.initial_step_size), cfg.tolerance);
+            break;
+        default:
+            integrator = std::make_unique<propagation::RKF78Integrator>(0.1, 1e-12);
+    }
+
     auto propagator = std::make_shared<propagation::Propagator>(
-        std::make_unique<propagation::RKF78Integrator>(0.1, 1e-12),
+        integrator,
         ephem,
         cfg.propagator_settings
     );

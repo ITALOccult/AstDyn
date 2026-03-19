@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
 
         astdyn::astrometry::AstrometricSettings a_settings;
         a_settings.light_time_correction = true;
-        a_settings.stellar_aberration = false; // Chebyshev typically fits astrometric positions
+        a_settings.aberrazione_differenziale = false; // Chebyshev typically fits astrometric positions
         a_settings.frame_conversion_to_equatorial = true;
 
         for (double t = start_mjd; t <= start_mjd + duration; t += 1.0) {

@@ -35,14 +35,14 @@ using DerivativeFunction = std::function<Eigen::VectorXd(double t, const Eigen::
  * @brief Integration statistics and diagnostics
  */
 struct IntegrationStatistics {
-    std::atomic<int> num_steps = 0;           ///< Total steps taken
-    std::atomic<int> num_function_evals = 0;  ///< Total function evaluations
-    std::atomic<int> num_rejected_steps = 0;  ///< Steps rejected (adaptive only)
-    std::atomic<double> min_step_size = 0.0;  ///< Minimum step size used
-    std::atomic<double> max_step_size = 0.0;  ///< Maximum step size used
-    std::atomic<double> final_time = 0.0;     ///< Actual final time reached
-    std::atomic<double> hamiltonian_drift = 0.0;         ///< drift di H reale (oscilla)
-    std::atomic<double> shadow_hamiltonian_drift = 0.0;  ///< drift di H̃ (quasi-conservato)
+    int num_steps = 0;           ///< Total steps taken
+    int num_function_evals = 0;  ///< Total function evaluations
+    int num_rejected_steps = 0;  ///< Steps rejected (adaptive only)
+    double min_step_size = 0.0;  ///< Minimum step size used
+    double max_step_size = 0.0;  ///< Maximum step size used
+    double final_time = 0.0;     ///< Actual final time reached
+    double hamiltonian_drift = 0.0;         ///< drift di H reale (oscilla)
+    double shadow_hamiltonian_drift = 0.0;  ///< drift di H̃ (quasi-conservato)
     
     void reset() {
         num_steps = 0;
@@ -55,18 +55,7 @@ struct IntegrationStatistics {
         shadow_hamiltonian_drift = 0.0;
     }
 
-    // Explicit copy support if needed, but atomics are not trivially copyable
     IntegrationStatistics() = default;
-    IntegrationStatistics(const IntegrationStatistics& other) {
-        num_steps = other.num_steps.load();
-        num_function_evals = other.num_function_evals.load();
-        num_rejected_steps = other.num_rejected_steps.load();
-        min_step_size = other.min_step_size.load();
-        max_step_size = other.max_step_size.load();
-        final_time = other.final_time.load();
-        hamiltonian_drift = other.hamiltonian_drift.load();
-        shadow_hamiltonian_drift = other.shadow_hamiltonian_drift.load();
-    }
 };
 
 /**

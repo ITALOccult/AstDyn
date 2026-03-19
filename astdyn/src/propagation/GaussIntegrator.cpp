@@ -108,8 +108,8 @@ Eigen::VectorXd GaussIntegrator::integrate(const DerivativeFunction& f,
         h = std::clamp(std::abs(h), h_min_, std::min(h_max_, base_h * 2.0)) * direction;
 
         if (stats_.min_step_size == 0.0) stats_.min_step_size = std::abs(h);
-        else astdyn::utils::atomic_min(stats_.min_step_size, std::abs(h));
-        astdyn::utils::atomic_max(stats_.max_step_size, std::abs(h));
+        else stats_.min_step_size = std::min(stats_.min_step_size, std::abs(h));
+        stats_.max_step_size = std::max(stats_.max_step_size, std::abs(h));
         
         if (stats_.num_steps > 1000000) break;
     }

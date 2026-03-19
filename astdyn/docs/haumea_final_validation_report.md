@@ -15,7 +15,15 @@ A partire dall'epoca AstDys originaria (MJD 61200), l'orbita baricentrica di Hau
 - Inclinazione (i): 28.21 deg
 - Anomalia Media (M): Aggiornata calcolando il mean motion per il Delta T = -35.16 giorni.
 
-## 3. Occultazione Corpo Principale: Confronto con Predizione Fornita
+## 3. Fit delle Osservazioni e Residui (AstDyS RWO)
+L'orbita validata di base (.eq1) poggia sul database di osservazioni racchiuso nel file `.rwo`. I risultati del fit sull'intero arco osservativo (dal 1955 ad oggi) restituiscono una qualità orbitale eccellente per Haumea:
+- Osservazioni Processate: ~4100
+- Modello Errori: fcct14
+- RMS Astrometrico (Totale): 0.292 arcsec
+- RMS Fotometrico (Mag): 0.246
+L'accuratezza sub-arcosecondo prolungata su quasi 70 anni attesta l'estrema precisione dell'orbita di partenza, rendendo la propagazione a Maggio 2026 altamente attendibile e senza spread divergenti sulle posizioni planetarie.
+
+## 4. Occultazione Corpo Principale: Confronto con Predizione Fornita
 I risultati dell'integrazione AstDyn per Haumea sono stati allineati geometricamente e visivamente con la predizione da te fornita.
 - Corridoio Geografico: I risultati AstDyn in GCRF posizionano l'ombra centrale in asse con l'evento (Sudan, Mar Rosso, Yemen e Oman).
 - Risoluzione Discrepanza: Lo scarto preliminare tra il path calcolato e il tuo evento in ingresso era causato dalla mancata trasformazione tra il frame planetario (ECLIPJ2000) e il frame del sensore Gaia (GCRF).
