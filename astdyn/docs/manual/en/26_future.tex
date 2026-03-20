@@ -342,15 +342,15 @@ struct RadarObservation {
 \textbf{Planned endpoints}:
 \begin{verbatim}
 POST /api/v1/propagate
-  Body: { "elements": {...}, "target_epoch": 2460100.5 }
+  Body: { "elements": {...}, ... }
   Returns: { "state": {...}, "elapsed_ms": 1.82 }
 
 POST /api/v1/orbit_determination
-  Body: { "observations": [...], "method": "differential_correction" }
-  Returns: { "elements": {...}, "rms": 0.658, "iterations": 4 }
+  Body: { "observations": [...], "method": "diff_corr" }
+  Returns: { "elements": {...}, "rms": 0.658 }
 
-GET /api/v1/ephemeris?object=pompeja&start=2460000&end=2460100&step=1
-  Returns: [ { "epoch": 2460000.5, "position": [...], ...}, ... ]
+GET /api/v1/ephemeris?obj=pompeja&...
+  Returns: [ { "epoch": 2460000.5, ... }, ... ]
 \end{verbatim}
 
 \textbf{Technology stack}:

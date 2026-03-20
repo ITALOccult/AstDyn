@@ -14,13 +14,13 @@ The numerical integrator (RKF78) and force model were validated by propagating t
 \end{itemize}
 
 \subsection{Results}
-The position residuals are shown in Figure~\ref{fig:residuals}. The maximum position error over the 10-year integration arc remains below $2.5 \times 10^{-9}$ AU (approximately 3 meters), well within the requirements for occultation prediction (typically $\sim 10$ km accuracy).
+The position residuals are shown in Figure~\ref{fig:residuals_val_accuracy}. The maximum position error over the 10-year integration arc remains below $2.5 \times 10^{-9}$ AU (approximately 3 meters), well within the requirements for occultation prediction (typically $\sim 10$ km accuracy).
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.9\textwidth]{residual_plot.pdf}
     \caption{Position residuals (AstDyn vs. JPL Horizons) for Asteroid (17030) Sierks over a 10-year propagation. The errors are dominated by the accumulation of floating-point noise and minor differences in the implementation of perturbative forces.}
-    \label{fig:residuals_pompeja}
+    \label{fig:residuals_val_accuracy}
 \end{figure}
 
 The Root Mean Square (RMS) errors are summarized in Table~\ref{tab:residuals_stats}.

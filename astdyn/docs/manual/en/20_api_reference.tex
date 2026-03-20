@@ -211,7 +211,7 @@ static KeplerianElements from_cartesian(
 \textbf{Purpose}: Convert Cartesian state to Keplerian elements.
 
 \textbf{Parameters}:
-```
+\begin{itemize}
     \item \texttt{pos}: Position vector (AU)
     \item \texttt{vel}: Velocity vector (AU/day)
     \item \texttt{epoch}: Epoch (JD)
@@ -358,7 +358,7 @@ public:
     virtual size_t steps_taken() const = 0;
     virtual size_t steps_rejected() const = 0;
 };
-\end{lstlisting}
+\end{lstlisting>
 
 \subsection{astdyn::propagation::RKF78}
 
@@ -384,7 +384,7 @@ public:
     size_t steps_taken() const override;
     size_t steps_rejected() const override;
 };
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Purpose}: Adaptive Runge-Kutta-Fehlberg 7(8) integrator.
 
@@ -407,7 +407,7 @@ public:
 Propagator(std::shared_ptr<IIntegrator> integrator,
           std::shared_ptr<ForceModel> forces,
           std::shared_ptr<ephemeris::IEphemeris> ephemeris);
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Parameters}:
 \begin{itemize}
@@ -421,7 +421,7 @@ Propagator(std::shared_ptr<IIntegrator> integrator,
 \begin{lstlisting}[language=C++]
 CartesianState propagate(const CartesianState& initial,
                          double target_epoch);
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Purpose}: Propagate state to target epoch.
 
@@ -449,7 +449,7 @@ CartesianState state1 = prop.propagate(state0, state0.epoch + 60.0);
 \begin{lstlisting}[language=C++]
 std::pair<CartesianState, Matrix6d> propagate_with_stm(
     const CartesianState& initial, double target_epoch);
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Purpose}: Propagate state and state transition matrix.
 
@@ -466,7 +466,7 @@ std::pair<CartesianState, Matrix6d> propagate_with_stm(
 std::vector<CartesianState> generate_ephemeris(
     const CartesianState& initial, 
     double start_epoch, double end_epoch, double step);
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Purpose}: Generate table of states at regular intervals.
 
@@ -507,7 +507,7 @@ public:
         double target_jd_tdb
     );
 };
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Purpose}: Simplified API for rigorous asteroid propagation and geocentric reduction matching JPL precision.
 
@@ -537,13 +537,13 @@ struct Observation {
     double weight_ra() const;
     double weight_dec() const;
 };
-\end{lstlisting}
+\end{lstlisting>
 
 \subsubsection{line\_of\_sight}
 
 \begin{lstlisting}[language=C++]
 Vector3d line_of_sight() const;
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Purpose}: Compute unit vector in direction of observation.
 
@@ -554,7 +554,7 @@ Vector3d line_of_sight() const;
 \begin{lstlisting}[language=C++]
 double weight_ra() const;
 double weight_dec() const;
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Purpose}: Compute observation weights for least squares.
 
@@ -572,13 +572,13 @@ struct ObservatoryCoordinates {
     Vector3d position_itrf() const;
     Vector3d position_icrf(double jd) const;
 };
-\end{lstlisting}
+\end{lstlisting>
 
 \textbf{Purpose}: Convert observatory location to observer position vectors.
 
 \section{Orbit Determination}
 
-\subsection{\texorpdfstring{astdyn::orbit\_determination::DifferentialCorrector}{DifferentialCorrector API}}
+\subsection{\texorpdfstring{ast::DifferentialCorrector}{DifferentialCorrector API}}
 
 \begin{lstlisting}[language=C++]
 class DifferentialCorrector {
@@ -600,7 +600,7 @@ public:
                 const std::vector<observations::Observation>& observations,
                 const std::vector<observations::ObservatoryCoordinates>& observatories);
 };
-\end{lstlisting}
+\end{lstlisting>
 
 \subsubsection{solve}
 
