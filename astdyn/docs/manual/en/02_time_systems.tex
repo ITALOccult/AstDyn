@@ -169,23 +169,26 @@ Figure~\ref{fig:timescales} illustrates the relationships between time scales:
 \end{figure}
 
 \section{Implementation in AstDyn}
-
-The \texttt{TimeScale} class handles conversions between time systems:
-
+ 
+The \texttt{astdyn::time} namespace provides strongly-typed epoch and conversion functions:
+ 
 \begin{lstlisting}[style=cpp,caption={Time scale conversions}]
 #include <astdyn/time/TimeScale.hpp>
 using namespace astdyn::time;
 
-// UTC to TDB conversion
-double mjd_utc = 61000.0;
-double mjd_tdb = TimeScale::utc_to_tdb(mjd_utc);
+// UTC to TDB conversion (Type-safe way)
+EpochUTC t_utc = EpochUTC::from_mjd(61000.0);
+EpochTDB t_tdb = to_tdb(t_utc);
 
-// TT to TAI
+// Access raw MJD value
+double mjd_tdb = t_tdb.mjd();
+
+// TT to TAI (raw double helpers also available)
 double mjd_tt = 61000.0;
-double mjd_tai = TimeScale::tt_to_tai(mjd_tt);
+double mjd_tai = tt_to_tai(mjd_tt);
 
 // UT1 to UTC (requires Delta_UT from IERS)
-double delta_ut = 0.15;  // seconds, from IERS Bulletin A
+double delta_ut = 0.15;  // seconds
 double mjd_ut1 = 61000.0;
 double mjd_utc_computed = mjd_ut1 - delta_ut / 86400.0;
 \end{lstlisting}
@@ -254,19 +257,22 @@ Therefore, using the correct time scale and accounting for leap seconds is essen
 Complete conversion from civil date to TDB:
 
 \begin{lstlisting}[style=cpp,caption={Converting calendar date to TDB}]
+#include <astdyn/time/TimeScale.hpp>
+using namespace astdyn::time;
+
 // Input: UTC civil date
 int year = 2025, month = 11, day = 26;
 double hour = 12.5;  // 12:30 UT
 
-// Step 1: Calendar to Julian Day
-double jd_utc = calendar_to_jd(year, month, day + hour/24.0);
-double mjd_utc = jd_utc - 2400000.5;
+// Step 1: Calendar to MJD (UTC)
+double mjd_utc_raw = calendar_to_mjd(year, month, day, hour/24.0);
+EpochUTC t_utc = EpochUTC::from_mjd(mjd_utc_raw);
 
-// Step 2: UTC to TDB
-double mjd_tdb = TimeScale::utc_to_tdb(mjd_utc);
+// Step 2: Convert to TDB (Strongly-typed conversion)
+EpochTDB t_tdb = to_tdb(t_utc);
 
 std::cout << "MJD (TDB): " << std::fixed << std::setprecision(6) 
-          << mjd_tdb << std::endl;
+          << t_tdb.mjd() << std::endl;
 // Output: MJD (TDB): 61000.520833
 \end{lstlisting}
 
