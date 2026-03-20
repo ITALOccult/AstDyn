@@ -85,28 +85,48 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
 std::vector<std::string> parse_asteroid_list(const std::string& input) {
     std::vector<std::string> ids;
     if (input.empty()) return ids;
+    
+    std::vector<std::string> raw_segments;
     if (input[0] == '@') {
         std::ifstream file(input.substr(1));
         std::string line;
         while (std::getline(file, line)) {
-            if (!line.empty()) ids.push_back(line);
+            if (!line.empty()) raw_segments.push_back(line);
         }
     } else {
         std::stringstream ss(input);
         std::string segment;
         while (std::getline(ss, segment, ',')) {
-            if (!segment.empty()) ids.push_back(segment);
+            if (!segment.empty()) raw_segments.push_back(segment);
+        }
+    }
+
+    for (const auto& seg : raw_segments) {
+        size_t dash_pos = seg.find('-');
+        if (dash_pos != std::string::npos && dash_pos > 0 && dash_pos < seg.length() - 1) {
+            try {
+                int start_id = std::stoi(seg.substr(0, dash_pos));
+                int end_id = std::stoi(seg.substr(dash_pos + 1));
+                if (start_id > end_id) std::swap(start_id, end_id);
+                for (int i = start_id; i <= end_id; ++i) {
+                    ids.push_back(std::to_string(i));
+                }
+            } catch (...) {
+                ids.push_back(seg);
+            }
+        } else {
+            ids.push_back(seg);
         }
     }
     return ids;
 }
 
 int main(int argc, char** argv) {
-    po::options_description desc("ioccultcalc: AstDyn Occultation Tool CLI\nUsage: ioccultcalc --asteroid <num1,num2...> --jd-start <jd> --duration <days>");
+    po::options_description desc("ioccultcalc: AstDyn Occultation Tool CLI\nUsage: ioccultcalc --asteroid <num1,num2,start-end...> --jd-start <jd> --duration <days>");
     desc.add_options()
         ("help,h", "produce help message")
         ("conf", po::value<std::string>(), "JSON configuration file for AstDynEngine")
-        ("asteroid", po::value<std::string>(), "asteroid designation list (comma-separated or @file)")
+        ("asteroid", po::value<std::string>(), "asteroid designations (comma-separated, ranges like '1-100', or '@file')")
         ("jd-start", po::value<double>(), "start Julian Date for searching (TDB)")
         ("duration", po::value<double>()->default_value(1.0), "search duration in days")
         ("mag", po::value<double>()->default_value(15.0), "magnitude limit for stars")
@@ -118,6 +138,9 @@ int main(int argc, char** argv) {
         ("lat", po::value<double>(), "observer latitude (degrees) for regional search")
         ("lon", po::value<double>(), "observer longitude (degrees) for regional search")
         ("alt", po::value<double>()->default_value(0.0), "observer altitude (meters)")
+        ("max-dist-km", po::value<double>(), "maximum distance from observer to shadow centerline [km]")
+        ("min-duration", po::value<double>(), "minimum event duration [seconds]")
+        ("min-diameter", po::value<double>(), "minimum asteroid diameter [km]")
         ("bsp", po::value<std::string>(), "path to satellite ephemeris file (BSP)")
         ("system-ids", po::value<std::string>(), "comma-separated NAIF IDs for system bodies (e.g. 100,201)")
         ("covariance,c", po::value<std::string>(), "path to orbital covariance file (.cor or .csv)")
@@ -125,6 +148,10 @@ int main(int argc, char** argv) {
         ("zoom", po::value<double>()->default_value(1.0), "zoom level for SVG map")
         ("map-lat", po::value<double>(), "center latitude for SVG map")
         ("map-lon", po::value<double>(), "center longitude for SVG map")
+        ("max-ruwe", po::value<double>(), "maximum Gaia DR3 RUWE for stars")
+        ("max-moon-phase", po::value<double>(), "maximum Moon phase [0.0 - 1.0]")
+        ("min-moon-dist", po::value<double>(), "minimum angular distance from Moon [degrees]")
+        ("max-shadow-dist", po::value<double>(), "maximum shadow search distance [km]")
         ("catalog", po::value<std::string>()->default_value("gaia_dr3"), "stellar catalog to use (gaia_dr3, legacy)")
         ("multibody", po::bool_switch()->default_value(false), "use high-precision multibody propagator for refinement")
         ("star-offset-mas", po::value<double>()->default_value(0.0), "apply RA offset to star in mas (e.g. for duplicity correction)")
@@ -231,8 +258,10 @@ int main(int argc, char** argv) {
                 auto props = horizons.query_physical_properties(id);
                 if (props) {
                     stored_props[id] = {props->h_mag, props->diameter_km};
+                    manager.set_diameter(id, props->diameter_km);
                 } else {
                     stored_props[id] = {0.0, 100.0};
+                    manager.set_diameter(id, 100.0);
                 }
             }
         }
@@ -252,6 +281,7 @@ int main(int argc, char** argv) {
             manager.add_system_body(id_str, naif_id, *system_reader, start_epoch, end_epoch);
             asteroid_ids.push_back(id_str); // Add to search list
             stored_props[id_str] = {15.0, 10.0}; // Default for satellites (H, D)
+            manager.set_diameter(id_str, 10.0);
         }
     }
 
@@ -259,6 +289,21 @@ int main(int argc, char** argv) {
     OccultationConfig occ_config = engine.config().occultation_settings;
     occ_config.max_mag_star = mag_limit;
     
+    // Apply scientific filters from CLI (overriding config if present)
+    if (vm.count("min-duration")) occ_config.min_duration_s = vm["min-duration"].as<double>();
+    if (vm.count("min-diameter")) occ_config.min_asteroid_diameter_km = vm["min-diameter"].as<double>();
+    
+    // Apply proximity filters from CLI
+    if (vm.count("lat")) occ_config.obs_lat = vm["lat"].as<double>();
+    if (vm.count("lon")) occ_config.obs_lon = vm["lon"].as<double>();
+    if (vm.count("max-dist-km")) occ_config.max_obs_dist_km = vm["max-dist-km"].as<double>();
+
+    // Apply scientific quality filters from CLI
+    if (vm.count("max-ruwe")) occ_config.max_gaia_ruwe = vm["max-ruwe"].as<double>();
+    if (vm.count("max-moon-phase")) occ_config.max_moon_phase = vm["max-moon-phase"].as<double>();
+    if (vm.count("min-moon-dist")) occ_config.min_moon_dist = vm["min-moon-dist"].as<double>();
+    if (vm.count("max-shadow-dist")) occ_config.max_shadow_distance = physics::Distance::from_km(vm["max-shadow-dist"].as<double>());
+
     std::vector<OccultationCandidate> results;
 
     if (!system_bsp.empty() && !system_ids_str.empty()) {

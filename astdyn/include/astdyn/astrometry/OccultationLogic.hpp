@@ -4,6 +4,7 @@
 #include "astdyn/astrometry/sky_types.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/catalog/CatalogTypes.hpp"
+#include "astdyn/astrometry/ClosestApproachFinder.hpp"
 #include <Eigen/Dense>
 #include <vector>
 #include <string>
@@ -37,6 +38,7 @@ struct OccultationParameters {
     double total_apparent_rate; // arcsec/hr
     time::TimeDuration max_duration;
     std::string star_id;
+    double moon_phase;                   // 0.0 (new) to 1.0 (full)
     
     physics::Distance cross_track_uncertainty;
     Eigen::Vector3d shadow_velocity_vector;
@@ -151,6 +153,15 @@ private:
         const OccultationConfig& config,
         AstDynEngine& engine,
         double t_start_jd, double t_end_jd);
+
+    static void evaluate_candidate(
+        const std::string& id,
+        const catalog::Star& star,
+        const catalog::ChebyshevSegment& segment,
+        const std::vector<ClosestApproachResult>& candidates,
+        std::vector<OccultationCandidate>& results,
+        const OccultationConfig& config,
+        AstDynEngine& engine);
 };
 
 struct OccultationConfig {
@@ -164,6 +175,19 @@ struct OccultationConfig {
     bool filter_daylight = true;
     physics::Distance max_shadow_distance = physics::Distance::from_km(10000.0);
     bool compute_uncertainty = true;
+
+    // Advanced Scientific Filters
+    double min_duration_s = 0.0;
+    double min_asteroid_diameter_km = 0.0;
+
+    // Site-Specific Proximity Filters
+    double obs_lat = 0.0;
+    double obs_lon = 0.0;
+    double max_obs_dist_km = 0.0; // 0.0 = disabled
+
+    // Scientific Quality Filters
+    double max_gaia_ruwe = 99.0;         // Rejects targets with RUWE > limit (e.g. 1.4)
+    double max_moon_phase = 1.0;         // 0.0 to 1.0 (Full)
 };
 
 } // namespace astdyn::astrometry

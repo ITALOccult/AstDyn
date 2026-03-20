@@ -186,7 +186,8 @@ void OccultationLogic::compute_sky_conditions(
     // Moon Geometry
     auto moon_ssb = ephem->getState(ephemeris::CelestialBody::MOON, t_ca);
     auto earth_ssb = ephem->getState(ephemeris::CelestialBody::EARTH, t_ca);
-    Eigen::Vector3d n_moon = (moon_ssb.position.to_eigen_si() - earth_ssb.position.to_eigen_si()).normalized();
+    Eigen::Vector3d r_moon_earth = (moon_ssb.position.to_eigen_si() - earth_ssb.position.to_eigen_si());
+    Eigen::Vector3d n_moon = r_moon_earth.normalized();
     
     params.moon_altitude = Angle::from_rad(std::asin(std::clamp(n_ast.dot(n_moon), -1.0, 1.0)));
     
@@ -194,6 +195,10 @@ void OccultationLogic::compute_sky_conditions(
     double ds = star_dec.to_rad();
     Eigen::Vector3d k_star(std::cos(ds) * std::cos(as), std::cos(ds) * std::sin(as), std::sin(ds));
     params.moon_dist = Angle::from_rad(std::acos(std::clamp(k_star.dot(n_moon), -1.0, 1.0)));
+
+    // Moon Phase (approximate from elongation)
+    double cos_psi = std::clamp(n_sun.dot(n_moon), -1.0, 1.0);
+    params.moon_phase = 0.5 * (1.0 - cos_psi);
 }
 
 void OccultationLogic::process_day_window(
@@ -240,6 +245,12 @@ void OccultationLogic::evaluate_candidate(
         max_sep_angle,
         720); // 2-minute sampling for a 1-day segment is enough for detection
 
+    if (ca_results.empty()) {
+        std::cout << "[DEBUG] No close approaches found for star " << star.source_id << " within " << max_sep_angle.to_arcsec() << " arcsec" << std::endl;
+    } else {
+        std::cout << "[DEBUG] Found " << ca_results.size() << " close approaches for star " << star.source_id << std::endl;
+    }
+
     for (const auto& ca : ca_results) {
         // Map ClosestApproachResult to OccultationParameters
         auto [pos, vel] = segment.evaluate_full(ca.t_ca.jd());
@@ -263,9 +274,119 @@ void OccultationLogic::evaluate_candidate(
             physics::Velocity::from_au_d(std::get<2>(vel)),
             ca.t_ca, engine.getEphemeris());
 
-        if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) continue;
+        if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) {
+            continue;
+        }
+
+        // --- NEW: Scientific & Proximity Filters ---
+
+        // 1. Duration filter
+        if (config.min_duration_s > 0.1 && params.max_duration.to_seconds() < config.min_duration_s) {
+            continue;
+        }
+
+        // 2. Gaia Quality Filter (RUWE)
+        if (star.ruwe > config.max_gaia_ruwe) {
+            continue;
+        }
+
+        // 3. Moon Filters
+        if (params.moon_dist.to_deg() < config.min_moon_dist) {
+            continue;
+        }
+        if (params.moon_phase > config.max_moon_phase + 0.001) {
+            continue;
+        }
+
+        // 4. Proximity filter (Great Circle Distance from center_lat/lon to observer)
+        if (config.max_obs_dist_km > 1.0) {
+            double phi1 = config.obs_lat * constants::DEG_TO_RAD;
+            double phi2 = params.center_lat.to_rad();
+            double dlam = (params.center_lon.to_deg() - config.obs_lon) * constants::DEG_TO_RAD;
+            
+            double d_rad = std::acos(std::sin(phi1)*std::sin(phi2) + std::cos(phi1)*std::cos(phi2)*std::cos(dlam));
+            double d_km = d_rad * 6371.0; 
+            
+            if (d_km > config.max_obs_dist_km) continue;
+        }
 
         results.push_back({"", star, params}); 
+    }
+}
+
+void OccultationLogic::evaluate_candidate(
+    const std::string& id,
+    const catalog::Star& star,
+    const catalog::ChebyshevSegment& segment,
+    const std::vector<ClosestApproachResult>& candidates,
+    std::vector<OccultationCandidate>& results,
+    const OccultationConfig& config,
+    AstDynEngine& engine)
+{
+    for (const auto& ca : candidates) {
+        auto star_at_tca = star.predict_at(ca.t_ca);
+        
+        auto [pos, vel] = segment.evaluate_full(ca.t_ca.jd());
+        double dist_au_at_ca = std::get<2>(pos);
+        
+        physics::Distance impact_dist = physics::Distance::from_m(
+            ca.separation.to_rad() * dist_au_at_ca * constants::AU * 1000.0);
+
+        if (impact_dist > config.max_shadow_distance) continue;
+
+        double dra_hr = (std::get<0>(vel) / 24.0) * 3600.0;
+        double ddec_hr = (std::get<1>(vel) / 24.0) * 3600.0;
+
+        OccultationParameters params = compute_parameters(
+            star_at_tca.ra(), star_at_tca.dec(),
+            RightAscension::from_deg(std::get<0>(pos)), Declination::from_deg(std::get<1>(pos)),
+            physics::Distance::from_au(std::get<2>(pos)),
+            Angle::from_arcsec(dra_hr), Angle::from_arcsec(ddec_hr),
+            physics::Velocity::from_au_d(std::get<2>(vel)),
+            ca.t_ca, engine.getEphemeris());
+
+        if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) {
+            std::cout << "[DEBUG] Filtered by daylight: sun_alt=" << params.sun_altitude.to_deg() << ", is_daylight=" << params.is_daylight << std::endl;
+            continue;
+        }
+
+        // --- Scientific Quality Filters ---
+
+        // 1. Duration filter
+        if (config.min_duration_s > 0.1 && params.max_duration.to_seconds() < config.min_duration_s) {
+            std::cout << "[DEBUG] Filtered by duration: " << params.max_duration.to_seconds() << " < " << config.min_duration_s << std::endl;
+            continue;
+        }
+
+        // 2. Gaia Quality Filter (RUWE)
+        if (star.ruwe > config.max_gaia_ruwe) {
+            std::cout << "[DEBUG] Filtered by RUWE: " << star.ruwe << " > " << config.max_gaia_ruwe << std::endl;
+            continue;
+        }
+
+        // 3. Moon Filters
+        if (params.moon_dist.to_deg() < config.min_moon_dist) {
+            std::cout << "[DEBUG] Filtered by moon dist: " << params.moon_dist.to_deg() << " < " << config.min_moon_dist << std::endl;
+            continue;
+        }
+        if (params.moon_phase > config.max_moon_phase + 0.001) {
+            std::cout << "[DEBUG] Filtered by moon phase: " << params.moon_phase << " > " << config.max_moon_phase << std::endl;
+            continue;
+        }
+
+        // 4. Proximity filter
+        if (config.max_obs_dist_km > 1.0) {
+            double phi1 = config.obs_lat * constants::DEG_TO_RAD;
+            double phi2 = params.center_lat.to_rad();
+            double dlam = (params.center_lon.to_deg() - config.obs_lon) * constants::DEG_TO_RAD;
+            
+            double d_rad = std::acos(std::sin(phi1)*std::sin(phi2) + std::cos(phi1)*std::cos(phi2)*std::cos(dlam));
+            double d_km = d_rad * 6371.0; 
+            
+            if (d_km > config.max_obs_dist_km) continue;
+        }
+
+        results.push_back({id, star, params}); 
     }
 }
 
@@ -418,6 +539,11 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
     // Iterate over the list of managed asteroids (pre-calculated with polynomials)
     for (const auto& id : asteroid_ids) {
         if (!manager.has_body(id)) continue;
+
+        // --- NEW: Diameter Filter ---
+        if (config.min_asteroid_diameter_km > 0.1 && manager.get_diameter(id) < config.min_asteroid_diameter_km) {
+            continue; 
+        }
         
         const auto& eph = manager.get_ephemeris(id);
         

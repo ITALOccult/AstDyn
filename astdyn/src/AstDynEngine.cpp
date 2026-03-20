@@ -142,6 +142,17 @@ void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {
     occ.use_proper_motion = ioc.get<bool>("occultation.use_proper_motion", true);
     occ.use_parallax = ioc.get<bool>("occultation.use_parallax", true);
     occ.max_shadow_distance = physics::Distance::from_km(ioc.get<double>("occultation.max_shadow_dist", 10000.0));
+    
+    // New Advanced Filters
+    occ.min_duration_s = ioc.get<double>("occultation.min_duration", 0.0);
+    occ.min_asteroid_diameter_km = ioc.get<double>("occultation.min_diameter", 0.0);
+    occ.max_obs_dist_km = ioc.get<double>("occultation.max_dist_km", 0.0);
+    occ.obs_lat = ioc.get<double>("occultation.lat", 0.0);
+    occ.obs_lon = ioc.get<double>("occultation.lon", 0.0);
+
+    // New Scientific Quality Filters
+    occ.max_gaia_ruwe = ioc.get<double>("occultation.max_ruwe", 99.0);
+    occ.max_moon_phase = ioc.get<double>("occultation.max_moon_phase", 1.0);
 }
 
 void AstDynEngine::load_config(const std::string& config_file) {

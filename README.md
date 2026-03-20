@@ -166,6 +166,27 @@ A rigorous validation of the (234) Barbara occultation event (May 11, 2026) has 
 
 A full high-fidelity multi-body propagation and validation report for the complete Haumea system (including satellites Hi'iaka and Namaka) occultation event on May 4, 2026 is available here: **[Haumea Validation Report](astdyn/docs/haumea_final_validation_report.md)**.
 
+### Ricerche Massive e Filtri Scientifici
+`ioccultcalc` è stato potenziato per supportare campagne di ricerca su larga scala con criteri di qualità scientifica avanzati:
+
+*   **Range di Asteroidi**: Supporta la sintassi `1000-5000` per processare intere sequenze.
+*   **Filtri di Qualità Stellare**: 
+    *   `max-ruwe`: Filtra stelle con RUWE (Gaia DR3) elevato (es. > 1.4) per garantire precisione astrometrica.
+*   **Filtri Lunari**:
+    *   `max-moon-phase`: Esclude osservazioni durante fasi lunari troppo luminose (0.0-1.0).
+    *   `min-moon-dist`: Distanza angolare minima dalla Luna per evitare background rumoroso.
+*   **Filtri Fisici e Geometrici**: 
+    *   `min-duration`: Durata minima dell'evento in secondi.
+    *   `min-diameter`: Diametro minimo dell'asteroide in km.
+    *   `max-shadow-dist`: Raggio massimo di ricerca dell'ombra geocentrica (km).
+*   **Filtri Prossimità Geografica**:
+    *   `lat`, `lon`, `max-dist-km`: Filtra eventi che passano entro X km da un sito osservativo.
+
+Esempio di ricerca professionale (ID 1000-5000) con filtri di qualità:
+```bash
+ioccultcalc --asteroid 1000-5000 --max-ruwe 1.4 --max-moon-phase 0.5 --min-moon-dist 15 --min-duration 0.3 --jd-start 2461171.1
+```
+
 ## 🚀 Development Roadmap (Towards v1.0)
 
 AstDyn is currently in an active developmental phase. Below is the strategic plan for the IOccultCalc tool and core library:

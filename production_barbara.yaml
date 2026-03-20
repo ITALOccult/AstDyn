@@ -1,0 +1,31 @@
+# Configurazione di produzione per l'occultazione di (234) Barbara
+# Utilizza l'integratore ad alta precisione AAS (Adaptive Symplectic)
+
+asteroid = 234
+jd-start = 2461171.1
+duration = 0.2
+mag = 16.0
+
+ephemeris {
+  file = /Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp
+}
+
+integrator {
+  type = AAS
+  aas_precision = 1e-6
+}
+
+astrometry {
+  catalog = online_esa
+  verbose = true
+}
+
+occultation {
+  filter_daylight = false       # Fondamentale per Barbara in Italia
+  max_shadow_dist = 20000.0     # Raggio di ricerca aumentato [km]
+}
+
+out-dir = barbara_results
+prefix = barbara_aas
+xml-output = results.xml
+svg-output = global_map.svg

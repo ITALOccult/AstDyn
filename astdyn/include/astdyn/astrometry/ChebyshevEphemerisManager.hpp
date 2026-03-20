@@ -73,9 +73,25 @@ public:
      */
     const IChebyshevEphemeris& get_ephemeris(const std::string& id) const;
 
+    /**
+     * @brief Set body diameter.
+     */
+    void set_diameter(const std::string& id, double diameter_km) {
+        diameters_km_[id] = diameter_km;
+    }
+
+    /**
+     * @brief Get body diameter (defaults to 100km if unknown).
+     */
+    double get_diameter(const std::string& id) const {
+        auto it = diameters_km_.find(id);
+        return (it != diameters_km_.end()) ? it->second : 100.0;
+    }
+
 private:
     const AstDynConfig& config_;
     std::map<std::string, std::unique_ptr<IChebyshevEphemeris>> ephemerides_;
+    std::map<std::string, double> diameters_km_;
 };
 
 } // namespace astdyn::astrometry
