@@ -99,6 +99,6 @@ auto k = KeplerianStateTyped<ECLIPJ2000>::from_traditional(
 
 \begin{itemize}
     \item \textbf{Avoid raw doubles}: Use \texttt{Distance}, \texttt{Velocity}, and \texttt{Angle} whenever possible.
-    \item \textbf{Use Factory Methods}: Instead of \texttt{val = 1.0}, use \texttt{Distance::from_au(1.0)}. This makes the code self-documenting and safe.
+    \item \textbf{Use Factory Methods}: Instead of \texttt{val = 1.0}, use \texttt{Distance::from\_au(1.0)}. This makes the code self-documenting and safe.
     \item \textbf{Check Frame Tags}: Always verify that the template parameter of your state matches the data source (e.g., use \texttt{ECLIPJ2000} for OrbFit/AstDyS files).
 \end{itemize}

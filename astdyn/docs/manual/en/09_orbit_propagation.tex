@@ -255,7 +255,7 @@ auto final = prop.propagate_keplerian(initial, t_final);
 
 \subsection{Multi-Epoch (Ephemeris) Propagation}
 
-For generating ephemerides, the \texttt{propagate_ephemeris} method is optimized for multiple target times.
+For generating ephemerides, the \texttt{propagate\_ephemeris} method is optimized for multiple target times.
 
 \begin{lstlisting}[language=C++,caption={Multi-epoch propagation}]
 std::vector<time::EpochTDB> targets = {t1, t2, t3, t4};

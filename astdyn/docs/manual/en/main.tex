@@ -21,6 +21,9 @@
 \usepackage{float}
 \usepackage{algorithm}
 \usepackage{algorithmic}
+\usepackage[utf8]{inputenc}
+\usepackage{newunicodechar}
+
 
 % Font similar to Optima - using Palatino (elegant serif) or Charter
 % classico package not available, using alternative
@@ -88,13 +91,28 @@
     breakatwhitespace=false,
     escapeinside={\%*}{*)},
     xleftmargin=1.5em,
-    xrightmargin=0.5em
+    xrightmargin=0.5em,
+    literate={_}{\_}{1}
 }
 
 % C++ language definition
 \lstdefinestyle{cpp}{
     language=C++,
     morekeywords={constexpr,nullptr,override,final}
+}
+
+\lstdefinestyle{output}{
+    backgroundcolor=\color{white},   % Sfondo bianco per l'output
+    basicstyle=\ttfamily\small\setstretch{1.0},
+    numbers=none,                    % Rimuove i numeri di riga per l'output
+    frame=single,                    % Cornice semplice
+    rulecolor=\color{gray},          % Cornice grigia leggera
+    keywordstyle=\color{black},      % Nessuna evidenziazione sintattica
+    commentstyle=\color{black},
+    stringstyle=\color{black},
+    showstringspaces=false,
+    breaklines=true,
+    literate={_}{\_}{1}              % Protegge eventuali underscore nell'output
 }
 
 % ============================================================================
@@ -123,6 +141,7 @@
 \newtheorem{remark}{Remark}[chapter]
 \newtheorem{note}{Note}[chapter]
 
+\newcommand{\mystar}{$\star$}
 % ============================================================================
 % HEADERS AND FOOTERS
 % ============================================================================

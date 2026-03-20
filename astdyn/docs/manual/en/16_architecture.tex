@@ -77,7 +77,7 @@ public:
 
 \subsection{Directory Structure}
 
-\\begin{lstlisting}[language=bash,caption={Project layout}]
+\begin{lstlisting}[language=bash,caption={Project layout}]
 astdyn/
 |-- include/astdyn/           # Public headers
 |   |-- AstDyn.hpp           # Main include (everything)
@@ -160,12 +160,12 @@ namespace astdyn {
 \end{itemize}
 
 \textbf{Type Aliases} (\texttt{core/Types.hpp}):
-// Strong typing for units (physics_types.hpp)
+// Strong typing for units (physics\_types.hpp)
 using Distance = Quantity<DistanceUnit>;
 using Velocity = Quantity<VelocityUnit>;
 using Angle    = Quantity<AngleUnit>;
 
-// State representation (physics_state.hpp)
+// State representation (physics\_state.hpp)
 template <typename Frame>
 struct CartesianStateTyped {
     time::EpochTDB epoch;

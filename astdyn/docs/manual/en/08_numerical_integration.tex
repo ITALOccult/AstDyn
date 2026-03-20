@@ -458,13 +458,13 @@ Table~\ref{tab:integrator_comparison} summarizes the characteristics of all inte
 \toprule
 \textbf{Method} & \textbf{Order} & \textbf{Type} & \textbf{Evals/step} & \textbf{Speed} & \textbf{Accuracy} & \textbf{Best For} \\
 \midrule
-RK4 & 4 & Explicit & 4 & ★★★★★ & ★★★ & Testing, debug \\
-RKF78 & 7(8) & Explicit & 13 & ★★★★ & ★★★★★ & General purpose \\
-Radau15 & 15 & Implicit & $\sim$32 & ★★★ & ★★★★★★ & Stiff, OD \\
-Gauss & 8 & Symplectic & $\sim$16 & ★★★★ & ★★★★ & Long-term \\
-AAS & 4(2) & Symplectic & 5 & ★★★★★ & ★★★★★ & Planets, moons \\
-SABA4 & 4 & Symplectic & 7 & ★★★★ & ★★★★ & Asteroids \\
-GRKN & 6(4) & Nystr\"om & 6 & ★★★★★ & ★★★★ & STM, 2nd order \\
+RK4 & 4 & Explicit & 4 & \mystar\mystar\mystar\mystar\mystar & \mystar\mystar\mystar & Testing, debug \\
+RKF78 & 7(8) & Explicit & 13 & \mystar\mystar\mystar\mystar & \mystar\mystar\mystar\mystar\mystar & General purpose \\
+Radau15 & 15 & Implicit & $\sim$32 & \mystar\mystar\mystar & \mystar\mystar\mystar\mystar\mystar\mystar & Stiff, OD \\
+Gauss & 8 & Symplectic & $\sim$16 & \mystar\mystar\mystar\mystar & \mystar\mystar\mystar\mystar & Long-term \\
+AAS & 4(2) & Symplectic & 5 & \mystar\mystar\mystar\mystar\mystar & \mystar\mystar\mystar\mystar\mystar & Planets, moons \\
+SABA4 & 4 & Symplectic & 7 & \mystar\mystar\mystar\mystar & \mystar\mystar\mystar\mystar & Asteroids \\
+GRKN & 6(4) & Nystr\"om & 6 & \mystar\mystar\mystar\mystar\mystar & \mystar\mystar\mystar\mystar & STM, 2nd order \\
 \bottomrule
 \end{tabular}
 \caption{Comparison of numerical integrators in AstDyn.}
