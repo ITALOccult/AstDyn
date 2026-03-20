@@ -5,119 +5,54 @@
 
 This chapter documents the core modules that implement orbital mechanics algorithms. Each module is designed to be independent yet composable.
 
-\section{Orbital Elements}
+\subsection{KeplerianStateTyped}
 
-\subsection{KeplerianElements}
+The primary way to represent orbital elements in AstDyn is via the \texttt{KeplerianStateTyped<Frame>} template. This ensures that the elements are always bound to a specific reference frame and use type-safe units.
 
-Classical six Keplerian elements for elliptical orbits.
+\begin{lstlisting}[language=C++,caption={KeplerianStateTyped class usage}]
+namespace astdyn::physics {
 
-\begin{lstlisting}[language=C++,caption={KeplerianElements class}]
-namespace astdyn {
-namespace coordinates {
+// Example: Creating elements from a database (AU, deg) in Ecliptic J2000
+auto elem = KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+    time::EpochTDB::from_mjd(60000.5),
+    2.77,                // semi-major axis [AU]
+    0.075,               // eccentricity
+    10.6,                // inclination [deg]
+    80.3,                // Omega [deg]
+    73.6,                // omega [deg]
+    0.0,                 // Mean anomaly [deg]
+    GravitationalParameter::sun()
+);
 
-class KeplerianElements {
-public:
-    // Elements
-    double a;      // Semi-major axis [AU]
-    double e;      // Eccentricity [0, 1)
-    double i;      // Inclination [rad]
-    double Omega;  // Longitude of ascending node [rad]
-    double omega;  // Argument of perihelion [rad]
-    double M;      // Mean anomaly [rad]
-    
-    // Epoch
-    double epoch;  // Julian date [TDB]
-    
-    // Construction
-    KeplerianElements() = default;
-    KeplerianElements(double a, double e, double i,
-                     double Omega, double omega, double M,
-                     double epoch);
-    
-    // Conversions
-    static KeplerianElements from_cartesian(
-        const Vector6d& state, double epoch, double mu = MU_SUN);
-    
-    Vector6d to_cartesian(double mu = MU_SUN) const;
-    
-    // Derived quantities
-    double period() const;           // Orbital period [days]
-    double mean_motion() const;      // Mean motion [rad/day]
-    double perihelion_distance() const;  // q [AU]
-    double aphelion_distance() const;    // Q [AU]
-    double orbital_energy(double mu = MU_SUN) const;
-    
-    // Mean anomaly at different epoch
-    double mean_anomaly_at(double jd) const;
-    
-    // Validation
-    bool is_valid() const;
-};
+// Derived quantities (type-safe)
+Distance q = elem.perihelion_distance();
+double period = elem.period_days();
 
-}} // namespace
+// Convert to Cartesian (Frame is preserved automatically)
+auto cart = keplerian_to_cartesian(elem);
 \end{lstlisting}
 
-\textbf{Usage}:
-\begin{lstlisting}[language=C++]
-using namespace astdyn::coordinates;
+\subsection{CartesianStateTyped}
 
-// Create from elements
-KeplerianElements elem;
-elem.a = 2.77;          // AU
-elem.e = 0.075;
-elem.i = 10.6 * DEG_TO_RAD;
-elem.Omega = 80.3 * DEG_TO_RAD;
-elem.omega = 73.6 * DEG_TO_RAD;
-elem.M = 0.0;
-elem.epoch = 2460000.5;
+Position and velocity are represented by \texttt{CartesianStateTyped<Frame>}, which uses \texttt{Distance} and \texttt{Velocity} types for its components.
 
-// Derived quantities
-std::cout << "Period: " << elem.period() << " days\n";
-std::cout << "q: " << elem.perihelion_distance() << " AU\n";
+\begin{lstlisting}[language=C++,caption={CartesianStateTyped usage}]
+using namespace astdyn::physics;
+using namespace astdyn::core;
 
-// Convert to Cartesian
-Vector6d state = elem.to_cartesian();
-\end{lstlisting}
+// Create from SI components
+auto state = CartesianStateTyped<GCRF>::from_si(
+    epoch,
+    rx, ry, rz, // meters
+    vx, vy, vz  // m/s
+);
 
-\subsection{CometaryElements}
+// Access components with unit conversion
+double dist_au = state.position.x().to_au();
+double speed_kms = state.velocity.norm().to_km_s();
 
-Optimized for parabolic and near-parabolic orbits (comets).
-
-\begin{lstlisting}[language=C++]
-class CometaryElements {
-public:
-    double q;      // Perihelion distance [AU]
-    double e;      // Eccentricity
-    double i;      // Inclination [rad]
-    double Omega;  // Longitude of ascending node [rad]
-    double omega;  // Argument of perihelion [rad]
-    double T;      // Time of perihelion passage [JD]
-    double epoch;
-    
-    Vector6d to_cartesian(double jd, double mu = MU_SUN) const;
-    static CometaryElements from_keplerian(const KeplerianElements& kep);
-};
-\end{lstlisting}
-
-\subsection{CartesianState}
-
-Position and velocity vectors.
-
-\begin{lstlisting}[language=C++]
-struct CartesianState {
-    Vector3d position;  // [AU]
-    Vector3d velocity;  // [AU/day]
-    double epoch;       // [JD TDB]
-    
-    Vector6d as_vector() const {
-        Vector6d v;
-        v << position, velocity;
-        return v;
-    }
-    
-    double distance() const { return position.norm(); }
-    double speed() const { return velocity.norm(); }
-};
+// Explicit frame transformation (Compile-time verified)
+auto ecliptic_state = state.cast_frame<ECLIPJ2000>();
 \end{lstlisting}
 
 \section{Force Models}
@@ -226,17 +161,43 @@ public:
                           const ForceModel& forces,
                           double dt_initial = 0.01) = 0;
     
-    // Get statistics
-    virtual size_t num_steps() const = 0;
-    virtual size_t num_function_calls() const = 0;
+\begin{lstlisting}[language=C++,caption={Integrator base class}]
+class Integrator {
+public:
+    virtual ~Integrator() = default;
+    
+    virtual Eigen::VectorXd integrate(
+        const DerivativeFunction& f,
+        const Eigen::VectorXd& y0,
+        double t0,
+        double tf) = 0;
 };
 \end{lstlisting}
 
-\subsection{Runge-Kutta-Fehlberg 7(8)}
+Standard implementations include \texttt{RK4Integrator} (fixed step) and \texttt{RKF78Integrator} (adaptive step).
 
-Adaptive step size, high accuracy.
+\section{Orbit Propagation}
 
-\begin{lstlisting}[language=C++]
+The \texttt{Propagator} class orchestrates the force field and the integrator to move a state vector forward or backward in time.
+
+\begin{lstlisting}[language=C++,caption={Using the Propagator}]
+// 1. Setup settings
+PropagatorSettings settings;
+settings.include_asteroids = true;
+settings.include_relativity = true;
+
+// 2. Create components
+auto ephem = std::make_shared<PlanetaryEphemeris>();
+auto integrator = std::make_shared<RKF78Integrator>(0.1, 1e-13);
+
+// 3. Initialize propagator
+Propagator prop(integrator, ephem, settings);
+
+// 4. Propagate (Type-safe and Frame-safe)
+using namespace astdyn::core;
+auto final_state = prop.propagate_keplerian<ECLIPJ2000>(initial_elem, target_epoch);
+\end{lstlisting}
+]
 class RKF78 : public IIntegrator {
 private:
     double tol_;         // Error tolerance
