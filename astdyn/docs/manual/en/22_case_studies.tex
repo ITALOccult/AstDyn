@@ -17,7 +17,7 @@ This section presents a detailed case study of orbit determination for asteroid 
     \item \textbf{Well-observed}: Abundant archival data from Pan-STARRS
     \item \textbf{Published orbit}: Reference solution available from JPL and OrbFit
     \item \textbf{Moderate eccentricity}: $e = 0.062$ (not circular, not extreme)
-    \item \textbf{Inclination}: $i = 11.7°$ (moderately inclined)
+    \item \textbf{Inclination}: $i = 11.7^\circ$ (moderately inclined)
 \end{itemize}
 
 \subsection{Objectives}
@@ -48,7 +48,7 @@ This section presents a detailed case study of orbit determination for asteroid 
 \begin{itemize}
     \item \textbf{Semimajor axis}: $a = 2.744$ AU
     \item \textbf{Eccentricity}: $e = 0.062$
-    \item \textbf{Inclination}: $i = 11.74°$
+    \item \textbf{Inclination}: $i = 11.74^\circ$
     \item \textbf{Orbital period}: 4.54 years (1658 days)
     \item \textbf{Perihelion}: $q = 2.574$ AU
     \item \textbf{Aphelion}: $Q = 2.914$ AU
@@ -62,8 +62,8 @@ Observations from Pan-STARRS 1 Survey (Observatory code: F51).
 
 \begin{itemize}
     \item \textbf{Location}: Haleakalā, Maui, Hawaii
-    \item \textbf{Longitude}: 156.2569° W
-    \item \textbf{Latitude}: 20.7082° N
+    \item \textbf{Longitude}: 156.2569^\circ W
+    \item \textbf{Latitude}: 20.7082^\circ N
     \item \textbf{Altitude}: 3055 m
     \item \textbf{Telescope}: 1.8m Ritchey-Chrétien
     \item \textbf{Typical accuracy}: 0.1-0.2 arcsec (astrometric)
@@ -71,7 +71,7 @@ Observations from Pan-STARRS 1 Survey (Observatory code: F51).
 
 \subsection{Observation Summary}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Pompeja observation dataset}
 \begin{tabular}{ll}
@@ -86,7 +86,6 @@ Observatory code & F51 (Pan-STARRS) \\
 Observation type & CCD astrometry \\
 Typical magnitude & V $\approx$ 18.2 \\
 RA range & 10h 20m - 10h 28m \\
-Dec range & +12° 20' - +12° 45' \\
 \hline
 \end{tabular}
 \end{table}
@@ -106,7 +105,7 @@ Dec range & +12° 20' - +12° 45' \\
 
 Used three observations spanning the arc:
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Selected observations for Gauss IOD}
 \begin{tabular}{lcccc}
@@ -122,7 +121,7 @@ Used three observations spanning the arc:
 
 \subsection{Initial Solution}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Gauss method initial orbital elements}
 \begin{tabular}{lccc}
@@ -156,7 +155,7 @@ settings.outlier_sigma = 3.0; // Carpentry rejection
 
 \subsection{Iteration History}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Differential correction convergence}
 \begin{tabular}{cccccc}
@@ -176,7 +175,7 @@ settings.outlier_sigma = 3.0; // Carpentry rejection
 
 \subsection{Final Orbital Elements}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Final orbit solution for Pompeja}
 \begin{tabular}{lcccc}
@@ -200,7 +199,7 @@ Epoch & 2460325.5 & (fixed) & JD \\
 
 \subsection{Residual Statistics}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Observation residuals}
 \begin{tabular}{lcc}
@@ -266,7 +265,7 @@ Residuals vs Time (RA):
 
 Processed same observations with OrbFit 5.0.5:
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{AstDyn vs. OrbFit comparison}
 \begin{tabular}{lccc}
@@ -293,7 +292,7 @@ Time (s) & 1.82 & 2.34 & -0.52 \\
 
 Compare propagated ephemeris with JPL Horizons:
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Position difference: AstDyn vs. JPL (60-day span)}
 \begin{tabular}{cccc}
@@ -326,7 +325,7 @@ Maximum difference: \textbf{3.9 km} after 60 days ($2.6 \times 10^{-8}$ AU).
 
 Full $6 \times 6$ covariance in orbital element space:
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Correlation matrix (selected elements)}
 \begin{tabular}{lcccc}
@@ -352,7 +351,7 @@ $\Omega$ & 0.008 & 0.011 & 0.342 & 1.000 \\
 
 Propagate covariance forward using state transition matrix:
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Position uncertainty vs. time}
 \begin{tabular}{cccc}
@@ -378,7 +377,7 @@ Propagate covariance forward using state transition matrix:
 
 Repeat orbit determination with different assumed uncertainties:
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Solution quality vs. observation uncertainty}
 \begin{tabular}{cccc}
@@ -399,7 +398,7 @@ Repeat orbit determination with different assumed uncertainties:
 
 Compare solutions using different observation spans:
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Solution quality vs. arc length}
 \resizebox{\columnwidth}{!}{%
@@ -423,7 +422,7 @@ Compare solutions using different observation spans:
 
 \subsection{Computational Cost}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \small
 \caption{Timing breakdown (Intel i7-10700K, single core)}

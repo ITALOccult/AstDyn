@@ -16,22 +16,22 @@ The core propagation engine (RKF78 integrator with full force model) was validat
 \end{itemize}
 
 \subsection{Results vs. JPL Horizons}
-The residuals (AstDyn - JPL) are shown in Figure~\ref{fig:residuals}. The agreement is excellent: the maximum position error over the entire decade is below $2.5 \times 10^{-9}$ AU ($\approx 3.7$ meters).
+The residuals (AstDyn - JPL) are shown in Figure~\ref{fig:residuals_precision}. The agreement is excellent: the maximum position error over the entire decade is below $2.5 \times 10^{-9}$ AU ($\approx 3.7$ meters).
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{residual_plot.pdf}
     \caption{Position residuals for Asteroid (17030) Sierks over 10 years. The deviations are on the order of meters, demonstrating sub-milliarcsecond astrometric consistency.}
-    \label{fig:residuals}
+    \label{fig:residuals_precision}
 \end{figure}
 
-The statistical summary is provided in Table~\ref{tab:residuals_stats}.
+The statistical summary is provided in Table~\ref{tab:residuals_precision}.
 
 \begin{table}[htbp]
 \centering
 \small
 \caption{Residual statistics (AstDyn vs JPL DE441).}
-\label{tab:residuals_stats}
+\label{tab:residuals_precision}
 \begin{tabular}{@{}lccc@{}}
 \toprule
 \textbf{Comp.} & \textbf{Max Err (m)} & \textbf{RMS (m)} & \textbf{Bias (m)} \\
@@ -51,13 +51,13 @@ This level of accuracy ($< 5$ meters) is orders of magnitude better than typical
 \subsection{State Transition Matrix (STM)}
 Orbit determination involves calculating the sensitivity of the final state to initial conditions (the STM). AstDyn implements an \textbf{Analytical STM} (solving variational equations) alongside traditional numerical differentiation.
 
-Figure~\ref{fig:benchmark} benchmarks the performance of both methods.
+Figure~\ref{fig:benchmark_perf} benchmarks the performance of both methods.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{benchmark_plot.pdf}
     \caption{Computational cost per step: Analytical STM (blue) vs Numerical Differentiation (red). The analytical method provides a constant overhead, whereas numerical differentiation scales linearly with the number of parameters and is generally slower for high-precision demands.}
-    \label{fig:benchmark}
+    \label{fig:benchmark_perf}
 \end{figure}
 
 \subsection{Efficiency}
