@@ -31,7 +31,7 @@ For a main-belt asteroid at 2.5 AU:
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{lcc}
+\begin{tabular}{@{}l p{3.3cm} p{3.3cm}@{}}
 \toprule
 \textbf{Perturbation} & \textbf{Acceleration} & \textbf{Relative to Sun} \\
 \midrule
@@ -136,7 +136,7 @@ For Earth: $J_2 = 1.08263 \times 10^{-3}$ (about 0.1\%)
 
 \subsection{J3 and Higher Order Harmonics}
 
-\subsection{J$_2$ Acceleration}
+\subsection{J2 Acceleration}
 
 The perturbing acceleration in Cartesian coordinates is:
 
@@ -381,6 +381,7 @@ Modern orbit determination often uses:
     \item Analytical theory to identify important perturbations
     \item Simplified models (e.g., averaged J$_2$) for faster computation
 \end{enumerate}
+
 \section{AstDyn Implementation}
 
 AstDyn provides a modular perturbation framework centered around the \texttt{PropagatorSettings} and \texttt{ForceField} classes.

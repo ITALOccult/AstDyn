@@ -211,7 +211,7 @@ static KeplerianElements from_cartesian(
 \textbf{Purpose}: Convert Cartesian state to Keplerian elements.
 
 \textbf{Parameters}:
-\begin{itemize}
+```
     \item \texttt{pos}: Position vector (AU)
     \item \texttt{vel}: Velocity vector (AU/day)
     \item \texttt{epoch}: Epoch (JD)
@@ -578,7 +578,7 @@ struct ObservatoryCoordinates {
 
 \section{Orbit Determination}
 
-\subsection{astdyn::orbit\_determination::DifferentialCorrector}
+\subsection{\texorpdfstring{astdyn::orbit\_determination::DifferentialCorrector}{DifferentialCorrector API}}
 
 \begin{lstlisting}[language=C++]
 class DifferentialCorrector {
