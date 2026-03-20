@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>Occultation Path</name>
+  <Style id="centerLine"><LineStyle><color>ff0000ff</color><width>4</width></LineStyle></Style>
+  <Style id="shadowLimit"><LineStyle><color>ffff0000</color><width>2</width></LineStyle></Style>
+  <Style id="sigmaLimit"><LineStyle><color>ff0000ff</color><width>1</width><dashArray>5,5</dashArray></LineStyle></Style>
+  <Style id="shadowArea"><PolyStyle><color>40ffffff</color><fill>1</fill><outline>0</outline></PolyStyle></Style>
+  <Style id="sigmaArea"><PolyStyle><color>200000ff</color><fill>1</fill><outline>0</outline></PolyStyle></Style>
+  <Placemark><name>Nominal Center</name><styleUrl>#centerLine</styleUrl>
+    <LineString><tessellate>1</tessellate><coordinates>
+    </coordinates></LineString></Placemark>
+</Document>
+</kml>

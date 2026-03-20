@@ -1,7 +1,0 @@
-/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/italoccultlib.dir
-/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/edit_cache.dir
-/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/rebuild_cache.dir
-/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/list_install_components.dir
-/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/install.dir
-/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/install/local.dir
-/Users/michelebigi/VisualStudioCode/GitHub/ITALOccultLibrary/italoccultlibrary/build/CMakeFiles/install/strip.dir
