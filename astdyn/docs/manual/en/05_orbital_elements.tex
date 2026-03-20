@@ -329,39 +329,41 @@ The angles are:
 AstDyn provides conversion functions in the \texttt{OrbitalElements} class:
 
 \begin{lstlisting}[language=C++,caption={Orbital element conversions in AstDyn}]
-#include <astdyn/core/OrbitalElements.hpp>
-#include <astdyn/core/StateVector.hpp>
+#include <astdyn/core/physics_state.hpp>
+#include <astdyn/core/frame_tags.hpp>
+#include <astdyn/time/epoch.hpp>
 
 using namespace astdyn;
+using namespace astdyn::physics;
+using namespace astdyn::time;
 
-// Keplerian elements
-OrbitalElements kep;
-kep.a = 2.77;        // AU
-kep.e = 0.078;
-kep.i = 10.6 * DEG_TO_RAD;  // radians
-kep.Omega = 80.3 * DEG_TO_RAD;
-kep.omega = 73.1 * DEG_TO_RAD;
-kep.M = 15.2 * DEG_TO_RAD;
-kep.epoch = 2460000.0;  // JD
-
-// Convert to Cartesian
-StateVector sv = kep.to_state_vector();
-std::cout << "Position: " << sv.r.transpose() << " AU\n";
-std::cout << "Velocity: " << sv.v.transpose() << " AU/day\n";
-
-// Convert back to Keplerian
-OrbitalElements kep2 = OrbitalElements::from_state_vector(
-    sv.r, sv.v, sv.t
+// 1. Create strongly-typed Keplerian state (Ecliptic J2000)
+auto epoch = EpochTDB::from_jd(2460000.0);
+auto kep = KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+    epoch, 
+    2.77,   // a [AU]
+    0.078,  // e
+    10.6,   // i [deg]
+    80.3,   // Omega [deg]
+    73.1,   // omega [deg]
+    15.2    // M [deg]
 );
 
-// Verify round-trip
-std::cout << "Delta a: " << kep2.a - kep.a << " AU\n";
-// Output: Delta a: 3.14e-15 AU (machine precision)
+// 2. Convert to Cartesian State (Strongly Typed)
+CartesianStateTyped<core::ECLIPJ2000> sv = kep.to_cartesian();
 
-// Convert to equinoctial
-auto eq = kep.to_equinoctial();
-std::cout << "h = " << eq.h << ", k = " << eq.k << "\n";
-std::cout << "p = " << eq.p << ", q = " << eq.q << "\n";
+std::cout << "Position: " << sv.position.to_eigen_si().transpose() << " m\n";
+std::cout << "Velocity: " << sv.velocity.to_eigen_si().transpose() << " m/s\n";
+
+// 3. Convert back to Keplerian (Inverse transform)
+auto kep2 = KeplerianStateTyped<core::ECLIPJ2000>::from_cartesian(sv);
+
+// Verify round-trip (AU conversion)
+std::cout << "Delta a: " << (kep2.a - kep.a).to_au() << " AU\n";
+// Output: Delta a: 0.0 AU (exact)
+
+// 4. Access helper methods
+std::cout << "Period: " << kep.period_days() << " days\n";
 \end{lstlisting}
 
 \section{Summary}

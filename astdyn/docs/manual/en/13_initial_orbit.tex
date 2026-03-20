@@ -101,63 +101,45 @@ This gives a scalar equation for $\rho_2$ (the "8th degree polynomial" after man
 \section{Implementation}
 
 \begin{lstlisting}[language=C++,caption={Gauss method implementation}]
-Vector6d gauss_iod(
+using namespace astdyn;
+using namespace astdyn::physics;
+using namespace astdyn::time;
+
+template <typename Frame>
+CartesianStateTyped<Frame> gauss_iod(
     const std::array<Observation, 3>& obs,
     const EphemerisInterface& ephemeris)
 {
-    // Extract times and line-of-sight vectors
-    double t1 = obs[0].epoch;
-    double t2 = obs[1].epoch;
-    double t3 = obs[2].epoch;
+    // Extract times (Strongly Typed)
+    EpochTDB t1 = obs[0].epoch;
+    EpochTDB t2 = obs[1].epoch;
+    EpochTDB t3 = obs[2].epoch;
     
-    Vector3d rho_hat1 = obs[0].line_of_sight();
-    Vector3d rho_hat2 = obs[1].line_of_sight();
-    Vector3d rho_hat3 = obs[2].line_of_sight();
+    auto rho_hat1 = obs[0].line_of_sight<Frame>();
+    auto rho_hat2 = obs[1].line_of_sight<Frame>();
+    auto rho_hat3 = obs[2].line_of_sight<Frame>();
     
-    // Observatory positions
-    Vector3d R1 = ephemeris.get_observer_position(obs[0]);
-    Vector3d R2 = ephemeris.get_observer_position(obs[1]);
-    Vector3d R3 = ephemeris.get_observer_position(obs[2]);
+    // Observatory positions [Distance]
+    auto R1 = ephemeris.get_observer_position<Frame>(obs[0]);
+    auto R2 = ephemeris.get_observer_position<Frame>(obs[1]);
+    auto R3 = ephemeris.get_observer_position<Frame>(obs[2]);
     
-    // Time intervals
-    double tau1 = t1 - t2;
-    double tau3 = t3 - t2;
+    // Time intervals [TimeDuration]
+    auto tau1 = t1 - t2;
+    auto tau3 = t3 - t2;
     
     // Initial guess for middle range
-    double rho2 = R2.norm();
+    Distance rho2 = R2.norm();
     
     // Iterative refinement
     for (int iter = 0; iter < 20; ++iter) {
-        Vector3d r2 = R2 + rho2 * rho_hat2;
-        double r2_mag = r2.norm();
+        auto r2_pos = R2 + (rho_hat2 * rho2.to_au()); 
+        Distance r2_mag = r2_pos.norm();
         
-        // Compute f,g series (to 3rd order)
-        double f1 = 1.0 - 0.5 * MU_SUN * tau1*tau1 / (r2_mag*r2_mag*r2_mag);
-        double f3 = 1.0 - 0.5 * MU_SUN * tau3*tau3 / (r2_mag*r2_mag*r2_mag);
-        double g1 = tau1 - MU_SUN * tau1*tau1*tau1 / (6.0 * r2_mag*r2_mag*r2_mag);
-        double g3 = tau3 - MU_SUN * tau3*tau3*tau3 / (6.0 * r2_mag*r2_mag*r2_mag);
-        
-        // Solve for velocity at t2
-        Vector3d v2 = (f3 * (R1 + rho_hat1) - f1 * (R3 + rho_hat3)) / (f1*g3 - f3*g1);
-        
-        // Improve rho2 using scalar equation of Lagrange
-        // (simplified: use r1, r3 estimates)
-        Vector3d r1 = r2 * f1 + v2 * g1;
-        Vector3d r3 = r2 * f3 + v3 * g3;
-        
-        double rho1_new = (r1 - R1).dot(rho_hat1);
-        double rho3_new = (r3 - R3).dot(rho_hat3);
-        double rho2_new = (r2 - R2).dot(rho_hat2);
-        
-        if (std::abs(rho2_new - rho2) < 1e-6) {
-            // Converged
-            return Vector6d(r2, v2);
-        }
-        
-        rho2 = rho2_new;
+        // ... (Compute f,g coefficients and solve for v2)
     }
     
-    throw std::runtime_error("Gauss IOD did not converge");
+    return result_state;
 }
 \end{lstlisting}
 

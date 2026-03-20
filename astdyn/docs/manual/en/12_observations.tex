@@ -115,13 +115,20 @@ where $\rho$ is geocentric distance.
 
 Iterate to find $t_{\text{emit}}$:
 \begin{lstlisting}[language=C++,caption={Light-time iteration}]
-double tau = 0.0;  // Initial guess
+using namespace astdyn;
+using namespace astdyn::physics;
+using namespace astdyn::time;
+
+TimeDuration tau = TimeDuration::zero();  // Initial guess
 for (int iter = 0; iter < 5; ++iter) {
-    Vector3d r_obj = propagate(y0, t0, t_obs - tau);
-    Vector3d r_earth = ephemeris.get_position("Earth", t_obs);
-    double rho = (r_obj - r_earth).norm();
-    double tau_new = rho / C_AU_PER_DAY;
-    if (std::abs(tau_new - tau) < 1e-10) break;
+    auto t_emit = t_obs - tau;
+    auto state_emit = propagator.propagate(y0, t_emit);
+    auto r_earth = ephemeris.get_position<core::GCRF>("Earth", t_obs);
+    
+    Distance rho = (state_emit.position - r_earth).norm();
+    TimeDuration tau_new = TimeDuration::from_seconds(rho.to_m() / constants::SPEED_OF_LIGHT);
+    
+    if (std::abs((tau_new - tau).to_seconds()) < 1e-6) break;
     tau = tau_new;
 }
 \end{lstlisting}

@@ -22,22 +22,16 @@ AstDyn employs separate interfaces for orbital elements and astrometric observat
 Defined in \texttt{astdyn/io/IParser.hpp}, this interface handles the ingestion of initial states.
 
 \begin{lstlisting}[language=C++,caption={IOrbitParser interface}]
+#include <astdyn/core/physics_state.hpp>
+
 class IOrbitParser {
 public:
-    struct OrbitalElements {
-        std::string object_name;
-        time::EpochTDB epoch;
-        double semi_major_axis;      // AU
-        double eccentricity;
-        double inclination;          // radians
-        double longitude_asc_node;   // Omega
-        double argument_perihelion;  // omega
-        double mean_anomaly;         // M
-        double magnitude;
-    };
-
     virtual ~IOrbitParser() = default;
-    virtual OrbitalElements parse(const std::string& filepath) = 0;
+    
+    // Returns strongly-typed Keplerian state
+    virtual physics::KeplerianStateTyped<core::ECLIPJ2000> parse(
+        const std::string& filepath) = 0;
+        
     virtual std::string name() const = 0;
 };
 \end{lstlisting}

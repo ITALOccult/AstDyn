@@ -140,17 +140,24 @@ The transformation involves rotation about the $x$-axis (vernal equinox directio
 
 \begin{lstlisting}[style=cpp,caption={Coordinate transformations in AstDyn}]
 #include <astdyn/coordinates/ReferenceFrame.hpp>
+#include <astdyn/core/frame_tags.hpp>
+#include <astdyn/core/physics_types.hpp>
+
+using namespace astdyn;
 using namespace astdyn::coordinates;
+using namespace astdyn::physics;
 
-// Ecliptic to J2000 equatorial
-Vector3d pos_ecl(1.0, 0.5, 0.1);  // AU
-Matrix3d rot = ReferenceFrame::ecliptic_to_j2000();
-Vector3d pos_eq = rot * pos_ecl;
+// Ecliptic to J2000 equatorial (Strongly Typed)
+auto pos_ecl = math::Vector3<core::ECLIPJ2000, Distance>::from_au(1.0, 0.5, 0.1);
 
-// Equatorial to ecliptic
-Vector3d vel_eq(0.01, 0.02, 0.005);  // AU/day
-Matrix3d rot_inv = rot.transpose();  // Orthogonal matrix
-Vector3d vel_ecl = rot_inv * vel_eq;
+// Type-safe transformation (Compile-time frame check)
+auto pos_eq = ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(pos_ecl);
+
+// Velocity transformation
+auto vel_eq = math::Vector3<core::GCRF, Velocity>::from_au_d(0.01, 0.02, 0.005);
+auto vel_ecl = ReferenceFrame::transform_vel<core::GCRF, core::ECLIPJ2000>(
+    pos_eq, vel_eq
+);
 \end{lstlisting}
 
 \section{The J2000.0 Reference Frame}

@@ -272,9 +272,12 @@ Uncertainty grows with time. For short-arc solutions, $\sigma$ can increase expo
 \section{Implementation}
 
 \begin{lstlisting}[language=C++,caption={Differential correction implementation}]
+using namespace astdyn;
+using namespace astdyn::physics;
+
 struct DCResult {
-    Vector6d state;
-    Matrix6d covariance;
+    CartesianStateTyped<core::ECLIPJ2000> state;
+    CovarianceMatrixAU<core::ECLIPJ2000> covariance;
     double rms;
     int iterations;
     std::vector<double> residuals;

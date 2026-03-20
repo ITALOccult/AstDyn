@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --build . --target od_benchmark -- -j8)",
+      "Bash(./build/astdyn/benchmarks/orbit_determination/od_benchmark)",
+      "Bash(/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/build/astdyn/benchmarks/bin/od_benchmark)"
+    ]
+  }
+}
