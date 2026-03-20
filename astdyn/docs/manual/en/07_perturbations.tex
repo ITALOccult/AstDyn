@@ -104,7 +104,7 @@ For highest precision (milliarcsecond level), the gravitational influence of the
 
 The acceleration is computed similarly to planetary perturbations, accounting for both direct and indirect terms relative to the Sun.
 
-\section{Oblateness Perturbations (J$_2$)}
+\section{Oblateness Perturbations (J2)}
 
 \subsection{Non-Spherical Mass Distribution}
 
@@ -122,7 +122,7 @@ where:
     \item $\phi$ is the latitude
 \end{itemize}
 
-\subsection{The J$_2$ Term}
+\subsection{The J2 Term}
 
 The dominant term is $J_2$ (quadrupole moment), representing equatorial bulge:
 
@@ -133,6 +133,8 @@ The dominant term is $J_2$ (quadrupole moment), representing equatorial bulge:
 where $P_2(\sin\phi) = \frac{1}{2}(3\sin^2\phi - 1)$.
 
 For Earth: $J_2 = 1.08263 \times 10^{-3}$ (about 0.1\%)
+
+\subsection{J$_3$ and Higher Order Harmonics}
 
 \subsection{J$_2$ Acceleration}
 
@@ -164,7 +166,7 @@ where $n = \sqrt{\mu/a^3}$ is the mean motion.
 
 For low Earth orbit (LEO), J$_2$ can cause $\Omega$ to change by several degrees per day.
 
-\subsection{Sun J2 Perturbation}
+\subsection{\texorpdfstring{J\textsubscript{2}}{J2} Perturbation}
 
 AstDyn also includes the effect of the Sun's oblateness, which is critical for long-term stability and precise propagation of inner-solar system bodies. The Sun's $J_2 \approx 2 \times 10^{-7}$ is small but persistent, contributing to the secular precession of perihelia.
 

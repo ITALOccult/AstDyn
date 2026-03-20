@@ -55,7 +55,7 @@ The equatorial system uses Earth's equator and rotation axis:
     \draw[dashed] (0,0) -- (0,-2.5);
     
     % Vernal Equinox (Gamma)
-    % Placed at the front intersection for simple visualization
+    % See Figure~\ref{fig:precession_coords} for a visual representation.
     \filldraw (0, -0.8) circle (1.5pt) node[below left] {$\gamma$};
     
     % Angle epsilon
@@ -118,8 +118,7 @@ For solar system objects:
 
 \section{Transformation Between Systems}
 
-\subsection{Ecliptic $\leftrightarrow$ Equatorial}
-
+\subsection{Equatorial to Ecliptic Transformation}
 The transformation involves rotation about the $x$-axis (vernal equinox direction) by the \textit{obliquity} $\varepsilon \approx 23.43929^\circ$:
 
 \begin{equation}
@@ -205,7 +204,7 @@ Earth's rotation axis precesses (wobbles) with a period of ~26,000 years due to 
     \shade[ball color=blue!50] (0,0) circle (0.3);
 \end{tikzpicture}
 \caption{Precession of the Earth's rotation axis (NCP) around the North Ecliptic Pole (NEP).}
-\label{fig:precession}
+\label{fig:precession_coords}
 \end{figure}
 
 The J2000.0 frame freezes the equinox at January 1, 2000, 12:00 TT, providing a fixed reference for long-term calculations.

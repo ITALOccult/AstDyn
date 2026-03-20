@@ -454,6 +454,7 @@ Table~\ref{tab:integrator_comparison} summarizes the characteristics of all inte
 
 \begin{table}[htbp]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lcccccc}
 \toprule
 \textbf{Method} & \textbf{Order} & \textbf{Type} & \textbf{Evals/step} & \textbf{Speed} & \textbf{Accuracy} & \textbf{Best For} \\
@@ -466,7 +467,8 @@ AAS & 4(2) & Symplectic & 5 & \mystar\mystar\mystar\mystar\mystar & \mystar\myst
 SABA4 & 4 & Symplectic & 7 & \mystar\mystar\mystar\mystar & \mystar\mystar\mystar\mystar & Asteroids \\
 GRKN & 6(4) & Nystr\"om & 6 & \mystar\mystar\mystar\mystar\mystar & \mystar\mystar\mystar\mystar & STM, 2nd order \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \caption{Comparison of numerical integrators in AstDyn.}
 \label{tab:integrator_comparison}
 \end{table}

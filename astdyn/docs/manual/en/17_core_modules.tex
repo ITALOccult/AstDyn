@@ -34,7 +34,7 @@ auto cart = keplerian_to_cartesian(elem);
 
 \subsection{CartesianStateTyped}
 
-Position and velocity are represented by \texttt{CartesianStateTyped<Frame>}, which uses \texttt{Distance} and \texttt{Velocity} types for its components.
+Position and velocity are represented by the \texttt{CartesianStateTyped<Frame>} template, which uses specialized \texttt{Distance} and \texttt{Velocity} types.
 
 \begin{lstlisting}[language=C++,caption={CartesianStateTyped usage}]
 using namespace astdyn::physics;

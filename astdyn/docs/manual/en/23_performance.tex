@@ -160,6 +160,7 @@ Vary number of observations (10-500), fixed 60-day arc.
 \begin{table}[h]
 \centering
 \caption{Performance vs. observation count}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{ccccc}
 \hline
 \textbf{Observations} & \textbf{Time (s)} & \textbf{Iterations} & \textbf{Time/obs (ms)} & \textbf{RMS (arcsec)} \\
@@ -171,7 +172,8 @@ Vary number of observations (10-500), fixed 60-day arc.
 200 & 3.65 & 4 & 18.3 & 0.642 \\
 500 & 9.15 & 5 & 18.3 & 0.635 \\
 \hline
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \textbf{Scaling}: Nearly linear—$\sim$18 ms per observation per iteration.
@@ -460,6 +462,7 @@ $10^{-16}$ & 4.18 & 287 & 0.002 & Research \\
 \begin{table}[h]
 \centering
 \caption{Force model accuracy/speed trade-off}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lccc}
 \hline
 \textbf{Model} & \textbf{Time (ms)} & \textbf{Error (km/60d)} & \textbf{Use Case} \\
@@ -470,7 +473,8 @@ Sun + 4 giants & 2.34 & 1.8 & High accuracy \\
 Sun + all planets & 2.87 & 0.9 & NEAs, precision \\
 + Moon & 3.24 & 0.7 & Earth-centric \\
 \hline
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \textbf{Recommendation}: Sun+Jupiter+Saturn for main-belt asteroids.

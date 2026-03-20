@@ -14,6 +14,7 @@ Match tolerance to your accuracy requirements:
 \begin{table}[h]
 \centering
 \caption{Recommended integration tolerances}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lcp{6cm}}
 \hline
 \textbf{Application} & \textbf{Tolerance} & \textbf{Rationale} \\
@@ -23,7 +24,8 @@ Standard orbit determination & $10^{-12}$ & Default, 3 km accuracy \\
 High-precision ephemerides & $10^{-14}$ & Research-grade, sub-km accuracy \\
 Numerical experiments & $10^{-16}$ & Maximum precision, slow \\
 \hline
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \textbf{Rule of thumb}: Tighter tolerance $\Rightarrow$ more steps $\Rightarrow$ slower but more accurate.
