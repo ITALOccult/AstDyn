@@ -36,41 +36,41 @@ curl -sG "https://ssd.jpl.nasa.gov/api/horizons.api" \
 
 Use the output \texttt{X, Y, Z, VX, VY, VZ} directly in your C++ code to initialize the \texttt{CartesianElements} structure.
 
-\section{High-Level API: HighPrecisionPropagator}
-\label{sec:high_precision_api}
+\section{High-Level API: AstDynEngine}
+\label{sec:high_level_api}
 
-To simplify the rigorous propagation workflow, AstDyn provides the \texttt{HighPrecisionPropagator} class. This high-level API encapsulates N-body settings, light-time correction, and geocentric reduction in a single call.
+To simplify the rigorous propagation workflow, AstDyn provides the \texttt{AstDynEngine} class. This high-level API encapsulates N-body settings, light-time correction, and geocentric reduction in a single configuration.
 
-\begin{lstlisting}[style=cpp, caption={Using HighPrecisionPropagator}]
-using namespace astdyn::propagation;
+\begin{lstlisting}[style=cpp, caption={Using AstDynEngine for high-precision predictions}]
+using namespace astdyn;
 
-// 1. Configure for maximum precision
-HighPrecisionPropagator::Config config;
-config.de441_path = "/path/to/de441.bsp";
-config.perturbations_planets = true;
-config.relativity = true;
+// 1. Configure the engine
+AstDynConfig config;
+config.ephemeris_file = "de441.bsp";
+config.propagator_settings.include_planets = {"Jupiter", "Saturn", "Mars", "Earth"};
+config.light_time_correction = true;
+config.aberrazione_differenziale = true;
 
-HighPrecisionPropagator propagator(config);
+AstDynEngine engine(config);
 
-// 2. Calculate geocentric RA/Dec with light-time correction
-auto result = propagator.calculateGeocentricObservation(elements, target_jd);
+// 2. Set the initial orbit (KeplerianStateTyped or CartesianStateTyped)
+engine.set_initial_orbit(my_orbit);
 
-std::cout << "RA: " << result.ra_deg << " deg" << std::endl;
-std::cout << "Dec: " << result.dec_deg << " deg" << std::endl;
+// 3. Compute asteroid apparent place at occultation time
+auto place = engine.compute_asteroid_apparent_place(t_occult, "F51");
+
+std::cout << "RA:  " << place.ra.to_hms() << "\n";
+std::cout << "Dec: " << place.dec.to_dms() << "\n";
 \end{lstlisting}
 
 \section{Multi-Body Propagation: The Haumea System}
 \label{sec:multi_body_propagation}
 
-For complex satellite systems where mutual gravitational attraction is significant, AstDyn provides a dedicated \texttt{MultiBodyPropagator}. This is essential for sub-milliarcsecond accuracy in predicting occultations by asteroid moons.
+For complex satellite systems where mutual gravitational attraction is significant, AstDyn provides a dedicated \texttt{RelativeMultiBodyPropagator}. This is essential for sub-milliarcsecond accuracy in predicting occultations by asteroid moons.
 
 \subsection{Dynamics and Interaction}
 
-The \texttt{MultiBodyPropagator} integrates the coupled equations of motion for $N$ bodies simultaneously:
-\begin{equation}
-    \ddot{\mathbf{r}}_i = \mathbf{a}_{Sun} + \mathbf{a}_{planets} + \sum_{j \neq i}^{N} G \frac{m_j(\mathbf{r}_j - \mathbf{r}_i)}{|\mathbf{r}_j - \mathbf{r}_i|^3}
-\end{equation}
-This approach naturally accounts for the barycentric "wobble" of the primary body, which can cause several milliseconds of error in Time of Closest Approach (TCA) if neglected.
+The \texttt{RelativeMultiBodyPropagator} integrates the coupled equations of motion for $N$ bodies simultaneously using relative vectors to prevent numerical precision loss.
 
 \subsection{Case Study: Namaka Occultation (May 4, 2026)}
 
@@ -95,14 +95,16 @@ The calculated TCA of 20:19:06 UT for Haumea shows a shift of only +64 seconds c
 
 \subsection{Implementation}
 
-\begin{lstlisting}[style=cpp, caption={Multi-body propagation example}]
-#include <astdyn/propagation/MultiBodyPropagator.hpp>
+\begin{lstlisting}[style=cpp, caption={Relative multi-body propagation example}]
+#include <astdyn/propagation/RelativeMultiBodyPropagator.hpp>
 
-auto mb_prop = std::make_shared<MultiBodyPropagator>(rkf78, ephem);
+// 1. Setup relative propagator
+auto mb_prop = std::make_shared<RelativeMultiBodyPropagator>(integrator, forces);
 
-// Haumea + Namaka + Hi'iaka
-std::vector<MultiBodyState> initial_states = {haumea, namaka, hiiaka};
-auto final_states = mb_prop->propagate(initial_states, t0, tf);
+// 2. Propagate a system of bodies (e.g., Haumea + Namaka)
+// States provided in Helocentric ECLIPJ2000
+std::vector<MultiBodyState> initial = {haumea, namaka, hiiaka};
+auto final_states = mb_prop->propagate(initial, t0, tf);
 \end{lstlisting}
 
 \section{Summary}

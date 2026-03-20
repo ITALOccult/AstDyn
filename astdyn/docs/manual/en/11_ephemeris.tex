@@ -195,193 +195,65 @@ For points $(t_i, \mathbf{r}_i)$, $i = 0, \ldots, n$, construct piecewise cubics
 
 \textbf{Use}: When smooth acceleration is important (covariance propagation).
 
-\section{SPICE System}
+\section{Native Ephemeris Provider}
 
-\subsection{Overview}
+AstDyn includes a high-performance, native \texttt{DE441Provider} that reads JPL binary SPK kernels directly. This provider is usually accessed through the \texttt{PlanetaryEphemeris} gateway.
 
-SPICE (Spacecraft Planet Instrument C-matrix Events) is NASA's toolkit for space mission geometry:
+\begin{lstlisting}[language=C++,caption={Using the PlanetaryEphemeris gateway}]
+#include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/ephemeris/DE441Provider.hpp"
 
-\begin{description}
-    \item[SPK] (Ephemeris kernels) Position and velocity
-    \item[CK] (Orientation kernels) Spacecraft attitude
-    \item[PCK] (Constants kernels) Physical parameters, body shapes
-    \item[IK] (Instrument kernels) FOV, boresight
-    \item[FK] (Frame kernels) Reference frame definitions
-    \item[LSK] (Leapsecond kernels) Time conversions
-\end{description}
+using namespace astdyn::ephemeris;
 
-\subsection{SPK Files}
+// 1. Initialize the native provider with a JPL kernel
+auto provider = std::make_shared<DE441Provider>("de441.bsp");
 
-Binary files containing Chebyshev or Hermite polynomial segments.
+// 2. Set it as the provider for the gateway
+PlanetaryEphemeris ephem(provider);
 
-\textbf{Usage in AstDyn}:
-\begin{lstlisting}[language=C++,caption={Loading SPICE kernel}]
-#include <astdyn/ephemeris/SpiceInterface.hpp>
+// 3. Query positions (Type-safe)
+using namespace astdyn::time;
+auto t = EpochTDB::from_mjd(60000.0);
 
-SpiceInterface spice;
-spice.load_kernel("de440.bsp");  // Planetary ephemeris
-spice.load_kernel("codes_300ast_20100725.bsp");  // Asteroids
+// Returns math::Vector3<core::GCRF, physics::Distance>
+auto jupiter_pos = ephem.getPosition(CelestialBody::Jupiter, t);
 
-// Query Jupiter position at epoch
-double et = spice.mjd_to_et(60000.0);  // Convert MJD to ET
-Vector6d jupiter_state = spice.get_state("JUPITER", et, "ECLIPJ2000", "SUN");
+std::cout << "Jupiter distance: " << jupiter_pos.norm().to_au() << " AU\n";
 
-std::cout << "Jupiter position: " << jupiter_state.head<3>().transpose() 
-          << " km\n";
+// Get full state (CartesianStateTyped)
+auto earth_state = ephem.getState(CelestialBody::Earth, t);
 \end{lstlisting}
 
-\subsection{NAIF IDs}
+\subsection{Note on Analytical Models (VSOP87)}
 
-SPICE uses integer IDs:
-\begin{itemize}
-    \item Sun: 10
-    \item Planets: 199 (Mercury), 299 (Venus), 399 (Earth), 499 (Mars), 599 (Jupiter), etc.
-    \item Moon: 301
-    \item Asteroids: 2000001 (Ceres), 2000004 (Vesta), 2000203 (Pompeja)
-\end{itemize}
-
-\section{Planetary Ephemerides}
-
-\subsection{JPL Development Ephemerides}
-
-\textbf{DE440/441} (released 2020):
-\begin{itemize}
-    \item Covers years 1550--2650
-    \item Includes Sun, planets, Moon, Pluto, 343 asteroids
-    \item Fit to ranging data (Mars missions), VLBI, LLR
-    \item Accuracy: $\sim$1 km for inner planets, $\sim$10 km for outer planets
-\end{itemize}
-
-\textbf{File sizes}:
-\begin{itemize}
-    \item DE440: 114 MB (standard planetary)
-    \item DE441: 3.2 GB (long-term, planetary + 343 asteroids)
-\end{itemize}
-
-\subsection{Native SPK Provider}
-
-AstDyn includes a native, dependency-free implementation for reading JPL DE440 and DE441 ephemerides directly from standard SPK binary kernels (.bsp files). This removes the need for the external CSPICE toolkit for high-precision planetary orbits and asteroid perturbations.
-
-\textbf{Features}:
-\begin{itemize}
-    \item \textbf{Performance}: Up to 3x faster than traditional SPICE-based lookups due to direct memory mapping and optimized Chebyshev evaluators.
-    \item \textbf{Type 2 \& 3 Support}: Full support for standard JPL planetary and asteroid SPK segments.
-    \item \textbf{Zero-Dependency}: No shared libraries or external headers needed.
-    \item \textbf{Thread-Safe}: Designed for parallel occultation searches.
-\end{itemize}
-
-\textbf{Configuration}:
-\begin{lstlisting}[language=bash]
-ephemeris.provider = NATIVE
-ephemeris.file = /path/to/de441.bsp
-\end{lstlisting}
-
-\subsection{VSOP87}
-
-Analytical series developed by Bretagnon \& Francou (1988).
-
-\textbf{Variants}:
-\begin{description}
-    \item[VSOP87A] Heliocentric rectangular, J2000 ecliptic
-    \item[VSOP87B] Heliocentric rectangular, J2000 equatorial  
-    \item[VSOP87C] Heliocentric spherical (mean ecliptic/equinox of date)
-    \item[VSOP87D] Heliocentric spherical (J2000 ecliptic)
-    \item[VSOP87E] Barycentric rectangular, J2000 ecliptic
-\end{description}
-
-\textbf{Implementation}:
-\begin{lstlisting}[language=C++,caption={VSOP87 usage}]
-#include <astdyn/ephemeris/VSOP87.hpp>
-
-VSOP87 vsop;
-double jd = 2460000.5;  // Julian date
-
-// Earth position (VSOP87A: heliocentric J2000 ecliptic)
-Vector3d earth_pos = vsop.get_position("Earth", jd, VSOP87_A);
-std::cout << "Earth position: " << earth_pos.transpose() << " AU\n";
-
-// Accuracy estimate
-double error_km = vsop.estimated_error("Earth", jd);
-std::cout << "Position error: ~" << error_km << " km\n";
-\end{lstlisting}
-
-\textbf{Accuracy}: $\sim$1 km for inner planets over $\pm$2000 years from J2000.
-
-\subsection{Comparison}
-
-\begin{table}[htbp]
-\centering
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Method} & \textbf{Accuracy} & \textbf{Speed} & \textbf{File Size} & \textbf{Dependency} \\
-\midrule
-DE441 (Native) & 1--10 km & ★★★★★★ & 3.2 GB & None \\
-DE440 (SPICE) & 1--10 km & ★★★★ & 114 MB & CSPICE \\
-VSOP87 & 1--5 km & ★★★ & $\sim$1 MB & None \\
-Keplerian & 100--1000 km & ★★★★★ & Negligible & None \\
-\bottomrule
-\end{tabular}
-\caption{Planetary ephemeris comparison.}
-\label{tab:planetary_eph}
-\end{table}
+Previous versions of AstDyn included internal VSOP87 analytical models. These are now \textbf{deprecated} and disabled for high-precision workflows (occultations, close approaches) because they do not match the accuracy of JPL's DE441 (centimeter vs kilometer level). For precision work, the \texttt{DE441Provider} or \texttt{HorizonsProvider} should always be used.
 
 \section{Light-Time Corrections}
 
-\subsection{Geometric vs Apparent Position}
+Light-time correction is essential for comparing predicted ephemeris positions with optical or radar observations.
 
-Light travels at finite speed $c = 299792.458$ km/s, so we observe planets where they \emph{were}, not where they \emph{are}.
-
-\textbf{Light-time}:
-
-\begin{equation}
-    \tau = \frac{|\mathbf{r}_{\text{planet}} - \mathbf{r}_{\text{obs}}|}{c}
-\end{equation}
-
-Typical values:
-\begin{itemize}
-    \item Sun: 8.3 minutes
-    \item Jupiter: 30--50 minutes
-    \item Saturn: 70--90 minutes
-    \item Neptune: 4 hours
-\end{itemize}
-
-\subsection{Iterative Correction}
-
-To find the \textbf{apparent position} at observation time $t_{\text{obs}}$:
-
-\begin{enumerate}
-    \item Start with geometric position: $\mathbf{r}_0 = \mathbf{r}_{\text{planet}}(t_{\text{obs}})$
-    \item Compute light-time: $\tau_0 = |\mathbf{r}_0 - \mathbf{r}_{\text{obs}}|/c$
-    \item Update: $\mathbf{r}_1 = \mathbf{r}_{\text{planet}}(t_{\text{obs}} - \tau_0)$
-    \item Iterate until convergence: $|\tau_{i+1} - \tau_i| < 10^{-6}$ s
-\end{enumerate}
-
-Typically converges in 2--3 iterations.
-
-\subsection{Implementation}
-
-\begin{lstlisting}[language=C++,caption={Light-time correction}]
-Vector3d compute_apparent_position(
-    const EphemerisInterface& ephem,
-    const std::string& target,
-    double t_obs,
-    const Vector3d& observer_pos)
+\begin{lstlisting}[language=C++,caption={Type-safe Light-time correction}]
+physics::CartesianStateTyped<core::GCRF> compute_apparent_state(
+    const PlanetaryEphemeris& ephem,
+    CelestialBody target,
+    time::EpochTDB t_obs,
+    const math::Vector3<core::GCRF, physics::Distance>& observer_pos)
 {
-    const double c_AU_per_day = 173.1446326846693;  // Speed of light
+    // 1. Geometric position (geometric at t_obs)
+    auto state_geom = ephem.getState(target, t_obs);
     
-    Vector3d r_geom = ephem.get_position(target, t_obs);
-    double tau = (r_geom - observer_pos).norm() / c_AU_per_day;
+    // 2. Initial light-time estimate
+    auto diff = state_geom.position - observer_pos;
+    time::Duration tau = diff.norm() / constants::SPEED_OF_LIGHT;
     
-    // Iterate light-time correction
-    for (int iter = 0; iter < 5; ++iter) {
-        Vector3d r_new = ephem.get_position(target, t_obs - tau);
-        double tau_new = (r_new - observer_pos).norm() / c_AU_per_day;
-        
-        if (std::abs(tau_new - tau) < 1e-10) break;  // Converged
-        tau = tau_new;
+    // 3. Iterate (converges in ~2 iterations)
+    for (int i = 0; i < 3; ++i) {
+        auto state_retarded = ephem.getState(target, t_obs - tau);
+        auto new_diff = state_retarded.position - observer_pos;
+        tau = new_diff.norm() / constants::SPEED_OF_LIGHT;
     }
     
-    return ephem.get_position(target, t_obs - tau);
+    return ephem.getState(target, t_obs - tau);
 }
 \end{lstlisting}
 

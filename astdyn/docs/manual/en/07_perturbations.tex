@@ -379,74 +379,52 @@ Modern orbit determination often uses:
     \item Analytical theory to identify important perturbations
     \item Simplified models (e.g., averaged J$_2$) for faster computation
 \end{enumerate}
-
 \section{AstDyn Implementation}
 
-AstDyn provides a modular perturbation framework:
+AstDyn provides a modular perturbation framework centered around the \texttt{PropagatorSettings} and \texttt{ForceField} classes.
 
-\begin{lstlisting}[language=C++,caption={Perturbations in AstDyn}]
-#include <astdyn/dynamics/Perturbations.hpp>
-#include <astdyn/dynamics/NBody.hpp>
+\begin{lstlisting}[language=C++,caption={Configuring Perturbations via PropagatorSettings}]
+using namespace astdyn::propagation;
 
-using namespace astdyn;
-
-// Create state vector
-Vector6d state = ...;  // [x, y, z, vx, vy, vz]
-
-// N-body perturbations from planets
-PlanetaryEphemeris ephem("de440.bsp");
-Vector3d acc_planets = NBody::compute_perturbation(
-    state, time, ephem, {"Jupiter", "Saturn", "Earth"}
-);
-
-// J2 perturbation (for Earth orbiter)
-Vector3d acc_j2 = Perturbations::j2_acceleration(
-    state, MU_EARTH, R_EARTH, J2_EARTH
-);
-
-// Solar radiation pressure
-double area_mass_ratio = 0.01;  // m^2/kg
-double Cr = 1.3;
-Vector3d sun_direction = ...;   // Unit vector to Sun
-Vector3d acc_srp = Perturbations::solar_radiation_pressure(
-    state, area_mass_ratio, Cr, sun_direction
-);
-
-// Relativistic correction
-Vector3d acc_gr = Perturbations::schwarzschild_correction(
-    state, MU_SUN
-);
-
-// Total perturbing acceleration
-Vector3d acc_total = acc_planets + acc_j2 + acc_srp + acc_gr;
-
-// Add to equations of motion
-Vector6d derivatives;
-derivatives.head<3>() = state.tail<3>();  // velocity
-derivatives.tail<3>() = -MU_SUN * state.head<3>() / r^3 + acc_total;
-\end{lstlisting}
-
-\subsection{Perturbation Selection}
-
-AstDyn allows users to enable/disable perturbations:
-
-\begin{lstlisting}[language=C++,caption={Configuring the Force Model in AstDyn}]
+// 1. Define high-precision settings
 PropagatorSettings settings;
 settings.include_planets = true;
+settings.include_moon = true;
 settings.include_asteroids = true;
-settings.use_default_asteroid_set = true;
+settings.use_default_asteroid_set = true; // Pluto + 16 massive asteroids
 settings.include_relativity = true;
-settings.include_sun_j2 = true;
-settings.ppn_beta = 1.0;
-settings.ppn_gamma = 1.0;
+settings.include_sun_j2 = true;           // Sun oblateness
+settings.include_earth_j2 = false;        // Not needed for heliocentric
 
-// Initialize ephemeris and force field
-auto ephem = std::make_shared<PlanetaryEphemeris>("de441.bsp");
+// 2. Initialize necessary providers
+auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
+
+// 3. Create a force field aggregator
 ForceField field(settings, ephem);
 
-// Use in propagation
-Propagator prop(settings, field);
-auto final_state = prop.propagate(initial_state, t0, tf);
+// 4. Computation (Internal or Advanced use)
+using namespace astdyn::time;
+auto acc = field.total_acceleration(
+    EpochTDB::from_mjd(60000.0),
+    pos_au,  // Eigen::Vector3d
+    vel_aud  // Eigen::Vector3d
+);
+\end{lstlisting}
+
+\subsection{Programmatic Control}
+
+The \texttt{Propagator} class automatically handles these settings during integration:
+
+\begin{lstlisting}[language=C++,caption={Propagation with perturbations}]
+// Create propagator with chosen integrator and settings
+auto integrator = std::make_shared<RKF78Integrator>(0.1, 1e-13);
+Propagator prop(integrator, ephem, settings);
+
+// Propagate a strongly-typed state
+auto final_state = prop.propagate_cartesian<astdyn::core::GCRF>(
+    initial_state, 
+    target_epoch
+);
 \end{lstlisting}
 
 \section{Summary}

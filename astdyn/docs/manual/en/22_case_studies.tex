@@ -146,14 +146,12 @@ Epoch & 2460325.5 & JD & \\
 
 \subsection{Configuration}
 
-\begin{lstlisting}[caption={Differential correction settings}]
-Settings:
-  - Maximum iterations: 20
-  - Convergence tolerance: 1e-8 (AU for positions)
-  - Integrator: RKF78, tolerance 1e-12
-  - Force model: Sun + Jupiter + Saturn + Earth
-  - Observation weighting: 1/sigma^2
-  - Default uncertainty: 0.5 arcsec (RA and Dec)
+\begin{lstlisting}[style=cpp, caption={Differential correction settings}]
+DifferentialCorrectorSettings settings;
+settings.max_iterations = 20;
+settings.convergence_tolerance = Distance::from_au(1e-8);
+settings.reject_outliers = true;
+settings.outlier_sigma = 3.0; // Carpentry rejection
 \end{lstlisting}
 
 \subsection{Iteration History}

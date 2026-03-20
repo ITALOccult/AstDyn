@@ -233,219 +233,102 @@ AstDyn supports all three modes.
 
 \section{Propagation Modes}
 
-\subsection{Forward and Backward Propagation}
-
-\textbf{Forward propagation} ($t_f > t_0$):
-\begin{itemize}
-    \item Standard ephemeris generation
-    \item Mission planning
-    \item Impact prediction
-\end{itemize}
-
-\textbf{Backward propagation} ($t_f < t_0$):
-\begin{itemize}
-    \item Orbital history reconstruction
-    \item Finding past close approaches
-    \item Validating orbit determination
-\end{itemize}
-
-Numerical integrators work equally well in both directions if the system is time-reversible.
+AstDyn supports both forward and backward propagation. Numerical integrators are generally time-reversible, allowing for historical reconstruction.
 
 \subsection{Single Epoch vs Multi-Epoch}
 
-\textbf{Single epoch propagation}:
 \begin{lstlisting}[language=C++,caption={Single epoch propagation}]
-Vector6d y0 = ...;  // Initial state
-double t0 = 60000.0;  // MJD TDB
-double tf = 60365.0;  // 1 year later
+using namespace astdyn::physics;
+using namespace astdyn::core;
 
-Propagator prop(force_model);
-Vector6d yf = prop.propagate(y0, t0, tf);
+// 1. Initial State
+auto initial = KeplerianStateTyped<ECLIPJ2000>::from_traditional(
+    time::EpochTDB::from_mjd(60000.0),
+    2.74, 0.07, 10.5, 80.0, 73.0, 0.0,
+    GravitationalParameter::sun()
+);
+
+// 2. Propagate (Type-safe)
+Propagator prop(integrator, ephem, settings);
+auto final = prop.propagate_keplerian(initial, t_final);
 \end{lstlisting}
 
-\textbf{Multi-epoch propagation}:
+\subsection{Multi-Epoch (Ephemeris) Propagation}
+
+For generating ephemerides, the \texttt{propagate_ephemeris} method is optimized for multiple target times.
+
 \begin{lstlisting}[language=C++,caption={Multi-epoch propagation}]
-std::vector<double> epochs = {60000, 60100, 60200, 60300};
-std::vector<Vector6d> states = prop.propagate_multi(y0, t0, epochs);
-\end{lstlisting}
+std::vector<time::EpochTDB> targets = {t1, t2, t3, t4};
+auto ephemeris = prop.propagate_ephemeris<GCRF>(initial_cartesian, targets);
 
-\section{Ephemeris Generation}
-
-\subsection{Tabulated Ephemerides}
-
-For efficient repeated lookups, create a table:
-
-\begin{lstlisting}[language=C++,caption={Generating ephemeris table}]
-EphemerisTable ephem;
-double t_start = 60000.0;
-double t_end = 61000.0;
-double dt = 1.0;  // 1-day intervals
-
-for (double t = t_start; t <= t_end; t += dt) {
-    Vector6d state = prop.propagate(y0, t0, t);
-    ephem.add_entry(t, state);
+for (const auto& state : ephemeris) {
+    std::cout << state.position.x().to_au() << " AU\n";
 }
-
-// Later: interpolate to arbitrary time
-Vector6d state_interp = ephem.interpolate(60123.5);
 \end{lstlisting}
-
-\subsection{Chebyshev Interpolation}
-
-For high-precision ephemerides, JPL uses Chebyshev polynomials:
-
-\begin{equation}
-    \mathbf{r}(t) = \sum_{k=0}^{n} c_k T_k(t')
-\end{equation}
-
-where $T_k$ are Chebyshev polynomials and $t'$ is normalized to $[-1, 1]$.
-
-Advantages:
-\begin{itemize}
-    \item Minimax property (minimizes maximum error)
-    \item Stable for high-degree polynomials
-    \item Fast evaluation
-\end{itemize}
 
 \section{State Transition Matrix}
 
-\subsection{Definition}
-
-The \textbf{state transition matrix} (STM) $\Phi(t, t_0)$ relates perturbations:
-
-\begin{equation}
-    \delta\mathbf{y}(t) = \Phi(t, t_0) \delta\mathbf{y}(t_0)
-\end{equation}
-
-It is a $6 \times 6$ matrix satisfying:
-
-\begin{equation}
-    \frac{d\Phi}{dt} = \mathbf{A}(t)\Phi, \quad \Phi(t_0, t_0) = \mathbf{I}
-\end{equation}
-
-where $\mathbf{A} = \partial\mathbf{f}/\partial\mathbf{y}$ is the Jacobian.
-
-\subsection{Applications}
-
-The STM is essential for:
-\begin{itemize}
-    \item Orbit determination (differential correction)
-    \item Covariance propagation (uncertainty quantification)
-    \item Sensitivity analysis
-    \item Maneuver optimization
-\end{itemize}
-
-\subsection{Computation}
-
-Augment the state vector:
-
-\begin{equation}
-    \tilde{\mathbf{y}} = \begin{bmatrix} \mathbf{y} \\ \text{vec}(\Phi) \end{bmatrix}
-\end{equation}
-
-where $\text{vec}(\Phi)$ stacks the 36 elements of $\Phi$ into a vector.
-
-The augmented system is:
-
-\begin{equation}
-    \frac{d\tilde{\mathbf{y}}}{dt} = \begin{bmatrix} \mathbf{f}(\mathbf{y}) \\ \mathbf{A}(\mathbf{y})\text{vec}(\Phi) \end{bmatrix}
-\end{equation}
+The State Transition Matrix (STM) $\Phi(t, t_0)$ is computed alongside the state by including the variational equations in the derivative function. AstDyn provides specialized integrators like \texttt{GRKN} for efficient STM propagation.
 
 \section{Practical Examples}
 
 \subsection{Example 1: Main-Belt Asteroid}
 
-Propagate asteroid 203 Pompeja for 1 year:
+Propagate asteroid 203 Pompeja for 1 year using high-precision asteroid perturbations.
 
-\begin{lstlisting}[language=C++,caption={Propagating Pompeja}]
+\begin{lstlisting}[language=C++,caption={Propagating Pompeja (203)}]
 #include <astdyn/propagation/Propagator.hpp>
+using namespace astdyn::physics;
+using namespace astdyn::core;
 
-using namespace astdyn;
+// Initial elements from database
+auto initial = KeplerianStateTyped<ECLIPJ2000>::from_traditional(
+    time::EpochTDB::from_mjd(60000.0),
+    2.74312, 0.0698, 11.78, 347.60, 59.96, 164.35,
+    GravitationalParameter::sun()
+);
 
-// Initial orbital elements (from OrbFit)
-OrbitalElements elements;
-elements.epoch = 60000.0;  // MJD TDB
-elements.a = 2.743;  // AU
-elements.e = 0.0698;
-elements.i = 11.78 * DEG_TO_RAD;
-elements.Omega = 347.60 * DEG_TO_RAD;
-elements.omega = 59.96 * DEG_TO_RAD;
-elements.M = 164.35 * DEG_TO_RAD;
+// Setup Propagator with massive asteroid perturbations
+PropagatorSettings settings;
+settings.include_asteroids = true;
+settings.use_default_asteroid_set = true;
 
-// Convert to Cartesian
-Vector6d state0 = elements.to_cartesian();
+auto integrator = std::make_shared<RKF78Integrator>(0.1, 1e-12);
+auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
 
-// Setup force model
-ForceModel forces;
-forces.enable_planets({"Jupiter", "Saturn", "Mars", "Earth"});
-forces.enable_relativity(true);
+Propagator prop(integrator, ephem, settings);
 
-// Create propagator
-Propagator prop(forces);
-prop.set_integrator("DOPRI54");
-prop.set_tolerance(1e-12);
+// Propagate 1 year (+365.25 days)
+auto target_epoch = initial.epoch + time::Duration::from_days(365.25);
+auto final_elem = prop.propagate_keplerian(initial, target_epoch);
 
-// Propagate 1 year
-double t0 = elements.epoch;
-double tf = t0 + 365.25;
-
-Vector6d state_final = prop.propagate(state0, t0, tf);
-
-// Convert back to elements
-OrbitalElements final_elements = 
-    OrbitalElements::from_cartesian(state_final, tf);
-
-std::cout << "Initial a: " << elements.a << " AU\n";
-std::cout << "Final a:   " << final_elements.a << " AU\n";
-std::cout << "Change:    " << (final_elements.a - elements.a) * 1e6 
-          << " km\n";
+std::cout << "Original a: " << initial.a.to_au() << " AU\n";
+std::cout << "Final a:    " << final_elem.a.to_au() << " AU\n";
 \end{lstlisting}
 
 \subsection{Example 2: Close Approach Analysis}
 
-Find minimum distance to Earth:
+Detecting the minimum distance between an asteroid and Earth.
 
 \begin{lstlisting}[language=C++,caption={Close approach detection}]
-double min_distance = 1e99;
-double closest_time = 0;
+Distance min_dist = Distance::from_au(1e9);
+time::EpochTDB closest_t;
 
-// Propagate with small steps near Earth encounter
-for (double t = t_start; t <= t_end; t += 0.01) {
-    Vector6d asteroid_state = prop.propagate(y0, t0, t);
-    Vector6d earth_state = ephemeris.get_planet("Earth", t);
+// Scan over a window with 0.1 day resolution
+for (double mjd = m1; mjd <= m2; mjd += 0.1) {
+    auto t = time::EpochTDB::from_mjd(mjd);
+    auto ast_state = prop.propagate_cartesian<GCRF>(initial, t);
+    auto earth_state = ephem->get_planet_state<GCRF>(ephemeris::Earth, t);
     
-    Vector3d rel_pos = asteroid_state.head<3>() - earth_state.head<3>();
-    double distance = rel_pos.norm();
+    // Type-safe vector subtraction and norm
+    auto diff = ast_state.position - earth_state.position;
+    Distance d = diff.norm();
     
-    if (distance < min_distance) {
-        min_distance = distance;
-        closest_time = t;
+    if (d < min_dist) {
+        min_dist = d;
+        closest_t = t;
     }
 }
-
-std::cout << "Closest approach: " << min_distance << " AU\n";
-std::cout << "                  " << min_distance * 149597870.7 << " km\n";
-std::cout << "At epoch: " << closest_time << " MJD\n";
-\end{lstlisting}
-
-\subsection{Example 3: Comet Propagation}
-
-Handle large eccentricity near perihelion:
-
-\begin{lstlisting}[language=C++,caption={Comet propagation}]
-// Comet with e = 0.995, q = 0.1 AU
-OrbitalElements comet;
-comet.a = 20.0;  // AU (very eccentric)
-comet.e = 0.995;
-comet.q = comet.a * (1 - comet.e);  // perihelion distance
-
-// Use variable step size, tighter tolerance
-prop.set_tolerance(1e-14);
-prop.set_min_step(1e-4);  // Allow very small steps near perihelion
-prop.set_max_step(30.0);   // Large steps at aphelion
-
-Vector6d state0 = comet.to_cartesian();
-Vector6d state_post_perihelion = prop.propagate(state0, t0, t0 + 180);
 \end{lstlisting}
 
 \section{Performance Optimization}

@@ -39,17 +39,21 @@ public:
 };
 
 // Integrator interface - multiple methods available
-class IIntegrator {
+class Integrator {
 public:
-    virtual ~IIntegrator() = default;
-    virtual void integrate(State& y, double t0, double t1, ForceModel& forces) = 0;
+    virtual ~Integrator() = default;
+    virtual Eigen::VectorXd integrate(
+        const DerivativeFunction& f, 
+        const Eigen::VectorXd& y0, 
+        double t0, double tf) = 0;
 };
 
-// Ephemeris interface - SPICE, JPL, analytic
-class IEphemeris {
+// Ephemeris Provider interface - DE441, Horizons, Spice
+class EphemerisProvider {
 public:
-    virtual ~IEphemeris() = default;
-    virtual Vector3d get_position(Body body, double jd_tdb) = 0;
+    virtual ~EphemerisProvider() = default;
+    virtual physics::CartesianStateTyped<core::GCRF>
+    getState(CelestialBody body, time::EpochTDB t) = 0;
 };
 \end{lstlisting}
 
@@ -73,67 +77,33 @@ public:
 
 \subsection{Directory Structure}
 
-\begin{lstlisting}[language=bash,caption={Project layout}]
+\\begin{lstlisting}[language=bash,caption={Project layout}]
 astdyn/
 |-- include/astdyn/           # Public headers
 |   |-- AstDyn.hpp           # Main include (everything)
-|   |-- AstDynEngine.hpp     # High-level engine
-|   |-- Version.hpp          # Version info (generated)
-|   |-- Config.hpp           # Build configuration (generated)
-|   |-- core/                # Fundamental types
-|   |   |-- Constants.hpp
-|   |   `-- Types.hpp
-|   |-- math/                # Mathematical utilities
-|   |   |-- MathUtils.hpp
-|   |   `-- LinearAlgebra.hpp
-|   |-- time/                # Time scales
-|   |   `-- TimeScale.hpp
-|   |-- coordinates/         # Reference frames
-|   |   |-- KeplerianElements.hpp
-|   |   |-- CartesianState.hpp
-|   |   `-- CometaryElements.hpp
-|   |-- orbit/               # Orbital mechanics
-|   |   |-- TwoBody.hpp
-|   |   `-- Perturbations.hpp
+|   |-- core/                # Fundamental types & physics
+|   |   |-- Constants.hpp    # Physical constants
+|   |   |-- physics_types.hpp # Distance, Velocity, Angle
+|   |   |-- frame_tags.hpp   # GCRF, ECLIPJ2000, etc.
+|   |   `-- physics_state.hpp # CartesianStateTyped
+|   |-- time/                # Time scales & durations
+|   |   |-- epoch.hpp        # EpochTDB, TimeDuration
+|   |   `-- transformations.hpp
 |   |-- propagation/         # Numerical integration
-|   |   |-- Integrator.hpp
-|   |   `-- Propagator.hpp
-|   |-- observations/        # Astrometric data
-|   |   |-- Observation.hpp
-|   |   |-- MPCReader.hpp
-|   |   `-- ObservatoryDatabase.hpp
-|   |-- orbit_determination/ # OD algorithms
-|   |   |-- GaussIOD.hpp
-|   |   |-- DifferentialCorrection.hpp
-|   |   |-- StateTransitionMatrix.hpp
-|   |   `-- Residuals.hpp
-|   |-- io/                  # Parsers
-|   |   |-- IParser.hpp
-|   |   |-- ParserFactory.hpp
-|   |   `-- parsers/
-|   |       |-- OrbFitEQ1Parser.hpp
-|   |       `-- OrbFitRWOParser.hpp
+|   |   |-- Integrator.hpp   # Base Integrator class
+|   |   |-- Propagator.hpp   # High-level Propagator
+|   |   |-- ForceField.hpp   # Perturbation management
+|   |   `-- GRKNIntegrator.hpp # Specialized RKN
 |   |-- ephemeris/           # Planetary positions
-|   |   `-- SpiceInterface.hpp
-|   `-- utils/               # Utilities
-|       |-- Logger.hpp
-|       `-- StringUtils.hpp
+|   |   |-- PlanetaryEphemeris.hpp # Gateway
+|   |   `-- DE441Provider.hpp # Native SPK reader
+|   `-- io/                  # Parsers
+|       |-- HorizonsClient.hpp
+|       `-- MPCReader.hpp
 |-- src/                     # Implementation files
-|   |-- CMakeLists.txt
-|   |-- AstDynEngine.cpp
-|   |-- math/
-|   |-- time/
-|   |-- coordinates/
-|   |-- orbit/
-|   |-- propagation/
-|   |-- observations/
-|   |-- orbit_determination/
-|   |-- io/
-|   `-- ephemeris/
-|-- tests/                   # Unit tests (Google Test)
+|-- tests/                   # Unit tests (GTest)
 |-- examples/                # Example programs
-|-- docs/                    # Documentation
-`-- data/                    # Data files (kernels, catalogs)
+`-- data/                    # Data files (DE441, catalogs)
 \end{lstlisting}
 
 \subsection{Namespace Organization}
@@ -190,20 +160,18 @@ namespace astdyn {
 \end{itemize}
 
 \textbf{Type Aliases} (\texttt{core/Types.hpp}):
-\begin{lstlisting}[language=C++]
-// Linear algebra (Eigen)
-using Vector3d = Eigen::Vector3d;
-using Vector6d = Eigen::Matrix<double, 6, 1>;
-using Matrix3d = Eigen::Matrix3d;
-using Matrix6d = Eigen::Matrix<double, 6, 6>;
+// Strong typing for units (physics_types.hpp)
+using Distance = Quantity<DistanceUnit>;
+using Velocity = Quantity<VelocityUnit>;
+using Angle    = Quantity<AngleUnit>;
 
-// Strong typing for units
-using Radians = double;
-using Degrees = double;
-using AU_Distance = double;
-using KM_Distance = double;
-using JulianDate = double;
-\end{lstlisting}
+// State representation (physics_state.hpp)
+template <typename Frame>
+struct CartesianStateTyped {
+    time::EpochTDB epoch;
+    math::Vector3<Frame, Distance> position;
+    math::Vector3<Frame, Velocity> velocity;
+};
 
 \textbf{Enumerations}:
 \begin{lstlisting}[language=C++]

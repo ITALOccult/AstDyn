@@ -27,97 +27,44 @@ Propagate asteroid (203) Pompeja for 60 days using simplified force model.
 
 \subsection{Code}
 
-\begin{lstlisting}[language=C++,caption={example1\_propagation.cpp}]
+\begin{lstlisting}[language=C++,caption={example1_propagation.cpp}]
 #include <astdyn/AstDyn.hpp>
 #include <iostream>
-#include <iomanip>
 
-using namespace astdyn;
+using namespace astdyn::physics;
+using namespace astdyn::core;
+using namespace astdyn::time;
 
 int main() {
-    // Define initial Keplerian elements (Pompeja at epoch JD 2460000.5)
-    orbit::KeplerianElements elem0;
-    elem0.a = 2.7436;                    // AU
-    elem0.e = 0.0624;
-    elem0.i = 11.74 * constants::DEG_TO_RAD;
-    elem0.Omega = 339.86 * constants::DEG_TO_RAD;
-    elem0.omega = 258.03 * constants::DEG_TO_RAD;
-    elem0.M = 45.32 * constants::DEG_TO_RAD;
-    elem0.epoch = 2460000.5;
-    elem0.name = "Pompeja";
+    // 1. Define initial state (Pompeja at epoch)
+    auto initial = KeplerianStateTyped<ECLIPJ2000>::from_traditional(
+        EpochTDB::from_mjd(60000.0),
+        2.74312, 0.0698, 11.78, 347.60, 59.96, 164.35,
+        GravitationalParameter::sun()
+    );
+
+    // 2. Setup Propagator with high-precision force model
+    PropagatorSettings settings;
+    settings.include_planets = {"Jupiter", "Saturn", "Mars", "Earth"};
+    settings.include_relativity = true;
+
+    auto integrator = std::make_shared<RKF78Integrator>(0.1, 1e-12);
+    auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
     
-    std::cout << "Initial Elements (Epoch " << std::fixed 
-              << std::setprecision(1) << elem0.epoch << " JD):\n";
-    std::cout << "  a     = " << std::setprecision(6) << elem0.a << " AU\n";
-    std::cout << "  e     = " << elem0.e << "\n";
-    std::cout << "  i     = " << std::setprecision(2) 
-              << elem0.i * constants::RAD_TO_DEG << " deg\n";
-    std::cout << "  Omega = " << elem0.Omega * constants::RAD_TO_DEG << " deg\n";
-    std::cout << "  omega = " << elem0.omega * constants::RAD_TO_DEG << " deg\n";
-    std::cout << "  M     = " << elem0.M * constants::RAD_TO_DEG << " deg\n";
-    std::cout << "  Period = " << std::setprecision(1) 
-              << elem0.period() << " days\n\n";
-    
-    // Convert to Cartesian
-    auto state0 = elem0.to_cartesian();
-    std::cout << "Cartesian State:\n";
-    std::cout << "  Position: [" << std::setprecision(8)
-              << state0.position[0] << ", "
-              << state0.position[1] << ", "
-              << state0.position[2] << "] AU\n";
-    std::cout << "  Velocity: [" 
-              << state0.velocity[0] << ", "
-              << state0.velocity[1] << ", "
-              << state0.velocity[2] << "] AU/day\n\n";
-    
-    // Setup ephemeris (analytic approximation for simplicity)
-    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
-    
-    // Create force model (Sun + Jupiter + Saturn)
-    auto forces = std::make_shared<propagation::PointMassGravity>(
-        eph, std::vector<std::string>{"JUPITER", "SATURN"});
-    
-    // Create integrator (RKF78 with 1e-12 tolerance)
-    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
-    
-    // Create propagator
-    propagation::Propagator prop(integrator, forces, eph);
-    
-    // Propagate 60 days
-    double target_epoch = elem0.epoch + 60.0;
-    std::cout << "Propagating to " << target_epoch << " JD (+60 days)...\n\n";
-    
-    auto state60 = prop.propagate(state0, target_epoch);
-    
-    // Convert back to Keplerian
-    auto elem60 = orbit::KeplerianElements::from_cartesian(
-        state60.position, state60.velocity, state60.epoch);
-    
-    std::cout << "Final Elements (Epoch " << elem60.epoch << " JD):\n";
-    std::cout << "  a     = " << std::setprecision(6) << elem60.a << " AU\n";
-    std::cout << "  e     = " << elem60.e << "\n";
-    std::cout << "  i     = " << std::setprecision(2) 
-              << elem60.i * constants::RAD_TO_DEG << " deg\n";
-    std::cout << "  Omega = " << elem60.Omega * constants::RAD_TO_DEG << " deg\n";
-    std::cout << "  omega = " << elem60.omega * constants::RAD_TO_DEG << " deg\n";
-    std::cout << "  M     = " << elem60.M * constants::RAD_TO_DEG << " deg\n\n";
-    
-    // Compute changes
-    std::cout << "Changes over 60 days:\n";
-    std::cout << "  Delta a     = " << std::scientific << std::setprecision(2)
-              << (elem60.a - elem0.a) << " AU\n";
-    std::cout << "  Delta e     = " << (elem60.e - elem0.e) << "\n";
-    std::cout << "  Delta i     = " << std::fixed << std::setprecision(4)
-              << (elem60.i - elem0.i) * constants::RAD_TO_DEG * 3600.0 
-              << " arcsec\n";
-    std::cout << "  Delta Omega = " 
-              << (elem60.Omega - elem0.Omega) * constants::RAD_TO_DEG * 3600.0
-              << " arcsec\n";
-    
-    std::cout << "\nIntegration Statistics:\n";
-    std::cout << "  Steps taken: " << integrator->steps_taken() << "\n";
-    std::cout << "  Steps rejected: " << integrator->steps_rejected() << "\n";
-    
+    // Set native DE441 provider (assumes file exists)
+    ephem->setProvider(std::make_shared<ephemeris::DE441Provider>("de441.bsp"));
+
+    Propagator prop(integrator, ephem, settings);
+
+    // 3. Propagate 1 year
+    auto target_epoch = initial.epoch + Duration::from_days(365.25);
+    auto final_state = prop.propagate_keplerian(initial, target_epoch);
+
+    // 4. Results
+    std::cout << "Initial a: " << initial.a.to_au() << " AU\n";
+    std::cout << "Final a:   " << final_state.a.to_au() << " AU\n";
+    std::cout << "Change:    " << (final_state.a - initial.a).to_km() << " km\n";
+
     return 0;
 }
 \end{lstlisting}
@@ -236,115 +183,45 @@ Determine orbit from synthetic observations using differential correction.
 
 \subsection{Code}
 
-\begin{lstlisting}[language=C++,caption={example3\_orbit\_determination.cpp}]
+\begin{lstlisting}[language=C++,caption={example3_orbit_determination.cpp}]
 #include <astdyn/AstDyn.hpp>
 #include <iostream>
-#include <iomanip>
-#include <random>
 
-using namespace astdyn;
+using namespace astdyn::physics;
+using namespace astdyn::core;
 
 int main() {
-    // True elements (what we want to recover)
-    orbit::KeplerianElements true_elem;
-    true_elem.a = 2.7436;
-    true_elem.e = 0.0624;
-    true_elem.i = 11.74 * constants::DEG_TO_RAD;
-    true_elem.Omega = 339.86 * constants::DEG_TO_RAD;
-    true_elem.omega = 258.03 * constants::DEG_TO_RAD;
-    true_elem.M = 45.32 * constants::DEG_TO_RAD;
-    true_elem.epoch = 2460000.5;
+    // 1. Initial guess (Cartesian)
+    auto initial_guess = CartesianStateTyped<GCRF>::from_au_aud(
+        time::EpochTDB::from_mjd(60000.0),
+        {1.1, 0.2, 0.05, -0.01, 0.02, 0.005},
+        GravitationalParameter::sun()
+    );
+
+    // 2. Load observations (from MPC file)
+    auto obs = io::MPCReader::read_file("observations.txt");
+
+    // 3. Setup Differential Corrector
+    auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
+    ephem->setProvider(std::make_shared<ephemeris::DE441Provider>("de441.bsp"));
     
-    // Generate synthetic observations
-    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
-    auto forces = std::make_shared<propagation::PointMassGravity>(
-        eph, std::vector<std::string>{"JUPITER", "SATURN"});
-    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
-    propagation::Propagator prop(integrator, forces, eph);
-    
-    // Observatory (Pan-STARRS F51)
-    observations::ObservatoryCoordinates obs_coord;
-    obs_coord.code = "F51";
-    obs_coord.longitude = -156.2569 * constants::DEG_TO_RAD;
-    obs_coord.latitude = 20.7082 * constants::DEG_TO_RAD;
-    obs_coord.altitude = 3055.0;
-    
-    std::vector<observations::Observation> observations;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::normal_distribution<> noise(0.0, 0.5 * constants::ARCSEC_TO_RAD);
-    
-    // Generate 10 observations over 60 days
-    auto state0 = true_elem.to_cartesian();
-    for (int i = 0; i < 10; ++i) {
-        double t = true_elem.epoch + i * 6.0;  // Every 6 days
-        auto state = prop.propagate(state0, t);
-        
-        // Observer position
-        Vector3d obs_pos = obs_coord.position_icrf(t);
-        
-        // Topocentric position
-        Vector3d topo = state.position - obs_pos;
-        double range = topo.norm();
-        
-        // Convert to RA/Dec
-        double ra = std::atan2(topo[1], topo[0]);
-        double dec = std::asin(topo[2] / range);
-        
-        // Add noise
-        ra += noise(gen);
-        dec += noise(gen);
-        
-        observations::Observation obs;
-        obs.epoch = t;
-        obs.ra = ra;
-        obs.dec = dec;
-        obs.sigma_ra = 0.5 * constants::ARCSEC_TO_RAD;
-        obs.sigma_dec = 0.5 * constants::ARCSEC_TO_RAD;
-        obs.obs_code = "F51";
-        
-        observations.push_back(obs);
+    // Low-level components for the corrector
+    auto rc = std::make_shared<orbit_determination::ResidualCalculator<GCRF>>(ephem);
+    auto stm = std::make_shared<orbit_determination::StateTransitionMatrix<GCRF>>(ephem);
+
+    orbit_determination::DifferentialCorrector<GCRF> dc(rc, stm);
+    orbit_determination::DifferentialCorrectorSettings settings;
+    settings.verbose = true;
+
+    // 4. Solve
+    auto result = dc.fit(obs, initial_guess, settings);
+
+    // 5. Results
+    result.print();
+    if (result.converged) {
+        std::cout << "Final Position: " << result.final_state.position.norm().to_km() << " km\n";
     }
-    
-    std::cout << "Generated " << observations.size() 
-              << " synthetic observations\n\n";
-    
-    // Initial guess (perturbed true elements)
-    orbit::KeplerianElements initial_guess = true_elem;
-    initial_guess.a += 0.001;  // +0.001 AU error
-    initial_guess.e += 0.002;  // +0.002 eccentricity error
-    
-    std::cout << "Initial Guess:\n";
-    std::cout << "  a = " << std::setprecision(6) << initial_guess.a << " AU\n";
-    std::cout << "  e = " << initial_guess.e << "\n\n";
-    
-    // Differential correction
-    orbit_determination::DifferentialCorrector dc(
-        std::make_shared<propagation::Propagator>(integrator, forces, eph),
-        20, 1e-8);
-    
-    auto result = dc.solve(initial_guess, 
-                          observations, 
-                          std::vector{obs_coord});
-    
-    // Results
-    std::cout << "Differential Correction Results:\n";
-    std::cout << "  Converged: " << (result.converged ? "Yes" : "No") << "\n";
-    std::cout << "  Iterations: " << result.iterations << "\n";
-    std::cout << "  RMS Residual: " << std::setprecision(3) 
-              << result.rms_residual << " arcsec\n\n";
-    
-    std::cout << "Recovered Elements:\n";
-    std::cout << "  a = " << std::setprecision(6) << result.elements.a 
-              << " AU (error: " << std::scientific << std::setprecision(2)
-              << (result.elements.a - true_elem.a) << ")\n";
-    std::cout << "  e = " 
-              << std::fixed << std::setprecision(6) 
-              << result.elements.e 
-              << " (error: " << std::scientific 
-              << (result.elements.e - true_elem.e) 
-              << ")\n";
-    
+
     return 0;
 }
 \end{lstlisting}
@@ -440,65 +317,35 @@ Propagate orbit with STM and analyze sensitivity to initial conditions.
 
 \subsection{Code}
 
-\begin{lstlisting}[language=C++,caption={example5\_stm.cpp}]
+\begin{lstlisting}[language=C++,caption={example5_stm.cpp}]
 #include <astdyn/AstDyn.hpp>
 #include <iostream>
-#include <iomanip>
 
-using namespace astdyn;
+using namespace astdyn::physics;
+using namespace astdyn::propagation;
 
 int main() {
-    // Initial elements
-    orbit::KeplerianElements elem;
-    elem.a = 2.7436;
-    elem.e = 0.0624;
-    elem.i = 11.74 * constants::DEG_TO_RAD;
-    elem.Omega = 339.86 * constants::DEG_TO_RAD;
-    elem.omega = 258.03 * constants::DEG_TO_RAD;
-    elem.M = 45.32 * constants::DEG_TO_RAD;
-    elem.epoch = 2460000.5;
+    // 1. Setup GRKN Integrator
+    GRKNIntegrator grkn(1e-12, 0.1);
+
+    // 2. Initial state + identity STM (42 elements)
+    Eigen::VectorXd y0 = Eigen::VectorXd::Zero(42);
+    y0.head<6>() << 2.5, 0.1, 0.05, -0.01, 0.005, 0.001; // AU, AU/d
+    Eigen::Map<Eigen::Matrix6d>(y0.data() + 6) = Eigen::Matrix6d::Identity();
+
+    // 3. Propagate 60 days
+    double t0 = 60000.0;
+    double tf = 60060.0;
     
-    // Setup propagator
-    auto eph = std::make_shared<ephemeris::AnalyticEphemeris>();
-    auto forces = std::make_shared<propagation::PointMassGravity>(
-        eph, std::vector<std::string>{"JUPITER", "SATURN"});
-    auto integrator = std::make_shared<propagation::RKF78>(1e-12);
-    propagation::Propagator prop(integrator, forces, eph);
+    // Assume derivative_func is defined (N-body force)
+    auto y_final = grkn.integrate(derivative_func, y0, t0, tf);
+
+    // 4. Extract result
+    Eigen::Matrix6d Phi = Eigen::Map<Eigen::Matrix6d>(y_final.data() + 6);
     
-    // Propagate with STM
-    auto state0 = elem.to_cartesian();
-    double target = elem.epoch + 60.0;
-    
-    auto [state60, stm] = prop.propagate_with_stm(state0, target);
-    
-    std::cout << "State Transition Matrix after 60 days:\n";
-    std::cout << std::scientific << std::setprecision(4);
-    
-    for (int i = 0; i < 6; ++i) {
-        for (int j = 0; j < 6; ++j) {
-            std::cout << std::setw(12) << stm(i, j) << " ";
-        }
-        std::cout << "\n";
-    }
-    
-    // Compute sensitivity
-    std::cout << "\nSensitivity Analysis:\n";
-    std::cout << "Initial position error: 1 km in X\n";
-    
-    Vector6d delta_x0;
-    delta_x0.setZero();
-    delta_x0(0) = 1.0 / constants::AU;  // 1 km = 1/AU_km AU
-    
-    Vector6d delta_xf = stm * delta_x0;
-    
-    std::cout << "Final position error:\n";
-    std::cout << "  Delta X: " << delta_xf(0) * constants::AU << " km\n";
-    std::cout << "  Delta Y: " << delta_xf(1) * constants::AU << " km\n";
-    std::cout << "  Delta Z: " << delta_xf(2) * constants::AU << " km\n";
-    
-    double pos_error = delta_xf.head<3>().norm() * constants::AU;
-    std::cout << "  Total: " << std::setprecision(2) << pos_error << " km\n";
-    
+    std::cout << "STM determinant: " << Phi.determinant() << "\n";
+    std::cout << "Sensitivity dr(tf)/dr(t0):\n" << Phi.block<3,3>(0,0) << "\n";
+
     return 0;
 }
 \end{lstlisting}
