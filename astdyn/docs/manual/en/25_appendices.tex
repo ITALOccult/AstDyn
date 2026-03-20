@@ -536,10 +536,10 @@ std::cout << "Jupiter position difference: " << diff << " km\n";
 \subsection{Windows: Missing DLLs}
 
 \textbf{Symptom}:
-\begin{verbatim}
+\begin{lstlisting}[style=output]
 The code execution cannot proceed because
 [library].dll was not found.
-\end{verbatim}
+\end{lstlisting}
 
 \textbf{Solution}: Add library directories to PATH:
 \begin{lstlisting}[language=bash]
@@ -549,9 +549,9 @@ set PATH=%PATH%;C:\path\to\eigen;C:\path\to\boost
 \subsection{macOS: Library Not Loaded}
 
 \textbf{Symptom}:
-\begin{verbatim}
+\begin{lstlisting}[style=output]
 dyld: Library not loaded: libastdyn.dylib
-\end{verbatim}
+\end{lstlisting}
 
 \textbf{Solution}:
 \begin{lstlisting}[language=bash]

@@ -340,7 +340,7 @@ struct RadarObservation {
 \textbf{Vision}: Cloud-based orbit determination service.
 
 \textbf{Planned endpoints}:
-\begin{verbatim}
+\begin{lstlisting}[style=output]
 POST /api/v1/propagate
   Body: { "elements": {...}, ... }
   Returns: { "state": {...}, "elapsed_ms": 1.82 }
@@ -351,7 +351,7 @@ POST /api/v1/orbit_determination
 
 GET /api/v1/ephemeris?obj=pompeja&...
   Returns: [ { "epoch": 2460000.5, ... }, ... ]
-\end{verbatim}
+\end{lstlisting}
 
 \textbf{Technology stack}:
 \begin{itemize}
@@ -506,7 +506,7 @@ AstDyn welcomes community contributions:
 
 If using AstDyn in research, please cite:
 
-\begin{verbatim}
+\begin{lstlisting}[language=TeX]
 @software{astdyn2025,
   author = {Bigi, Michele and Contributors},
   title = {AstDyn: Modern C++ Library for Asteroid Orbit Determination},
@@ -514,7 +514,7 @@ If using AstDyn in research, please cite:
   version = {1.0.0},
   url = {https://github.com/user/astdyn}
 }
-\end{verbatim}
+\end{lstlisting}
 
 \section{Research Directions}
 
