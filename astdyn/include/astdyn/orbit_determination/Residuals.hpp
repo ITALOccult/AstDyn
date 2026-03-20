@@ -13,8 +13,12 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/observations/Observation.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/time/epoch.hpp"
+#include "astdyn/core/frame_tags.hpp"
 #include <vector>
 #include <optional>
 #include <memory>
@@ -31,12 +35,12 @@ namespace astdyn::orbit_determination {
  * @brief Single observation residual
  */
 struct ObservationResidual {
-    double mjd_utc;                      ///< Observation epoch
+    time::EpochUTC time;                 ///< Observation epoch
     std::string observatory_code;        ///< Observatory
     
-    // Angular residuals [rad]
-    double residual_ra;                  ///< O-C in right ascension
-    double residual_dec;                 ///< O-C in declination
+    // Angular residuals
+    astrometry::Angle residual_ra;       ///< O-C in right ascension (σ_α*cos(δ))
+    astrometry::Angle residual_dec;      ///< O-C in declination
     
     // Weights (1/sigma^2)
     double weight_ra;                    ///< Weight for RA equation
@@ -47,12 +51,12 @@ struct ObservationResidual {
     double normalized_dec;               ///< (O-C) / sigma_dec
     
     // Computed values
-    double computed_ra;                  ///< Computed RA [rad]
-    double computed_dec;                 ///< Computed Dec [rad]
+    astrometry::RightAscension computed_ra;  ///< Computed RA
+    astrometry::Declination computed_dec;   ///< Computed Dec
     
     // Geometry
-    double range;                        ///< Topocentric distance [AU]
-    double range_rate;                   ///< Topocentric range rate [AU/day]
+    physics::Distance range;             ///< Topocentric distance
+    physics::Velocity range_rate;        ///< Topocentric range rate
     
     // Quality flags
     bool outlier;                        ///< Marked as outlier?
@@ -75,10 +79,10 @@ struct ResidualStatistics {
     int num_outliers;
     int degrees_of_freedom;              ///< N_obs - N_params
     
-    // RMS residuals [arcsec]
-    double rms_ra;
-    double rms_dec;
-    double rms_total;
+    // RMS residuals
+    astrometry::Angle rms_ra;
+    astrometry::Angle rms_dec;
+    astrometry::Angle rms_total;
     
     // Weighted RMS (normalized)
     double weighted_rms;
@@ -88,16 +92,16 @@ struct ResidualStatistics {
     double reduced_chi_squared;          ///< χ²/dof
     
     // Max residuals
-    double max_abs_ra;
-    double max_abs_dec;
+    astrometry::Angle max_abs_ra;
+    astrometry::Angle max_abs_dec;
 };
 
 /**
  * @brief Residual calculator for orbit determination
  * 
- * Computes O-C residuals for optical observations given an orbital state.
- * Handles light-time correction, aberration, and topocentric parallax.
+ * @tparam Frame Reference frame for integration
  */
+template <typename Frame>
 class ResidualCalculator {
 public:
     /**
@@ -118,7 +122,17 @@ public:
      */
     std::vector<ObservationResidual> compute_residuals(
         const std::vector<astdyn::observations::OpticalObservation>& observations,
-        const astdyn::propagation::CartesianElements& state) const;
+        const physics::CartesianStateTyped<Frame>& state) const;
+
+    /**
+     * @brief Batch compute residuals using internal propagator efficiency.
+     * 
+     * If a propagator is available, it uses the optimized propagate_ephemeris
+     * path which is much faster than individual compute_residual calls.
+     */
+    std::vector<ObservationResidual> batch_compute(
+        const std::vector<astdyn::observations::OpticalObservation>& observations,
+        const physics::CartesianStateTyped<Frame>& state) const;
     
     /**
      * @brief Compute residual for single observation
@@ -129,7 +143,7 @@ public:
      */
     std::optional<ObservationResidual> compute_residual(
         const astdyn::observations::OpticalObservation& obs,
-        const astdyn::propagation::CartesianElements& state) const;
+        const physics::CartesianStateTyped<Frame>& state) const;
     
     /**
      * @brief Compute statistics from residuals
@@ -173,43 +187,37 @@ public:
      * @brief Get observer position at observation time
      * 
      * @param obs Observation with time and observatory code
-     * @return Observer position (heliocentric) [AU], or nullopt if failed
+     * @return Observer position (heliocentric) [m] in GCRF, or nullopt if failed
      */
-    std::optional<astdyn::Vector3d> get_observer_position(
+    std::optional<math::Vector3<core::GCRF, physics::Distance>> get_observer_position(
         const astdyn::observations::OpticalObservation& obs) const;
     
     /**
      * @brief Get observer velocity at observation time
      * 
      * @param obs Observation with time and observatory code
-     * @return Observer velocity (heliocentric) [AU/day], or nullopt if failed
+     * @return Observer velocity (heliocentric) [m/s] in GCRF, or nullopt if failed
      */
-    std::optional<astdyn::Vector3d> get_observer_velocity(
+    std::optional<math::Vector3<core::GCRF, physics::Velocity>> get_observer_velocity(
         const astdyn::observations::OpticalObservation& obs) const;
     
-    /**
-     * @brief Convert UTC to TDB time scale
-     * 
-     * @param mjd_utc Modified Julian Date in UTC
-     * @return MJD in TDB time scale
-     */
-    static double utc_to_tdb(double mjd_utc);
+
 
 private:
     /**
      * @brief Compute topocentric position of object
      * 
-     * @param heliocentric_pos Object position (heliocentric) [AU]
-     * @param observer_pos Observer position (heliocentric) [AU]
-     * @param observer_vel Observer velocity (heliocentric) [AU/day]
-     * @param[out] range Topocentric distance [AU]
-     * @param[out] range_rate Topocentric range rate [AU/day]
+     * @param heliocentric_pos Object position (heliocentric) [m]
+     * @param observer_pos Observer position (heliocentric) [m]
+     * @param observer_vel Observer velocity (heliocentric) [m/s]
+     * @param[out] range Topocentric distance [m]
+     * @param[out] range_rate Topocentric range rate [m/s]
      * @return Unit vector from observer to object
      */
-    astdyn::Vector3d compute_topocentric_direction(
-        const astdyn::Vector3d& heliocentric_pos,
-        const astdyn::Vector3d& observer_pos,
-        const astdyn::Vector3d& observer_vel,
+    math::Vector3<core::GCRF, physics::Distance> compute_topocentric_direction(
+        const math::Vector3<core::GCRF, physics::Distance>& heliocentric_pos,
+        const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
+        const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
         double& range,
         double& range_rate) const;
     
@@ -217,16 +225,19 @@ private:
      * @brief Convert topocentric Cartesian to RA/Dec
      * 
      * @param direction Unit vector (topocentric)
+     * @param rho_vec Topocentric vector [m]
+     * @param observer_pos Observer heliocentric position [m]
+     * @param observer_vel Observer heliocentric velocity [m/s]
      * @param[out] ra Right ascension [rad]
      * @param[out] dec Declination [rad]
      */
     void cartesian_to_radec(
-        const astdyn::Vector3d& direction,
-        const astdyn::Vector3d& rho_vec,
-        const astdyn::Vector3d& observer_pos,
-        const astdyn::Vector3d& observer_vel,
-        double& ra,
-        double& dec) const;
+        const math::Vector3<core::GCRF, physics::Distance>& direction,
+        const math::Vector3<core::GCRF, physics::Distance>& rho_vec,
+        const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
+        const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
+        astrometry::RightAscension& ra,
+        astrometry::Declination& dec) const;
 
 private:
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;

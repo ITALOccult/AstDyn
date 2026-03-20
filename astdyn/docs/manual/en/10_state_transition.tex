@@ -178,58 +178,40 @@ In practice, we integrate:
     \item Total: 42 coupled ODEs
 \end{itemize}
 
-\subsection{Implementation in AstDyn}
+\subsection{Implementation in AstDyn: GRKNIntegrator}
 
-\begin{lstlisting}[language=C++,caption={STM propagation using STMPropagator}]
-#include "astdyn/propagation/STMPropagator.hpp"
-#include "astdyn/propagation/AnalyticalJacobian.hpp"
+The primary way to propagate the STM in AstDyn is using the \texttt{GRKNIntegrator}, a specialized Runge-Kutta-Nyström integrator that can simultaneously evolve the state and its variational equations.
+
+\begin{lstlisting}[language=C++,caption={STM propagation using GRKNIntegrator}]
+#include "astdyn/propagation/GRKNIntegrator.hpp"
 
 using namespace astdyn::propagation;
 
-// 1. Setup Force Function (e.g. 2-body)
-double mu = 1.327e11; // GM Sun
-auto force_func = [mu](double t, const Vector6d& y) {
-    Vector3d r = y.head<3>();
-    double r_norm = r.norm();
-    Vector3d acc = -mu * r / (r_norm * r_norm * r_norm);
-    Vector6d dydt;
-    dydt.head<3>() = y.tail<3>();
-    dydt.tail<3>() = acc;
-    return dydt;
-};
+// 1. Setup the integrator with physical parameters
+GRKNIntegrator grkn(
+    1e-12,    // tolerance
+    0.1,      // initial step [days]
+    1e-8,     // min step
+    100.0,    // max step
+    mu_sun,   // GM
+    j2_sun    // J2 (optional)
+);
 
-// 2. Setup Jacobian Function (Analytical)
-auto jac_func = [mu](double t, const Vector6d& y) {
-    return AnalyticalJacobian::two_body(y, mu);
-};
+// 2. Prepare the augmented state (42 elements: 6 state + 36 STM)
+Eigen::VectorXd y0 = Eigen::VectorXd::Zero(42);
+y0.head<6>() = initial_cartesian_au_aud; // [x,y,z,vx,vy,vz] in AU, AU/d
+// Initial STM is local identity
+Eigen::Map<Eigen::Matrix<double, 6, 6>>(y0.data() + 6) = 
+    Eigen::Matrix<double, 6, 6>::Identity();
 
-\begin{algorithm}
-\caption{Analytical STM Computation}
-\begin{algorithmic}[1]
-\REQUIRE Position $\mathbf{r}$
-\ENSURE Jacobian $\mathbf{G} = \partial \mathbf{a} / \partial \mathbf{r}$
-\STATE Initialize $\mathbf{G} = \mathbf{0}$
-\STATE Add Keplerian term: $\mathbf{G} \leftarrow \mathbf{G} + \frac{\mu}{r^5}(3\mathbf{r}\mathbf{r}^T - r^2 \mathbf{I})$
-\FOR{each planet $j$}
-   \STATE $\boldsymbol{\rho}_j = \mathbf{r} - \mathbf{r}_j$
-   \STATE $\mathbf{G} \leftarrow \mathbf{G} + \mu_j \left( \frac{3 \boldsymbol{\rho}_j \boldsymbol{\rho}_j^T}{\rho_j^5} - \frac{\mathbf{I}}{\rho_j^3} \right)$
-\ENDFOR
-\end{algorithmic}
-\end{algorithm}
+// 3. Propagate
+auto y_final = grkn.integrate(derivative_func, y0, t0, tf);
 
-// 3. Instantiate STMPropagator
-auto integrator = std::make_unique<RKF78Integrator>(0.1, 1e-12);
-STMPropagator stm_prop(std::move(integrator), force_func, jac_func);
-
-// 4. Propagate
-Vector6d y0 = ...; // Initial state
-double t0 = 60000.0;
-double tf = 60100.0;
-
-auto result = stm_prop.propagate(y0, t0, tf);
-
-Vector6d yf = result.state;
-Matrix6d Phi = result.stm;
+// 4. Extract results
+Eigen::Vector3d rf = y_final.head<3>();
+Eigen::Vector3d vf = y_final.segment<3>(3);
+Eigen::Matrix<double, 6, 6> Phi = 
+    Eigen::Map<Eigen::Matrix<double, 6, 6>>(y_final.data() + 6);
 
 std::cout << "STM determinant: " << Phi.determinant() << "\n";
 \end{lstlisting}

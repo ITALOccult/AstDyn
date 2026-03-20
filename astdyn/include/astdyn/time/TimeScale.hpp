@@ -14,6 +14,7 @@
 
 #include <astdyn/core/Types.hpp>
 #include <astdyn/core/Constants.hpp>
+#include <astdyn/time/epoch.hpp>
 #include <string>
 #include <optional>
 
@@ -182,6 +183,52 @@ inline double utc_to_tdb(double mjd_utc) {
  */
 inline double tdb_to_utc(double mjd_tdb) {
     return tt_to_utc(tdb_to_tt(mjd_tdb));
+}
+
+// ============================================================================
+// Type-Safe Overloads (Epoch based)
+// ============================================================================
+
+/**
+ * @brief Convert EpochUTC to EpochTDB
+ */
+inline EpochTDB to_tdb(EpochUTC t_utc) {
+    return EpochTDB::from_mjd(utc_to_tdb(t_utc.mjd()));
+}
+
+/**
+ * @brief Convert EpochTDB to EpochUTC
+ */
+inline EpochUTC to_utc(EpochTDB t_tdb) {
+    return EpochUTC::from_mjd(tdb_to_utc(t_tdb.mjd()));
+}
+
+/**
+ * @brief Convert EpochUTC to EpochTT
+ */
+inline EpochTT to_tt(EpochUTC t_utc) {
+    return EpochTT::from_mjd(utc_to_tt(t_utc.mjd()));
+}
+
+/**
+ * @brief Convert EpochTT to EpochUTC
+ */
+inline EpochUTC to_utc(EpochTT t_tt) {
+    return EpochUTC::from_mjd(tt_to_utc(t_tt.mjd()));
+}
+
+/**
+ * @brief Convert EpochTT to EpochTDB
+ */
+inline EpochTDB to_tdb(EpochTT t_tt) {
+    return EpochTDB::from_mjd(tt_to_tdb(t_tt.mjd()));
+}
+
+/**
+ * @brief Convert EpochTDB to EpochTT
+ */
+inline EpochTT to_tt(EpochTDB t_tdb) {
+    return EpochTT::from_mjd(tdb_to_tt(t_tdb.mjd()));
 }
 
 /**

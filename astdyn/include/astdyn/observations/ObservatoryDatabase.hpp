@@ -16,11 +16,16 @@
 #ifndef ASTDYN_OBSERVATIONS_OBSERVATORYDATABASE_HPP
 #define ASTDYN_OBSERVATIONS_OBSERVATORYDATABASE_HPP
 
-#include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/time/epoch.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
 #include <string>
 #include <map>
 #include <optional>
+#include <vector>
 #include <Eigen/Dense>
 
 namespace astdyn {
@@ -39,7 +44,7 @@ struct Observatory {
     double altitude;           ///< Altitude above sea level [meters]
     
     // Geocentric coordinates (cached)
-    Eigen::Vector3d position;  ///< Geocentric position [km] (ITRF)
+    math::Vector3<core::ITRF, physics::Distance> position;  ///< Geocentric position (ITRF)
     
     // Parallax constants (for speed)
     double rho_cos_phi;        ///< ρ cos φ' (geocentric)
@@ -50,7 +55,7 @@ struct Observatory {
      */
     Observatory()
         : longitude(0.0), latitude(0.0), altitude(0.0),
-          position(Eigen::Vector3d::Zero()),
+          position(math::Vector3<core::ITRF, physics::Distance>::from_si(0,0,0)),
           rho_cos_phi(0.0), rho_sin_phi(0.0) {}
     
     /**
@@ -63,10 +68,10 @@ struct Observatory {
     
     /**
      * @brief Get position vector at specific time (includes Earth rotation)
-     * @param mjd_utc Modified Julian Date in UTC
-     * @return Geocentric position [km] in J2000 frame
+     * @param t Time
+     * @return Geocentric position in J2000 frame (GCRF)
      */
-    Eigen::Vector3d getPositionJ2000(double mjd_utc) const;
+    math::Vector3<core::GCRF, physics::Distance> getPositionGCRF(time::EpochUTC t) const;
 };
 
 /**
@@ -137,14 +142,9 @@ private:
 };
 
 /**
- * @brief Convert geodetic to geocentric coordinates
- * 
- * @param lon_geodetic East longitude [radians]
- * @param lat_geodetic Geodetic latitude [radians]
- * @param alt_meters Altitude above WGS84 ellipsoid [meters]
- * @return Geocentric Cartesian position [km] in ITRF frame
+ * @return Geocentric Cartesian position in ITRF frame
  */
-Eigen::Vector3d geodeticToGeocentric(
+math::Vector3<core::ITRF, physics::Distance> geodeticToGeocentric(
     double lon_geodetic,
     double lat_geodetic,
     double alt_meters

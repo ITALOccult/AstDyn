@@ -27,7 +27,7 @@ max_step = 10.0
 
 ```ini
 [integrator]
-type = RKF78                    ! RK4, RKF78, DOPRI, RADAU
+type = AAS                       ! RK4, RKF78, AAS, DOPRI, RADAU
 step_size = 0.1                 ! Passo iniziale [giorni]
 tolerance = 1.0e-12             ! Tolleranza errore (adattivo)
 min_step = 1.0e-6              ! Passo minimo [giorni]
@@ -37,6 +37,7 @@ max_step = 100.0               ! Passo massimo [giorni]
 **Integratori Disponibili:**
 - `RK4` - Runge-Kutta 4° ordine (passo fisso)
 - `RKF78` - Runge-Kutta-Fehlberg 7(8) (adattivo, alta precisione)
+- `AAS` - AstDyn-Adaptive Symplectic (veloce, conserva energia, default)
 - `DOPRI` - Dormand-Prince (adattivo)
 - `RADAU` - Radau IIA (implicito, problemi stiff)
 
@@ -46,8 +47,11 @@ max_step = 100.0               ! Passo massimo [giorni]
 [perturbations]
 planets = true                  ! Perturbazioni planetarie
 planet_list = SUN,JUPITER,SATURN,EARTH,VENUS,MARS,URANUS,NEPTUNE
-asteroids = false               ! Perturbazioni asteroidali (futuro)
-relativity = false              ! Correzioni relativistiche
+asteroids = true                ! Perturbazioni asteroidali (Default: true)
+asteroid_set = 17               ! 17 (Default) o 30
+relativity = true               ! Correzioni relativistiche (Default: true)
+sun_j2 = true                   ! Armoniche solari J2
+earth_j2 = true                 ! Armoniche terrestri J2
 solar_radiation = false         ! Pressione radiazione solare
 ```
 

@@ -15,21 +15,29 @@
 #define ASTDYN_ORBITAL_ELEMENTS_HPP
 
 #include "astdyn/core/Types.hpp"
-#include "astdyn/core/Constants.hpp"
-#include <Eigen/Dense>
+#include "astdyn/time/epoch.hpp"
+#include "astdyn/types/vectors.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include <string>
 #include <optional>
+#include <vector>
 
 namespace astdyn::propagation {
 
 /**
- * @brief Keplerian orbital elements
- * 
- * Standard osculating elements at a given epoch.
- * Units: km, radians, days (MJD)
+ * @brief Keplerian orbital elements — internal propagation representation.
+ *
+ * Internal format used by the propagation engine (OrbitalElements.cpp,
+ * Propagator, etc.).  Units: AU, radians, AU³/day².
+ *
+ * External code should use physics::KeplerianStateTyped<Frame> and the
+ * typed template converters keplerian_to_cartesian<Frame> /
+ * cartesian_to_keplerian<Frame> declared below.
  */
 struct KeplerianElements {
-    double epoch_mjd_tdb;           ///< Epoch (MJD TDB)
+    time::EpochTDB epoch;           ///< Epoch (EpochTDB)
     double semi_major_axis;          ///< Semi-major axis [AU]
     double eccentricity;             ///< Eccentricity [dimensionless]
     double inclination;              ///< Inclination [rad]
@@ -85,17 +93,21 @@ struct KeplerianElements {
 };
 
 /**
- * @brief Cartesian state vector
- * 
- * Position and velocity in J2000 equatorial frame.
- * Units: AU, AU/day
+ * @brief Cartesian state vector — internal propagation representation.
+ *
+ * Always in SI units: position [m], velocity [m/s], GM [m³/s²].
+ * Reference frame implied by the propagation context (usually GCRF).
+ *
+ * External code should use physics::CartesianStateTyped<Frame> and the
+ * typed template converters keplerian_to_cartesian<Frame> /
+ * cartesian_to_keplerian<Frame> declared below.
  */
 struct CartesianElements {
-    double epoch_mjd_tdb;              ///< Epoch (MJD TDB)
-    Eigen::Vector3d position;          ///< Position [AU]
-    Eigen::Vector3d velocity;          ///< Velocity [AU/day]
+    time::EpochTDB epoch;              ///< Epoch (EpochTDB)
+    math::Vector3<core::GCRF, physics::Distance> position; ///< Position vector [m]
+    math::Vector3<core::GCRF, physics::Velocity> velocity; ///< Velocity vector [m/s]
     
-    double gravitational_parameter = constants::GMS;    ///< GM of central body [AU³/day²]
+    double gravitational_parameter = constants::GM_SUN * 1e9;  ///< GM [m³/s²] (default: solar)
     
     // Optional covariance (6x6: position, velocity)
     std::optional<Eigen::Matrix<double, 6, 6>> covariance;
@@ -118,13 +130,13 @@ struct CartesianElements {
      * @brief Compute distance from central body
      * @return |r| [AU]
      */
-    double distance() const { return position.norm(); }
+    double distance() const { return position.norm().to_au(); }
     
     /**
      * @brief Compute speed
      * @return |v| [AU/day]
      */
-    double speed() const { return velocity.norm(); }
+    double speed() const { return velocity.norm().to_au_d(); }
 };
 
 /**
@@ -134,7 +146,7 @@ struct CartesianElements {
  * See Walker et al. (1985) Celestial Mechanics.
  */
 struct EquinoctialElements {
-    double epoch_mjd_tdb;     ///< Epoch (MJD TDB)
+    time::EpochTDB epoch;     ///< Epoch (EpochTDB)
     double a;                 ///< Semi-major axis [AU]
     double h;                 ///< h = e sin(ω + Ω)
     double k;                 ///< k = e cos(ω + Ω)
@@ -156,13 +168,13 @@ struct EquinoctialElements {
  * Useful for parabolic/hyperbolic orbits.
  */
 struct CometaryElements {
-    double epoch_mjd_tdb;              ///< Epoch (MJD TDB)
+    time::EpochTDB epoch;              ///< Epoch (EpochTDB)
     double perihelion_distance;        ///< q [AU]
     double eccentricity;               ///< e [dimensionless]
     double inclination;                ///< i [rad]
     double longitude_ascending_node;   ///< Ω [rad]
     double argument_perihelion;        ///< ω [rad]
-    double time_perihelion_mjd_tdb;    ///< Tp [MJD TDB]
+    time::EpochTDB time_perihelion;    ///< Tp (EpochTDB)
     
     double gravitational_parameter = constants::GMS;    ///< GM [AU³/day²]
     
@@ -208,6 +220,59 @@ CartesianElements keplerian_to_cartesian(const KeplerianElements& kep);
 KeplerianElements cartesian_to_keplerian(const CartesianElements& cart);
 
 /**
+ * @brief Type-safe conversion from Keplerian to Cartesian state
+ * @tparam Frame Reference frame of the state
+ */
+template <typename Frame>
+physics::CartesianStateTyped<Frame> keplerian_to_cartesian(const physics::KeplerianStateTyped<Frame>& kep) {
+    // Bridge to un-typed format for conversion logic (defined in .cpp)
+    KeplerianElements legacy;
+    legacy.epoch = kep.epoch;
+    legacy.semi_major_axis = kep.a.to_au();
+    legacy.eccentricity = kep.e;
+    legacy.inclination = kep.i.to_rad();
+    legacy.longitude_ascending_node = kep.node.to_rad();
+    legacy.argument_perihelion = kep.omega.to_rad();
+    legacy.mean_anomaly = kep.M.to_rad();
+    legacy.gravitational_parameter = kep.gm.to_au3_d2();
+
+    auto cart_legacy = keplerian_to_cartesian(legacy);
+    
+    return physics::CartesianStateTyped<Frame>::from_si(
+        kep.epoch,
+        cart_legacy.position.x_si(), cart_legacy.position.y_si(), cart_legacy.position.z_si(),
+        cart_legacy.velocity.x_si(), cart_legacy.velocity.y_si(), cart_legacy.velocity.z_si(),
+        cart_legacy.gravitational_parameter
+    );
+}
+
+/**
+ * @brief Type-safe conversion from Cartesian to Keplerian state
+ * @tparam Frame Reference frame of the state
+ */
+template <typename Frame>
+physics::KeplerianStateTyped<Frame> cartesian_to_keplerian(const physics::CartesianStateTyped<Frame>& cart) {
+    CartesianElements legacy;
+    legacy.epoch = cart.epoch;
+    legacy.position = math::Vector3<core::GCRF, physics::Distance>::from_si(cart.position.x_si(), cart.position.y_si(), cart.position.z_si());
+    legacy.velocity = math::Vector3<core::GCRF, physics::Velocity>::from_si(cart.velocity.x_si(), cart.velocity.y_si(), cart.velocity.z_si());
+    legacy.gravitational_parameter = cart.gm.to_m3_s2();
+
+    auto kep_legacy = cartesian_to_keplerian(legacy);
+
+    return physics::KeplerianStateTyped<Frame>::from_traditional(
+        cart.epoch,
+        kep_legacy.semi_major_axis,
+        kep_legacy.eccentricity,
+        kep_legacy.inclination * constants::RAD_TO_DEG,
+        kep_legacy.longitude_ascending_node * constants::RAD_TO_DEG,
+        kep_legacy.argument_perihelion * constants::RAD_TO_DEG,
+        kep_legacy.mean_anomaly * constants::RAD_TO_DEG,
+        cart.gm
+    );
+}
+
+/**
  * @brief Convert Keplerian to Equinoctial
  * 
  * @param kep Keplerian elements
@@ -243,17 +308,6 @@ CometaryElements keplerian_to_cometary(const KeplerianElements& kep);
  */
 KeplerianElements cometary_to_keplerian(const CometaryElements& com);
 
-/**
- * @brief Solve Kepler's equation M = E - e sin(E) for eccentric anomaly
- * 
- * Uses Newton-Raphson iteration with excellent convergence.
- * 
- * @param M Mean anomaly [rad]
- * @param e Eccentricity
- * @param tolerance Convergence tolerance (default 1e-12)
- * @param max_iter Maximum iterations (default 50)
- * @return Eccentric anomaly E [rad]
- */
 double solve_kepler_equation(double M, double e, 
                              double tolerance = 1e-12, 
                              int max_iter = 50);

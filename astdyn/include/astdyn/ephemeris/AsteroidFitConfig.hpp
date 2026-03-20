@@ -11,6 +11,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
+#include "astdyn/time/epoch.hpp"
 
 namespace astdyn {
 namespace ephemeris {
@@ -27,7 +28,7 @@ struct SimpleKeplerianElements {
     double Omega = 0.0;  // longitude of ascending node (rad)
     double omega = 0.0;  // argument of periapsis (rad)
     double M = 0.0;      // mean anomaly (rad)
-    double epoch_mjd_tdb = 0.0; // Epoch of elements (MJD TDB)
+    time::EpochTDB epoch; // Epoch of elements
 };
 
 
@@ -92,8 +93,8 @@ struct AsteroidFitConfig {
     // Orbital elements to use when files are not supplied.
     SimpleKeplerianElements orbit;
 
-    // Observation epochs (MJD, UTC). Used when no .rwo file is supplied.
-    std::vector<double> mjd_observations;
+    // Observation epochs. Used when no .rwo file is supplied.
+    std::vector<time::EpochUTC> t_observations;
 
     // Output frame: true = Equatorial J2000, false = Ecliptic J2000.
     bool output_equatorial = true;
@@ -118,7 +119,10 @@ inline AsteroidFitConfig loadAsteroidFitConfig(const std::string& config_file) {
     
     // Parse Observations
     if (j.contains("mjd_observations")) {
-        config.mjd_observations = j["mjd_observations"].get<std::vector<double>>();
+        auto mjds = j["mjd_observations"].get<std::vector<double>>();
+        for (double mjd : mjds) {
+            config.t_observations.push_back(time::EpochUTC::from_mjd(mjd));
+        }
     }
     
     // Parse Initial Orbit (if provided directly)
@@ -130,7 +134,7 @@ inline AsteroidFitConfig loadAsteroidFitConfig(const std::string& config_file) {
         config.orbit.Omega = orb.value("Omega", 0.0);
         config.orbit.omega = orb.value("omega", 0.0);
         config.orbit.M = orb.value("M", 0.0);
-        config.orbit.epoch_mjd_tdb = orb.value("epoch_mjd_tdb", 0.0);
+        config.orbit.epoch = time::EpochTDB::from_mjd(orb.value("epoch_mjd_tdb", 0.0));
     }
     
     // Parse Output Options

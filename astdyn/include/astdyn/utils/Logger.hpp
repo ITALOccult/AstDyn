@@ -60,10 +60,10 @@ public:
         
         std::string formatted = oss.str();
         
-        std::cout << formatted << std::endl;
+        std::cout << formatted << "\n";
         
         if (use_file_ && file_.is_open()) {
-            file_ << formatted << std::endl;
+            file_ << formatted << "\n";
             file_.flush();
         }
     }

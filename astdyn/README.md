@@ -1,8 +1,7 @@
-# AstDyn C++
-
-[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B17)
+[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B23)
 [![CMake](https://img.shields.io/badge/CMake-3.15+-blue.svg)](https://cmake.org/)
 [![License](https://img.shields.io/badge/License-GPL--3.0-green.svg)](LICENSE)
+[![OpenMP](https://img.shields.io/badge/OpenMP-Parallel-red.svg)](https://www.openmp.org/)
 
 Modern C++ port of **AstDyn** - A comprehensive software package for orbit determination and propagation of asteroids and celestial objects.
 
@@ -12,35 +11,39 @@ AstDyn C++ is a complete rewrite of the original Fortran 90 AstDyn software, bri
 
 ### Features
 
-- ✅ **Phase 1 Complete** (Setup & Infrastructure)
-  - Modern CMake build system
-  - Eigen3 for linear algebra
-  - Boost for utilities
-  - Google Test framework
-  - Core types and constants
+- ✅ **Core Infrastructure & Performance**
+  - Modern CMake build system with **OpenMP** parallelization
+  - **High-Precision Integrator Suite**: AAS, RKF78, Gauss-Legendre (GL8), SABA4, and Radau15 (IAS15).
+  - **Stability & Precision**: Optimized step-control (Picard/Sundman) for non-conservative systems and Jacobian caching for implicit methods.
+  - Native C++ SPK (SPICE) reader: **stateless and thread-safe** (no CSPICE needed)
+  - JPL DE441 integration via native reader
 
-- 🚧 **In Development**
-  - Time scale conversions
-  - JPL ephemeris integration
-  - Orbit propagation
-  - Least squares fitting
-  - Observation handling
+- ✅ **Astrometry & Occultations**
+  - High-precision Occultation Engine (Bessel Fundamental Plane)
+  - Validated against Occult4 (precision < 1 mas)
+  - **Relativistic Aberration & Light Deflection** (IAU 2000 compliant)
+  - Advanced stellar correctors for Gaia DR3 (Proper Motion, Parallax)
+
+- ✅ **Dynamics & Perturbations**
+  - **Optimized Close Approach Engine**: Sub-millimeter TCA refinement via golden-section search
+  - **High-Precision MOID**: Optimized 2-stage grid search for Minimum Orbit Intersection Distance
+  - Native Force Model: 17 massive asteroids, relativity, and J2 (Sun/Earth)
+  - **IAU 2015 Standards**: Standardized GM and physical radii repository
 
 ## 🛠️ Requirements
 
 ### Minimum Requirements
 
-- **C++ Compiler**: GCC 7+, Clang 6+, or MSVC 2017+
+- **C++ Compiler**: GCC 11+, Clang 14+, or MSVC 2022+ (C++23 support)
 - **CMake**: 3.15 or higher
-- **Eigen3**: 3.4 or higher (auto-fetched if not found)
+- **Eigen3**: 3.4 or higher
 - **Boost**: 1.70 or higher
-  - Components: filesystem, program_options, date_time
+- **OpenMP**: For multi-core acceleration
 
 ### Optional Dependencies
 
-- **CSPICE** (NASA SPICE Toolkit) - For enhanced ephemeris support
-- **Doxygen** - For generating API documentation
-- **Google Test** - For unit testing (auto-fetched if not found)
+- **Doxygen**: For generating API documentation
+- **Google Test**: For unit testing
 
 ## 🚀 Quick Start
 
@@ -75,8 +78,7 @@ Configure the build with these options:
 cmake -DASTDYN_BUILD_TESTS=ON \          # Build unit tests (default: ON)
       -DASTDYN_BUILD_EXAMPLES=ON \       # Build examples (default: ON)
       -DASTDYN_BUILD_DOCS=OFF \          # Build documentation (default: OFF)
-      -DASTDYN_USE_SPICE=ON \            # Use SPICE toolkit (default: ON)
-      -DASTDYN_ENABLE_PROFILING=OFF \    # Enable profiling (default: OFF)
+      -DASTDYN_USE_OPENMP=ON \           # Enable OpenMP (default: ON)
       -DCMAKE_BUILD_TYPE=Release \       # Build type (Debug/Release)
       ..
 ```
@@ -100,10 +102,10 @@ cmake -DCMAKE_BUILD_TYPE=Release \
 cmake --build . -j$(nproc)
 ```
 
-**With SPICE support:**
+**Multi-core accelerated build:**
 ```bash
-export CSPICE_ROOT=/path/to/cspice
-cmake -DASTDYN_USE_SPICE=ON ..
+cmake -DASTDYN_USE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . -j$(sysctl -n hw.ncpu)
 ```
 
 ## 📦 Installing Dependencies
@@ -167,7 +169,7 @@ int main() {
 
 Compile and link:
 ```bash
-g++ -std=c++17 example.cpp -lastdyn -I/usr/local/include -L/usr/local/lib
+g++ -std=c++23 example.cpp -lastdyn -I/usr/local/include -L/usr/local/lib
 ```
 
 ### High-Precision Propagation
@@ -179,12 +181,12 @@ g++ -std=c++17 example.cpp -lastdyn -I/usr/local/include -L/usr/local/lib
 int main() {
     astdyn::initialize();
 
-    // 1. Configure for JPL precision
-    astdyn::propagation::HighPrecisionPropagator::Config config;
-    config.de441_path = "de441.bsp";
+    // 1. Configure for High Precision
+    astdyn::propagation::PropagatorSettings settings;
+    settings.include_planets = true;
+    settings.include_asteroids = true;
+    settings.use_default_asteroid_set = true;  // Load 17 massive asteroids
     
-    astdyn::propagation::HighPrecisionPropagator propagator(config);
-
     // 2. Initial elements (Epoch 2458315.5)
     astdyn::propagation::KeplerianElements elements;
     // ... set elements ...
@@ -255,7 +257,7 @@ astdyn/
 
 ### Code Style
 
-- **C++ Standard**: C++17 (minimum)
+- **C++ Standard**: C++23
 - **Formatting**: Follow project .clang-format
 - **Naming**:
   - Classes: `PascalCase`
@@ -320,18 +322,18 @@ Original Fortran AstDyn © 1997-2020 AstDyn Consortium
 ## 🗺️ Roadmap
 
 - [x] **Phase 1**: Setup & Infrastructure *(Complete)*
-- [ ] **Phase 2**: Base Utilities & Math
-- [ ] **Phase 3**: Ephemerides & Reference Systems
-- [ ] **Phase 4**: Observations
-- [ ] **Phase 5**: Orbital Elements
-- [ ] **Phase 6**: Propagation Core
-- [ ] **Phase 7**: Orbit Determination
-- [ ] **Phase 8**: Close Approaches
-- [ ] **Phase 9**: Main Programs
-- [ ] **Phase 10**: Testing & Validation
-- [ ] **Phase 11**: Documentation & Release
-
-See [ASTDYN_CPP_CONVERSION_PLAN.md](ASTDYN_CPP_CONVERSION_PLAN.md) for detailed roadmap.
+- [x] **Phase 2**: Base Utilities & Math *(Complete)*
+- [x] **Phase 3**: Ephemerides & Reference Systems *(Complete)*
+- [x] **Phase 4**: Observations *(Complete)*
+- [x] **Phase 5**: Orbital Elements *(Complete)*
+- [x] **Phase 6**: Propagation Core *(Complete)*
+- [x] **Phase 7**: Orbit Determination & Uncertainty *(Complete)*
+- [x] **Phase 8**: Close Approaches & Occultations *(Validated)*
+  - Stabilized Gauss and SABA step-control for solar system propagation
+  - Optimized Radau15 (IAS15) with Jacobian caching
+- [ ] **Phase 9**: Advanced Fitter (Global Batch)
+- [ ] **Phase 10**: Cloud/Parallel Cluster Support
+- [ ] **Phase 11**: Final Documentation & Release
 
 ---
 

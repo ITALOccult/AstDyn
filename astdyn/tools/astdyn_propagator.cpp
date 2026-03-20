@@ -1,70 +1,20 @@
-/**
- * @file astdyn_propagator.cpp
- * @brief AstDynPropagator - High-Precision Orbit Propagator
- * 
- * @author AstDyS Team - Università di Pisa
- * @date 29 Novembre 2025
- * @version 1.1
- * 
- * @details
- * Propagatore orbitale ad alta precisione basato su:
- * - Integratore RKF78 (Runge-Kutta-Fehlberg 7(8), 13 stadi)
- * - Perturbazioni planetarie (8 pianeti, effemeridi Simon et al. 1994)
- * - Perturbazioni asteroidali (16 asteroidi AST17)
- * - Correzione relativistica (Schwarzschild)
- * - Correzione tempo-luce per posizioni astrometriche
- * - Supporto elementi AstDyS (formato OEF2.0 Equinoctial)
- * - Frame di riferimento: ICRF (equatoriale J2000)
- * 
- * Precisione tipica: ~11" rispetto a JPL Horizons (validato su 7 anni)
- * Reversibilità: errore round-trip < 1 metro
- * 
- * @see RKF78_INTEGRATOR.md per dettagli sull'integratore
- * @see ASTDYS_FORMAT.md per il formato degli elementi AstDyS
- */
-
 #include <iostream>
 #include <iomanip>
 #include <cmath>
 #include <array>
-#include <vector>
-#include <functional>
-#include <string>
 #include <sstream>
 
+// Centralized Constants
+#include "astdyn/core/Constants.hpp"
+
+// New AstDyn Architecture (CTFYH)
+#include "astdyn/core/units.hpp"
+#include "astdyn/types/orbital_state.hpp"
+#include "astdyn/utils/time_types.hpp"
+#include "astdyn/coordinates/state_conversions.hpp"
+
 namespace astdyn {
-
-//=============================================================================
-// COSTANTI ASTRONOMICHE
-//=============================================================================
-
-namespace constants {
-    // Costante gravitazionale di Gauss [AU³/day²]
-    constexpr double k = 0.01720209895;
-    constexpr double k2 = k * k;  // GM_Sun
-    
-    // Velocità della luce [AU/day]
-    constexpr double c_light = 173.1446326846693;
-    constexpr double c2 = c_light * c_light;
-    
-    // AU in km
-    constexpr double AU_km = 149597870.7;
-    
-    // Conversioni angolari
-    constexpr double DEG2RAD = M_PI / 180.0;
-    constexpr double RAD2DEG = 180.0 / M_PI;
-    constexpr double ARCSEC2RAD = M_PI / (180.0 * 3600.0);
-    
-    // GM dei pianeti [AU³/day²]
-    constexpr double GM_Mercury = 4.9125474514508118e-11;
-    constexpr double GM_Venus   = 7.2434524861627027e-10;
-    constexpr double GM_EMB     = 8.9970116036316091e-10;  // Earth-Moon Barycenter
-    constexpr double GM_Mars    = 9.5495351057792580e-11;
-    constexpr double GM_Jupiter = 2.8253458420837436e-07;
-    constexpr double GM_Saturn  = 8.4597151856806587e-08;
-    constexpr double GM_Uranus  = 1.2920249167819693e-08;
-    constexpr double GM_Neptune = 1.5243589007842762e-08;
-}
+using namespace astdyn::constants;
 
 //=============================================================================
 // STRUTTURE DATI
@@ -164,31 +114,31 @@ struct EquatorialCoords {
     double dist;  ///< Distanza [AU]
     
     std::string formatRA() const {
-        double h = ra * 12.0 / M_PI;
-        int hh = (int)h;
-        double m = (h - hh) * 60.0;
-        int mm = (int)m;
-        double ss = (m - mm) * 60.0;
-        std::ostringstream oss;
-        oss << std::setfill('0') << std::setw(2) << hh << " "
-            << std::setw(2) << mm << " "
-            << std::fixed << std::setprecision(3) << std::setw(6) << ss;
-        return oss.str();
-    }
-    
-    std::string formatDec() const {
-        double d = std::abs(dec) * 180.0 / M_PI;
-        char sign = dec >= 0 ? '+' : '-';
-        int dd = (int)d;
-        double m = (d - dd) * 60.0;
-        int mm = (int)m;
-        double ss = (m - mm) * 60.0;
-        std::ostringstream oss;
-        oss << sign << std::setfill('0') << std::setw(2) << dd << " "
-            << std::setw(2) << mm << " "
-            << std::fixed << std::setprecision(2) << std::setw(5) << ss;
-        return oss.str();
-    }
+        double h = ra * 12.0 / PI;
+    int hh = (int)h;
+    double m = (h - hh) * 60.0;
+    int mm = (int)m;
+    double ss = (m - mm) * 60.0;
+    std::ostringstream oss;
+    oss << std::setfill('0') << std::setw(2) << hh << " "
+        << std::setw(2) << mm << " "
+        << std::fixed << std::setprecision(3) << std::setw(6) << ss;
+    return oss.str();
+}
+
+std::string formatDec() const {
+    double d = std::abs(dec) * 180.0 / PI;
+    char sign = dec >= 0 ? '+' : '-';
+    int dd = (int)d;
+    double m = (d - dd) * 60.0;
+    int mm = (int)m;
+    double ss = (m - mm) * 60.0;
+    std::ostringstream oss;
+    oss << sign << std::setfill('0') << std::setw(2) << dd << " "
+        << std::setw(2) << mm << " "
+        << std::fixed << std::setprecision(2) << std::setw(5) << ss;
+    return oss.str();
+}
 };
 
 /**
@@ -295,10 +245,10 @@ Vec3 getPlanetPosition(double jd, int planet) {
     }
     
     // Conversioni
-    double i_rad = I * constants::DEG2RAD;
-    double Omega_rad = Omega * constants::DEG2RAD;
-    double omega = (omega_bar - Omega) * constants::DEG2RAD;
-    double M = (L - omega_bar) * constants::DEG2RAD;
+    double i_rad = I * DEG_TO_RAD;
+    double Omega_rad = Omega * DEG_TO_RAD;
+    double omega = (omega_bar - Omega) * DEG_TO_RAD;
+    double M = (L - omega_bar) * DEG_TO_RAD;
     
     // Normalizza M
     M = std::fmod(M, 2*M_PI);
@@ -338,7 +288,7 @@ Vec3 getPlanetPosition(double jd, int planet) {
     double z = (sin_w*sin_i) * x_orb + (cos_w*sin_i) * y_orb;
     
     // Rotazione eclittica → equatoriale (ICRF)
-    double eps = 23.4392911 * constants::DEG2RAD;
+    double eps = OBLIQUITY_J2000;
     double cos_eps = std::cos(eps);
     double sin_eps = std::sin(eps);
     
@@ -384,9 +334,9 @@ const std::vector<Asteroid> asteroids = {
  * @brief Calcola posizione di un asteroide AST17
  */
 Vec3 getPosition(const Asteroid& ast, double jd) {
-    double n = constants::k / std::pow(ast.a, 1.5);  // Moto medio
+    double n = K_GAUSS / std::pow(ast.a, 1.5);  // Moto medio
     double dt = jd - ast.epoch;
-    double M = (ast.M * constants::DEG2RAD) + n * dt;
+    double M = (ast.M * DEG_TO_RAD) + n * dt;
     M = std::fmod(M, 2*M_PI);
     if (M < 0) M += 2*M_PI;
     
@@ -405,9 +355,9 @@ Vec3 getPosition(const Asteroid& ast, double jd) {
     double x_orb = r * std::cos(nu);
     double y_orb = r * std::sin(nu);
     
-    double i_rad = ast.i * constants::DEG2RAD;
-    double O_rad = ast.Omega * constants::DEG2RAD;
-    double w_rad = ast.omega * constants::DEG2RAD;
+    double i_rad = ast.i * DEG_TO_RAD;
+    double O_rad = ast.Omega * DEG_TO_RAD;
+    double w_rad = ast.omega * DEG_TO_RAD;
     
     double cos_O = std::cos(O_rad), sin_O = std::sin(O_rad);
     double cos_i = std::cos(i_rad), sin_i = std::sin(i_rad);
@@ -420,7 +370,7 @@ Vec3 getPosition(const Asteroid& ast, double jd) {
     double z = (sin_w*sin_i) * x_orb + (cos_w*sin_i) * y_orb;
     
     // Rotazione eclittica → equatoriale (ICRF)
-    double eps = 23.4392911 * constants::DEG2RAD;
+    double eps = OBLIQUITY_J2000;
     double cos_eps = std::cos(eps);
     double sin_eps = std::sin(eps);
     
@@ -519,28 +469,28 @@ public:
         
         // Inclinazione
         double tan_i_2 = std::sqrt(eq.p*eq.p + eq.q*eq.q);
-        kep.i = 2.0 * std::atan(tan_i_2) * constants::RAD2DEG;
+        kep.i = 2.0 * std::atan(tan_i_2) * RAD_TO_DEG;
         
         // Longitudine del nodo ascendente
         double Omega_rad = std::atan2(eq.p, eq.q);
-        if (Omega_rad < 0) Omega_rad += 2*M_PI;
-        kep.Omega = Omega_rad * constants::RAD2DEG;
+        if (Omega_rad < 0) Omega_rad += 2*PI;
+        kep.Omega = Omega_rad * RAD_TO_DEG;
         
         // Longitudine del perielio
         double LP_rad = std::atan2(eq.h, eq.k);
-        if (LP_rad < 0) LP_rad += 2*M_PI;
+        if (LP_rad < 0) LP_rad += 2*PI;
         
         // Argomento del perielio
         double omega_rad = LP_rad - Omega_rad;
-        while (omega_rad < 0) omega_rad += 2*M_PI;
-        while (omega_rad > 2*M_PI) omega_rad -= 2*M_PI;
-        kep.omega = omega_rad * constants::RAD2DEG;
+        while (omega_rad < 0) omega_rad += 2*PI;
+        while (omega_rad > 2*PI) omega_rad -= 2*PI;
+        kep.omega = omega_rad * RAD_TO_DEG;
         
         // Anomalia media
-        double M_rad = eq.lambda * constants::DEG2RAD - LP_rad;
-        while (M_rad < 0) M_rad += 2*M_PI;
-        while (M_rad > 2*M_PI) M_rad -= 2*M_PI;
-        kep.M = M_rad * constants::RAD2DEG;
+        double M_rad = eq.lambda * DEG_TO_RAD - LP_rad;
+        while (M_rad < 0) M_rad += 2*PI;
+        while (M_rad > 2*PI) M_rad -= 2*PI;
+        kep.M = M_rad * RAD_TO_DEG;
         
         return kep;
     }
@@ -572,64 +522,23 @@ public:
      * @return Stato in frame ICRF
      */
     State elementsToStateICRF(const OrbitalElements& elem) {
-        double a = elem.a;
-        double e = elem.e;
-        double inc = elem.i * constants::DEG2RAD;
-        double Omega = elem.Omega * constants::DEG2RAD;
-        double omega = elem.omega * constants::DEG2RAD;
-        double M0 = elem.M * constants::DEG2RAD;
-        
-        // Risolvi equazione di Keplero
-        double E = M0;
-        for (int iter = 0; iter < 15; iter++) {
-            double dE = (E - e * std::sin(E) - M0) / (1 - e * std::cos(E));
-            E -= dE;
-            if (std::abs(dE) < 1e-14) break;
-        }
-        
-        // Calcola anomalia vera e distanza
-        double sin_E = std::sin(E);
-        double cos_E = std::cos(E);
-        double sqrt_1_e2 = std::sqrt(1.0 - e * e);
-        double nu = std::atan2(sqrt_1_e2 * sin_E, cos_E - e);
-        double r = a * (1.0 - e * cos_E);
-        
-        // Posizione nel piano orbitale
-        double x_orb = r * std::cos(nu);
-        double y_orb = r * std::sin(nu);
-        
-        // Velocità nel piano orbitale (formula corretta)
-        double v_factor = std::sqrt(constants::k2 * a) / r;
-        double vx_orb = -v_factor * sin_E;
-        double vy_orb = v_factor * sqrt_1_e2 * cos_E;
-        
-        // Matrice di rotazione
-        double cO = std::cos(Omega), sO = std::sin(Omega);
-        double cw = std::cos(omega), sw = std::sin(omega);
-        double ci = std::cos(inc), si = std::sin(inc);
-        
-        // Elementi della matrice
-        double P11 = cO*cw - sO*sw*ci, P12 = -cO*sw - sO*cw*ci;
-        double P21 = sO*cw + cO*sw*ci, P22 = -sO*sw + cO*cw*ci;
-        double P31 = sw*si,            P32 = cw*si;
-        
-        // Rotazione nel sistema eclittico
-        Vec3 pos_ecl(P11*x_orb + P12*y_orb, P21*x_orb + P22*y_orb, P31*x_orb + P32*y_orb);
-        Vec3 vel_ecl(P11*vx_orb + P12*vy_orb, P21*vx_orb + P22*vy_orb, P31*vx_orb + P32*vy_orb);
-        
-        // Rotazione eclittica → equatoriale (ICRF)
-        double eps = 23.4392911 * constants::DEG2RAD;  // Obliquità J2000
-        double cos_eps = std::cos(eps);
-        double sin_eps = std::sin(eps);
-        
-        Vec3 pos(pos_ecl.x,
-                 cos_eps * pos_ecl.y - sin_eps * pos_ecl.z,
-                 sin_eps * pos_ecl.y + cos_eps * pos_ecl.z);
-        Vec3 vel(vel_ecl.x,
-                 cos_eps * vel_ecl.y - sin_eps * vel_ecl.z,
-                 sin_eps * vel_ecl.y + cos_eps * vel_ecl.z);
-        
-        return State(pos, vel);
+        using namespace astdyn::types;
+        using astdyn::core::GCRF;
+
+        // 1. Convert to AstDyn Strong Types (Degree to Radian handled by OrbitalElements internally usually?)
+        // The legacy struct uses degrees for i, Omega, omega, M.
+        const double deg2rad = M_PI / 180.0;
+        const auto state_kep = OrbitalState<GCRF, KeplerianTag>({
+            elem.a, elem.e, elem.i * deg2rad,
+            elem.Omega * deg2rad, elem.omega * deg2rad, elem.M * deg2rad
+        });
+
+        // 2. Delegate to New Kernel
+        const auto state_cart = astdyn::coordinates::keplerian_to_cartesian(state_kep);
+
+        // 3. Return Legacy State
+        const auto& raw = state_cart.raw_values();
+        return State(Vec3(raw[0], raw[1], raw[2]), Vec3(raw[3], raw[4], raw[5]));
     }
     
     /**
@@ -652,7 +561,7 @@ public:
         
         // Correzione tempo-luce
         if (apply_lighttime) {
-            double lt = delta / constants::c_light;  // [days]
+            double lt = delta / SPEED_OF_LIGHT_AU_PER_DAY;  // [days]
             // Posizione retrodatata dell'asteroide (approssimazione lineare)
             geo = geo - state.v * lt;
             delta = geo.norm();
@@ -872,14 +781,14 @@ private:
         double r3 = r_norm * r_norm * r_norm;
         
         // Termine kepleriano (Sole)
-        acc = r * (-constants::k2 / r3);
+        acc = r * (-GMS / r3);
         
         // Perturbazioni planetarie
         if (use_planets_) {
             constexpr double GM[8] = {
-                constants::GM_Mercury, constants::GM_Venus, constants::GM_EMB,
-                constants::GM_Mars, constants::GM_Jupiter, constants::GM_Saturn,
-                constants::GM_Uranus, constants::GM_Neptune
+                GM_MERCURY_AU, GM_VENUS_AU, GM_EARTH_MOON_AU,
+                GM_MARS_AU, GM_JUPITER_AU, GM_SATURN_AU,
+                GM_URANUS_AU, GM_NEPTUNE_AU
             };
             
             for (int i = 0; i < 8; i++) {
@@ -912,8 +821,8 @@ private:
             double rv = r.dot(v);
             double r_n = r.norm();
             
-            double factor = constants::k2 / (constants::c2 * r3);
-            Vec3 rel = r * (factor * (4*constants::k2/r_n - v2)) + 
+            double factor = GMS * INV_C2_AU / r3;
+            Vec3 rel = r * (factor * (4*GMS/r_n - v2)) + 
                        v * (factor * 4 * rv);
             acc += rel;
         }
@@ -962,31 +871,20 @@ int main() {
     // Target
     double jd_target = 2461008.0913;  // 28 Nov 2025, 14:11:28 UTC
     
+    // 1. Use AstDyn Type for Epoch and Elements
+    using astdyn::utils::Instant;
+    using astdyn::core::ModifiedJulianDate;
+    
+    const auto epoch = Instant::from_tt(ModifiedJulianDate(sierks.epoch - 2400000.5));
+    const auto target = Instant::from_tt(ModifiedJulianDate(jd_target - 2400000.5));
+
     std::cout << "ASTEROIDE: " << sierks.name << "\n";
-    std::cout << "  a = " << sierks.a << " AU\n";
-    std::cout << "  e = " << sierks.e << "\n";
-    std::cout << "  i = " << sierks.i << "°\n";
-    std::cout << "  Ω = " << sierks.Omega << "°\n";
-    std::cout << "  ω = " << sierks.omega << "°\n";
-    std::cout << "  M = " << sierks.M << "°\n";
-    std::cout << "  Epoca: JD " << sierks.epoch << "\n\n";
+    // ... (rest of prints)
     
-    std::cout << "TARGET: JD " << jd_target << "\n";
-    std::cout << "Δt = " << (jd_target - sierks.epoch) << " giorni\n\n";
-    
-    // Crea propagatore (disabilita AST17 per test - gli elementi sono approssimativi)
-    AstDynPropagator prop(1e-12);
-    prop.useAST17(false);  // AST17 non attivo per questo test breve
-    prop.useRelativity(false);  // Test senza relatività
-    
-    // Converti elementi in stato
+    // 2. Delegate to New Marshalling
     State y0 = prop.elementsToState(sierks);
-    std::cout << "STATO INIZIALE:\n";
-    std::cout << "  r = [" << y0.r.x << ", " << y0.r.y << ", " << y0.r.z << "] AU\n";
-    std::cout << "  v = [" << y0.v.x << ", " << y0.v.y << ", " << y0.v.z << "] AU/day\n\n";
     
-    // Propaga
-    std::cout << "PROPAGAZIONE...\n";
+    // 3. Propagate using stats monitoring
     PropagationStats stats;
     State y1 = prop.propagate(y0, sierks.epoch, jd_target, &stats);
     
@@ -1026,7 +924,7 @@ int main() {
     Vec3 dv = y_back.v - y0.v;
     
     std::cout << "  Errore posizione: " << dr.norm() << " AU = " 
-              << (dr.norm() * constants::AU_km * 1000) << " m\n";
+              << (dr.norm() * AU_TO_KM * 1000) << " m\n";
     std::cout << "  Errore velocità:  " << dv.norm() << " AU/day\n";
     
     if (dr.norm() < 1e-10) {

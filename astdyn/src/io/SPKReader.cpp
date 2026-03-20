@@ -4,10 +4,13 @@
  */
 
 #include "astdyn/io/SPKReader.hpp"
+#include <vector>
+#include <fstream>
 #include <iostream>
-#include <algorithm>
-#include <stdexcept>
 #include <cstring>
+#include <algorithm>
+#include <unordered_set>
+#include <stdexcept>
 #include <cmath>
 
 namespace astdyn::io {
@@ -93,108 +96,69 @@ void SPKReader::loadIndex() {
     file_.seekg(0, std::ios::beg);
     std::vector<char> record(RECORD_SIZE);
     file_.read(record.data(), RECORD_SIZE);
-    
-    // DAF Record 1 layout checks
-    int fwd;
-    std::memcpy(&fwd, record.data() + 76, 4);
-    if (big_endian_ != isSystemBigEndian()) fwd = swapEndian(fwd);
-    
-    if (fwd <= 0) fwd = 2; // Fallback
-    
-    int current_rec = fwd;
-    // int total_segments = 0; // Unused
-    
+    int current_rec = get_first_summary_record(record);
     while (current_rec > 0) {
         seekToRecord(current_rec);
-        file_.read(record.data(), RECORD_SIZE);
-        
-        double next_d_ptr, ns_d;
-        std::memcpy(&next_d_ptr, record.data(), 8);
-        std::memcpy(&ns_d, record.data() + 16, 8);
-        
-        if (big_endian_ != isSystemBigEndian()) {
-            next_d_ptr = swapEndian(next_d_ptr);
-            ns_d = swapEndian(ns_d);
-        }
-        
-        int next = (int)next_d_ptr;
-        int ns = (int)ns_d;
-        
-        // Safety break
-        if (ns > 250 || ns < 0) break; 
-        
-        int sum_size = 2 * 8 + 6 * 4; // 40 bytes
-        
-        for (int i = 0; i < ns; ++i) {
-            int offset = 24 + i * sum_size;
-            
-            double start_et, end_et;
-            std::memcpy(&start_et, record.data() + offset, 8);
-            std::memcpy(&end_et, record.data() + offset + 8, 8);
-            
-            if (big_endian_ != isSystemBigEndian()) {
-                start_et = swapEndian(start_et);
-                end_et = swapEndian(end_et);
-            }
-            
-            int ints[6];
-            std::memcpy(ints, record.data() + offset + 16, 6 * 4);
-            
-            if (big_endian_ != isSystemBigEndian()) {
-                for (int& v : ints) v = swapEndian(v);
-            }
-            
-            SPKSegment seg;
-            seg.start_et = start_et;
-            seg.end_et = end_et;
-            seg.body_id = ints[0];
-            seg.center_id = ints[1];
-            seg.frame_id = ints[2];
-            seg.type = ints[3];
-            seg.start_addr = ints[4];
-            seg.end_addr = ints[5];
-            
-            // Read segment params (lazy or eager)
-            // Eager reading for Type 2
-            if (seg.type == 2) {
-                // int end_byte = (seg.end_addr - 1) * 8; // Unused
-                // Read last 4 doubles
-                // Check bounds?
-                 
-                double params[4];
-                file_.seekg((seg.end_addr - 4) * 8, std::ios::beg);
-                char pbuf[32];
-                file_.read(pbuf, 32);
-                std::memcpy(params, pbuf, 32);
-                
-                if (big_endian_ != isSystemBigEndian()) {
-                     for (double& v : params) v = swapEndian(v);
-                }
-                
-                seg.init_sec = params[0];
-                seg.intlen = params[1];
-                seg.rsize = (int)params[2];
-                int n_coeffs = (seg.rsize - 2) / 3;
-                seg.order = n_coeffs - 1;
-                seg.n_comp = 3;
-            }
-            // Use else if for Type 13 if specific initialization needed, but currently Type 13 is lazy.
-            else if (seg.type == 13) {
-                seg.n_comp = 3;
-            }
-            
-            segments_.insert({seg.body_id, seg});
-        }
-        
-        current_rec = next;
+        if (!file_.read(record.data(), RECORD_SIZE)) break;
+        current_rec = process_summary_record(record);
     }
 }
 
-void SPKReader::seekToRecord(int record_idx) {
-    file_.seekg((record_idx - 1) * RECORD_SIZE, std::ios::beg);
+int SPKReader::get_first_summary_record(const std::vector<char>& file_record) {
+    int fwd; std::memcpy(&fwd, file_record.data() + 76, 4);
+    if (big_endian_ != isSystemBigEndian()) fwd = swapEndian(fwd);
+    return (fwd <= 0) ? 2 : fwd;
 }
 
-Eigen::VectorXd SPKReader::getState(int target_id, double et) {
+int SPKReader::process_summary_record(const std::vector<char>& record) {
+    double next_d, ns_d; std::memcpy(&next_d, record.data(), 8); std::memcpy(&ns_d, record.data() + 16, 8);
+    if (big_endian_ != isSystemBigEndian()) { next_d = swapEndian(next_d); ns_d = swapEndian(ns_d); }
+    int next = static_cast<int>(next_d), ns = static_cast<int>(ns_d);
+    if (ns > 0 && ns <= 250) for (int i = 0; i < ns; ++i) process_segment(record, i);
+    return (next > 0) ? next : 0;
+}
+
+void SPKReader::process_segment(const std::vector<char>& record, int i) {
+    int offset = 24 + i * 40; SPKSegment seg;
+    std::memcpy(&seg.start_et, record.data() + offset, 8);
+    std::memcpy(&seg.end_et, record.data() + offset + 8, 8);
+    int ints[6]; std::memcpy(ints, record.data() + offset + 16, 24);
+    if (big_endian_ != isSystemBigEndian()) {
+        seg.start_et = swapEndian(seg.start_et); seg.end_et = swapEndian(seg.end_et);
+        for (int& v : ints) v = swapEndian(v);
+    }
+    seg.body_id = ints[0]; seg.center_id = ints[1]; seg.frame_id = ints[2];
+    seg.type = ints[3]; seg.start_addr = ints[4]; seg.end_addr = ints[5];
+    if (seg.type == 2) {
+        init_type2_segment(seg);
+    } else if (seg.type == 21) {
+        // Type 21: RSIZE is determined by N in each record, but usually constant.
+        // We'll read the first record to get N.
+        file_.seekg(static_cast<long long>(seg.start_addr - 1) * 8, std::ios::beg);
+        double meta[3]; file_.read(reinterpret_cast<char*>(meta), 24);
+        if (big_endian_ != isSystemBigEndian()) for (double& v : meta) v = swapEndian(v);
+        seg.init_sec = meta[0] - meta[1]; // meta[0] is midpoint, meta[1] is radius
+        seg.intlen = meta[1] * 2.0; // Full window
+        int n = static_cast<int>(meta[2]);
+        seg.rsize = 3 + 3 * n + 3 * n;
+        std::cout << "[SPK] Type 21 Init: Body=" << seg.body_id << " N=" << n << " rsize=" << seg.rsize << " Mid=" << meta[0] << "\n";
+    }
+    segments_.insert({seg.body_id, seg});
+}
+
+void SPKReader::init_type2_segment(SPKSegment& seg) {
+    double p[4]; file_.seekg(static_cast<long long>(seg.end_addr - 4) * 8, std::ios::beg);
+    file_.read(reinterpret_cast<char*>(p), 32);
+    if (big_endian_ != isSystemBigEndian()) for (double& v : p) v = swapEndian(v);
+    seg.init_sec = p[0]; seg.intlen = p[1]; seg.rsize = (int)p[2];
+    seg.order = ((int)p[2] - 2) / 3 - 1; seg.n_comp = 3;
+}
+
+void SPKReader::seekToRecord(int record_idx) {
+    file_.seekg(static_cast<long long>(record_idx - 1) * RECORD_SIZE, std::ios::beg);
+}
+
+Eigen::Matrix<double, 6, 1> SPKReader::getState(int target_id, double et) {
     auto range = segments_.equal_range(target_id);
     bool found_body = false;
     for (auto it = range.first; it != range.second; ++it) {
@@ -202,6 +166,8 @@ Eigen::VectorXd SPKReader::getState(int target_id, double et) {
         if (et >= it->second.start_et && et <= it->second.end_et) {
             if (it->second.type == 2) {
                 return evaluateType2(it->second, et);
+            } else if (it->second.type == 21) {
+                return evaluateType21(it->second, et);
             } else if (it->second.type == 13) {
                 return evaluateType13(it->second, et);
             } else {
@@ -222,79 +188,98 @@ Eigen::VectorXd SPKReader::getState(int target_id, double et) {
     throw std::runtime_error(msg);
 }
 
-Eigen::VectorXd SPKReader::evaluateType2(const SPKSegment& seg, double et) {
-    // Type 2: Chebyshev for Position. Velocity via differentiation.
-    
-    // 1. Locate record
-    // Index = floor((et - init) / intlen)
+int SPKReader::getCenter(int target_id) const {
+    auto it = segments_.find(target_id);
+    if (it != segments_.end()) return it->second.center_id;
+    return -1;
+}
+
+std::vector<int> SPKReader::getAvailableIDs() const {
+    std::unordered_set<int> ids;
+    for (const auto& [id, seg] : segments_) ids.insert(id);
+    return std::vector<int>(ids.begin(), ids.end());
+}
+
+std::vector<SPKReader::SPKSegment> SPKReader::getSegments() const {
+    std::vector<SPKSegment> res;
+    for (const auto& [id, seg] : segments_) res.push_back(seg);
+    return res;
+}
+
+Eigen::Matrix<double, 6, 1> SPKReader::evaluateType2(const SPKSegment& seg, double et) {
+    std::lock_guard<std::mutex> lock(file_mutex_);
     int rec_idx = (int)std::floor((et - seg.init_sec) / seg.intlen);
+    Type2Cache& cache = type2_cache_[seg.body_id];
+    if (cache.seg != &seg || cache.rec_idx != rec_idx) refresh_type2_cache(seg, rec_idx, cache);
+    double x = (et - cache.coeffs[0]) / cache.coeffs[1];
+    int n = (seg.rsize - 2) / 3;
+    std::vector<double> T(n), U(n); 
+    compute_chebyshev(x, n, T, U);
+    return finalize_type2_state(cache.coeffs, T, U, n, cache.coeffs[1]);
+}
+
+Eigen::Matrix<double, 6, 1> SPKReader::evaluateType21(const SPKSegment& seg, double et) {
+    std::lock_guard<std::mutex> lock(file_mutex_);
+    int rec_idx = (int)std::floor((et - seg.init_sec) / seg.intlen);
+    Type2Cache& cache = type2_cache_[seg.body_id];
+    if (cache.seg != &seg || cache.rec_idx != rec_idx) refresh_type2_cache(seg, rec_idx, cache);
     
-    // Address of this record (1-based double index)
-    // start_addr is start of DATA.
-    int rec_start_addr = seg.start_addr + rec_idx * seg.rsize;
+    double t_mid = cache.coeffs[0];
+    double t_rad = cache.coeffs[1];
+    double n_val = cache.coeffs[2];
+    int n = static_cast<int>(n_val);
     
-    // Read record data (Midpoint, Radius, Coeffs...)
-    std::vector<double> buf(seg.rsize);
-    // Seek: (addr - 1) * 8
-    file_.seekg((rec_start_addr - 1) * 8, std::ios::beg);
+    double x = (et - t_mid) / t_rad;
+    std::vector<double> T(n), U(n);
+    compute_chebyshev(x, n, T, U);
     
-    std::vector<char> byte_buf(seg.rsize * 8);
-    file_.read(byte_buf.data(), seg.rsize * 8);
-    std::memcpy(buf.data(), byte_buf.data(), seg.rsize * 8);
-    
-    if (big_endian_ != isSystemBigEndian()) {
-        for (double& v : buf) v = swapEndian(v);
+    Eigen::Matrix<double, 6, 1> s = Eigen::Matrix<double, 6, 1>::Zero();
+    for (int i = 0; i < 3; ++i) {
+        // Position from first 3*n coeffs
+        for (int k = 0; k < n; ++k) s[i] += cache.coeffs[3 + i*n + k] * T[k];
+        // Velocity from next 3*n coeffs
+        for (int k = 0; k < n; ++k) s[i+3] += cache.coeffs[3 + 3*n + i*n + k] * T[k];
     }
-    
-    double mid = buf[0];
-    double rad = buf[1];
-    
-    // Normalized time x in [-1, 1]
-    double x = (et - mid) / rad;
-    
-    // Evaluate Chebyshev polynomials
-    int n_coeffs = (seg.rsize - 2) / 3; // Number of coefficients per component
-    
-    std::vector<double> T(n_coeffs); // Tk(x)
-    std::vector<double> U(n_coeffs); // T'k(x)
-    
-    T[0] = 1.0;
-    T[1] = x;
-    U[0] = 0.0;
-    U[1] = 1.0;
-    
-    for (int k = 2; k < n_coeffs; ++k) {
+    return s;
+}
+
+void SPKReader::refresh_type2_cache(const SPKSegment& seg, int idx, Type2Cache& cache) {
+    long long addr = static_cast<long long>(seg.start_addr + idx * seg.rsize - 1);
+    if (addr < seg.start_addr - 1 || addr + seg.rsize > seg.end_addr) {
+         throw std::runtime_error("SPK address out of segment bounds: addr=" + std::to_string(addr) + " seg=" + std::to_string(seg.start_addr) + "-" + std::to_string(seg.end_addr));
+    }
+    cache.seg = &seg; cache.rec_idx = idx; cache.coeffs.resize(seg.rsize);
+    file_.seekg(addr * 8, std::ios::beg);
+    file_.read(reinterpret_cast<char*>(cache.coeffs.data()), seg.rsize * 8);
+    if (big_endian_ != isSystemBigEndian()) for (double& v : cache.coeffs) v = swapEndian(v);
+}
+
+void SPKReader::compute_chebyshev(double x, int n, std::vector<double>& T, std::vector<double>& U) {
+    T[0] = 1.0; T[1] = x; U[0] = 0.0; U[1] = 1.0;
+    for (int k = 2; k < n; ++k) {
         T[k] = 2.0 * x * T[k-1] - T[k-2];
         U[k] = 2.0 * x * U[k-1] - U[k-2] + 2.0 * T[k-1];
     }
-    
-    // Sum coefficients
-    // Layout: [Mid, Rad, X_coeffs..., Y_coeffs..., Z_coeffs...]
-    double pos[3] = {0, 0, 0};
-    double vel[3] = {0, 0, 0};
-    
-    for (int comp = 0; comp < 3; ++comp) {
-        int offset = 2 + comp * n_coeffs;
-        for (int k = 0; k < n_coeffs; ++k) {
-            double c = buf[offset + k];
-            pos[comp] += c * T[k];
-            vel[comp] += c * U[k];
-        }
-    }
-    
-    // Velocity scaling: dx/dt = 1/rad
-    for (int i=0; i<3; ++i) vel[i] /= rad;
-    
-    Eigen::VectorXd state(6);
-    state << pos[0], pos[1], pos[2], vel[0], vel[1], vel[2];
-    return state;
 }
 
-Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
+Eigen::Matrix<double, 6, 1> SPKReader::finalize_type2_state(const std::vector<double>& c, const std::vector<double>& T, const std::vector<double>& U, int n, double rad) {
+    Eigen::Matrix<double, 6, 1> s = Eigen::Matrix<double, 6, 1>::Zero();
+    for (int i = 0; i < 3; ++i) {
+        for (int k = 0; k < n; ++k) {
+            s[i] += c[2 + i*n + k] * T[k];
+            s[i+3] += c[2 + i*n + k] * U[k];
+        }
+        s[i+3] /= rad;
+    }
+    return s;
+}
+
+Eigen::Matrix<double, 6, 1> SPKReader::evaluateType13(const SPKSegment& seg, double et) {
+    std::lock_guard<std::mutex> lock(file_mutex_);
     // Read Metadata from End
     // Layout: ... [Directory N doubles] [Degree] [N] (Last)
     double meta[2];
-    file_.seekg((seg.end_addr - 2) * 8, std::ios::beg);
+    file_.seekg(static_cast<long long>(seg.end_addr - 2) * 8, std::ios::beg);
     char mbuf[16];
     file_.read(mbuf, 16);
     std::memcpy(meta, mbuf, 16);
@@ -333,7 +318,7 @@ Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
     
     // Optimization: Just seek to End - 2 - N
     // Absolute offset in file doubles: (seg.end_addr - 2 - N)
-    file_.seekg((seg.end_addr - 2 - N) * 8, std::ios::beg);
+    file_.seekg(static_cast<long long>(seg.end_addr - 2 - N) * 8, std::ios::beg);
     std::vector<char> dbuf(N * 8);
     file_.read(dbuf.data(), N * 8);
     std::memcpy(epochs.data(), dbuf.data(), N * 8);
@@ -361,7 +346,7 @@ Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
     // Record i is at start + i * rsize
     int rec1_addr = seg.start_addr + idx * rsize;
     
-    file_.seekg((rec1_addr - 1) * 8, std::ios::beg);
+    file_.seekg(static_cast<long long>(rec1_addr - 1) * 8, std::ios::beg);
     char sbuf[12 * 8]; // Read 2 records ? RSIZE might be 6.
     // if records are adjacent? Yes.
     file_.read(sbuf, 2 * rsize * 8);
@@ -414,7 +399,7 @@ Eigen::VectorXd SPKReader::evaluateType13(const SPKSegment& seg, double et) {
     
     Eigen::Vector3d vel = (dh00 * p1 + dh10 * dt * v1 + dh01 * p2 + dh11 * dt * v2) / dt;
     
-    Eigen::VectorXd res(6);
+    Eigen::Matrix<double, 6, 1> res;
     res << pos, vel;
     return res;
 }

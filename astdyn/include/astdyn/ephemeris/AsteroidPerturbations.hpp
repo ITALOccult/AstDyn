@@ -20,6 +20,7 @@
 #define ASTDYN_ASTEROID_PERTURBATIONS_HPP
 
 #include <astdyn/coordinates/CartesianState.hpp>
+#include <astdyn/core/physics_state.hpp>
 #include <astdyn/core/Constants.hpp>
 #include <Eigen/Dense>
 #include <vector>
@@ -30,6 +31,10 @@
 // Forward declaration
 namespace astdyn { namespace io { class SPKReader; } }
 
+#include <astdyn/core/physics_types.hpp>
+#include <astdyn/astrometry/sky_types.hpp>
+#include <astdyn/time/epoch.hpp>
+
 namespace astdyn {
 namespace ephemeris {
 
@@ -37,23 +42,47 @@ namespace ephemeris {
  * @brief Asteroid data for perturbation calculations
  */
 struct AsteroidData {
-    int number;              ///< Asteroid number
-    std::string name;        ///< Name
-    double gm;               ///< Gravitational parameter [km³/s²]
-    double a;                ///< Semi-major axis [AU]
-    double e;                ///< Eccentricity
-    double i;                ///< Inclination [degrees]
-    double omega;            ///< Argument of perihelion [degrees]
-    double Omega;            ///< Longitude of ascending node [degrees]
-    double M0;               ///< Mean anomaly at epoch [degrees]
-    double epoch_mjd;        ///< Epoch [MJD TDB]
-    double mean_motion;      ///< Mean motion [deg/day]
+    int number;                           ///< Asteroid number (displayed/config)
+    int naif_id;                          ///< NAIF ID for SPK lookup
+    std::string name;                     ///< Name
+    physics::GravitationalParameter gm;    ///< Gravitational parameter
+    physics::Distance a;                  ///< Semi-major axis
+    double e;                             ///< Eccentricity
+    astrometry::Angle i;                  ///< Inclination
+    astrometry::Angle omega;              ///< Argument of perihelion
+    astrometry::Angle Omega;              ///< Longitude of ascending node
+    astrometry::Angle M0;                 ///< Mean anomaly at epoch
+    time::EpochTDB epoch;                 ///< Epoch
+    double mean_motion_deg_day;           ///< Mean motion [deg/day]
     
+    /**
+     * @brief Construct from raw values (for compatibility with existing data tables)
+     */
+    AsteroidData(int num, std::string nam, double gm_val, double a_au, double ecc, 
+                 double i_deg, double om_deg, double Om_deg, double m0_deg, 
+                 double mjd, double n_deg_day, int naif = -1)
+        : number(num), naif_id(naif == -1 ? (num < 1000000 ? 2000000 + num : num) : naif), 
+          name(std::move(nam)), 
+          gm(physics::GravitationalParameter::from_km3_s2(gm_val)),
+          a(physics::Distance::from_au(a_au)), e(ecc),
+          i(astrometry::Angle::from_deg(i_deg)),
+          omega(astrometry::Angle::from_deg(om_deg)),
+          Omega(astrometry::Angle::from_deg(Om_deg)),
+          M0(astrometry::Angle::from_deg(m0_deg)),
+          epoch(time::EpochTDB::from_mjd(mjd)),
+          mean_motion_deg_day(n_deg_day) {}
+
+    /**
+     * @brief Default constructor
+     */
+    AsteroidData() = default;
+
     /**
      * @brief Compute mean anomaly at given time
      */
-    double meanAnomalyAt(double mjd_tdb) const {
-        return M0 + mean_motion * (mjd_tdb - epoch_mjd);
+    astrometry::Angle meanAnomalyAt(time::EpochTDB t) const {
+        double dt = t.mjd() - epoch.mjd();
+        return astrometry::Angle::from_deg(M0.to_deg() + mean_motion_deg_day * dt).wrap_0_2pi();
     }
 };
 
@@ -80,31 +109,46 @@ public:
     /**
      * @brief Compute position of asteroid at given time
      * @param asteroid Asteroid data
-     * @param mjd_tdb Time [MJD TDB]
-     * @return Heliocentric position [AU] in J2000 ecliptic
+     * @param t Time
+     * @return Heliocentric position in J2000 ecliptic
      */
-    Eigen::Vector3d getPosition(const AsteroidData& asteroid, double mjd_tdb) const;
+    math::Vector3<core::ECLIPJ2000, physics::Distance> getPosition(const AsteroidData& asteroid, time::EpochTDB t) const;
     
     /**
      * @brief Compute total perturbation acceleration from all loaded asteroids
-     * @param position Helper position of target body (Heliocentric) [AU]
-     * @param mjd_tdb Time [MJD TDB]
-     * @param sun_pos_bary Position of Sun relative to SSB [AU]
-     * @return Acceleration vector [AU/d^2]
+     * 
+     * @param state Heliocentric state of interest
+     * @param sun_pos_bary Position of Sun relative to SSB (optional)
+     * 
+     * @return Acceleration vector in Frame
      */
-    Eigen::Vector3d computePerturbation(const Eigen::Vector3d& position, double mjd_tdb, const Eigen::Vector3d& sun_pos_bary = Eigen::Vector3d::Zero()) const;
+    template <typename Frame>
+    math::Vector3<Frame, physics::Acceleration> computePerturbation(
+        const physics::CartesianStateTyped<Frame>& state, 
+        const math::Vector3<core::GCRF, physics::Distance>& sun_pos_bary = math::Vector3<core::GCRF, physics::Distance>::from_si(0,0,0)) const;
     
     /**
      * @brief Compute perturbation from single asteroid
-     * @param position Spacecraft position [AU]
-     * @param asteroid_pos Asteroid position [AU]
-     * @param gm Asteroid GM [km³/s²]
-     * @return Acceleration [AU/day²]
+     * @param target_pos Position of object being perturbed
+     * @param asteroid_pos Asteroid position
+     * @param gm Asteroid GM
+     * @return Acceleration
      */
-    static Eigen::Vector3d computeSinglePerturbation(
-        const Eigen::Vector3d& position,
-        const Eigen::Vector3d& asteroid_pos,
-        double gm);
+    template <typename Frame>
+    static math::Vector3<Frame, physics::Acceleration> computeSinglePerturbation(
+        const math::Vector3<Frame, physics::Distance>& target_pos,
+        const math::Vector3<Frame, physics::Distance>& asteroid_pos,
+        const physics::GravitationalParameter& gm);
+    
+    /**
+     * @brief Compute perturbation using raw Eigen vectors (AU for pos, MJD for time).
+     * Returns acceleration in AU/day^2.
+     */
+    Eigen::Vector3d computePerturbationRaw(
+        const Eigen::Vector3d& pos_au,
+        double mjd,
+        const Eigen::Vector3d& sun_pos_bary_au,
+        bool in_ecliptic) const;
     
     /**
      * @brief Get list of included asteroids
@@ -132,6 +176,17 @@ public:
     void loadDefaultAsteroids();
 
     /**
+     * @brief Load the specific AstDyn default set of 17 asteroids (Pluto + 16 massive asteroids)
+     * with custom numbering 10-26 as requested.
+     */
+    void loadAstDynDefaultSet();
+
+    /**
+     * @brief Load the top 30 most massive asteroids
+     */
+    void loadDefault30Asteroids();
+
+    /**
      * @brief Load asteroid SPK file for precise positions
      */
     void loadSPK(const std::string& filename);
@@ -151,6 +206,10 @@ private:
     
     // Optional SPK Reader for precise positions
     std::unique_ptr<io::SPKReader> spk_reader_;
+
+    // Cache for same-time evaluations
+    mutable double last_mjd_cached_ = -1.0;
+    mutable std::vector<Eigen::Vector3d> pos_cache_ecl_au_;
 };
 
 /**

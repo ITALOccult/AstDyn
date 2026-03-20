@@ -1,0 +1,8 @@
+Checks: '-*,readability-function-size,readability-function-cognitive-complexity,readability-identifier-naming,modernize-*,bugprone-*'
+CheckOptions:
+  - key: readability-function-size.LineThreshold
+    value: '15' # Limite inderogabile di 15 righe
+  - key: readability-function-size.ParameterThreshold
+    value: '3'  # Massimo 3 parametri
+  - key: readability-function-cognitive-complexity.Threshold
+    value: '5'  # Complessità ciclotomatica < 6

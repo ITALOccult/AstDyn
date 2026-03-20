@@ -329,5 +329,6 @@ std::array<double, 6> PlanetaryPeriodicPerturbations::calculateCorrections(
     // Assign to delta_a
     corrections[0] = dd5;
     return corrections;
+}
 
 } // namespace astdyn::propagation

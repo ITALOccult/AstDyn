@@ -12,32 +12,31 @@
  */
 
 #include "astdyn/propagation/GaussIntegrator.hpp"
+#include "astdyn/core/Constants.hpp"
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
+#include "astdyn/utils/Atomics.hpp"
 
 namespace astdyn::propagation {
 
-// Gauss-Legendre 4-stage (order 8) coefficients
-// Gauss points in [0,1]
+// Gauss-Legendre 3-stage (order 6) coefficients
 const double GaussIntegrator::c_[num_stages_] = {
-    0.5 - std::sqrt(525.0 + 70.0*std::sqrt(30.0)) / 70.0,
-    0.5 - std::sqrt(525.0 - 70.0*std::sqrt(30.0)) / 70.0,
-    0.5 + std::sqrt(525.0 - 70.0*std::sqrt(30.0)) / 70.0,
-    0.5 + std::sqrt(525.0 + 70.0*std::sqrt(30.0)) / 70.0
+    0.5 - std::sqrt(15.0) / 10.0,
+    0.5,
+    0.5 + std::sqrt(15.0) / 10.0
 };
 
-// Gauss-Legendre RK matrix (symplectic)
 const double GaussIntegrator::a_[num_stages_][num_stages_] = {
-    {0.25, 0.25 - std::sqrt(30.0)/72.0, 0.25 - std::sqrt(30.0)/72.0, 0.25},
-    {0.25 + std::sqrt(30.0)/72.0, 0.25, 0.25, 0.25 - std::sqrt(30.0)/72.0},
-    {0.25 + std::sqrt(30.0)/72.0, 0.25, 0.25, 0.25 - std::sqrt(30.0)/72.0},
-    {0.25, 0.25 + std::sqrt(30.0)/72.0, 0.25 + std::sqrt(30.0)/72.0, 0.25}
+    { 5.0/36.0,            2.0/9.0 - std::sqrt(15.0)/15.0, 5.0/36.0 - std::sqrt(15.0)/30.0 },
+    { 5.0/36.0 + std::sqrt(15.0)/24.0, 2.0/9.0,            5.0/36.0 - std::sqrt(15.0)/24.0 },
+    { 5.0/36.0 + std::sqrt(15.0)/30.0, 2.0/9.0 + std::sqrt(15.0)/15.0, 5.0/36.0           }
 };
 
-// Weights (Gauss quadrature)
 const double GaussIntegrator::b_[num_stages_] = {
-    0.25, 0.25, 0.25, 0.25
+    5.0 / 18.0,
+    4.0 / 9.0,
+    5.0 / 18.0
 };
 
 GaussIntegrator::GaussIntegrator(double initial_step,
@@ -67,24 +66,22 @@ Eigen::VectorXd GaussIntegrator::integrate(const DerivativeFunction& f,
     
     double t = t0;
     Eigen::VectorXd y = y0;
-    double h = h_initial_;
-    
-    // OPTIMIZATION: Track energy for adaptive control (Hamiltonian systems)
-    double E0 = compute_energy(y);  // Initial energy
-    
-    while (t < tf) {
-        if (t + h > tf) {
+    double direction = (tf > t0) ? 1.0 : -1.0;
+    double h = std::abs(h_initial_) * direction;
+
+    while (std::abs(tf - t) > 1e-14) {
+        if (std::abs(tf - t) < std::abs(h)) {
             h = tf - t;
         }
         
         // Solve implicit system
         std::vector<Eigen::VectorXd> k(num_stages_, Eigen::VectorXd::Zero(y.size()));
-        bool converged = solve_implicit_system(f, t, y, h, k);
+        int iters = 0;
+        bool converged = solve_implicit_system_with_iters(f, t, y, h, k, iters);
         
-        if (!converged) {
-            // Reduce step and retry
+        if (!converged || !y.allFinite()) {
             h *= 0.5;
-            h = std::max(h, h_min_);
+            if (std::abs(h) < h_min_) break;
             stats_.num_rejected_steps++;
             continue;
         }
@@ -95,31 +92,26 @@ Eigen::VectorXd GaussIntegrator::integrate(const DerivativeFunction& f,
             y_new += h * b_[i] * k[i];
         }
         
-        // OPTIMIZATION: Energy-based step control (symplectic property)
-        double E_new = compute_energy(y_new);
-        double dE = std::abs(E_new - E0);
-        double rel_dE = dE / (std::abs(E0) + 1e-10);
-        
-        // Accept if energy drift is acceptable
-        if (rel_dE < tolerance_ * 10.0) {  // Relaxed for speed
-            y = y_new;
-            t += h;
-            stats_.num_steps++;
+        y = y_new;
+        t += h;
+        stats_.num_steps++;
             
-            // Adaptive step size (increase if energy well conserved)
-            if (rel_dE < tolerance_) {
-                h *= 1.2;
-                h = std::min(h, h_max_);
-            }
-        } else {
-            // Reject and reduce step
-            h *= 0.5;
-            h = std::max(h, h_min_);
-            stats_.num_rejected_steps++;
-        }
+        // NEW: Step size control based on convergence speed (Picard iteration)
+        // and Sundman-style scaling (proportional to r^1.5 approx)
+        double r = y.head<3>().norm();
+        double r_factor = std::pow(r / 1.0, 1.5); // Normalized to 1 AU
+        double base_h = std::abs(h_initial_) * r_factor;
+
+        if (iters < 5) h *= 1.25;
+        else if (iters > 15) h *= 0.8;
         
-        stats_.min_step_size = (stats_.min_step_size == 0.0) ? h : std::min(stats_.min_step_size, h);
-        stats_.max_step_size = std::max(stats_.max_step_size, h);
+        h = std::clamp(std::abs(h), h_min_, std::min(h_max_, base_h * 2.0)) * direction;
+
+        if (stats_.min_step_size == 0.0) stats_.min_step_size = std::abs(h);
+        else stats_.min_step_size = std::min(stats_.min_step_size, std::abs(h));
+        stats_.max_step_size = std::max(stats_.max_step_size, std::abs(h));
+        
+        if (stats_.num_steps > 1000000) break;
     }
     
     stats_.final_time = t;
@@ -144,8 +136,11 @@ void GaussIntegrator::integrate_steps(const DerivativeFunction& f,
     t_out.push_back(t);
     y_out.push_back(y);
     
-    while (t < tf) {
-        if (t + h > tf) {
+    double direction = (tf > t0) ? 1.0 : -1.0;
+    h = std::abs(h) * direction;
+
+    while (std::abs(tf - t) > 1e-14) {
+        if (std::abs(tf - t) < std::abs(h)) {
             h = tf - t;
         }
         
@@ -153,8 +148,11 @@ void GaussIntegrator::integrate_steps(const DerivativeFunction& f,
         bool converged = solve_implicit_system(f, t, y, h, k);
         
         if (!converged) {
+            if (std::abs(h) <= h_min_) {
+                throw std::runtime_error("GaussIntegrator failed to converge at h_min");
+            }
             h *= 0.5;
-            h = std::max(h, h_min_);
+            if (std::abs(h) < h_min_) h = direction * h_min_;
             stats_.num_rejected_steps++;
             continue;
         }
@@ -173,76 +171,133 @@ void GaussIntegrator::integrate_steps(const DerivativeFunction& f,
     stats_.final_time = t;
 }
 
+std::vector<Eigen::VectorXd> GaussIntegrator::integrate_at(const DerivativeFunction& f,
+                                                       const Eigen::VectorXd& y0,
+                                                       double t0,
+                                                       const std::vector<double>& t_targets) {
+    stats_.reset();
+    std::vector<Eigen::VectorXd> results;
+    results.reserve(t_targets.size());
+    
+    double t = t0;
+    Eigen::VectorXd y = y0;
+    double h = h_initial_;
+    
+    for (double tf : t_targets) {
+        if (std::abs(tf - t) < 1e-14) {
+            results.push_back(y);
+            continue;
+        }
+        
+        double direction = (tf > t) ? 1.0 : -1.0;
+        h = std::abs(h) * direction;
+
+        while (std::abs(tf - t) > 1e-14) {
+            if (std::abs(tf - t) < std::abs(h)) {
+                h = tf - t;
+            }
+            
+            std::vector<Eigen::VectorXd> k(num_stages_, Eigen::VectorXd::Zero(y.size()));
+            int iters = 0;
+            bool converged = solve_implicit_system_with_iters(f, t, y, h, k, iters);
+            
+            if (!converged) {
+                if (std::abs(h) <= h_min_) break;
+                h *= 0.5;
+                stats_.num_rejected_steps++;
+                continue;
+            }
+            
+            for (int i = 0; i < num_stages_; ++i) {
+                y += h * b_[i] * k[i];
+            }
+            t += h;
+            stats_.num_steps++;
+            
+            // Adjust h for next step
+            if (iters < 5) h *= 1.25;
+            else if (iters > 15) h *= 0.8;
+            h = std::clamp(std::abs(h), h_min_, h_max_) * direction;
+        }
+        results.push_back(y);
+    }
+    
+    stats_.final_time = t;
+    return results;
+}
+
 bool GaussIntegrator::solve_implicit_system(const DerivativeFunction& f,
                                             double t,
                                             const Eigen::VectorXd& y,
                                             double h,
                                             std::vector<Eigen::VectorXd>& k) {
-    const int n = y.size();
-    
-    // OPTIMIZATION: Reduced iterations (3-5 instead of 10)
-    const int max_iter = std::min(max_newton_iter_, 5);
-    
-    // Initial guess: use previous k if available, else explicit Euler
+    int dummy = 0;
+    return solve_implicit_system_with_iters(f, t, y, h, k, dummy);
+}
+
+bool GaussIntegrator::solve_implicit_system_with_iters(const DerivativeFunction& f,
+                                            double t,
+                                            const Eigen::VectorXd& y,
+                                            double h,
+                                            std::vector<Eigen::VectorXd>& k,
+                                            int& iters) {
+    // Stage evaluation: initial guess using previous k if available or f(y)
     for (int i = 0; i < num_stages_; ++i) {
-        if (k[i].norm() < 1e-10) {  // First time
-            Eigen::VectorXd y_stage = y;
-            for (int j = 0; j < i; ++j) {
-                y_stage += h * a_[i][j] * k[j];
-            }
-            k[i] = f(t + c_[i] * h, y_stage);
+        if (k[i].norm() < 1e-10) {  
+            k[i] = f(t, y); 
             stats_.num_function_evals++;
         }
     }
     
-    // Fixed-point iteration (simplified Newton)
-    for (int iter = 0; iter < max_iter; ++iter) {
-        std::vector<Eigen::VectorXd> k_new(num_stages_);
-        double max_change = 0.0;
-        
-        for (int i = 0; i < num_stages_; ++i) {
-            Eigen::VectorXd y_stage = y;
-            for (int j = 0; j < num_stages_; ++j) {
-                y_stage += h * a_[i][j] * k[j];
+        // Fixed-point iteration (Picard)
+        for (iters = 0; iters < 50; ++iters) { 
+            std::vector<Eigen::VectorXd> k_new(num_stages_);
+            double max_change = 0.0;
+            
+            for (int i = 0; i < num_stages_; ++i) {
+                Eigen::VectorXd y_stage = y;
+                for (int j = 0; j < num_stages_; ++j) {
+                    y_stage += h * a_[i][j] * k[j];
+                }
+                
+                k_new[i] = f(t + c_[i] * h, y_stage);
+                stats_.num_function_evals++;
+                
+                // Component-wise relative convergence check
+                for (int l = 0; l < k_new[i].size(); ++l) {
+                    const double scale_l = std::max({std::abs(k_new[i][l]), std::abs(k[i][l]), 1.0e-12});
+                    const double rel_change = std::abs(k_new[i][l] - k[i][l]) / scale_l;
+                    max_change = std::max(max_change, rel_change);
+                }
             }
             
-            k_new[i] = f(t + c_[i] * h, y_stage);
-            stats_.num_function_evals++;
+            k = k_new;
             
-            double change = (k_new[i] - k[i]).norm();
-            max_change = std::max(max_change, change);
+            if (max_change < tolerance_) { 
+                return true;
+            }
+            
+            if (iters > 10 && max_change > 100.0) { // Diversion check
+                return false;
+            }
         }
-        
-        k = k_new;
-        
-        // OPTIMIZATION: Relaxed convergence for speed
-        if (max_change < tolerance_ * 0.1) {
-            return true;
-        }
-    }
     
-    // Accept if close enough
-    return true;  // Gauss is robust, accept even if not fully converged
+    // Accept if close enough, but return false if far from convergence to trigger step reduction
+    return false;
 }
 
 double GaussIntegrator::compute_energy(const Eigen::VectorXd& y) const {
-    // For Hamiltonian systems: H = T + V
-    // Assumes y = [r, v] with first half position, second half velocity
-    const int n = y.size() / 2;
+    if (y.size() < 6) return 0.0;
     
-    if (n * 2 != y.size()) {
-        return 0.0;  // Not a Hamiltonian system
-    }
+    // Assumes y = [r, v] in unified AU/day
+    Eigen::VectorXd r = y.head<3>();
+    Eigen::VectorXd v = y.segment<3>(y.size()/2);
     
-    Eigen::VectorXd r = y.head(n);
-    Eigen::VectorXd v = y.tail(n);
-    
-    // Kinetic energy
     double T = 0.5 * v.squaredNorm();
-    
-    // Potential energy (simple 2-body for now)
     double r_norm = r.norm();
-    constexpr double mu = 2.959122082855911e-4;  // GM Sun
+    if (r_norm < 1e-10) return 0.0;
+
+    double mu = constants::GMS;
     double V = -mu / r_norm;
     
     return T + V;

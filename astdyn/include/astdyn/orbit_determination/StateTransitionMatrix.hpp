@@ -14,19 +14,31 @@
 #define ASTDYN_ORBIT_DETERMINATION_STATE_TRANSITION_MATRIX_HPP
 
 #include "astdyn/core/Types.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/propagation/Integrator.hpp"
 #include "astdyn/propagation/Propagator.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/core/frame_tags.hpp"
 #include <memory>
 
 namespace astdyn::orbit_determination {
 
 /**
+ * @brief STM computation settings
+ */
+struct STMSettings {
+    bool use_numerical_jacobian = true; ///< Default to OrbFit style
+    double differentiation_step = 1e-7;  ///< Default step [AU]
+};
+
+/**
  * @brief State transition matrix result
  */
+template <typename Frame>
 struct STMResult {
     astdyn::Matrix6d phi;                        ///< Φ(t,t₀) - 6x6 state transition matrix
-    astdyn::propagation::CartesianElements final_state;       ///< Propagated state at time t
+    physics::CartesianStateTyped<Frame> final_state;       ///< Propagated state at time t
     
     /**
      * @brief Map covariance from t₀ to t
@@ -44,15 +56,9 @@ struct STMResult {
 /**
  * @brief Computes state transition matrix via variational equations
  * 
- * Integrates both the state equations and variational equations:
- * 
- * dx/dt = f(x, t)
- * dΦ/dt = A(t) * Φ
- * 
- * where A(t) = ∂f/∂x is the Jacobian of the dynamics.
- * 
- * Initial condition: Φ(t₀,t₀) = I (identity matrix)
+ * @tparam Frame Reference frame for integration
  */
+template <typename Frame>
 class StateTransitionMatrix {
 public:
     /**
@@ -60,7 +66,8 @@ public:
      * 
      * @param propagator Orbit propagator (provides force model)
      */
-    explicit StateTransitionMatrix(std::shared_ptr<astdyn::propagation::Propagator> propagator);
+    explicit StateTransitionMatrix(std::shared_ptr<astdyn::propagation::Propagator> propagator,
+                                   std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem = nullptr);
     
     /**
      * @brief Compute STM from t₀ to t
@@ -69,9 +76,9 @@ public:
      * @param target_mjd_tdb Target time t
      * @return STM result with Φ(t,t₀) and final state
      */
-    STMResult compute(
-        const astdyn::propagation::CartesianElements& initial,
-        double target_mjd_tdb);
+    STMResult<Frame> compute(
+        const physics::CartesianStateTyped<Frame>& initial,
+        time::EpochTDB target_time);
     
     /**
      * @brief Compute STM and partials w.r.t observations
@@ -88,19 +95,42 @@ public:
     struct ObservationPartials {
         astdyn::Matrix6d phi;                    ///< State transition matrix
         Eigen::Matrix<double, 2, 6> partial_radec; ///< ∂(RA,Dec)/∂x
-        astdyn::propagation::CartesianElements final_state;
+        physics::CartesianStateTyped<Frame> final_state;
     };
     
     ObservationPartials compute_with_partials(
-        const astdyn::propagation::CartesianElements& initial,
-        double target_mjd_tdb,
-        const astdyn::Vector3d& observer_pos);
+        const physics::CartesianStateTyped<Frame>& initial,
+        time::EpochTDB target_time,
+        const math::Vector3<core::GCRF, physics::Distance>& observer_pos);
+    
+    /**
+     * @brief Compute STM at multiple observation epochs
+     * 
+     * Uses optimized batch integration hit targets without resetting the integrator.
+     * 
+     * @param initial Initial state at t0
+     * @param target_times Vector of target times
+     * @param observer_positions Optional observer positions for calculating observation partials
+     * @return Vector of results
+     */
+    std::vector<ObservationPartials> compute_batch(
+        const physics::CartesianStateTyped<Frame>& initial,
+        const std::vector<time::EpochTDB>& target_times,
+        const std::vector<math::Vector3<core::GCRF, physics::Distance>>& observer_positions);
     
     /**
      * @brief Set integrator for variational equations
      */
     void set_integrator(std::shared_ptr<astdyn::propagation::Integrator> integrator) {
         integrator_ = integrator;
+    }
+
+    /**
+     * @brief Apply STM settings
+     */
+    void apply_settings(const STMSettings& settings) {
+        use_numerical_jacobian_ = settings.use_numerical_jacobian;
+        diff_step_ = settings.differentiation_step;
     }
     
     /**
@@ -112,6 +142,16 @@ public:
      */
     void set_differentiation_step(double step) {
         diff_step_ = step;
+    }
+
+    /**
+     * @brief Enable or disable numerical Jacobian computation
+     * 
+     * If true, uses finite differences on the full propagator derivatives (matching OrbFit).
+     * If false, uses analytical gravity partials (traditional AstDyn behavior).
+     */
+    void set_use_numerical_jacobian(bool use_num) {
+        use_numerical_jacobian_ = use_num;
     }
 
 private:
@@ -128,7 +168,7 @@ private:
      * @param state State vector [x,y,z,vx,vy,vz]
      * @return 6x6 Jacobian matrix
      */
-    astdyn::Matrix6d compute_jacobian(double t, const Eigen::VectorXd& state);
+    astdyn::Matrix6d compute_jacobian(time::EpochTDB t, const Eigen::VectorXd& state);
     
     /**
      * @brief Compute ∂a/∂r for gravitational acceleration
@@ -153,9 +193,16 @@ private:
      * @param target_mjd Target time
      * @return Final state and STM
      */
-    STMResult propagate_with_stm(
-        const astdyn::propagation::CartesianElements& initial,
-        double target_mjd_tdb);
+    STMResult<Frame> propagate_with_stm(
+        const physics::CartesianStateTyped<Frame>& initial,
+        time::EpochTDB target_time);
+
+    /**
+     * @brief Internal batch propagator for augmented state
+     */
+    std::vector<STMResult<Frame>> propagate_with_stm_batch(
+        const physics::CartesianStateTyped<Frame>& initial,
+        const std::vector<time::EpochTDB>& target_times);
     
     /**
      * @brief Compute observation partials ∂(RA,Dec)/∂x
@@ -167,14 +214,16 @@ private:
      * @return 2x6 matrix of partials
      */
     Eigen::Matrix<double, 2, 6> compute_observation_partials(
-        const astdyn::propagation::CartesianElements& state,
-        const astdyn::Vector3d& observer_pos) const;
+        const physics::CartesianStateTyped<Frame>& state,
+        const math::Vector3<core::GCRF, physics::Distance>& observer_pos) const;
 
 private:
     std::shared_ptr<astdyn::propagation::Propagator> propagator_;
     std::shared_ptr<astdyn::propagation::Integrator> integrator_;
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephemeris_;
     
-    double diff_step_ = 1e-8;            ///< Numerical differentiation step
+    double diff_step_ = 1e-7;            ///< Numerical differentiation step (OrbFit default)
+    bool use_numerical_jacobian_ = true; ///< Default to true to match OrbFit logic
 };
 
 } // namespace astdyn::orbit_determination

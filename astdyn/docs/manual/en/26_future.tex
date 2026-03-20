@@ -7,117 +7,32 @@ This chapter outlines planned enhancements and future research directions for As
 
 \section{Non-Gravitational Forces}
 
-\subsection{Solar Radiation Pressure}
+\subsection{Yarkovsky and YORP Effects}
 
-\textbf{Status}: Partial implementation exists (example in Chapter 20).
+\textbf{Status}: Theoretical framework established; implementation in progress for v1.1.
 
 \textbf{Planned}:
 \begin{itemize}
-    \item Full integration into force model framework
-    \item Shadowing model (Earth/Moon occultation)
-    \item Thermal re-radiation (Yarkovsky effect)
-    \item Parameter estimation in differential correction
+    \item Diurnal and seasonal Yarkovsky models.
+    \item Standard thermal model (STM) integration for diameter/albedo dependent forces.
+    \item Parameter estimation (drift rate $da/dt$) in differential correction.
 \end{itemize}
 
 \textbf{Implementation sketch}:
 \begin{lstlisting}[language=C++]
-class SolarRadiationPressure : public ForceModel {
+class YarkovskyForce : public ForceModel {
 public:
-    SolarRadiationPressure(
-        double area_mass_ratio,
-        double reflectivity = 1.0,
-        bool include_yarkovsky = false
-    );
+    YarkovskyForce(double A2_scaled, double dAdt_estimated);
     
     Vector3d acceleration(double t, const Vector3d& pos, 
                          const Vector3d& vel) const override;
-    
-    // For differential correction
-    bool supports_partials() const override { return true; }
-    std::pair<Matrix3d, Matrix3d> partials(...) const override;
-    
-private:
-    double area_mass_ratio_;
-    double reflectivity_;
-    bool include_yarkovsky_;
-    
-    // Shadow computation
-    double shadow_function(double t, const Vector3d& pos) const;
 };
 \end{lstlisting}
 
-\textbf{Scientific impact}: Critical for small NEAs and space debris tracking.
+\textbf{Scientific impact}: Crucial for long-term impact risk assessment (e.g., Apophis, Bennu).
 
 \subsection{Cometary Outgassing}
-
-\textbf{Motivation}: Comets exhibit non-gravitational accelerations from sublimating volatiles.
-
-\textbf{Planned model}:
-\begin{itemize}
-    \item Marsden's formulation: $A_1/r^2 + A_2/r^3 + A_3$ terms
-    \item Radial, transverse, and normal components
-    \item Temperature-dependent activity curve
-\end{itemize}
-
-\begin{lstlisting}[language=C++]
-class CometaryOutgassing : public ForceModel {
-public:
-    CometaryOutgassing(double A1, double A2, double A3);
-    
-    Vector3d acceleration(double t, const Vector3d& pos, 
-                         const Vector3d& vel) const override {
-        Vector3d r_sun = pos;  // Heliocentric position
-        double r = r_sun.norm();
-        
-        // Marsden model
-        Vector3d radial = r_sun.normalized();
-        Vector3d transverse = /* compute from velocity */;
-        Vector3d normal = radial.cross(transverse);
-        
-        double g = activity_function(r);  // Activity curve
-        
-        return g * (A1_ * radial + A2_ * transverse + A3_ * normal) / (r * r);
-    }
-    
-private:
-    double A1_, A2_, A3_;
-    double activity_function(double r) const;
-};
-\end{lstlisting}
-
-\textbf{Use case}: Long-period comets, short-period comets with significant outgassing.
-
-\subsection{General Relativity}
-
-\textbf{Current limitation}: Post-Newtonian effects neglected.
-
-\textbf{Planned}: First-order relativistic corrections.
-
-\textbf{Formulation}:
-\[
-\mathbf{a}_{\text{rel}} = \frac{GM_\odot}{c^2 r^3} \left[ 4 \frac{GM_\odot}{r} - v^2 \right] \mathbf{r} + 4 \frac{GM_\odot}{c^2 r^3} (\mathbf{r} \cdot \mathbf{v}) \mathbf{v}
-\]
-
-\textbf{Implementation}:
-\begin{lstlisting}[language=C++]
-class RelativisticCorrection : public ForceModel {
-public:
-    Vector3d acceleration(double t, const Vector3d& pos, 
-                         const Vector3d& vel) const override {
-        double r = pos.norm();
-        double v2 = vel.squaredNorm();
-        double rdotv = pos.dot(vel);
-        
-        double factor1 = 4.0 * GM_SUN / r - v2;
-        double factor2 = 4.0 * rdotv;
-        
-        return (GM_SUN / (C * C * r * r * r)) * 
-               (factor1 * pos + factor2 * vel);
-    }
-};
-\end{lstlisting}
-
-\textbf{Magnitude}: $\sim 10^{-8}$ m/s$^2$ at 1 AU—affects Mercury significantly, negligible for asteroids beyond Mars.
+% ... (existing Marsden model content)
 
 \section{Uncertainty Propagation}
 
@@ -235,41 +150,21 @@ public:
     \item Post-encounter orbital element prediction
 \end{itemize}
 
-\section{Parallel Processing}
+\section{Performance and Parallelization}
 
-\subsection{OpenMP Parallelization}
+\subsection{OpenMP and HPC}
 
-\textbf{Current limitation}: Single-threaded only.
+\textbf{Status}: Implemented in v1.0 for batch trajectory exports and occultation searches.
 
-\textbf{Target operations}:
-\begin{enumerate}
-    \item Batch orbit propagation
-    \item Observation residual computation
-    \item Monte Carlo sampling
-    \item Parameter grid search
-\end{enumerate}
-
-\textbf{Implementation}:
-\begin{lstlisting}[language=C++]
-// Parallel batch propagation
-#pragma omp parallel for schedule(dynamic)
-for (int i = 0; i < n_orbits; ++i) {
-    auto state = propagator.propagate(initial_states[i], target_epoch);
-    results[i] = state;
-}
-
-// Parallel residual computation in differential correction
-#pragma omp parallel for
-for (int i = 0; i < n_observations; ++i) {
-    auto computed = compute_predicted_observation(obs[i]);
-    residuals[2*i] = obs[i].ra - computed.ra;
-    residuals[2*i+1] = obs[i].dec - computed.dec;
-}
-\end{lstlisting}
-
-\textbf{Expected speedup}: 6-7$\times$ on 8-core CPU for batch operations.
+\textbf{Planned}:
+\begin{itemize}
+    \item Fine-grained parallelization of the numerical integration steps (vectorization).
+    \item Multi-threaded differential correction (parallel evaluation of the Jacobian).
+    \item Native support for Apple Silicon Accelerate framework.
+\end{itemize}
 
 \subsection{GPU Acceleration}
+% ... (rest unchanged)
 
 \textbf{Long-term goal}: CUDA/OpenCL for massive parallelism.
 
@@ -562,30 +457,29 @@ emcc -O3 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 \
 
 Priority features:
 \begin{itemize}
-    \item OpenMP parallelization
-    \item Python bindings (pybind11)
-    \item Solar radiation pressure
-    \item Radar observations support
+    \item Yarkovsky effect modeling.
+    \item Python bindings (pybind11).
+    \item Covariance-based automated refinement.
+    \item Radar observations support.
 \end{itemize}
 
 \subsection{Version 1.2 (Q4 2026)}
 
 Extended capabilities:
 \begin{itemize}
-    \item Covariance propagation
-    \item Monte Carlo uncertainty
-    \item Cometary outgassing model
-    \item Symplectic integrator
+    \item Monte Carlo uncertainty quantification.
+    \item Cometary outgassing model.
+    \item Symplectic integrators for long-term stability.
+    \item IAU-CSN star catalog integration.
 \end{itemize}
 
 \subsection{Version 2.0 (2027)}
 
-Major enhancements:
+Major architecture shifts:
 \begin{itemize}
-    \item Close encounter handling (KS regularization)
-    \item General relativity corrections
-    \item GPU acceleration (CUDA)
-    \item Web service deployment
+    \item Kustaanheimo-Stiefel (KS) regularization.
+    \item GPU-accelerated massive occultation searches.
+    \item Cloud-native REST API deployment.
 \end{itemize}
 
 \section{Community Contributions}

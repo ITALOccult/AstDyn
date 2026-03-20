@@ -6,20 +6,30 @@
 #ifndef ASTDYN_EPHEMERIS_POSITIONCALCULATOR_HPP
 #define ASTDYN_EPHEMERIS_POSITIONCALCULATOR_HPP
 
+#include "astdyn/core/Constants.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
+#include "astdyn/time/epoch.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include <Eigen/Dense>
 #include <cmath>
+#include <string>
+#include <cassert>
 
 namespace astdyn {
 namespace ephemeris {
 
 // Simple struct for Keplerian elements (mean values).
 struct KeplerianElements {
-    double a;      // semi‑major axis (AU)
+    double a;      // semi‑major axis (AU or meters depending on context, using AU here as it was)
     double e;      // eccentricity
     double i;      // inclination (rad)
     double Omega;  // longitude of ascending node (rad)
     double omega;  // argument of periapsis (rad)
     double M;      // mean anomaly at epoch (rad)
+    time::EpochTDB epoch; // epoch of elements
     // Optional: flag indicating whether the elements are expressed in the
     // equatorial J2000 frame. If false they are assumed to be ecliptic J2000.
     bool equatorial = false;
@@ -27,19 +37,17 @@ struct KeplerianElements {
 
 class PositionCalculator {
 public:
-    // Compute heliocentric position (AU) at a given MJD.
-    // The function solves Kepler's equation iteratively (Newton‑Raphson) and
-    // transforms the orbital plane coordinates to the requested reference frame.
-    static Eigen::Vector3d computePosition(const KeplerianElements& elem,
-                                           double mjd_target,
-                                           double mjd_epoch,
-                                           bool outputEquatorial = false) {
+    // Compute heliocentric position (m) at a given Epoch.
+    static math::Vector3<core::GCRF, physics::Distance> computePosition(const KeplerianElements& elem,
+                                           time::EpochTDB target_time,
+                                           bool outputEquatorial = true) {
         // Time since epoch in days (not used for pure Keplerian propagation).
         // For a simple two‑body problem the mean motion n = sqrt(mu / a^3).
         // Using Gaussian gravitational constant k = 0.01720209895 AU^{3/2} / day.
         constexpr double k = 0.01720209895;
-        double n = k * std::sqrt(1.0 / (elem.a * elem.a * elem.a)); // rad/day
-        double dt = mjd_target - mjd_epoch;
+        double a_au = elem.a; // Assuming elem.a is in AU for this specific calculator
+        double n = k * std::sqrt(1.0 / (a_au * a_au * a_au)); // rad/day
+        double dt = target_time.mjd() - elem.epoch.mjd();
         double M = elem.M + n * dt; // propagate mean anomaly
         // Normalize M to [0, 2π)
         M = std::fmod(M, 2.0 * M_PI);
@@ -60,43 +68,33 @@ public:
         // heliocentric ecliptic coordinates (the library works internally in the
         // ecliptic frame). The obliquity of the ecliptic J2000 is ε = 23.43928°.
         if (elem.equatorial) {
-            constexpr double epsilon = 23.43928 * M_PI / 180.0; // rad
-            Eigen::Matrix3d R;
-            R << 1, 0, 0,
-                 0, std::cos(epsilon), std::sin(epsilon),
-                 0, -std::sin(epsilon), std::cos(epsilon);
+            auto R = coordinates::ReferenceFrame::j2000_to_ecliptic(target_time);
             pos = R * pos; // convert equatorial -> ecliptic
         }
         if (outputEquatorial) {
             // Convert back to equatorial frame
-            constexpr double epsilon = 23.43928 * M_PI / 180.0; // rad
-            Eigen::Matrix3d R;
-            R << 1, 0, 0,
-                 0, std::cos(epsilon), -std::sin(epsilon),
-                 0, std::sin(epsilon),  std::cos(epsilon);
+            auto R = coordinates::ReferenceFrame::ecliptic_to_j2000(target_time);
             pos = R * pos; // ecliptic -> equatorial
         }
-        return pos; // AU, heliocentric
+        
+        // Convert to meters
+        using namespace astdyn::constants;
+        return math::Vector3<core::GCRF, physics::Distance>::from_si(pos.x() * AU, pos.y() * AU, pos.z() * AU);
     }
 
-    // Compute position directly from a Cartesian state vector (first three components are position).
-    // The vector is assumed to be in heliocentric ecliptic coordinates.
-    // If outputEquatorial is true, the result is transformed to the equatorial J2000 frame.
-    static Eigen::Vector3d computePositionFromState(const Eigen::VectorXd& state,
-                                                   bool outputEquatorial = false) {
+    // Compute position directly from a Cartesian state vector.
+    static math::Vector3<core::GCRF, physics::Distance> computePositionFromState(const Eigen::VectorXd& state,
+                                                   bool outputEquatorial = true) {
         // Ensure the state has at least 3 components.
         assert(state.size() >= 3 && "State vector must contain at least 3 elements (x, y, z)");
         Eigen::Vector3d pos = state.head<3>();
         if (outputEquatorial) {
-            constexpr double epsilon = 23.43928 * M_PI / 180.0; // rad
-            Eigen::Matrix3d R;
-            R << 1, 0, 0,
-                 0, std::cos(epsilon), -std::sin(epsilon),
-                 0, std::sin(epsilon),  std::cos(epsilon);
+            auto R = coordinates::ReferenceFrame::ecliptic_to_j2000(); // Assume J2000 if no time context
             pos = R * pos; // ecliptic -> equatorial
         }
-        return pos; // AU, heliocentric (or equatorial if requested)
-
+        // Convert to meters (assuming input state was in AU)
+        using namespace astdyn::constants;
+        return math::Vector3<core::GCRF, physics::Distance>::from_si(pos.x() * AU, pos.y() * AU, pos.z() * AU);
     }
 
 

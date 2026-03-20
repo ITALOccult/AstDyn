@@ -43,6 +43,13 @@ public:
     static std::vector<OpticalObservation> readFile(const std::string& filepath);
     
     /**
+     * @brief Read observations from a generic stream
+     * @param stream Input stream
+     * @return Vector of optical observations
+     */
+    static std::vector<OpticalObservation> readStream(std::istream& stream);
+    
+    /**
      * @brief Parse single line from .rwo file
      * @param line Line text
      * @return Observation if successfully parsed
@@ -63,19 +70,19 @@ private:
     static std::string parseDesignation(const std::string& line);
     
     /**
-     * @brief Parse observation date
+     * @brief Parse observation date (returns Epoch UTC)
      */
-    static double parseDate(const std::string& date_str);
+    static time::EpochUTC parseDate(const std::string& date_str);
     
     /**
      * @brief Parse RA from "HH MM SS.ddd" format
      */
-    static double parseRA(const std::string& ra_str);
+    static astrometry::RightAscension parseRA(const std::string& ra_str);
     
     /**
      * @brief Parse Dec from "sDD MM SS.dd" format
      */
-    static double parseDec(const std::string& dec_str);
+    static astrometry::Declination parseDec(const std::string& dec_str);
     
     /**
      * @brief Parse observatory code (usually 3 chars near end)

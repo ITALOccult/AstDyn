@@ -22,6 +22,10 @@
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/time/epoch.hpp"
+#include "astdyn/core/frame_tags.hpp"
 #include <cmath>
 #include <string>
 
@@ -158,38 +162,67 @@ public:
     // J2000 ↔ Ecliptic Transformation
     // ========================================================================
     
+    static double mean_obliquity(time::EpochTDB t) {
+        // T is Julian centuries from J2000.0
+        double T = (t.mjd() - constants::MJD2000) / constants::DAYS_PER_CENTURY;
+        
+        // IAU 2006 terms (in arcseconds)
+        double eps_arcsec = 84381.406 
+                          - 46.836769 * T 
+                          - 0.0001831 * T * T 
+                          + 0.00200340 * T * T * T 
+                          - 0.000000576 * T * T * T * T 
+                          - 0.0000000434 * T * T * T * T * T;
+                          
+        return eps_arcsec * constants::ARCSEC_TO_RAD;
+    }
+
     /**
      * @brief Get transformation matrix from J2000 to Ecliptic
      * 
-     * Rotation about X-axis by the mean obliquity of the ecliptic (ε₀)
-     * at J2000.0 = 23.439291° (IAU 2000)
+     * Rotation about X-axis by the mean obliquity of the ecliptic (ε)
      * 
-     * To go from equatorial to ecliptic, rotate by +ε around X axis
-     * 
+     * @param t Epoch (defaults to J2000.0)
      * @return 3x3 rotation matrix
      */
-    static Matrix3d j2000_to_ecliptic() {
-        // Mean obliquity at J2000.0 (IAU 2000 high-precision: 23° 26' 21".406)
-        constexpr double epsilon0 = 0.4090926227129525;
-        return rotation_x(epsilon0);
+    static Matrix3d j2000_to_ecliptic(time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000)) {
+        return rotation_x(mean_obliquity(t));
     }
     
     /**
      * @brief Get transformation matrix from Ecliptic to J2000
-     * 
-     * To go from ecliptic to equatorial, rotate by -ε around X axis
-     * 
+     * @param t Epoch (defaults to J2000.0)
      * @return 3x3 rotation matrix
      */
-    static Matrix3d ecliptic_to_j2000() {
-        constexpr double epsilon0 = 0.4090926227129525;
-        return rotation_x(-epsilon0);
+    static Matrix3d ecliptic_to_j2000(time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000)) {
+        return rotation_x(-mean_obliquity(t));
     }
     
     // ========================================================================
     // J2000 ↔ ITRF Transformation (simplified)
     // ========================================================================
     
+    /**
+     * @brief Compute Earth Rotation Angle (ERA)
+     * @param t_utc Epoch in UTC
+     * @param dut1 UT1 - UTC in seconds (from IERS data)
+     * @return ERA in radians
+     */
+    static double computeERA(time::EpochUTC t_utc, double dut1 = 0.0) {
+        double mjd_ut1 = t_utc.mjd() + dut1 / 86400.0;
+        
+        constexpr double era_0 = 0.7790572732640;
+        constexpr double era_1 = 1.00273781191135448;
+        
+        double era = 2.0 * constants::PI * (era_0 + era_1 * (mjd_ut1 - 51544.5));
+        
+        // Normalize to [0, 2π)
+        era = std::fmod(era, 2.0 * constants::PI);
+        if (era < 0.0) era += 2.0 * constants::PI;
+        
+        return era;
+    }
+
     /**
      * @brief Get transformation matrix from J2000 to ITRF (simplified)
      * 
@@ -200,19 +233,11 @@ public:
      * - Earth rotation angle
      * - Polar motion
      * 
-     * @param mjd_ut1 Modified Julian Date in UT1 time scale
+     * @param t_utc Epoch in UTC
      * @return 3x3 rotation matrix
      */
-    static Matrix3d j2000_to_itrf_simple(double mjd_ut1) {
-        // Earth rotation angle (ERA)
-        // ERA = 2π(0.7790572732640 + 1.00273781191135448 × (MJD_UT1 - 51544.5))
-        
-        double T = mjd_ut1 - constants::MJD2000;
-        double era = 2.0 * constants::PI * (0.7790572732640 + 1.00273781191135448 * T);
-        
-        // Normalize to [0, 2π)
-        era = std::fmod(era, 2.0 * constants::PI);
-        if (era < 0.0) era += 2.0 * constants::PI;
+    static Matrix3d j2000_to_itrf_simple(time::EpochUTC t_utc) {
+        double era = computeERA(t_utc, 0.0);
         
         // Rotation about Z-axis (negative for celestial to terrestrial)
         return rotation_z(-era);
@@ -223,8 +248,8 @@ public:
      * @param mjd_ut1 Modified Julian Date in UT1 time scale
      * @return 3x3 rotation matrix
      */
-    static Matrix3d itrf_to_j2000_simple(double mjd_ut1) {
-        return j2000_to_itrf_simple(mjd_ut1).transpose();
+    static Matrix3d itrf_to_j2000_simple(time::EpochUTC t_utc) {
+        return j2000_to_itrf_simple(t_utc).transpose();
     }
     
     // ========================================================================
@@ -235,11 +260,11 @@ public:
      * @brief Get transformation matrix between two frames
      * @param from Source frame
      * @param to Target frame
-     * @param mjd_ut1 Modified Julian Date (only used for ITRF transformations)
+     * @param t Epoch (time::EpochTDB)
      * @return 3x3 rotation matrix
      */
     static Matrix3d get_transformation(FrameType from, FrameType to, 
-                                       double mjd_ut1 = constants::MJD2000) {
+                                       time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000)) {
         // Same frame, return identity
         if (from == to) {
             return Matrix3d::Identity();
@@ -253,37 +278,37 @@ public:
             return icrs_to_j2000();
         }
         if (from == FrameType::J2000 && to == FrameType::ECLIPTIC) {
-            return j2000_to_ecliptic();
+            return j2000_to_ecliptic(t);
         }
         if (from == FrameType::ECLIPTIC && to == FrameType::J2000) {
-            return ecliptic_to_j2000();
+            return ecliptic_to_j2000(t);
         }
         if (from == FrameType::J2000 && to == FrameType::ITRF) {
-            return j2000_to_itrf_simple(mjd_ut1);
+            return j2000_to_itrf_simple(time::EpochUTC::from_mjd(t.mjd()));
         }
         if (from == FrameType::ITRF && to == FrameType::J2000) {
-            return itrf_to_j2000_simple(mjd_ut1);
+            return itrf_to_j2000_simple(time::EpochUTC::from_mjd(t.mjd()));
         }
         
         // Chain transformations through J2000
         // Example: ICRS → ECLIPTIC = ICRS → J2000 → ECLIPTIC
         if (from == FrameType::ICRS && to == FrameType::ECLIPTIC) {
-            return j2000_to_ecliptic() * icrs_to_j2000();
+            return j2000_to_ecliptic(t) * icrs_to_j2000();
         }
         if (from == FrameType::ECLIPTIC && to == FrameType::ICRS) {
-            return j2000_to_icrs() * ecliptic_to_j2000();
+            return j2000_to_icrs() * ecliptic_to_j2000(t);
         }
         if (from == FrameType::ICRS && to == FrameType::ITRF) {
-            return j2000_to_itrf_simple(mjd_ut1) * icrs_to_j2000();
+            return j2000_to_itrf_simple(time::EpochUTC::from_mjd(t.mjd())) * icrs_to_j2000();
         }
         if (from == FrameType::ITRF && to == FrameType::ICRS) {
-            return j2000_to_icrs() * itrf_to_j2000_simple(mjd_ut1);
+            return j2000_to_icrs() * itrf_to_j2000_simple(time::EpochUTC::from_mjd(t.mjd()));
         }
         if (from == FrameType::ECLIPTIC && to == FrameType::ITRF) {
-            return j2000_to_itrf_simple(mjd_ut1) * ecliptic_to_j2000();
+            return j2000_to_itrf_simple(time::EpochUTC::from_mjd(t.mjd())) * ecliptic_to_j2000(t);
         }
         if (from == FrameType::ITRF && to == FrameType::ECLIPTIC) {
-            return j2000_to_ecliptic() * itrf_to_j2000_simple(mjd_ut1);
+            return j2000_to_ecliptic(t) * itrf_to_j2000_simple(time::EpochUTC::from_mjd(t.mjd()));
         }
         
         // Default: return identity (should not reach here)
@@ -299,13 +324,14 @@ public:
      * @param pos Position vector in source frame [km]
      * @param from Source frame
      * @param to Target frame
-     * @param mjd_ut1 Modified Julian Date (for ITRF)
+     * @param t Epoch (time::EpochTDB)
      * @return Position vector in target frame [km]
      */
+    [[deprecated("Use typed transform_pos<FromFrame,ToFrame>() instead")]]
     static Vector3d transform_position(const Vector3d& pos, 
                                       FrameType from, FrameType to,
-                                      double mjd_ut1 = constants::MJD2000) {
-        Matrix3d R = get_transformation(from, to, mjd_ut1);
+                                      time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000)) {
+        Matrix3d R = get_transformation(from, to, t);
         return R * pos;
     }
     
@@ -319,13 +345,14 @@ public:
      * @param vel Velocity vector in source frame [km/s]
      * @param from Source frame
      * @param to Target frame
-     * @param mjd_ut1 Modified Julian Date (for ITRF)
+     * @param t Epoch (time::EpochTDB)
      * @return Velocity vector in target frame [km/s]
      */
+    [[deprecated("Use typed transform_vel<FromFrame,ToFrame>() instead")]]
     static Vector3d transform_velocity(const Vector3d& pos, const Vector3d& vel,
                                       FrameType from, FrameType to,
-                                      double mjd_ut1 = constants::MJD2000) {
-        Matrix3d R = get_transformation(from, to, mjd_ut1);
+                                      time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000)) {
+        Matrix3d R = get_transformation(from, to, t);
         Vector3d vel_rotated = R * vel;
         
         // Add Coriolis term for rotating frame transformations
@@ -356,15 +383,16 @@ public:
      * @param state Cartesian state in source frame
      * @param from Source frame
      * @param to Target frame
-     * @param mjd_ut1 Modified Julian Date (for ITRF)
+     * @param t Epoch (time::EpochTDB)
      * @return Cartesian state in target frame
      */
+    [[deprecated("Use typed transform_pos/transform_vel<FromFrame,ToFrame>() instead")]]
     static CartesianState transform_state(const CartesianState& state,
                                          FrameType from, FrameType to,
-                                         double mjd_ut1 = constants::MJD2000) {
-        Vector3d pos_new = transform_position(state.position(), from, to, mjd_ut1);
+                                         time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000)) {
+        Vector3d pos_new = transform_position(state.position(), from, to, t);
         Vector3d vel_new = transform_velocity(state.position(), state.velocity(),
-                                              from, to, mjd_ut1);
+                                              from, to, t);
         
         return CartesianState(pos_new, vel_new, state.mu());
     }
@@ -392,7 +420,8 @@ public:
      * @param mjd_ut1 Modified Julian Date in UT1
      * @return GMST [rad]
      */
-    static double gmst(double mjd_ut1) {
+    static double gmst(time::EpochUTC t_utc) {
+        double mjd_ut1 = t_utc.mjd();
         double T = (mjd_ut1 - constants::MJD2000) / 36525.0;
         
         // GMST at 0h UT1 (IAU 2000)
@@ -411,7 +440,158 @@ public:
         
         return gmst_rad;
     }
+    // ========================================================================
+    // Type-Safe Frame Transformations (AstDyn beta 0.9)
+    // ========================================================================
+    // These template methods encode the frame in the types, so the compiler
+    // prevents mixing frames at compile-time.
+    //
+    // Usage:
+    //   auto R = ReferenceFrame::get_rotation<core::ECLIPJ2000, core::GCRF>();
+    //   auto pos_gcrf = R * pos_ecliptic;  // compile-time frame check!
+    //
+    //   auto pos_gcrf = ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(pos_ecl);
+    // ========================================================================
+
+    // --- Rotation matrix factories (compile-time frame pair) ---
+
+    /**
+     * @brief Get typed rotation matrix between two frame tags.
+     * 
+     * Specializations exist for all supported pairs.
+     * ITRF transformations require a time parameter.
+     */
+    template <typename FromFrame, typename ToFrame>
+    static math::RotationMatrix<FromFrame, ToFrame> get_rotation(
+        time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000));
+
+    // --- Position transformation ---
+
+    /**
+     * @brief Transform a typed position vector between frames.
+     * Returns a Vector3 tagged with ToFrame.
+     */
+    template <typename FromFrame, typename ToFrame, typename PhysUnit>
+    static math::Vector3<ToFrame, PhysUnit> transform_pos(
+        const math::Vector3<FromFrame, PhysUnit>& pos,
+        time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000))
+    {
+        auto R = get_rotation<FromFrame, ToFrame>(t);
+        return R * pos;
+    }
+
+    // --- Velocity transformation (with Coriolis for rotating frames) ---
+
+    /**
+     * @brief Transform typed velocity between frames. 
+     * Handles Coriolis term for ITRF.
+     */
+    template <typename FromFrame, typename ToFrame>
+    static math::Vector3<ToFrame, physics::Velocity> transform_vel(
+        const math::Vector3<FromFrame, physics::Distance>& pos,
+        const math::Vector3<FromFrame, physics::Velocity>& vel,
+        time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000))
+    {
+        auto R = get_rotation<FromFrame, ToFrame>(t);
+        return R * vel; // Default: pure rotation (inertial-to-inertial)
+    }
 };
+
+// ============================================================================
+// Template specializations for get_rotation
+// ============================================================================
+
+// --- Identity (same frame) ---
+template<> inline
+math::RotationMatrix<core::GCRF, core::GCRF> ReferenceFrame::get_rotation<core::GCRF, core::GCRF>(time::EpochTDB) {
+    return math::RotationMatrix<core::GCRF, core::GCRF>::from_eigen(Matrix3d::Identity());
+}
+template<> inline
+math::RotationMatrix<core::ECLIPJ2000, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::ECLIPJ2000>(time::EpochTDB) {
+    return math::RotationMatrix<core::ECLIPJ2000, core::ECLIPJ2000>::from_eigen(Matrix3d::Identity());
+}
+template<> inline
+math::RotationMatrix<core::ITRF, core::ITRF> ReferenceFrame::get_rotation<core::ITRF, core::ITRF>(time::EpochTDB) {
+    return math::RotationMatrix<core::ITRF, core::ITRF>::from_eigen(Matrix3d::Identity());
+}
+
+// --- ECLIPJ2000 ↔ GCRF ---
+template<> inline
+math::RotationMatrix<core::ECLIPJ2000, core::GCRF> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::GCRF>(time::EpochTDB) {
+    // ECLIPJ2000 is the Mean Ecliptic of J2000.0. It MUST NOT depend on the current epoch t.
+    return math::RotationMatrix<core::ECLIPJ2000, core::GCRF>::from_eigen(
+        j2000_to_icrs() * ecliptic_to_j2000()); // Uses default J2000 epoch inside
+}
+template<> inline
+math::RotationMatrix<core::GCRF, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>(time::EpochTDB) {
+    return math::RotationMatrix<core::GCRF, core::ECLIPJ2000>::from_eigen(
+        j2000_to_ecliptic() * icrs_to_j2000()); // Uses default J2000 epoch inside
+}
+
+// --- GCRF ↔ ITRF ---
+template<> inline
+math::RotationMatrix<core::GCRF, core::ITRF> ReferenceFrame::get_rotation<core::GCRF, core::ITRF>(time::EpochTDB t) {
+    return math::RotationMatrix<core::GCRF, core::ITRF>::from_eigen(
+        j2000_to_itrf_simple(time::EpochUTC::from_mjd(t.mjd())) * icrs_to_j2000());
+}
+template<> inline
+math::RotationMatrix<core::ITRF, core::GCRF> ReferenceFrame::get_rotation<core::ITRF, core::GCRF>(time::EpochTDB t) {
+    return math::RotationMatrix<core::ITRF, core::GCRF>::from_eigen(
+        j2000_to_icrs() * itrf_to_j2000_simple(time::EpochUTC::from_mjd(t.mjd())));
+}
+
+// --- ECLIPJ2000 ↔ ITRF (chained via GCRF) ---
+template<> inline
+math::RotationMatrix<core::ECLIPJ2000, core::ITRF> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::ITRF>(time::EpochTDB t) {
+    return math::RotationMatrix<core::ECLIPJ2000, core::ITRF>::from_eigen(
+        j2000_to_itrf_simple(time::EpochUTC::from_mjd(t.mjd())) * ecliptic_to_j2000(t));
+}
+template<> inline
+math::RotationMatrix<core::ITRF, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::ITRF, core::ECLIPJ2000>(time::EpochTDB t) {
+    return math::RotationMatrix<core::ITRF, core::ECLIPJ2000>::from_eigen(
+        j2000_to_ecliptic(t) * itrf_to_j2000_simple(time::EpochUTC::from_mjd(t.mjd())));
+}
+
+// ============================================================================
+// Velocity specializations for ITRF (adds Coriolis term)
+// ============================================================================
+
+template<> inline
+math::Vector3<core::ITRF, physics::Velocity> ReferenceFrame::transform_vel<core::GCRF, core::ITRF>(
+    const math::Vector3<core::GCRF, physics::Distance>& pos,
+    const math::Vector3<core::GCRF, physics::Velocity>& vel,
+    time::EpochTDB t)
+{
+    auto R = get_rotation<core::GCRF, core::ITRF>(t);
+    auto vel_rotated = R * vel;
+    auto pos_rotated = R * pos;
+    
+    // ω_earth cross r (in ITRF)
+    constexpr double omega_earth = 7.292115e-5; // rad/s
+    // ω = (0, 0, ω_earth) cross pos_rotated
+    double wx = -omega_earth * pos_rotated.y_si();
+    double wy =  omega_earth * pos_rotated.x_si();
+    
+    return vel_rotated - math::Vector3<core::ITRF, physics::Velocity>::from_si(wx, wy, 0.0);
+}
+
+template<> inline
+math::Vector3<core::GCRF, physics::Velocity> ReferenceFrame::transform_vel<core::ITRF, core::GCRF>(
+    const math::Vector3<core::ITRF, physics::Distance>& pos,
+    const math::Vector3<core::ITRF, physics::Velocity>& vel,
+    time::EpochTDB t)
+{
+    auto R = get_rotation<core::ITRF, core::GCRF>(t);
+    auto vel_rotated = R * vel;
+    auto pos_rotated = R * pos;
+    
+    // ω_earth cross r (in GCRF)
+    constexpr double omega_earth = 7.292115e-5;
+    double wx = -omega_earth * pos_rotated.y_si();
+    double wy =  omega_earth * pos_rotated.x_si();
+    
+    return vel_rotated + math::Vector3<core::GCRF, physics::Velocity>::from_si(wx, wy, 0.0);
+}
 
 } // namespace coordinates
 } // namespace astdyn

@@ -1,0 +1,3 @@
+[submodule "astdyn/external/ioc_gaialib"]
+	path = astdyn/external/ioc_gaialib
+	url = https://github.com/manvalan/IOC_GaiaLib.git

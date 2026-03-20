@@ -15,6 +15,11 @@ class AstDynEngineTest : public ::testing::Test {
 protected:
     void SetUp() override {
         engine = std::make_unique<AstDynEngine>();
+        
+        // Disable planetary perturbations for unit tests (requires .bsp file otherwise)
+        AstDynConfig config = engine->config();
+        config.propagator_settings.include_planets = false;
+        engine->set_config(config);
     }
     
     std::unique_ptr<AstDynEngine> engine;
@@ -24,7 +29,7 @@ protected:
 TEST_F(AstDynEngineTest, Construction) {
     EXPECT_TRUE(engine != nullptr);
     EXPECT_FALSE(engine->has_orbit());
-    EXPECT_EQ(engine->observations().size(), 0);
+    EXPECT_EQ(engine->observations().size(), static_cast<size_t>(0));
 }
 
 // Test 2: Configuration
@@ -43,35 +48,30 @@ TEST_F(AstDynEngineTest, Configuration) {
 
 // Test 3: Set initial orbit
 TEST_F(AstDynEngineTest, SetInitialOrbit) {
-    KeplerianElements orbit;
-    orbit.epoch_mjd_tdb = 60000.0;
-    orbit.semi_major_axis = 2.5;
-    orbit.eccentricity = 0.1;
-    orbit.inclination = 0.1;
-    orbit.longitude_ascending_node = 0.5;
-    orbit.argument_perihelion = 1.0;
-    orbit.mean_anomaly = 0.0;
-    orbit.gravitational_parameter = constants::GMS;
+    auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60000.0),
+        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
+    );
     
     engine->set_initial_orbit(orbit);
     
     EXPECT_TRUE(engine->has_orbit());
-    EXPECT_DOUBLE_EQ(engine->orbit().semi_major_axis, 2.5);
-    EXPECT_DOUBLE_EQ(engine->orbit().eccentricity, 0.1);
+    EXPECT_DOUBLE_EQ(engine->orbit().a.to_au(), 2.5);
+    EXPECT_DOUBLE_EQ(engine->orbit().e, 0.1);
 }
 
 // Test 4: Add observations
 TEST_F(AstDynEngineTest, AddObservations) {
     observations::OpticalObservation obs;
     obs.object_designation = "TEST001";
-    obs.mjd_utc = 60000.0;
-    obs.ra = 180.0 * M_PI / 180.0;  // Convert to radians
-    obs.dec = 10.0 * M_PI / 180.0;  // Convert to radians
+    obs.time = time::EpochUTC::from_mjd(60000.0);
+    obs.ra = astrometry::RightAscension(astrometry::Angle::from_rad(180.0 * M_PI / 180.0));
+    obs.dec = astrometry::Declination(astrometry::Angle::from_rad(10.0 * M_PI / 180.0));
     obs.observatory_code = "500";
     
     engine->add_observation(obs);
     
-    EXPECT_EQ(engine->observations().size(), 1);
+    EXPECT_EQ(engine->observations().size(), 1UL);
     EXPECT_EQ(engine->observations()[0].object_designation, "TEST001");
 }
 
@@ -79,68 +79,58 @@ TEST_F(AstDynEngineTest, AddObservations) {
 TEST_F(AstDynEngineTest, ClearObservations) {
     observations::OpticalObservation obs;
     obs.object_designation = "TEST001";
-    obs.mjd_utc = 60000.0;
-    obs.ra = 180.0 * M_PI / 180.0;  // Convert to radians
-    obs.dec = 10.0 * M_PI / 180.0;  // Convert to radians
+    obs.time = time::EpochUTC::from_mjd(60000.0);
+    obs.ra = astrometry::RightAscension(astrometry::Angle::from_rad(180.0 * M_PI / 180.0));
+    obs.dec = astrometry::Declination(astrometry::Angle::from_rad(10.0 * M_PI / 180.0));
     obs.observatory_code = "500";
     
     engine->add_observation(obs);
-    EXPECT_EQ(engine->observations().size(), 1);
+    EXPECT_EQ(engine->observations().size(), 1UL);
     
     engine->clear_observations();
-    EXPECT_EQ(engine->observations().size(), 0);
+    EXPECT_EQ(engine->observations().size(), static_cast<size_t>(0));
 }
 
 // Test 6: Propagate orbit
 TEST_F(AstDynEngineTest, PropagateOrbit) {
     // Set initial orbit
-    KeplerianElements orbit;
-    orbit.epoch_mjd_tdb = 60000.0;
-    orbit.semi_major_axis = 2.5;
-    orbit.eccentricity = 0.1;
-    orbit.inclination = 0.1;
-    orbit.longitude_ascending_node = 0.5;
-    orbit.argument_perihelion = 1.0;
-    orbit.mean_anomaly = 0.0;
-    orbit.gravitational_parameter = constants::GMS;
+    auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60000.0),
+        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
+    );
     
     engine->set_initial_orbit(orbit);
     
     // Propagate 100 days forward
-    double target_mjd = 60100.0;
+    time::EpochTDB target_time = time::EpochTDB::from_mjd(60100.0);
     
     EXPECT_NO_THROW({
-        auto propagated = engine->propagate_to(target_mjd);
-        EXPECT_DOUBLE_EQ(propagated.epoch_mjd_tdb, target_mjd);
-        EXPECT_NEAR(propagated.semi_major_axis, 2.5, 1e-3);  // a changes due to planetary perturbations
+        auto propagated = engine->propagate_to(target_time);
+        EXPECT_DOUBLE_EQ(propagated.epoch.mjd(), target_time.mjd());
+        EXPECT_NEAR(propagated.a.to_au(), 2.5, 1e-3);  // a changes due to planetary perturbations
     });
 }
 
 // Test 7: Compute ephemeris
 TEST_F(AstDynEngineTest, ComputeEphemeris) {
     // Set initial orbit
-    KeplerianElements orbit;
-    orbit.epoch_mjd_tdb = 60000.0;
-    orbit.semi_major_axis = 2.5;
-    orbit.eccentricity = 0.1;
-    orbit.inclination = 0.1;
-    orbit.longitude_ascending_node = 0.5;
-    orbit.argument_perihelion = 1.0;
-    orbit.mean_anomaly = 0.0;
-    orbit.gravitational_parameter = constants::GMS;
+    auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60000.0),
+        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
+    );
     
     engine->set_initial_orbit(orbit);
     
     // Generate ephemeris
-    double start_mjd = 60000.0;
-    double end_mjd = 60010.0;
+    time::EpochTDB start_time = time::EpochTDB::from_mjd(60000.0);
+    time::EpochTDB end_time = time::EpochTDB::from_mjd(60010.0);
     double step = 1.0;
     
-    auto ephemeris = engine->compute_ephemeris(start_mjd, end_mjd, step);
+    auto ephemeris = engine->compute_ephemeris(start_time, end_time, step);
     
-    EXPECT_EQ(ephemeris.size(), 11);  // 0, 1, 2, ..., 10 days
-    EXPECT_DOUBLE_EQ(ephemeris[0].epoch_mjd_tdb, start_mjd);
-    EXPECT_DOUBLE_EQ(ephemeris.back().epoch_mjd_tdb, end_mjd);
+    EXPECT_EQ(ephemeris.size(), 11UL);  // 0, 1, 2, ..., 10 days
+    EXPECT_DOUBLE_EQ(ephemeris[0].epoch.mjd(), start_time.mjd());
+    EXPECT_DOUBLE_EQ(ephemeris.back().epoch.mjd(), end_time.mjd());
 }
 
 // Test 8: Verbose mode toggle
@@ -154,15 +144,10 @@ TEST_F(AstDynEngineTest, VerboseMode) {
 
 // Test 9: Orbit without observations (should fail fit)
 TEST_F(AstDynEngineTest, FitOrbitWithoutObservations) {
-    KeplerianElements orbit;
-    orbit.epoch_mjd_tdb = 60000.0;
-    orbit.semi_major_axis = 2.5;
-    orbit.eccentricity = 0.1;
-    orbit.inclination = 0.1;
-    orbit.longitude_ascending_node = 0.5;
-    orbit.argument_perihelion = 1.0;
-    orbit.mean_anomaly = 0.0;
-    orbit.gravitational_parameter = constants::GMS;
+    auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60000.0),
+        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
+    );
     
     engine->set_initial_orbit(orbit);
     
@@ -175,47 +160,38 @@ TEST_F(AstDynEngineTest, FitOrbitWithoutObservations) {
 // Test 10: Propagate without orbit (should fail)
 TEST_F(AstDynEngineTest, PropagateWithoutOrbit) {
     EXPECT_THROW({
-        engine->propagate_to(60100.0);
+        engine->propagate_to(time::EpochTDB::from_mjd(60100.0));
     }, std::runtime_error);
 }
 
 // Test 11: Ephemeris without orbit (should fail)
 TEST_F(AstDynEngineTest, EphemerisWithoutOrbit) {
     EXPECT_THROW({
-        engine->compute_ephemeris(60000.0, 60100.0, 1.0);
+        engine->compute_ephemeris(time::EpochTDB::from_mjd(60000.0), 
+                                  time::EpochTDB::from_mjd(60100.0), 1.0);
     }, std::runtime_error);
 }
 
 // Test 12: Multiple orbits - verify update
 TEST_F(AstDynEngineTest, UpdateOrbit) {
     // Set first orbit
-    KeplerianElements orbit1;
-    orbit1.epoch_mjd_tdb = 60000.0;
-    orbit1.semi_major_axis = 2.5;
-    orbit1.eccentricity = 0.1;
-    orbit1.inclination = 0.1;
-    orbit1.longitude_ascending_node = 0.5;
-    orbit1.argument_perihelion = 1.0;
-    orbit1.mean_anomaly = 0.0;
-    orbit1.gravitational_parameter = constants::GMS;
+    auto orbit1 = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60000.0),
+        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
+    );
     
     engine->set_initial_orbit(orbit1);
-    EXPECT_DOUBLE_EQ(engine->orbit().semi_major_axis, 2.5);
+    EXPECT_DOUBLE_EQ(engine->orbit().a.to_au(), 2.5);
     
     // Update to different orbit
-    KeplerianElements orbit2;
-    orbit2.epoch_mjd_tdb = 60100.0;
-    orbit2.semi_major_axis = 3.0;
-    orbit2.eccentricity = 0.15;
-    orbit2.inclination = 0.2;
-    orbit2.longitude_ascending_node = 0.6;
-    orbit2.argument_perihelion = 1.1;
-    orbit2.mean_anomaly = 0.5;
-    orbit2.gravitational_parameter = constants::GMS;
+    auto orbit2 = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60100.0),
+        3.0, 0.15, 0.2, 0.6, 1.1, 0.5
+    );
     
     engine->set_initial_orbit(orbit2);
-    EXPECT_DOUBLE_EQ(engine->orbit().semi_major_axis, 3.0);
-    EXPECT_DOUBLE_EQ(engine->orbit().eccentricity, 0.15);
+    EXPECT_DOUBLE_EQ(engine->orbit().a.to_au(), 3.0);
+    EXPECT_DOUBLE_EQ(engine->orbit().e, 0.15);
 }
 
 // Test 13: Propagator settings
@@ -235,58 +211,50 @@ TEST_F(AstDynEngineTest, PropagatorSettings) {
 
 // Test 14: Long ephemeris generation
 TEST_F(AstDynEngineTest, LongEphemeris) {
-    KeplerianElements orbit;
-    orbit.epoch_mjd_tdb = 60000.0;
-    orbit.semi_major_axis = 2.5;
-    orbit.eccentricity = 0.1;
-    orbit.inclination = 0.1;
-    orbit.longitude_ascending_node = 0.5;
-    orbit.argument_perihelion = 1.0;
-    orbit.mean_anomaly = 0.0;
-    orbit.gravitational_parameter = constants::GMS;
+    // Set initial orbit
+    auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60000.0),
+        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
+    );
     
     engine->set_initial_orbit(orbit);
     
     // Generate 1 year ephemeris with 10-day steps
-    auto ephemeris = engine->compute_ephemeris(60000.0, 60365.0, 10.0);
+    auto ephemeris = engine->compute_ephemeris(time::EpochTDB::from_mjd(60000.0), 
+                                               time::EpochTDB::from_mjd(60365.0), 10.0);
     
-    EXPECT_EQ(ephemeris.size(), 38);  // 365/10 + 1 (including both endpoints)
+    EXPECT_EQ(ephemeris.size(), 37UL);  // 365/10 + 1 (0 to 360 by 10)
     
     // Check all epochs are in order
     for (size_t i = 1; i < ephemeris.size(); ++i) {
-        EXPECT_GT(ephemeris[i].epoch_mjd_tdb, ephemeris[i-1].epoch_mjd_tdb);
+        EXPECT_GT(ephemeris[i].epoch.mjd(), ephemeris[i-1].epoch.mjd());
     }
 }
 
 // Test 15: Integration with different tolerances
 TEST_F(AstDynEngineTest, DifferentTolerances) {
-    KeplerianElements orbit;
-    orbit.epoch_mjd_tdb = 60000.0;
-    orbit.semi_major_axis = 2.5;
-    orbit.eccentricity = 0.1;
-    orbit.inclination = 0.1;
-    orbit.longitude_ascending_node = 0.5;
-    orbit.argument_perihelion = 1.0;
-    orbit.mean_anomaly = 0.0;
-    orbit.gravitational_parameter = constants::GMS;
+    auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(60000.0),
+        2.5, 0.1, 0.1, 0.5, 1.0, 0.0
+    );
     
     // Test with tight tolerance
-    AstDynConfig config;
+    AstDynConfig config = engine->config();
     config.tolerance = 1e-14;
     engine->set_config(config);
     engine->set_initial_orbit(orbit);
     
-    auto result1 = engine->propagate_to(60100.0);
+    auto result1 = engine->propagate_to(time::EpochTDB::from_mjd(60100.0));
     
     // Test with loose tolerance
     config.tolerance = 1e-10;
     engine->set_config(config);
     engine->set_initial_orbit(orbit);
     
-    auto result2 = engine->propagate_to(60100.0);
+    auto result2 = engine->propagate_to(time::EpochTDB::from_mjd(60100.0));
     
     // Results should be similar but not identical
-    EXPECT_NEAR(result1.semi_major_axis, result2.semi_major_axis, 1e-8);
+    EXPECT_NEAR(result1.a.to_au(), result2.a.to_au(), 1e-8);
 }
 
 // Test 16: Summary

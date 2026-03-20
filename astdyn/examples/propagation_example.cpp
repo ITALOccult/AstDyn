@@ -40,15 +40,14 @@ int main() {
     double n = std::sqrt(GMS / (a_au * a_au * a_au));
     double m_rad = n * (epoch_jd_tdb - tp_jd_tdb);
     
-    KeplerianElements elements;
-    elements.epoch_mjd_tdb = epoch_mjd_tdb;
-    elements.semi_major_axis = a_au;
-    elements.eccentricity = e;
-    elements.inclination = 7.967893011038914 * DEG_TO_RAD;
-    elements.longitude_ascending_node = 289.4707834155099 * DEG_TO_RAD;
-    elements.argument_perihelion = 63.81392291128233 * DEG_TO_RAD;
-    elements.mean_anomaly = m_rad;
-    elements.gravitational_parameter = GMS;
+    auto elements = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        time::EpochTDB::from_mjd(epoch_mjd_tdb),
+        a_au, e, 
+        7.967893011038914, 
+        289.4707834155099, 
+        63.81392291128233, 
+        m_rad * constants::RAD_TO_DEG
+    );
 
     // 2. Propagator Configuration
     HighPrecisionPropagator::Config config;
@@ -63,13 +62,13 @@ int main() {
     // 3. Target Date: 2026-Jan-10 01:56:34 UTC
     double target_fraction = (1.0 + 56.0/60.0 + 34.0/3600.0) / 24.0;
     double target_mjd_utc = time::calendar_to_mjd(2026, 1, 10, target_fraction);
-    double target_jd_tdb = time::mjd_to_jd(time::utc_to_tdb(target_mjd_utc));
+    time::EpochTDB target_time = time::to_tdb(time::EpochUTC::from_mjd(target_mjd_utc));
 
     std::cout << "Target Date:  2026-01-10 01:56:34 UTC\n";
-    std::cout << "Target JD TDB: " << target_jd_tdb << "\n\n";
+    std::cout << "Target JD TDB: " << target_time.jd() << "\n\n";
     
     // 4. Calculate Geocentric Position
-    auto result = propagator.calculateGeocentricObservation(elements, target_jd_tdb);
+    auto result = propagator.calculateGeocentricObservation(elements, target_time);
 
     // 5. Display Results
     std::cout << "--- AstDyn Rigorous Position (with DE441) ---\n";

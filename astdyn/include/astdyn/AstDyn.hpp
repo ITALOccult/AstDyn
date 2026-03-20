@@ -32,12 +32,18 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
 
+// IO and Networking
+#include "astdyn/io/HorizonsClient.hpp"
+
 // Orbital elements
 #include "astdyn/propagation/OrbitalElements.hpp"
 
 // Propagation
 #include "astdyn/propagation/Propagator.hpp"
-#include "astdyn/propagation/HighPrecisionPropagator.hpp"
+
+// Top-level APIs
+#include "astdyn/orbit_determination/OrbFitAPI.hpp"
+#include "astdyn/astrometry/Astrometry.hpp"
 
 namespace astdyn {
 

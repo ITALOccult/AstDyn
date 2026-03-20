@@ -110,7 +110,3 @@ TEST(LoggerTest, Macros) {
     EXPECT_NO_THROW(LOG_ERROR("Error via macro"));
 }
 
-int main(int argc, char** argv) {
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

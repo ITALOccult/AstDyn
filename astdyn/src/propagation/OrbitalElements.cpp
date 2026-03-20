@@ -5,10 +5,20 @@
 
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "astdyn/propagation/PlanetaryPeriodicPerturbations.hpp"
+
+// New AstDyn Architecture (CTFYH)
+#include "astdyn/core/units.hpp"
+#include "astdyn/types/orbital_state.hpp"
+#include "astdyn/math/kepler_solver.hpp"
+#include "astdyn/math/anomaly_conversions.hpp"
+#include "astdyn/coordinates/state_conversions.hpp"
+#include "astdyn/core/Constants.hpp"
+
 #include <cmath>
 #include <stdexcept>
 
 namespace astdyn::propagation {
+using namespace astdyn::constants;
 
 // ============================================================================
 // KeplerianElements methods
@@ -46,13 +56,18 @@ double KeplerianElements::aphelion_distance() const {
 // ============================================================================
 
 double CartesianElements::energy() const {
-    double v2 = velocity.squaredNorm();
-    double r = position.norm();
-    return 0.5 * v2 - gravitational_parameter / r;
+    double v = velocity.norm().to_au_d();
+    double r = position.norm().to_au();
+    double AU_M = constants::AU * 1000.0;
+    double m3s2_to_au3d2 = (86400.0 * 86400.0) / (AU_M * AU_M * AU_M);
+    double mu = gravitational_parameter * m3s2_to_au3d2;
+    return 0.5 * v * v - mu / r;
 }
 
 Eigen::Vector3d CartesianElements::angular_momentum() const {
-    return position.cross(velocity);
+    auto r_au = position.to_eigen_si() / (constants::AU * 1000.0);
+    auto v_aud = velocity.to_eigen_si() * (86400.0 / (constants::AU * 1000.0));
+    return r_au.cross(v_aud);
 }
 
 // ============================================================================
@@ -71,136 +86,69 @@ double CometaryElements::semi_major_axis() const {
 // ============================================================================
 
 double solve_kepler_equation(double M, double e, double tolerance, int max_iter) {
-    // Normalize M to [0, 2π)
-    M = std::fmod(M, constants::TWO_PI);
-    if (M < 0.0) M += constants::TWO_PI;
-    
-    // Initial guess for E (Danby's method)
-    double E = M + 0.85 * e * std::sin(M) / std::abs(std::sin(M));
-    if (e < 0.8) {
-        E = M;
+    using astdyn::core::Radian;
+    using astdyn::math::KeplerSolverOptions;
+
+    const auto options = KeplerSolverOptions{e, tolerance, max_iter};
+    const auto result = astdyn::math::solve_kepler_elliptic(Radian(M), options);
+
+    if (!result.has_value()) {
+        throw std::runtime_error("Kepler equation failed to converge (AstDyn Kernel)");
     }
-    
-    // Newton-Raphson iteration
-    for (int iter = 0; iter < max_iter; ++iter) {
-        double f = E - e * std::sin(E) - M;
-        double fp = 1.0 - e * std::cos(E);
-        double delta = -f / fp;
-        
-        E += delta;
-        
-        if (std::abs(delta) < tolerance) {
-            return E;
-        }
-    }
-    
-    throw std::runtime_error("Kepler equation failed to converge");
+
+    return result->value;
 }
 
 double eccentric_to_true_anomaly(double E, double e) {
-    // tan(ν/2) = √((1+e)/(1-e)) tan(E/2)
-    double sqrt_factor = std::sqrt((1.0 + e) / (1.0 - e));
-    double tan_half_E = std::tan(E / 2.0);
-    double tan_half_nu = sqrt_factor * tan_half_E;
-    double nu = 2.0 * std::atan(tan_half_nu);
-    
-    // Normalize to [0, 2π)
-    if (nu < 0.0) nu += constants::TWO_PI;
-    
-    return nu;
+    using astdyn::core::Radian;
+    const auto nu = astdyn::math::eccentric_to_true_anomaly(Radian(E), e);
+    return nu.value;
 }
 
 double true_to_eccentric_anomaly(double nu, double e) {
-    // tan(E/2) = √((1-e)/(1+e)) tan(ν/2)
-    double sqrt_factor = std::sqrt((1.0 - e) / (1.0 + e));
-    double tan_half_nu = std::tan(nu / 2.0);
-    double tan_half_E = sqrt_factor * tan_half_nu;
-    double E = 2.0 * std::atan(tan_half_E);
-    
-    // Ensure same quadrant as nu
-    if (nu > constants::PI && E < 0.0) E += constants::TWO_PI;
-    
-    return E;
+    using astdyn::core::Radian;
+    const auto E = astdyn::math::true_to_eccentric_anomaly(Radian(nu), e);
+    return E.value;
 }
 
 // ============================================================================
 // Keplerian <-> Cartesian Conversions
 // ============================================================================
 
-CartesianElements keplerian_to_cartesian(const KeplerianElements& kep) {
-    CartesianElements cart;
-    cart.epoch_mjd_tdb = kep.epoch_mjd_tdb;
-    cart.gravitational_parameter = kep.gravitational_parameter;
-    
-    // Extract elements
-    double a = kep.semi_major_axis;
-    double e = kep.eccentricity;
-    double i = kep.inclination;
-    double Omega = kep.longitude_ascending_node;
-    double omega = kep.argument_perihelion;
-    double M = kep.mean_anomaly;
-    double mu = kep.gravitational_parameter;
-    
-    // Solve Kepler's equation for eccentric anomaly
-    double E = solve_kepler_equation(M, e);
-    
-    // Compute true anomaly
-    double nu = eccentric_to_true_anomaly(E, e);
-    
-    // Compute distance
-    double r = a * (1.0 - e * std::cos(E));
-    
-    // Position and velocity in orbital plane (perifocal frame)
-    double cos_nu = std::cos(nu);
-    double sin_nu = std::sin(nu);
-    
-    double x_orb = r * cos_nu;
-    double y_orb = r * sin_nu;
-    
-    // Velocity in orbital plane
-    // v = sqrt(mu*a) / r * [-sin(E), sqrt(1-e²)*cos(E)]
-    double sqrt_mu_a = std::sqrt(mu * a);
-    double vx_orb = -(sqrt_mu_a / r) * std::sin(E);
-    double vy_orb = (sqrt_mu_a / r) * std::sqrt(1.0 - e * e) * std::cos(E);
-    
-    // Rotation matrices
-    double cos_omega = std::cos(omega);
-    double sin_omega = std::sin(omega);
-    double cos_Omega = std::cos(Omega);
-    double sin_Omega = std::sin(Omega);
-    double cos_i = std::cos(i);
-    double sin_i = std::sin(i);
-    
-    // Perifocal to J2000 transformation
-    // R = R_z(-Ω) R_x(-i) R_z(-ω)
-    double r11 = cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i;
-    double r12 = -cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i;
-    double r21 = sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i;
-    double r22 = -sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i;
-    double r31 = sin_omega * sin_i;
-    double r32 = cos_omega * sin_i;
-    
-    // Transform position
-    cart.position(0) = r11 * x_orb + r12 * y_orb;
-    cart.position(1) = r21 * x_orb + r22 * y_orb;
-    cart.position(2) = r31 * x_orb + r32 * y_orb;
-    
-    // Transform velocity
-    cart.velocity(0) = r11 * vx_orb + r12 * vy_orb;
-    cart.velocity(1) = r21 * vx_orb + r22 * vy_orb;
-    cart.velocity(2) = r31 * vx_orb + r32 * vy_orb;
-    
+static CartesianElements finalize_cartesian(const KeplerianElements& kep, const std::array<double, 6>& raw) {
+    CartesianElements cart; cart.epoch = kep.epoch;
+    double AU_M = constants::AU * 1000.0, AUd_MS = AU_M / 86400.0;
+    double au3d2_to_m3s2 = (AU_M * AU_M * AU_M) / (86400.0 * 86400.0);
+    cart.gravitational_parameter = kep.gravitational_parameter * au3d2_to_m3s2;
+    cart.position = math::Vector3<core::GCRF, physics::Distance>::from_si(raw[0]*AU_M, raw[1]*AU_M, raw[2]*AU_M);
+    cart.velocity = math::Vector3<core::GCRF, physics::Velocity>::from_si(raw[3]*AUd_MS, raw[4]*AUd_MS, raw[5]*AUd_MS);
     return cart;
+}
+
+CartesianElements keplerian_to_cartesian(const KeplerianElements& kep) {
+    using namespace astdyn::types;
+    const auto state_kep = OrbitalState<core::GCRF, KeplerianTag>({
+        kep.semi_major_axis, kep.eccentricity, kep.inclination,
+        kep.longitude_ascending_node, kep.argument_perihelion, kep.mean_anomaly
+    });
+    const auto state_cart = astdyn::coordinates::keplerian_to_cartesian(state_kep, kep.gravitational_parameter);
+    return finalize_cartesian(kep, state_cart.raw_values());
 }
 
 KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = cart.epoch_mjd_tdb;
-    kep.gravitational_parameter = cart.gravitational_parameter;
-    
-    const Eigen::Vector3d& r = cart.position;
-    const Eigen::Vector3d& v = cart.velocity;
-    double mu = cart.gravitational_parameter;
+    kep.epoch = cart.epoch;
+    // CartesianElements.gravitational_parameter is in m³/s² (SI).
+    // KeplerianElements.gravitational_parameter is in AU³/day².
+    constexpr double AU_M = AU * 1000.0;
+    constexpr double M3s2_TO_AU3d2 = (86400.0 * 86400.0) / (AU_M * AU_M * AU_M);
+    kep.gravitational_parameter = cart.gravitational_parameter * M3s2_TO_AU3d2;
+
+    double mu = cart.gravitational_parameter; // m³/s²
+
+    // CartesianElements is always in SI (m, m/s, m³/s²) — no heuristic needed.
+    Eigen::Vector3d r(cart.position.x_si(), cart.position.y_si(), cart.position.z_si()); // [m]
+    Eigen::Vector3d v(cart.velocity.x_si(), cart.velocity.y_si(), cart.velocity.z_si()); // [m/s]
     
     double r_mag = r.norm();
     double v_mag = v.norm();
@@ -218,8 +166,11 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     // ε = v²/2 - μ/r = -μ/(2a)  =>  a = -μ/(2ε)
     double specific_energy = 0.5 * v_mag * v_mag - mu / r_mag;
     double a = -mu / (2.0 * specific_energy);
+    // CartesianElements is always SI (m, m/s, m³/s²), so 'a' is in meters.
+    // KeplerianElements.semi_major_axis is always in AU. AU_M defined above.
+    double a_au = a / AU_M;
     
-    kep.semi_major_axis = a;
+    kep.semi_major_axis = a_au;
     kep.eccentricity = e;
     
     // Inclination
@@ -274,7 +225,7 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
 
 EquinoctialElements keplerian_to_equinoctial(const KeplerianElements& kep) {
     EquinoctialElements eq;
-    eq.epoch_mjd_tdb = kep.epoch_mjd_tdb;
+    eq.epoch = kep.epoch;
     eq.gravitational_parameter = kep.gravitational_parameter;
     
     double e = kep.eccentricity;
@@ -295,7 +246,7 @@ EquinoctialElements keplerian_to_equinoctial(const KeplerianElements& kep) {
 
 KeplerianElements equinoctial_to_keplerian(const EquinoctialElements& eq) {
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = eq.epoch_mjd_tdb;
+    kep.epoch = eq.epoch;
     kep.gravitational_parameter = eq.gravitational_parameter;
     
     kep.semi_major_axis = eq.a;
@@ -326,7 +277,7 @@ KeplerianElements equinoctial_to_keplerian(const EquinoctialElements& eq) {
 
 CometaryElements keplerian_to_cometary(const KeplerianElements& kep) {
     CometaryElements com;
-    com.epoch_mjd_tdb = kep.epoch_mjd_tdb;
+    com.epoch = kep.epoch;
     com.gravitational_parameter = kep.gravitational_parameter;
     
     com.perihelion_distance = kep.perihelion_distance();
@@ -338,14 +289,14 @@ CometaryElements keplerian_to_cometary(const KeplerianElements& kep) {
     // Compute time of perihelion from M and epoch
     double n = kep.mean_motion();
     double time_since_perihelion = -kep.mean_anomaly / n;
-    com.time_perihelion_mjd_tdb = kep.epoch_mjd_tdb + time_since_perihelion;
+    com.time_perihelion = time::EpochTDB::from_mjd(kep.epoch.mjd() + time_since_perihelion);
     
     return com;
 }
 
 KeplerianElements cometary_to_keplerian(const CometaryElements& com) {
     KeplerianElements kep;
-    kep.epoch_mjd_tdb = com.epoch_mjd_tdb;
+    kep.epoch = com.epoch;
     kep.gravitational_parameter = com.gravitational_parameter;
     
     kep.semi_major_axis = com.semi_major_axis();
@@ -357,98 +308,29 @@ KeplerianElements cometary_to_keplerian(const CometaryElements& com) {
     // Compute mean anomaly from time of perihelion
     double n = std::sqrt(com.gravitational_parameter / 
                         (kep.semi_major_axis * kep.semi_major_axis * kep.semi_major_axis));
-    double time_since_perihelion = com.epoch_mjd_tdb - com.time_perihelion_mjd_tdb;
+    double time_since_perihelion = com.epoch.mjd() - com.time_perihelion.mjd();
     kep.mean_anomaly = n * time_since_perihelion;
     
     return kep;
 }
 
-// ============================================================================
-// Mean to Osculating Element Conversions
-// ============================================================================
+static void apply_planetary_corrections(KeplerianElements& osc, const KeplerianElements& mean) {
+    PlanetaryPeriodicPerturbations mk;
+    if (mean.gravitational_parameter < 1e-10) const_cast<KeplerianElements&>(mean).gravitational_parameter = GMS;
+    auto corr = mk.calculateCorrections(mean, mean.epoch.mjd(), false);
+    osc.semi_major_axis += corr[0];
+}
 
-KeplerianElements mean_to_osculating(
-    const KeplerianElements& mean_elements,
-    double j2,
-    double central_body_radius)
-{
-    KeplerianElements osc = mean_elements;
-    
-    // If J2 is zero, we still check for planetary perturbations
-    // if (std::abs(j2) < 1e-12) return osc;  <-- REMOVED
-    
-    // Extract orbital parameters
-    double a = mean_elements.semi_major_axis;
-    double e = mean_elements.eccentricity;
-    double i = mean_elements.inclination;
-    double Omega = mean_elements.longitude_ascending_node;
-    double omega = mean_elements.argument_perihelion;
-    double M = mean_elements.mean_anomaly;
-    
-    // Compute derived quantities
-    double eta = std::sqrt(1.0 - e * e);     // Auxiliary parameter
-    
-    // J2 factor: k = J2 * (R/a)²
-    double R_over_a = central_body_radius / a;
-    double k = j2 * R_over_a * R_over_a;
-    
-    // Trigonometric functions
-    double sin_i = std::sin(i);
-    double cos_i = std::cos(i);
-    double sin2_i = sin_i * sin_i;
-    
-    // Convert mean anomaly to eccentric anomaly, then to true anomaly
-    double E = solve_kepler_equation(M, e);
-    double nu = eccentric_to_true_anomaly(E, e);
-    
-    double cos_nu = std::cos(nu);
-    double sin_2nu = std::sin(2.0 * nu);
-    double cos_2nu = std::cos(2.0 * nu);
-    
-    // Compute short-period J2 perturbations
-    // These are the differences: Δx = x_osculating - x_mean
-    
-    // Semi-major axis: negligible short-period variation
-    double Delta_a = 0.0;
-    
-    // Eccentricity short-period variation
-    // Δe = (k/8) * e * η * (1 - 11cos²i - 40(cos⁴i)/(1-5cos²i)) * sin(2ω+2ν)
-    double Delta_e = (k / 8.0) * e * eta * 
-                     (1.0 - 11.0 * cos_i * cos_i) * sin_2nu;
-    
-    // Inclination short-period variation
-    // Δi = -(k/2) * e * sin(i) * cos(i) * cos(2ω+2ν)
-    double Delta_i = -(k / 2.0) * e * sin_i * cos_i * cos_2nu;
-    
-    // RAAN short-period variation
-    // ΔΩ = (k/2) * cos(i) * [something complex with ν]
-    // Simplified: dominant term is secular, short-period is small
-    double Delta_Omega = 0.0;  // Short-period part typically neglected
-    
-    // Argument of perihelion short-period variation
-    // Δω includes both short-period oscillations
-    double Delta_omega = (k / 8.0) * (4.0 - 5.0 * sin2_i) * 
-                         (2.0 + e * cos_nu) * sin_2nu / eta;
-    
-    // 2. Apply Milani-Knezevic planetary periodic perturbations
-    // Only applied for main belt asteroids (1.8 AU < a < 4.0 AU) to avoid validation errors for Earth/Mars
-    if (mean_elements.semi_major_axis > 1.8 && mean_elements.semi_major_axis < 4.0) {
-        PlanetaryPeriodicPerturbations mk_theory;
-        if (mean_elements.gravitational_parameter < 1e-10) {
-             const_cast<KeplerianElements&>(mean_elements).gravitational_parameter = constants::GMS;
-             osc.gravitational_parameter = constants::GMS;
-        }
-        auto corrections = mk_theory.calculateCorrections(mean_elements, mean_elements.epoch_mjd_tdb, false);
-
-        // Apply semi-major axis correction Delta a (index 0)
-        osc.semi_major_axis += corrections[0];
-
-        // Note: The other element corrections (e, i, Omega, omega, M) are currently
-        // placeholders in calculateCorrections and return 0.
-        // If we implement them in PlanetaryPeriodicPerturbations.cpp,
-        // we should apply them here.
-    }
-    
+KeplerianElements mean_to_osculating(const KeplerianElements& mean, double j2, double R) {
+    KeplerianElements osc = mean;
+    double a = mean.semi_major_axis, e = mean.eccentricity, i = mean.inclination, M = mean.mean_anomaly;
+    double k = j2 * (R/a) * (R/a), eta = std::sqrt(1.0 - e*e);
+    double nu = eccentric_to_true_anomaly(solve_kepler_equation(M, e), e);
+    double sin_i = std::sin(i), cos_i = std::cos(i), sin2nu = std::sin(2.0*nu), cos2nu = std::cos(2.0*nu);
+    osc.eccentricity += (k/8.0) * e * eta * (1.0 - 11.0*cos_i*cos_i) * sin2nu;
+    osc.inclination += -(k/2.0) * e * sin_i * cos_i * cos2nu;
+    osc.argument_perihelion += (k/8.0) * (4.0 - 5.0*sin_i*sin_i) * (2.0 + e*std::cos(nu)) * sin2nu / eta;
+    if (a > 1.8 && a < 4.0) apply_planetary_corrections(osc, mean);
     return osc;
 }
 

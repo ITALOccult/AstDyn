@@ -26,7 +26,7 @@ namespace astdyn::propagation {
  * - Excellent for long-term integrations (no secular drift)
  * - Requires solving implicit system at each step
  * 
- * This implementation uses 4 stages (order 8).
+ * This implementation uses 3 stages (order 6).
  * 
  * References:
  * - Hairer, Lubich, Wanner (2006) "Geometric Numerical Integration"
@@ -60,6 +60,11 @@ public:
                         double tf,
                         std::vector<double>& t_out,
                         std::vector<Eigen::VectorXd>& y_out) override;
+
+    std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                             const Eigen::VectorXd& y0,
+                                             double t0,
+                                             const std::vector<double>& t_targets) override;
     
     void set_tolerance(double tol) { tolerance_ = tol; }
     double tolerance() const { return tolerance_; }
@@ -71,20 +76,27 @@ private:
     double h_max_;
     int max_newton_iter_;
     
-    // Gauss-Legendre coefficients (4 stages, order 8)
-    static constexpr int num_stages_ = 4;
+    // Gauss-Legendre coefficients (3 stages, order 6)
+    static constexpr int num_stages_ = 3;
     static const double c_[num_stages_];      ///< Gauss points
     static const double a_[num_stages_][num_stages_];  ///< RK matrix
     static const double b_[num_stages_];      ///< Weights
     
     /**
-     * @brief Solve implicit Gauss system (simplified Newton)
+     * @brief Solve implicit Gauss system (simplified Newton / Picard)
      */
     bool solve_implicit_system(const DerivativeFunction& f,
                                double t,
                                const Eigen::VectorXd& y,
                                double h,
                                std::vector<Eigen::VectorXd>& k);
+
+    bool solve_implicit_system_with_iters(const DerivativeFunction& f,
+                               double t,
+                               const Eigen::VectorXd& y,
+                               double h,
+                               std::vector<Eigen::VectorXd>& k,
+                               int& iters);
     
     /**
      * @brief Compute energy for Hamiltonian systems (monitoring)

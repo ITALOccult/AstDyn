@@ -148,38 +148,46 @@ void example_reference_frames() {
     print_vector("Position", state_j2000.position(), "km");
     print_vector("Velocity", state_j2000.velocity(), "km/s");
     
+    // Helper: apply rotation matrix to a CartesianState
+    auto apply_rot = [](const CartesianState& s, const Matrix3d& R) {
+        return CartesianState(R * s.position(), R * s.velocity(), s.mu());
+    };
+
+    time::EpochTDB epoch_tdb = time::EpochTDB::from_mjd(mjd);
+    time::EpochUTC epoch_utc = time::EpochUTC::from_mjd(mjd);
+
     // Transform to ICRS (small change)
     std::cout << "\n2. Transform to ICRS (frame bias ~0.02 arcsec):\n";
-    CartesianState state_icrs = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ICRS);
+    CartesianState state_icrs = apply_rot(
+        state_j2000, ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ICRS));
     print_vector("Position", state_icrs.position(), "km");
     Vector3d pos_diff = state_icrs.position() - state_j2000.position();
     std::cout << "  Difference = " << pos_diff.norm() * 1000.0 << " meters\n";
-    
+
     // Transform to Ecliptic
     std::cout << "\n3. Transform to Ecliptic frame:\n";
-    CartesianState state_ecl = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ECLIPTIC);
+    CartesianState state_ecl = apply_rot(
+        state_j2000, ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ECLIPTIC, epoch_tdb));
     print_vector("Position", state_ecl.position(), "km");
     std::cout << "  (Note Z-component changed due to obliquity rotation)\n";
-    
+
     // Transform to ITRF (Earth-fixed)
     std::cout << "\n4. Transform to ITRF (Earth-fixed) at MJD = " << mjd << ":\n";
-    CartesianState state_itrf = ReferenceFrame::transform_state(
-        state_j2000, FrameType::J2000, FrameType::ITRF, mjd);
+    CartesianState state_itrf = apply_rot(
+        state_j2000, ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ITRF, epoch_tdb));
     print_vector("Position", state_itrf.position(), "km");
     print_vector("Velocity", state_itrf.velocity(), "km/s");
-    std::cout << "  (Velocity includes Coriolis effect)\n";
-    
+    std::cout << "  (Note: Coriolis correction requires typed API for full accuracy)\n";
+
     // GMST at this epoch
-    double gmst = ReferenceFrame::gmst(mjd);
-    std::cout << "\n5. GMST = " << gmst * RAD_TO_DEG << " deg = " 
+    double gmst = ReferenceFrame::gmst(epoch_utc);
+    std::cout << "\n5. GMST = " << gmst * RAD_TO_DEG << " deg = "
               << (gmst * RAD_TO_DEG / 15.0) << " hours\n";
-    
+
     // Round-trip verification
     std::cout << "\n6. Round-trip verification (J2000 → ECLIPTIC → J2000):\n";
-    CartesianState state_final = ReferenceFrame::transform_state(
-        state_ecl, FrameType::ECLIPTIC, FrameType::J2000);
+    CartesianState state_final = apply_rot(
+        state_ecl, ReferenceFrame::get_transformation(FrameType::ECLIPTIC, FrameType::J2000, epoch_tdb));
     Vector3d roundtrip_error = state_final.position() - state_j2000.position();
     std::cout << "  Position error = " << roundtrip_error.norm() * 1e6 << " microns\n";
 }
@@ -208,14 +216,18 @@ void example_ground_station_visibility() {
     std::cout << "  Longitude = " << lon * RAD_TO_DEG << " deg E\n";
     
     double mjd = MJD2000;
-    double gmst = ReferenceFrame::gmst(mjd);
-    
+    time::EpochTDB epoch_tdb = time::EpochTDB::from_mjd(mjd);
+    time::EpochUTC epoch_utc = time::EpochUTC::from_mjd(mjd);
+    double gmst = ReferenceFrame::gmst(epoch_utc);
+
     std::cout << "\n2. At epoch MJD = " << mjd << ":\n";
     std::cout << "  GMST = " << (gmst * RAD_TO_DEG / 15.0) << " hours\n";
-    
+
     // Transform satellite to ITRF
-    CartesianState sat_itrf = ReferenceFrame::transform_state(
-        sat_j2000, FrameType::J2000, FrameType::ITRF, mjd);
+    CartesianState sat_itrf(
+        ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ITRF, epoch_tdb) * sat_j2000.position(),
+        ReferenceFrame::get_transformation(FrameType::J2000, FrameType::ITRF, epoch_tdb) * sat_j2000.velocity(),
+        sat_j2000.mu());
     
     std::cout << "\n3. Satellite in Earth-fixed frame (ITRF):\n";
     print_vector("Position", sat_itrf.position(), "km");

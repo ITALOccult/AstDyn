@@ -6,11 +6,9 @@
  * 
  * Provides heliocentric positions and velocities for solar system planets.
  * 
- * Implementation uses simplified VSOP87 series expansions suitable for
- * accuracy of ~1 arcsec (Earth) to ~10 arcsec (outer planets) over
- * the period 1800-2050.
- * 
- * For higher accuracy, consider integrating SPICE toolkit (cspice).
+ * @warning Analytical VSOP87/Simon 1994 models are DEPRECATED and DISABLED for 
+ * precision reasons. High-precision orbit determination requires 
+ * external providers (SPICE/DE441).
  * 
  * References:
  * - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998)
@@ -21,99 +19,96 @@
 #ifndef ASTDYN_EPHEMERIS_PLANETARYEPHEMERIS_HPP
 #define ASTDYN_EPHEMERIS_PLANETARYEPHEMERIS_HPP
 
-#include "astdyn/core/Types.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/time/epoch.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include "astdyn/core/units.hpp"
+#include "astdyn/core/physics_types.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
 #include "astdyn/ephemeris/PlanetaryData.hpp"
 #include "astdyn/ephemeris/EphemerisProvider.hpp"
-#include <Eigen/Dense>
 #include <vector>
-#include <memory> // for std::shared_ptr
+#include <memory>
 
 namespace astdyn {
 namespace ephemeris {
 
 /**
- * @brief Planetary ephemeris calculator using analytical approximations
+ * @brief Planetary ephemeris gateway (DEPRECATED: internal analytical models)
  * 
- * Provides heliocentric positions and velocities in J2000 ecliptic frame.
+ * Provides heliocentric positions and velocities. 
  * 
- * Coordinate System:
- * - Reference frame: J2000.0 ecliptic (FK5)
- * - Origin: Solar System Barycenter (approximated as Sun center for planets)
- * - Units: AU for position, AU/day for velocity
- * 
- * Accuracy:
- * - Inner planets (Mercury-Mars): ~1-5 arcsec over 1800-2050
- * - Outer planets (Jupiter-Neptune): ~5-20 arcsec over 1800-2050
- * - Sufficient for asteroid orbit determination, preliminary trajectory design
- * 
- * For sub-arcsecond accuracy, use JPL SPICE kernels (DE440/441).
+ * @note This class no longer provides internal analytical approximations (VSOP87).
+ * It acts as a gateway for high-precision providers (DE441/Horizons).
+ * Call PlanetaryEphemeris::setProvider() before any query.
  */
 class PlanetaryEphemeris {
 public:
     /**
-     * @brief Construct ephemeris calculator
+     * @brief Construct ephemeris gateway with a provider
+     * @param provider Shared pointer to high-precision provider
      */
-    PlanetaryEphemeris() = default;
+    explicit PlanetaryEphemeris(std::shared_ptr<EphemerisProvider> provider = nullptr);
+
+    /**
+     * @param body Celestial body
+     * @param t Epoch (TDB)
+     * @return Position vector in J2000 equatorial frame (ICRF)
+     */
+    math::Vector3<core::GCRF, physics::Distance> getPosition(CelestialBody body, time::EpochTDB t) const;
     
     /**
-     * @brief Get heliocentric position of a planet
-     * @param body Celestial body (planet or Moon)
-     * @param jd_tdb Julian Date in TDB time scale
-     * @return Position vector [AU] in J2000 ecliptic frame
+     * @param body Celestial body
+     * @param t Epoch (TDB)
+     * @return Velocity vector in J2000 equatorial frame (ICRF)
      */
-    static Eigen::Vector3d getPosition(CelestialBody body, double jd_tdb);
+    math::Vector3<core::GCRF, physics::Velocity> getVelocity(CelestialBody body, time::EpochTDB t) const;
     
     /**
-     * @brief Get heliocentric velocity of a planet
-     * @param body Celestial body (planet or Moon)
-     * @param jd_tdb Julian Date in TDB time scale
-     * @return Velocity vector [AU/day] in J2000 ecliptic frame
+     * @param body Celestial body
+     * @param t Epoch (TDB)
+     * @return CartesianState in J2000 equatorial frame (GCRF)
      */
-    static Eigen::Vector3d getVelocity(CelestialBody body, double jd_tdb);
+    physics::CartesianStateTyped<core::GCRF> getState(CelestialBody body, time::EpochTDB t) const;
     
     /**
-     * @brief Get heliocentric state (position + velocity)
-     * @param body Celestial body (planet or Moon)
-     * @param jd_tdb Julian Date in TDB time scale
-     * @return CartesianState in J2000 ecliptic frame [AU, AU/day]
+     * @param t Epoch (TDB)
+     * @return Position vector of Sun relative to SSB
      */
-    static coordinates::CartesianState getState(CelestialBody body, double jd_tdb);
-    
-    /**
-     * @brief Get barycentric position (Sun relative to SSB)
-     * @param jd_tdb Julian Date in TDB time scale
-     * @return Position vector [AU] of Sun relative to SSB
-     * 
-     * Computed as weighted sum of planetary positions.
-     * Useful for high-precision orbit determination.
-     */
-    static Eigen::Vector3d getSunBarycentricPosition(double jd_tdb);
+    math::Vector3<core::GCRF, physics::Distance> getSunBarycentricPosition(time::EpochTDB t) const;
     
     /**
      * @brief Convert heliocentric to barycentric state
-     * @param heliocentric_state State relative to Sun
-     * @param jd_tdb Julian Date in TDB
-     * @return State relative to Solar System Barycenter
      */
-    static coordinates::CartesianState heliocentricToBarycentric(
-        const coordinates::CartesianState& heliocentric_state, 
-        double jd_tdb
-    );
+    physics::CartesianStateTyped<core::GCRF> heliocentricToBarycentric(
+        const physics::CartesianStateTyped<core::GCRF>& heliocentric_state, 
+        time::EpochTDB t
+    ) const;
 
     /**
-     * @brief Set a high-precision ephemeris provider (e.g. DE441)
-     * 
-     * If set, getPosition/getVelocity will use this provider instead of
-     * the internal analytical approximations.
-     * 
-     * @param provider Shared pointer to provider (can be null to reset to default)
+     * @brief Set the global ephemeris provider for the current thread
      */
-    static void setProvider(std::shared_ptr<EphemerisProvider> provider);
+    static void setGlobalProvider(std::shared_ptr<EphemerisProvider> provider);
+    
+    /**
+     * @return Global provider for the current thread
+     */
+    static std::shared_ptr<EphemerisProvider> getGlobalProvider();
+
+    void setProvider(std::shared_ptr<EphemerisProvider> provider);
+    std::shared_ptr<EphemerisProvider> getProvider() const { return provider_; }
+    
+    /**
+     * @brief Get gravitational parameter of a planet in AU^3/day^2
+     */
+    static double planet_gm(CelestialBody body) {
+        return physics::GravitationalParameter::from_km3_s2(PlanetaryData::getGM(body)).to_au3_d2();
+    }
 
 private:
-    static std::shared_ptr<EphemerisProvider> global_provider_;
+    std::shared_ptr<EphemerisProvider> provider_;
+    static thread_local std::shared_ptr<EphemerisProvider> global_provider_;
 
     /**
      * @brief Compute Julian centuries from J2000.0
@@ -133,6 +128,7 @@ private:
      * Uses Simon et al. (1994) low-precision formulae.
      * L = mean longitude, omega_bar = longitude of perihelion
      */
+    [[deprecated("VSOP87 analytical elements are no longer supported. Use a provider.")]]
     static void computeOrbitalElements(
         CelestialBody body, 
         double T,

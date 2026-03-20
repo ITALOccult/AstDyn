@@ -18,6 +18,7 @@
 #include <Eigen/Dense>
 #include <functional>
 #include <vector>
+#include <atomic>
 
 namespace astdyn::propagation {
 
@@ -40,6 +41,8 @@ struct IntegrationStatistics {
     double min_step_size = 0.0;  ///< Minimum step size used
     double max_step_size = 0.0;  ///< Maximum step size used
     double final_time = 0.0;     ///< Actual final time reached
+    double hamiltonian_drift = 0.0;         ///< drift di H reale (oscilla)
+    double shadow_hamiltonian_drift = 0.0;  ///< drift di H̃ (quasi-conservato)
     
     void reset() {
         num_steps = 0;
@@ -48,7 +51,11 @@ struct IntegrationStatistics {
         min_step_size = 0.0;
         max_step_size = 0.0;
         final_time = 0.0;
+        hamiltonian_drift = 0.0;
+        shadow_hamiltonian_drift = 0.0;
     }
+
+    IntegrationStatistics() = default;
 };
 
 /**
@@ -88,6 +95,20 @@ public:
                                  double tf,
                                  std::vector<double>& t_out,
                                  std::vector<Eigen::VectorXd>& y_out) = 0;
+    
+    /**
+     * @brief Integrate and return states at specific times
+     * 
+     * @param f Derivative function
+     * @param y0 Initial state at t0
+     * @param t0 Initial time
+     * @param t_targets Sorted list of target times
+     * @return States at each target time
+     */
+    virtual std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                                      const Eigen::VectorXd& y0,
+                                                      double t0,
+                                                      const std::vector<double>& t_targets) = 0;
     
     /**
      * @brief Get integration statistics
@@ -136,6 +157,11 @@ public:
                         double tf,
                         std::vector<double>& t_out,
                         std::vector<Eigen::VectorXd>& y_out) override;
+
+    std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                             const Eigen::VectorXd& y0,
+                                             double t0,
+                                             const std::vector<double>& t_targets) override;
     
     /**
      * @brief Single RK4 step
@@ -197,6 +223,11 @@ public:
                         double tf,
                         std::vector<double>& t_out,
                         std::vector<Eigen::VectorXd>& y_out) override;
+
+    std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                             const Eigen::VectorXd& y0,
+                                             double t0,
+                                             const std::vector<double>& t_targets) override;
     
     /**
      * @brief Adaptive RKF78 step with error control
@@ -221,16 +252,19 @@ public:
     void set_max_step(double h_max) { h_max_ = h_max; }
     
 private:
-    double h_initial_; ///< Initial step size
-    double tolerance_; ///< Relative error tolerance
-    double h_min_;     ///< Minimum step size
-    double h_max_;     ///< Maximum step size
+    void compute_stages(const DerivativeFunction& f, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k);
+    double estimate_error(const Eigen::VectorXd& y, const Eigen::VectorXd& y7, const Eigen::VectorXd& y8, double h) const;
+    void verify_iteration_limits(int count, int rejections, double t, double h) const;
+
+    double h_initial_;
+    double tolerance_;
+    double h_min_;
+    double h_max_;
     
-    // RKF78 Butcher tableau coefficients
-    static const double a_[13][12];  // Matrix A
-    static const double b7_[13];     // 7th order weights
-    static const double b8_[13];     // 8th order weights
-    static const double c_[13];      // Time nodes
+    static const double a_[13][12];
+    static const double b7_[13];
+    static const double b8_[13];
+    static const double c_[13];
 };
 
 } // namespace astdyn::propagation

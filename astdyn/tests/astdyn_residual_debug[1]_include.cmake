@@ -1,5 +1,0 @@
-if(EXISTS "/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_residual_debug[1]_tests.cmake")
-  include("/Users/michelebigi/VisualStudio Code/GitHub/ITALOccultLibrary/astdyn/tests/astdyn_residual_debug[1]_tests.cmake")
-else()
-  add_test(astdyn_residual_debug_NOT_BUILT astdyn_residual_debug_NOT_BUILT)
-endif()

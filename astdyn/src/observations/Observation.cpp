@@ -15,23 +15,23 @@ namespace observations {
 void ObservationSet::sortByTime() {
     std::sort(observations.begin(), observations.end(),
         [](const Observation& a, const Observation& b) {
-            return a.getMJD() < b.getMJD();
+            return a.getEpoch().mjd() < b.getEpoch().mjd();
         });
 }
 
-double ObservationSet::getTimeSpan() const {
-    if (observations.empty()) return 0.0;
+time::TimeDuration ObservationSet::getTimeSpan() const {
+    if (observations.empty()) return time::TimeDuration::from_seconds(0.0);
     
-    double min_mjd = observations.front().getMJD();
-    double max_mjd = observations.front().getMJD();
+    time::EpochUTC min_epoch = observations.front().getEpoch();
+    time::EpochUTC max_epoch = observations.front().getEpoch();
     
     for (const auto& obs : observations) {
-        double mjd = obs.getMJD();
-        if (mjd < min_mjd) min_mjd = mjd;
-        if (mjd > max_mjd) max_mjd = mjd;
+        time::EpochUTC epoch = obs.getEpoch();
+        if (epoch < min_epoch) min_epoch = epoch;
+        if (epoch > max_epoch) max_epoch = epoch;
     }
     
-    return max_mjd - min_mjd;
+    return max_epoch - min_epoch;
 }
 
 std::vector<OpticalObservation> ObservationSet::getOpticalObservations() const {

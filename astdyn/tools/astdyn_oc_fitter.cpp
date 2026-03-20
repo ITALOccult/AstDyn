@@ -21,47 +21,19 @@
 #include <cmath>
 #include <array>
 #include <vector>
-#include <string>
-#include <algorithm>
-#include <numeric>
 #include <map>
 
+// Centralized Constants
+#include "astdyn/core/Constants.hpp"
+
+// New AstDyn Architecture (CTFYH)
+#include "astdyn/core/units.hpp"
+#include "astdyn/types/orbital_state.hpp"
+#include "astdyn/utils/time_types.hpp"
+#include "astdyn/io/oel_parser.hpp"
+
 namespace astdyn {
-
-//=============================================================================
-// COSTANTI
-//=============================================================================
-
-namespace constants {
-    constexpr double PI = 3.14159265358979323846;
-    constexpr double TWO_PI = 2.0 * PI;
-    constexpr double DEG2RAD = PI / 180.0;
-    constexpr double RAD2DEG = 180.0 / PI;
-    constexpr double ARCSEC2RAD = PI / (180.0 * 3600.0);
-    constexpr double RAD2ARCSEC = 180.0 * 3600.0 / PI;
-    
-    constexpr double k = 0.01720209895;          // Costante di Gauss
-    constexpr double k2 = k * k;                 // GM_Sun [AU³/day²]
-    constexpr double c_light = 173.1446326846693; // Velocità luce [AU/day]
-    constexpr double c2 = c_light * c_light;
-    constexpr double AU_km = 149597870.7;
-    
-    constexpr double OBLIQUITY_J2000 = 23.439291111 * DEG2RAD;
-    constexpr double JD_J2000 = 2451545.0;
-    constexpr double MJD_J2000 = 51544.5;
-    
-    // GM pianeti [AU³/day²]
-    constexpr double GM_Mercury = 4.9125474514508118e-11;
-    constexpr double GM_Venus   = 7.2434524861627027e-10;
-    constexpr double GM_EMB     = 8.9970116036316091e-10;
-    constexpr double GM_Mars    = 9.5495351057792580e-11;
-    constexpr double GM_Jupiter = 2.8253458420837436e-07;
-    constexpr double GM_Saturn  = 8.4597151856806587e-08;
-    constexpr double GM_Uranus  = 1.2920249167819693e-08;
-    constexpr double GM_Neptune = 1.5243589007842762e-08;
-}
-
-using namespace constants;
+using namespace astdyn::constants;
 
 //=============================================================================
 // STRUTTURE DATI
@@ -179,66 +151,41 @@ struct FitStatistics {
 class AstDySElementsReader {
 public:
     static OrbitalElements read(const std::string& filename) {
+        using namespace astdyn::utils;
+        using astdyn::core::ModifiedJulianDate;
+        using astdyn::core::Radian;
+
         std::ifstream file(filename);
-        if (!file.is_open()) {
-            throw std::runtime_error("Cannot open file: " + filename);
-        }
+        if (!file.is_open()) throw std::runtime_error("Cannot open file: " + filename);
         
         OrbitalElements elem;
-        elem.has_covariance = false;
         std::string line;
-        
         while (std::getline(file, line)) {
             if (line.empty() || line[0] == '!' || line[0] == '%') continue;
             
-            // Parse formato AstDyS
-            // Esempio: 17030  KEP  60676.0  3.1754733  0.0454207  2.9046 ...
             std::istringstream iss(line);
-            
-            std::string token;
-            iss >> token;
-            
-            // Numero o designazione
-            try {
-                elem.number = std::stoi(token);
-                elem.name = "(" + token + ")";
-            } catch (...) {
-                elem.number = 0;
-                elem.name = token;
-            }
-            
-            // Tipo elementi (KEP, EQU, CAR)
-            std::string type;
-            iss >> type;
-            
-            if (type == "KEP" || type == "kep") {
-                // Elementi kepleriani: epoch a e i Omega omega M
-                iss >> elem.epoch >> elem.a >> elem.e >> elem.i 
-                    >> elem.Omega >> elem.omega >> elem.M;
-            } else if (type == "EQU" || type == "equ") {
-                // Elementi equinoziali: epoch a h k p q lambda
-                double h, k_elem, p, q, lambda;
-                iss >> elem.epoch >> elem.a >> h >> k_elem >> p >> q >> lambda;
+            std::string token, type;
+            iss >> token >> type;
+            elem.name = token;
+
+            if (type == "KEP") {
+                double raw_epoch, a, e, i, node, peri, m;
+                iss >> raw_epoch >> a >> e >> i >> node >> peri >> m;
                 
-                // Converti in kepleriani
-                elem.e = std::sqrt(h*h + k_elem*k_elem);
-                elem.omega = std::atan2(h, k_elem) * RAD2DEG;
-                elem.i = 2.0 * std::asin(std::sqrt(p*p + q*q)) * RAD2DEG;
-                elem.Omega = std::atan2(p, q) * RAD2DEG;
-                elem.M = (lambda - elem.omega - elem.Omega);
-                while (elem.M < 0) elem.M += 360;
-                while (elem.M >= 360) elem.M -= 360;
+                // 1. Convert to AstDyn Strong Types
+                const auto instant = astdyn::utils::Instant::from_tt(astdyn::core::ModifiedJulianDate(raw_epoch));
+                const auto state_kep = astdyn::types::OrbitalState<astdyn::core::GCRF, astdyn::types::KeplerianTag>::create({
+                    a, e, i * DEG_TO_RAD, node * DEG_TO_RAD, peri * DEG_TO_RAD, m * DEG_TO_RAD
+                });
+                
+                if (!state_kep) throw std::runtime_error("Invalid orbital elements (AstDyn Validation)");
+
+                // 2. Map back to Legacy Structure
+                elem.epoch = raw_epoch;
+                elem.a = a; elem.e = e; 
+                elem.i = i; elem.Omega = node; elem.omega = peri; elem.M = m;
             }
-            
-            // Leggi H e G se presenti
-            if (iss >> elem.H) {
-                if (!(iss >> elem.G)) elem.G = 0.15;
-            } else {
-                elem.H = 15.0;
-                elem.G = 0.15;
-            }
-            
-            break;  // Solo prima riga di elementi
+            break;
         }
         
         // Cerca matrice covarianza
@@ -315,8 +262,8 @@ public:
                 >> o.ra_sigma >> o.dec_sigma >> o.mag >> o.band >> o.obs_code;
             
             // Converti in radianti
-            o.ra_obs = ra_deg * DEG2RAD;
-            o.dec_obs = dec_deg * DEG2RAD;
+            o.ra_obs = ra_deg * DEG_TO_RAD;
+            o.dec_obs = dec_deg * DEG_TO_RAD;
             
             // Default errori se non specificati
             if (o.ra_sigma <= 0) o.ra_sigma = 0.5;
@@ -455,10 +402,10 @@ Vec3 getPlanetPosition(double jd, int planet) {
             return Vec3(0, 0, 0);
     }
     
-    double i_rad = I * DEG2RAD;
-    double Omega_rad = Omega * DEG2RAD;
-    double omega = (omega_bar - Omega) * DEG2RAD;
-    double M = (L - omega_bar) * DEG2RAD;
+    double i_rad = I * DEG_TO_RAD;
+    double Omega_rad = Omega * DEG_TO_RAD;
+    double omega = (omega_bar - Omega) * DEG_TO_RAD;
+    double M = (L - omega_bar) * DEG_TO_RAD;
     M = std::fmod(M, TWO_PI);
     if (M < 0) M += TWO_PI;
     
@@ -540,8 +487,8 @@ public:
             
             // Calcola residui [arcsec]
             double cos_dec = std::cos(obs[i].dec_obs);
-            obs[i].ra_residual = (obs[i].ra_obs - ra_calc) * cos_dec * RAD2ARCSEC;
-            obs[i].dec_residual = (obs[i].dec_obs - dec_calc) * RAD2ARCSEC;
+            obs[i].ra_residual = (obs[i].ra_obs - ra_calc) * cos_dec * RAD_TO_ARCSEC;
+            obs[i].dec_residual = (obs[i].dec_obs - dec_calc) * RAD_TO_ARCSEC;
             
             // Chi normalizzato
             double chi_ra = obs[i].ra_residual / obs[i].ra_sigma;
@@ -579,7 +526,7 @@ public:
         
         // Errore
         Vec3 dr = y2.r - y0.r;
-        return dr.norm() * AU_km * 1000;  // [m]
+        return dr.norm() * AU_TO_KM * 1000;  // [m]
     }
     
 private:
@@ -594,10 +541,10 @@ private:
     State elementsToState(const OrbitalElements& elem) {
         double a = elem.a;
         double e = elem.e;
-        double inc = elem.i * DEG2RAD;
-        double Omega = elem.Omega * DEG2RAD;
-        double omega = elem.omega * DEG2RAD;
-        double M0 = elem.M * DEG2RAD;
+        double inc = elem.i * DEG_TO_RAD;
+        double Omega = elem.Omega * DEG_TO_RAD;
+        double omega = elem.omega * DEG_TO_RAD;
+        double M0 = elem.M * DEG_TO_RAD;
         
         // Keplero
         double E = M0;
@@ -644,7 +591,7 @@ private:
         
         // Correzione light-time (iterativa)
         for (int iter = 0; iter < 3; iter++) {
-            double lt = delta / c_light;
+            double lt = delta / SPEED_OF_LIGHT_AU_PER_DAY;
             Vec3 r_retard = state.r - state.v * lt;
             geo = r_retard - earth;
             delta = geo.norm();
@@ -705,12 +652,12 @@ private:
         double r3 = r_norm * r_norm * r_norm;
         
         // Kepleriano
-        Vec3 acc = r * (-k2 / r3);
+        Vec3 acc = r * (-GMS / r3);
         
         // Perturbazioni planetarie
         constexpr double GM[8] = {
-            GM_Mercury, GM_Venus, GM_EMB, GM_Mars,
-            GM_Jupiter, GM_Saturn, GM_Uranus, GM_Neptune
+            GM_MERCURY_AU, GM_VENUS_AU, GM_EARTH_AU, GM_MARS_AU,
+            GM_JUPITER_AU, GM_SATURN_AU, GM_URANUS_AU, GM_NEPTUNE_AU
         };
         
         for (int i = 0; i < 8; i++) {
@@ -726,8 +673,8 @@ private:
         // Correzione relativistica
         double v2 = v.norm2();
         double rv = r.dot(v);
-        double factor = k2 / (c2 * r3);
-        acc += r * (factor * (4*k2/r_norm - v2)) + v * (factor * 4 * rv);
+        double factor = GMS * INV_C2_AU / r3;
+        acc += r * (factor * (4*GMS/r_norm - v2)) + v * (factor * 4 * rv);
         
         return acc;
     }
@@ -803,7 +750,7 @@ std::string formatRA(double ra_rad) {
 }
 
 std::string formatDec(double dec_rad) {
-    double d = dec_rad * RAD2DEG;
+    double d = dec_rad * RAD_TO_DEG;
     char sign = d >= 0 ? '+' : '-';
     d = std::abs(d);
     int dd = (int)d;

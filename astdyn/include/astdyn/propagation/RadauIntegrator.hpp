@@ -4,31 +4,9 @@
  * @author AstDyn Team
  * @date 2025-12-09
  * 
- * ⚠️  WARNING: NOT YET OPTIMIZED FOR PRODUCTION USE ⚠️
- * 
- * This integrator is currently SLOW and NOT RECOMMENDED for general use.
- * 
- * CURRENT STATUS:
- * - ❌ Too slow for non-stiff problems (100-1000× slower than RKF78)
- * - ❌ Newton solver not optimized
- * - ❌ No step size prediction
- * - ⚠️  Use ONLY for specific stiff problems
- * 
- * RECOMMENDED ALTERNATIVES:
- * - For general propagation: RKF78 (fast, accurate, adaptive)
- * - For orbit determination: RKF78 + STMPropagator
- * - For long-term: Gauss (symplectic, energy-conserving)
- * 
- * USE RADAU15 ONLY IF:
- * - Problem is genuinely stiff (rare in orbital mechanics)
- * - Maximum precision required (> 1e-13)
- * - You understand implicit methods and their cost
- * 
- * FUTURE WORK:
- * - Optimize Newton solver
- * - Add step size prediction
- * - Implement variable-order scheme
- * - Benchmark against DOPRI/RADAU from literature
+ * This is a high-precision, optimized implementation of the Radau IIA integrator.
+ * It uses Jacobian caching and a corrected PI controller for maximum performance
+ * in celestial mechanics problems.
  * 
  * References:
  * - Everhart, E. (1985) "An efficient integrator that uses Gauss-Radau spacings"
@@ -61,7 +39,6 @@ namespace astdyn::propagation {
  * 
  * References:
  * - Hairer & Wanner (1996) "Solving Ordinary Differential Equations II"
- * - Everhart (1985) "An efficient integrator that uses Gauss-Radau spacings"
  */
 class RadauIntegrator : public Integrator {
 public:
@@ -91,6 +68,11 @@ public:
                         double tf,
                         std::vector<double>& t_out,
                         std::vector<Eigen::VectorXd>& y_out) override;
+
+    std::vector<Eigen::VectorXd> integrate_at(const DerivativeFunction& f,
+                                             const Eigen::VectorXd& y0,
+                                             double t0,
+                                             const std::vector<double>& t_targets) override;
     
     /**
      * @brief Adaptive Radau step with error control
@@ -123,8 +105,8 @@ private:
     double h_max_;          ///< Maximum step size
     int max_newton_iter_;   ///< Max Newton iterations
     
-    // Radau IIA coefficients (8 stages, order 15)
-    static constexpr int num_stages_ = 8;
+    // Radau IIA coefficients (3 stages, order 5)
+    static constexpr int num_stages_ = 3;
     static const double c_[num_stages_];      ///< Time nodes (Radau points)
     static const double a_[num_stages_][num_stages_];  ///< Runge-Kutta matrix
     static const double b_[num_stages_];      ///< Weights
@@ -146,6 +128,13 @@ private:
                                const Eigen::VectorXd& y,
                                double h,
                                std::vector<Eigen::VectorXd>& k);
+
+    std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>> setup_lu_solvers(const Eigen::MatrixXd& jac, int n, double h);
+    void setup_initial_guess(const DerivativeFunction& f, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k);
+    bool solve_newton_iterations(const DerivativeFunction& f, const std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>>& solvers, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k);
+
+    Eigen::MatrixXd jacobian_;     ///< Last computed Jacobian
+    std::vector<Eigen::VectorXd> k_prev_; ///< Last stage derivatives (initial guess)
 };
 
 } // namespace astdyn::propagation

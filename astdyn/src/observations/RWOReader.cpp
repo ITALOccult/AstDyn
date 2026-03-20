@@ -20,20 +20,11 @@ namespace observations {
 
 using namespace utils;
 
-std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath) {
-    // RWO format is OrbFit's proprietary format, NOT standard MPC!
-    // We must parse it directly using the format specification from OrbFit
-    
+std::vector<OpticalObservation> RWOReader::readStream(std::istream& stream) {
     std::vector<OpticalObservation> observations;
-    std::ifstream file(filepath);
-    
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file: " + filepath);
-    }
-    
     std::string line;
     int line_num = 0;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         line_num++;
         if (line.empty() || line[0] == '#' || line[0] == '!') continue;
         
@@ -55,6 +46,19 @@ std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath)
     std::cerr << "RWOReader Debug: Total lines " << line_num << ". Total obs " << observations.size() << "\n";
     
     return observations;
+}
+
+std::vector<OpticalObservation> RWOReader::readFile(const std::string& filepath) {
+    // RWO format is OrbFit's proprietary format, NOT standard MPC!
+    // We must parse it directly using the format specification from OrbFit
+    
+    std::ifstream file(filepath);
+    
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file: " + filepath);
+    }
+    
+    return readStream(file);
 }
 
 std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) {
@@ -79,7 +83,7 @@ std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) 
         }
         
         std::string date_str = line.substr(17, 21);
-        obs.mjd_utc = parseDate(date_str);
+        obs.time = parseDate(date_str);
         // ... (rest of function)
         
         // Fortran FORMAT 521 starts at READ(record(51:),521)
@@ -164,13 +168,13 @@ std::optional<OpticalObservation> RWOReader::parseLine(const std::string& line) 
             }
         }
 
-        obs.sigma_ra = sigma_ra_arcsec * constants::ARCSEC_TO_RAD;
-        obs.sigma_dec = sigma_dec_arcsec * constants::ARCSEC_TO_RAD;
+        obs.sigma_ra = astrometry::Angle::from_arcsec(sigma_ra_arcsec);
+        obs.sigma_dec = astrometry::Angle::from_arcsec(sigma_dec_arcsec);
         
         return obs;
         
     } catch (const std::exception& e) {
-        std::cerr << "Error parsing RWO line: " << e.what() << std::endl;
+        std::cerr << "Error parsing RWO line: " << e.what() << "\n";
         return std::nullopt;
     }
 }
@@ -208,7 +212,7 @@ std::string RWOReader::parseDesignation(const std::string& line) {
     return trim(line.substr(0, 14));
 }
 
-double RWOReader::parseDate(const std::string& date_str) {
+time::EpochUTC RWOReader::parseDate(const std::string& date_str) {
     // Format: "YYYY MM DD.ddddddddddd" from Fortran FORMAT 120: (I4,1X,I2,1X,F13.10)
     std::istringstream iss(date_str);
     int year, month;
@@ -218,16 +222,17 @@ double RWOReader::parseDate(const std::string& date_str) {
     
     if (year < 1000 || year > 3000 || month < 1 || month > 12 || day < 1 || day > 32) {
         std::cerr << "WARNING: Invalid date parsed: " << year << "/" << month << "/" << day 
-                  << " from string: '" << date_str << "'" << std::endl;
+                  << " from string: '" << date_str << "'" << "\n";
     }
     
     // Convert to MJD
     int day_int = static_cast<int>(day);
     double fraction = day - day_int;
-    return time::calendar_to_mjd(year, month, day_int, fraction);
+    double mjd = time::calendar_to_mjd(year, month, day_int, fraction);
+    return time::EpochUTC::from_mjd(mjd);
 }
 
-double RWOReader::parseRA(const std::string& ra_str) {
+astrometry::RightAscension RWOReader::parseRA(const std::string& ra_str) {
     // Format: "HH MM SS.ddd"
     std::istringstream iss(ra_str);
     int hours, minutes;
@@ -235,12 +240,12 @@ double RWOReader::parseRA(const std::string& ra_str) {
     
     iss >> hours >> minutes >> seconds;
     
-    // Convert to degrees, then radians
+    // Convert to degrees
     double ra_deg = hours * 15.0 + minutes * 0.25 + seconds * (15.0 / 3600.0);
-    return ra_deg * constants::DEG_TO_RAD;
+    return astrometry::RightAscension(astrometry::Angle::from_deg(ra_deg));
 }
 
-double RWOReader::parseDec(const std::string& dec_str) {
+astrometry::Declination RWOReader::parseDec(const std::string& dec_str) {
     // Format: "sDD MM SS.dd" where s is + or -
     char sign = dec_str[0];
     
@@ -256,7 +261,7 @@ double RWOReader::parseDec(const std::string& dec_str) {
         dec_deg = -dec_deg;
     }
     
-    return dec_deg * constants::DEG_TO_RAD;
+    return astrometry::Declination(astrometry::Angle::from_deg(dec_deg));
 }
 
 std::string RWOReader::parseObservatory(const std::string& line) {

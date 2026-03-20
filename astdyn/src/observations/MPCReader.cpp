@@ -18,25 +18,31 @@ namespace observations {
 
 using namespace astdyn::utils;
 
+std::vector<OpticalObservation> MPCReader::readStream(std::istream& stream) {
+    std::vector<OpticalObservation> result;
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (line.length() >= 80) {
+            auto obs = parseLine(line);
+            if (obs) result.push_back(*obs);
+        }
+    }
+    return result;
+}
+
+std::vector<OpticalObservation> MPCReader::parseString(const std::string& content) {
+    std::istringstream iss(content);
+    return readStream(iss);
+}
+
 std::vector<OpticalObservation> MPCReader::readFile(const std::string& filepath) {
-    std::vector<OpticalObservation> observations;
     std::ifstream file(filepath);
     
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open file: " + filepath);
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        
-        auto obs = parseLine(line);
-        if (obs) {
-            observations.push_back(*obs);
-        }
-    }
-    
-    return observations;
+    return readStream(file);
 }
 
 std::optional<OpticalObservation> MPCReader::parseLine(const std::string& line) {
@@ -61,7 +67,7 @@ std::optional<OpticalObservation> MPCReader::parseLine(const std::string& line) 
         
         // Parse date (columns 16-32)
         std::string date_str = line.substr(15, 17);
-        obs.mjd_utc = parseDate(date_str);
+        obs.time = parseDate(date_str);
         
         // Parse RA (columns 33-44)
         std::string ra_str = line.substr(32, 12);
@@ -91,8 +97,8 @@ std::optional<OpticalObservation> MPCReader::parseLine(const std::string& line) 
         obs.observatory_code = trim(line.substr(77, 3));
         
         // Set default uncertainties (can be refined with astrometric catalogs)
-        obs.sigma_ra = 0.5 * constants::ARCSEC_TO_RAD;  // 0.5 arcsec
-        obs.sigma_dec = 0.5 * constants::ARCSEC_TO_RAD;
+        obs.sigma_ra = astrometry::Angle::from_arcsec(0.5);  // 0.5 arcsec
+        obs.sigma_dec = astrometry::Angle::from_arcsec(0.5);
         
         return obs;
         
@@ -149,7 +155,7 @@ std::string MPCReader::parseDesignation(const std::string& packed) {
     return trim(packed);
 }
 
-double MPCReader::parseDate(const std::string& date_str) {
+time::EpochUTC MPCReader::parseDate(const std::string& date_str) {
     // Format: "YYYY MM DD.ddddd"
     std::istringstream iss(date_str);
     int year, month;
@@ -160,10 +166,11 @@ double MPCReader::parseDate(const std::string& date_str) {
     // Convert to MJD
     int day_int = static_cast<int>(day);
     double fraction = day - day_int;
-    return time::calendar_to_mjd(year, month, day_int, fraction);
+    double mjd = time::calendar_to_mjd(year, month, day_int, fraction);
+    return time::EpochUTC::from_mjd(mjd);
 }
 
-double MPCReader::parseRA(const std::string& ra_str) {
+astrometry::RightAscension MPCReader::parseRA(const std::string& ra_str) {
     // Format: "HH MM SS.ddd"
     std::istringstream iss(ra_str);
     int hours, minutes;
@@ -171,12 +178,12 @@ double MPCReader::parseRA(const std::string& ra_str) {
     
     iss >> hours >> minutes >> seconds;
     
-    // Convert to degrees, then radians
+    // Convert to degrees
     double ra_deg = hours * 15.0 + minutes * 0.25 + seconds * (15.0 / 3600.0);
-    return ra_deg * constants::DEG_TO_RAD;
+    return astrometry::RightAscension(astrometry::Angle::from_deg(ra_deg));
 }
 
-double MPCReader::parseDec(const std::string& dec_str) {
+astrometry::Declination MPCReader::parseDec(const std::string& dec_str) {
     // Format: "sDD MM SS.dd"
     char sign = dec_str[0];
     
@@ -192,7 +199,7 @@ double MPCReader::parseDec(const std::string& dec_str) {
         dec_deg = -dec_deg;
     }
     
-    return dec_deg * constants::DEG_TO_RAD;
+    return astrometry::Declination(astrometry::Angle::from_deg(dec_deg));
 }
 
 std::optional<double> MPCReader::parseMagnitude(const std::string& mag_str) {
@@ -277,6 +284,88 @@ std::string MPCReader::unpackProvisional(const std::string& packed) {
     std::string suffix = trimmed.substr(3);
     
     return std::to_string(year) + " " + suffix;
+}
+
+// ============================================================================
+// MPCWriter Implementation
+// ============================================================================
+
+void MPCWriter::writeFile(const std::string& filepath, const std::vector<OpticalObservation>& observations) {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file for writing: " + filepath);
+    }
+    
+    for (const auto& obs : observations) {
+        file << formatLine(obs) << "\n";
+    }
+}
+
+std::string MPCWriter::formatLine(const OpticalObservation& obs) {
+    std::stringstream ss;
+    
+    // 1-12: Designation
+    ss << std::left << std::setw(12) << packDesignation(obs.object_designation);
+    
+    // 13: Discovery (*)
+    ss << (obs.is_discovery ? "*" : " ");
+    
+    // 14-15: Notes
+    ss << (obs.note1.empty() ? " " : obs.note1.substr(0,1));
+    ss << (obs.note2.empty() ? " " : obs.note2.substr(0,1));
+    
+    // 16-32: Date (YYYY MM DD.ddddd)
+    ss << formatDate(obs.time);
+    
+    // 33-44: RA
+    ss << formatRA(obs.ra);
+    
+    // 45-56: Dec
+    ss << formatDec(obs.dec);
+    
+    // 57-65: Blank
+    ss << "         ";
+    
+    // 66-70: Magnitude
+    if (obs.magnitude) {
+        ss << std::right << std::fixed << std::setprecision(1) << std::setw(5) << *obs.magnitude;
+    } else {
+        ss << "     ";
+    }
+    
+    // 71: Band
+    ss << (obs.mag_band ? *obs.mag_band : ' ');
+    
+    // 72-77: Catalog/Offset stuff (blank for now)
+    ss << "      ";
+    
+    // 78-80: Observatory code
+    ss << std::right << std::setw(3) << obs.observatory_code;
+    
+    return ss.str();
+}
+
+std::string MPCWriter::packDesignation(const std::string& designation) {
+    // Basic implementation: truncate or pad to 12 chars
+    if (designation.length() > 12) return designation.substr(0, 12);
+    return designation;
+}
+
+std::string MPCWriter::formatDate(time::EpochUTC t_utc) {
+    auto [year, month, day, fraction] = time::mjd_to_calendar(t_utc.mjd());
+    
+    std::stringstream ss;
+    ss << " " << std::setfill('0') << std::setw(4) << year << " " 
+       << std::setw(2) << month << " " << std::fixed << std::setprecision(5) << std::setw(8) << (day + fraction);
+    return ss.str();
+}
+
+std::string MPCWriter::formatRA(astrometry::RightAscension ra) {
+    return " " + ra.to_hms();
+}
+
+std::string MPCWriter::formatDec(astrometry::Declination dec) {
+    return dec.to_dms();
 }
 
 } // namespace observations

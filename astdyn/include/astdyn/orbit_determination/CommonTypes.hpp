@@ -7,12 +7,13 @@
 #ifndef ASTDYN_OD_COMMON_TYPES_HPP
 #define ASTDYN_OD_COMMON_TYPES_HPP
 
+#include "astdyn/time/epoch.hpp"
 #include <string>
 
 namespace astdyn::orbit_determination {
 
 struct Observation {
-    double epoch_mjd;
+    time::EpochUTC time;
     double ra_deg;
     double dec_deg;
     double ra_sigma_arcsec;
@@ -23,7 +24,7 @@ struct Observation {
 };
 
 struct Residual {
-    double epoch_mjd;
+    time::EpochUTC time;
     double ra_computed_deg;
     double dec_computed_deg;
     double ra_residual_arcsec;

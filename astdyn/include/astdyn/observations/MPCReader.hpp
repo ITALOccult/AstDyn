@@ -23,6 +23,8 @@
  *  71:    Band
  *  78-80: Observatory code
  */
+ 
+#include "astdyn/time/epoch.hpp"
 
 #ifndef ASTDYN_OBSERVATIONS_MPCREADER_HPP
 #define ASTDYN_OBSERVATIONS_MPCREADER_HPP
@@ -47,6 +49,20 @@ public:
      * @return Vector of observations
      */
     static std::vector<OpticalObservation> readFile(const std::string& filepath);
+    
+    /**
+     * @brief Read observations from a generic stream in MPC format
+     * @param stream Input stream
+     * @return Vector of observations
+     */
+    static std::vector<OpticalObservation> readStream(std::istream& stream);
+    
+    /**
+     * @brief Parse observations from a string
+     * @param content Content in MPC format
+     * @return Vector of observations
+     */
+    static std::vector<OpticalObservation> parseString(const std::string& content);
     
     /**
      * @brief Parse a single MPC observation line
@@ -77,23 +93,23 @@ private:
     /**
      * @brief Parse date (columns 16-32)
      * Format: "YYYY MM DD.ddddd"
-     * @return MJD in UTC
+     * @return Epoch (UTC)
      */
-    static double parseDate(const std::string& date_str);
+    static time::EpochUTC parseDate(const std::string& date_str);
     
     /**
      * @brief Parse RA (columns 33-44)
      * Format: "HH MM SS.ddd"
-     * @return RA in radians
+     * @return RightAscension
      */
-    static double parseRA(const std::string& ra_str);
+    static astrometry::RightAscension parseRA(const std::string& ra_str);
     
     /**
      * @brief Parse Dec (columns 45-56)
      * Format: "sDD MM SS.dd"
-     * @return Dec in radians
+     * @return Declination
      */
-    static double parseDec(const std::string& dec_str);
+    static astrometry::Declination parseDec(const std::string& dec_str);
     
     /**
      * @brief Parse magnitude (columns 65-69)
@@ -154,17 +170,17 @@ private:
     /**
      * @brief Format date to MPC format
      */
-    static std::string formatDate(double mjd_utc);
+    static std::string formatDate(time::EpochUTC t_utc);
     
     /**
      * @brief Format RA to MPC format
      */
-    static std::string formatRA(double ra_rad);
+    static std::string formatRA(astrometry::RightAscension ra);
     
     /**
      * @brief Format Dec to MPC format
      */
-    static std::string formatDec(double dec_rad);
+    static std::string formatDec(astrometry::Declination dec);
 };
 
 } // namespace observations

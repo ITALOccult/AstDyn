@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(OrbFit
-    VERSION 1.0.0
-    DESCRIPTION "High-precision Asteroid Dynamics Library"
+    VERSION 0.9.0
+    DESCRIPTION "High-precision Asteroid Dynamics Library (beta 0.9)"
     HOMEPAGE_URL "https://github.com/ITALOccult/AstDyn"
     LANGUAGES CXX C
 )
@@ -11,18 +11,20 @@ project(OrbFit
 # Project Options
 # ============================================================================
 
-option(ASTDYN_BUILD_TESTS "Build unit tests" ON)
+option(ASTDYN_BUILD_TESTS "Build unit tests" OFF)
 option(ASTDYN_BUILD_EXAMPLES "Build examples" ON)
 option(ASTDYN_BUILD_DOCS "Build documentation" OFF)
 option(ASTDYN_USE_SPICE "Use SPICE toolkit for ephemerides" OFF)
 option(ASTDYN_ENABLE_PROFILING "Enable profiling support" OFF)
 option(ASTDYN_BUILD_SHARED "Build shared library in addition to static" ON)
+option(ASTDYN_BUILD_CATALOG "Build Gaia DR3 stellar catalog module (requires local catalog data)" OFF)
+option(ASTDYN_USE_OPENMP "Enable OpenMP parallelization" ON)
 
 # ============================================================================
 # C++ Standard and Compiler Settings
 # ============================================================================
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -98,16 +100,80 @@ find_package(Boost 1.70 REQUIRED COMPONENTS
     date_time
 )
 
-# Optional: SPICE Toolkit
-if(ASTDYN_USE_SPICE)
-    find_package(CSPICE QUIET)
-    if(CSPICE_FOUND)
-        message(STATUS "CSPICE found: ${CSPICE_INCLUDE_DIRS}")
-        add_compile_definitions(ASTDYN_USE_SPICE)
-    else()
-        message(WARNING "CSPICE not found. Ephemeris functionality will be limited.")
-        set(ASTDYN_USE_SPICE OFF)
+# Find CURL for networking
+find_package(CURL REQUIRED)
+
+# Find or fetch nlohmann/json
+find_package(nlohmann_json QUIET)
+if(NOT nlohmann_json_FOUND)
+    message(STATUS "nlohmann_json not found, fetching...")
+    include(FetchContent)
+    FetchContent_Declare(
+        json
+        URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    )
+    FetchContent_MakeAvailable(json)
+endif()
+
+# Find OpenMP
+if(ASTDYN_USE_OPENMP)
+    if(APPLE)
+        # Search for Homebrew libomp
+        if(EXISTS "/opt/homebrew/opt/libomp")
+            set(OpenMP_CXX_FLAGS "-Xpreprocessor;-fopenmp")
+            set(OpenMP_CXX_INCLUDE_DIRS "/opt/homebrew/opt/libomp/include")
+            set(OpenMP_CXX_LIB_NAMES "omp")
+            set(OpenMP_omp_LIBRARY "/opt/homebrew/opt/libomp/lib/libomp.dylib")
+            set(OpenMP_FOUND TRUE)
+            message(STATUS "OpenMP found via Homebrew: /opt/homebrew/opt/libomp")
+        endif()
     endif()
+    
+    if(NOT OpenMP_FOUND)
+        find_package(OpenMP)
+    endif()
+    
+    if(OpenMP_FOUND)
+        message(STATUS "OpenMP found: ${OpenMP_CXX_VERSION}")
+        if(NOT TARGET OpenMP::OpenMP_CXX)
+            add_library(OpenMP::OpenMP_CXX INTERFACE IMPORTED)
+            set_target_properties(OpenMP::OpenMP_CXX PROPERTIES
+                INTERFACE_COMPILE_OPTIONS "${OpenMP_CXX_FLAGS}"
+                INTERFACE_INCLUDE_DIRECTORIES "${OpenMP_CXX_INCLUDE_DIRS}"
+                INTERFACE_LINK_LIBRARIES "${OpenMP_omp_LIBRARY}"
+            )
+        endif()
+    else()
+        message(WARNING "OpenMP not found, parallelization will be disabled")
+    endif()
+endif()
+
+# Python Bindings (pybind11)
+option(ASTDYN_BUILD_PYTHON "Build Python bindings" OFF)
+if(ASTDYN_BUILD_PYTHON)
+    FetchContent_Declare(
+      pybind11
+      GIT_REPOSITORY https://github.com/pybind/pybind11.git
+      GIT_TAG v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
+endif()
+
+# Catalog module dependencies (SQLite3, LibXml2, ZLIB — CURL already required above)
+if(ASTDYN_BUILD_CATALOG)
+    find_package(SQLite3 REQUIRED)
+    find_package(LibXml2 REQUIRED)
+    find_package(ZLIB REQUIRED)
+
+    # Disable ioc_gaialib examples and tests to avoid build noise
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING  OFF CACHE BOOL "" FORCE)
+    add_subdirectory(external/ioc_gaialib)
+endif()
+
+# Optional: Profiling
+if(ASTDYN_ENABLE_PROFILING)
+    add_compile_definitions(ASTDYN_ENABLE_PROFILING)
 endif()
 
 # Google Test (only if building tests)
@@ -163,12 +229,23 @@ include_directories(
 
 add_subdirectory(src)
 
+if(ASTDYN_BUILD_CATALOG)
+    add_subdirectory(src/catalog)
+endif()
+
 if(ASTDYN_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
 if(ASTDYN_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+# add_subdirectory(benchmarks)
+add_subdirectory(tools)
+
+if(ASTDYN_BUILD_PYTHON)
+    add_subdirectory(src/python)
 endif()
 
 if(ASTDYN_BUILD_DOCS)
@@ -215,7 +292,7 @@ message(STATUS "")
 message(STATUS "╔════════════════════════════════════════════════════════════╗")
 message(STATUS "║              OrbFit C++ Configuration Summary              ║")
 message(STATUS "╠════════════════════════════════════════════════════════════╣")
-message(STATUS "║ Version:          ${PROJECT_VERSION}")
+message(STATUS "║ Version:          beta 0.9")
 message(STATUS "║ Build Type:       ${CMAKE_BUILD_TYPE}")
 message(STATUS "║ C++ Standard:     C++${CMAKE_CXX_STANDARD}")
 message(STATUS "║ Compiler:         ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
@@ -224,15 +301,12 @@ message(STATUS "║ Options:")
 message(STATUS "║   Build Tests:    ${ASTDYN_BUILD_TESTS}")
 message(STATUS "║   Build Examples: ${ASTDYN_BUILD_EXAMPLES}")
 message(STATUS "║   Build Docs:     ${ASTDYN_BUILD_DOCS}")
-message(STATUS "║   Use SPICE:      ${ASTDYN_USE_SPICE}")
 message(STATUS "║   Profiling:      ${ASTDYN_ENABLE_PROFILING}")
+message(STATUS "║   Gaia Catalog:   ${ASTDYN_BUILD_CATALOG}")
 message(STATUS "╠════════════════════════════════════════════════════════════╣")
 message(STATUS "║ Dependencies:")
 message(STATUS "║   Eigen3:         ${EIGEN3_VERSION_STRING}")
 message(STATUS "║   Boost:          ${Boost_VERSION_STRING}")
-if(ASTDYN_USE_SPICE AND CSPICE_FOUND)
-message(STATUS "║   CSPICE:         Found")
-endif()
 if(ASTDYN_BUILD_TESTS)
 message(STATUS "║   Google Test:    Enabled")
 endif()

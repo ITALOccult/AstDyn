@@ -29,6 +29,9 @@ constexpr double HALF_PI = PI / 2.0;
 /// 2*Pi
 constexpr double TWO_PI = 2.0 * PI;
 
+/// Tau (2*Pi)
+constexpr double TAU = TWO_PI;
+
 /// Degrees to radians conversion factor
 constexpr double DEG_TO_RAD = PI / 180.0;
 
@@ -48,6 +51,9 @@ constexpr double RAD_TO_ARCSEC = (180.0 * 3600.0) / PI;
 /// Julian Date of J2000.0 epoch
 constexpr double JD2000 = 2451545.0;
 
+/// Julian Date of J2016.0 epoch (Gaia DR3 reference epoch)
+constexpr double JD2016 = 2457389.0;
+
 /// Modified Julian Date of J2000.0 epoch
 constexpr double MJD2000 = 51544.5;
 
@@ -63,8 +69,17 @@ constexpr double DAYS_PER_YEAR = 365.25;
 /// Seconds per Julian year
 constexpr double YEAR = DAYS_PER_YEAR * SECONDS_PER_DAY;
 
+/// Gaia DR3 reference epoch JD
+constexpr double GAIA_EPOCH_JD = JD2016;
+
 /// Days per Julian century
 constexpr double DAYS_PER_CENTURY = 36525.0;
+
+/// TAI-TT offset in seconds (32.184s)
+constexpr double TT_MINUS_TAI_SECONDS = 32.184;
+
+/// Placeholder for leap seconds (UTC-TAI difference)
+constexpr double CURRENT_UTC_TAI_DIFF_SECONDS = 37.0;
 
 // ============================================================================
 // Fundamental Astronomical Constants (IAU 2015)
@@ -76,17 +91,46 @@ constexpr double C_LIGHT = 299792.458;
 /// Astronomical Unit [km] (IAU 2012/2015)
 constexpr double AU = 149597870.700;
 
+/// Parsec to Meters [m]
+constexpr double PARSEC_TO_M = 3.085677581e16;
+
 /// Gaussian gravitational constant [AU^(3/2) / (M_sun^(1/2) * day)]
 constexpr double K_GAUSS = 0.01720209895;
 
 /// Solar radius [km] (IAU 2015)
 constexpr double R_SUN = 695700.0;
 
+/// Solar radius [AU]
+constexpr double R_SUN_AU = R_SUN / AU;
+
 /// Earth equatorial radius [km] (WGS84)
-constexpr double R_EARTH = 6378.137;
+constexpr double R_EARTH_EQUATORIAL = 6378.137;
 
 /// Earth flattening (WGS84)
 constexpr double EARTH_FLATTENING = 1.0 / 298.257223563;
+
+/// Earth J2 harmonic coefficient (WGS84)
+constexpr double EARTH_J2 = 0.001082626322;
+
+/// Sun J2 harmonic coefficient
+constexpr double SUN_J2 = 2.2e-7;
+
+/// Obliquity of the Ecliptic at J2000.0 [rad] (IAU 2006: 84381.406 arcsec).
+/// This is the fixed value at J2000.0.  For a time-varying value use
+/// coordinates::ReferenceFrame::mean_obliquity(epoch).
+constexpr double OBLIQUITY_J2000 = 84381.406 * ARCSEC_TO_RAD;
+
+// ============================================================================
+// Sky Geometry Constants
+// ============================================================================
+
+/// standard Sun altitude limit for daylight [deg] (refraction + disk radius ~ 50')
+constexpr double SUN_ALTITUDE_LIMIT_DEG = -0.833;
+
+/// twilight limits [deg]
+constexpr double TWILIGHT_CIVIL_DEG = -6.0;
+constexpr double TWILIGHT_NAUTICAL_DEG = -12.0;
+constexpr double TWILIGHT_ASTRONOMICAL_DEG = -18.0;
 
 // ============================================================================
 // Gravitational Parameters [km^3/s^2] (from JPL DE431)
@@ -129,6 +173,58 @@ constexpr double GM_NEPTUNE = 6836527.100580;
 constexpr double GM_PLUTO = 975.500000;
 
 // ============================================================================
+// Planetary Radii [km] (IAU 2015 reference values)
+// ============================================================================
+
+constexpr double R_MERCURY = 2439.7;     // Mercury
+constexpr double R_VENUS   = 6051.8;     // Venus
+constexpr double R_EARTH   = 6371.0084;  // Earth (nominal mean volumetric)
+constexpr double R_MARS    = 3389.5;     // Mars
+constexpr double R_JUPITER = 69911.0;    // Jupiter
+constexpr double R_SATURN  = 58232.0;    // Saturn
+constexpr double R_URANUS  = 25362.0;    // Uranus
+constexpr double R_NEPTUNE = 24622.0;    // Neptune
+constexpr double R_PLUTO   = 1188.3;     // Pluto
+constexpr double R_MOON    = 1737.4;     // Moon
+
+// ============================================================================
+// Gravitational Parameters in AU³/day² (for orbit propagation)
+// ============================================================================
+
+/// Conversion factor: km³/s² to AU³/day²
+constexpr double GM_KM3S2_TO_AU3DAY2 = (SECONDS_PER_DAY * SECONDS_PER_DAY) / (AU * AU * AU);
+
+/// GM Mercury [AU³/day²]
+constexpr double GM_MERCURY_AU = GM_MERCURY * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Venus [AU³/day²]
+constexpr double GM_VENUS_AU = GM_VENUS * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Earth alone [AU³/day²]
+constexpr double GM_EARTH_AU = GM_EARTH * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Earth+Moon system [AU³/day²]
+constexpr double GM_EARTH_MOON_AU = GM_EARTH_MOON * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Mars system [AU³/day²]
+constexpr double GM_MARS_AU = GM_MARS * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Jupiter system [AU³/day²]
+constexpr double GM_JUPITER_AU = GM_JUPITER * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Saturn system [AU³/day²]
+constexpr double GM_SATURN_AU = GM_SATURN * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Uranus system [AU³/day²]
+constexpr double GM_URANUS_AU = GM_URANUS * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Neptune system [AU³/day²]
+constexpr double GM_NEPTUNE_AU = GM_NEPTUNE * GM_KM3S2_TO_AU3DAY2;
+
+/// GM Moon [AU³/day²]
+constexpr double GM_MOON_AU = GM_MOON * GM_KM3S2_TO_AU3DAY2;
+
+// ============================================================================
 // Heliocentric Gravitational Constant
 // ============================================================================
 
@@ -141,9 +237,6 @@ constexpr double GMS_SI = GM_SUN;
 // ============================================================================
 // Gravitational Parameters in AU³/day² (for orbit propagation)
 // ============================================================================
-
-/// Conversion factor: km³/s² to AU³/day²
-constexpr double GM_KM3S2_TO_AU3DAY2 = (SECONDS_PER_DAY * SECONDS_PER_DAY) / (AU * AU * AU);
 
 /// Speed of light in AU/day
 constexpr double SPEED_OF_LIGHT_AU_PER_DAY = C_LIGHT * SECONDS_PER_DAY / AU;

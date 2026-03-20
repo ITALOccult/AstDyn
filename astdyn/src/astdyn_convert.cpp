@@ -47,7 +47,7 @@ Examples:
   # Process observations
   astdyn_convert --oef ceres.oef --obs ceres.rwo --output ./results
 
-)" << std::endl;
+)" << "\n";
 }
 
 struct ProgramOptions {
@@ -92,7 +92,7 @@ ProgramOptions parse_args(int argc, char** argv) {
 void print_elements(const propagation::KeplerianElements& elem, const std::string& label) {
     std::cout << "\n=== " << label << " ===\n";
     std::cout << std::fixed << std::setprecision(9);
-    std::cout << "Epoch:  " << elem.epoch_mjd_tdb << " MJD TDB\n";
+    std::cout << "Epoch:  " << elem.epoch.mjd() << " MJD TDB\n";
     std::cout << "a:      " << elem.semi_major_axis << " AU\n";
     std::cout << "e:      " << elem.eccentricity << "\n";
     std::cout << std::setprecision(6);
@@ -178,12 +178,9 @@ int main(int argc, char** argv) {
         auto elements = config_mgr.getOsculatingElements();
         auto original = config_mgr.getOriginalElements();
         
-        std::cout << "Element type: " << 
-            (config_mgr.getElementType() == OrbitalElementSubType::MEAN ? "MEAN" : "OSCULATING") << "\n";
-        
         print_elements(original, "Original Elements");
         
-        if (config_mgr.getElementType() == OrbitalElementSubType::MEAN) {
+        if (std::abs(original.semi_major_axis - elements.semi_major_axis) > 1e-12 || std::abs(original.eccentricity - elements.eccentricity) > 1e-12) {
             print_elements(elements, "Converted to Osculating");
             compare_elements(original, elements);
         }
@@ -193,8 +190,8 @@ int main(int argc, char** argv) {
         std::cout << "\nObservations: " << observations.size() << " loaded\n";
         
         if (!observations.empty()) {
-            std::cout << "Time span: " << observations.front().mjd_utc 
-                     << " - " << observations.back().mjd_utc << " MJD\n";
+            std::cout << "Time span: " << observations.front().time.mjd() 
+                     << " - " << observations.back().time.mjd() << " MJD\n";
         }
         
         // Save to output directory

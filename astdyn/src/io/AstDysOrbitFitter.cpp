@@ -4,6 +4,8 @@
  */
 
 #include <astdyn/io/AstDysOrbitFitter.hpp>
+#include <astdyn/observations/MPCReader.hpp>
+#include <curl/curl.h>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -11,6 +13,26 @@
 #include <cmath>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
+
+namespace {
+    size_t write_data(void* ptr, size_t size, size_t nmemb, FILE* stream) {
+        return fwrite(ptr, size, nmemb, stream);
+    }
+
+    bool download_file(const std::string& url, const std::string& path) {
+        CURL* curl = curl_easy_init();
+        if (!curl) return false;
+        FILE* fp = fopen(path.c_str(), "wb");
+        if (!fp) { curl_easy_cleanup(curl); return false; }
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        CURLcode res = curl_easy_perform(curl);
+        fclose(fp); curl_easy_cleanup(curl);
+        return (res == CURLE_OK);
+    }
+}
 
 namespace astdyn {
 namespace io {
@@ -70,7 +92,7 @@ void AstDysOrbitFitter::set_elements_file(const std::string& filename,
     }
 }
 
-void AstDysOrbitFitter::set_elements(const propagation::KeplerianElements& elements) {
+void AstDysOrbitFitter::set_elements(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements) {
     initial_elements_ = elements;
     
     if (verbose_) {
@@ -87,7 +109,7 @@ void AstDysOrbitFitter::set_config_file(const std::string& filename) {
 }
 
 void AstDysOrbitFitter::set_reference_orbit(
-    const propagation::KeplerianElements& elements) {
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements) {
     reference_orbit_ = elements;
 }
 
@@ -107,8 +129,8 @@ AstDysFitResult AstDysOrbitFitter::fit() {
     if (verbose_) {
         std::cout << "\n=== Starting Orbit Fit ===\n";
         std::cout << "Observations: " << observations_.size() << "\n";
-        std::cout << "Initial epoch: MJD " << initial_elements_->epoch_mjd_tdb << "\n";
-        std::cout << "Initial a: " << initial_elements_->semi_major_axis << " AU\n\n";
+        std::cout << "Initial epoch: MJD " << initial_elements_->epoch.mjd() << " MJD TDB\n";
+        std::cout << "Initial a: " << initial_elements_->a.to_au() << " AU\n\n";
     }
     
     // Create AstDyn engine
@@ -135,6 +157,7 @@ AstDysFitResult AstDysOrbitFitter::fit() {
     
     // Fill result structure
     result.fitted_orbit = fit_result.orbit;
+    result.object_name = "Unknown Object"; // Default or extracted
     result.converged = fit_result.converged;
     result.num_iterations = fit_result.num_iterations;
     result.rms_ra = fit_result.rms_ra;
@@ -147,11 +170,11 @@ AstDysFitResult AstDysOrbitFitter::fit() {
     if (reference_orbit_.has_value()) {
         result.reference_orbit = *reference_orbit_;
         
-        double da = (result.fitted_orbit.semi_major_axis - 
-                    reference_orbit_->semi_major_axis) * constants::AU;
-        double de = result.fitted_orbit.eccentricity - reference_orbit_->eccentricity;
-        double di = (result.fitted_orbit.inclination - 
-                    reference_orbit_->inclination) * 180.0 / constants::PI;
+        double da = (result.fitted_orbit.a.to_au() - 
+                    reference_orbit_->a.to_au()) * constants::AU;
+        double de = result.fitted_orbit.e - reference_orbit_->e;
+        double di = (result.fitted_orbit.i.to_rad() - 
+                    reference_orbit_->i.to_rad()) * 180.0 / constants::PI;
         
         result.delta_a_km = da / 1000.0;
         result.delta_e = de;
@@ -192,14 +215,26 @@ void AstDysOrbitFitter::load_rwo_file(const std::string& filename) {
     
     std::string line;
     while (std::getline(file, line)) {
-        if (line.length() >= 80) {
-            temp << line.substr(0, 80) << "\n";
+        // RWO lines often start with a space. The MPC record (80 chars) starts after that.
+        if (line.empty()) continue;
+        size_t start = 0;
+        if (line[0] == ' ') start = 1;
+        
+        if (line.length() >= start + 80) {
+            temp << line.substr(start, 80) << "\n";
         }
     }
     temp.close();
     
-    // Parse with MPCReader
-    observations_ = observations::MPCReader::readFile(temp_file);
+    // Parse with MPCReader and filter for post-1970 observations to avoid EOP issues
+    auto all_obs = observations::MPCReader::readFile(temp_file);
+    observations_.clear();
+    for (const auto& obs : all_obs) {
+        auto [y, m, d, f] = time::mjd_to_calendar(obs.time.mjd());
+        if (y >= 1970) {
+            observations_.push_back(obs);
+        }
+    }
 }
 
 void AstDysOrbitFitter::load_mpc_file(const std::string& filename) {
@@ -221,20 +256,20 @@ void AstDysOrbitFitter::load_eq1_file(const std::string& filename) {
         
         std::istringstream iss(line);
         std::string key;
-        double value;
         
-        if (iss >> key >> value) {
-            if (key == "a") a = value;
-            else if (key == "h") h = value;
-            else if (key == "k") k = value;
-            else if (key == "p") p = value;
-            else if (key == "q") q = value;
-            else if (key == "lambda") lambda = value;
-            else if (key == "MJD") mjd = value;
+        if (iss >> key) {
+            if (key == "EQU") {
+                iss >> a >> h >> k >> p >> q >> lambda;
+            } else if (key == "MJD") {
+                double val;
+                std::string tdt;
+                iss >> val >> tdt;
+                mjd = val;
+            }
         }
     }
     
-    initial_elements_ = equinoctial_to_keplerian(a, h, k, p, q, lambda, mjd);
+    initial_elements_ = equinoctial_to_keplerian(a, h, k, p, q, lambda, time::EpochTDB::from_mjd(mjd));
 }
 
 void AstDysOrbitFitter::load_oel_file(const std::string& filename) {
@@ -271,43 +306,39 @@ void AstDysOrbitFitter::load_json_file(const std::string& filename) {
     }
 }
 
-propagation::KeplerianElements AstDysOrbitFitter::equinoctial_to_keplerian(
-    double a, double h, double k, double p, double q, double lambda, double mjd) {
-    
-    propagation::KeplerianElements kep;
-    
-    kep.semi_major_axis = a;
+physics::KeplerianStateTyped<core::ECLIPJ2000> AstDysOrbitFitter::equinoctial_to_keplerian(
+    double a, double h, double k, double p, double q, double lambda, time::EpochTDB epoch) {
     
     // Eccentricity
     double e = std::sqrt(h*h + k*k);
-    kep.eccentricity = e;
     
     // Inclination
     double tan_half_i = std::sqrt(p*p + q*q);
-    kep.inclination = 2.0 * std::atan(tan_half_i);
+    double i_rad = 2.0 * std::atan(tan_half_i);
     
     // Longitude of ascending node
     double Omega = std::atan2(p, q);
     if (Omega < 0) Omega += 2.0 * constants::PI;
-    kep.longitude_ascending_node = Omega;
     
     // Argument of perihelion
     double omega_plus_Omega = std::atan2(h, k);
     if (omega_plus_Omega < 0) omega_plus_Omega += 2.0 * constants::PI;
     double omega = omega_plus_Omega - Omega;
     if (omega < 0) omega += 2.0 * constants::PI;
-    kep.argument_perihelion = omega;
     
     // Mean anomaly
     double M = lambda - omega_plus_Omega;
     while (M < 0) M += 2.0 * constants::PI;
     while (M >= 2.0*constants::PI) M -= 2.0 * constants::PI;
-    kep.mean_anomaly = M;
     
-    kep.epoch_mjd_tdb = mjd;
-    kep.gravitational_parameter = constants::GMS;
-    
-    return kep;
+    return physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+        epoch,
+        a * constants::AU, e, i_rad * constants::RAD_TO_DEG,
+        Omega * constants::RAD_TO_DEG,
+        omega * constants::RAD_TO_DEG,
+        M * constants::RAD_TO_DEG,
+        physics::GravitationalParameter::sun()
+    );
 }
 
 std::string AstDysOrbitFitter::detect_format(const std::string& filename) {
@@ -364,29 +395,14 @@ AstDysFitResult AstDysOrbitFitter::fit_from_astdys(
     
     std::cout << "\n=== Downloading from AstDyS ===\n";
     std::cout << "Object: " << object_name << " (" << obj_num << ")\n";
-    std::cout << "Elements URL: " << oel_url << "\n";
-    std::cout << "Observations URL: " << rwo_url << "\n";
     
-    // Download files using curl or wget
-    // For now, provide instructions and throw
-    std::string instructions = 
-        "\nTo use fit_from_astdys(), please download files manually:\n"
-        "  wget " + oel_url + " -O " + oel_file + "\n"
-        "  wget " + rwo_url + " -O " + rwo_file + "\n"
-        "\nThen use:\n"
-        "  fitter.set_observations_file(\"" + rwo_file + "\", \"rwo\");\n"
-        "  fitter.set_elements_file(\"" + oel_file + "\", \"oel\");\n"
-        "  auto result = fitter.fit();\n";
-    
-    throw std::runtime_error("fit_from_astdys: Automatic download not yet implemented.\n" + 
-                            instructions);
-    
-    // Future implementation would use libcurl:
-    // 1. Download .oel file
-    // 2. Download .rwo file  
-    // 3. Call set_observations_file() and set_elements_file()
-    // 4. Call fit()
-    // 5. Return result
+    if (!download_file(oel_url, oel_file)) throw std::runtime_error("Failed to download elements from: " + oel_url);
+    if (!download_file(rwo_url, rwo_file)) throw std::runtime_error("Failed to download observations from: " + rwo_url);
+
+    AstDysOrbitFitter instance;
+    instance.set_observations_file(rwo_file, "rwo");
+    instance.set_elements_file(oel_file, "oel");
+    return instance.fit();
 }
 
 } // namespace io

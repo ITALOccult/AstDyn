@@ -207,11 +207,7 @@ int main(int argc, char** argv) {
         config.max_iterations = opts.max_iterations;
         config.tolerance = opts.tolerance;
         config.propagator_settings.include_planets = true;
-        config.propagator_settings.include_asteroids = false;  // Can enable if needed
-        config.propagator_settings.perturb_jupiter = true;
-        config.propagator_settings.perturb_saturn = true;
-        config.propagator_settings.perturb_earth = true;
-        config.propagator_settings.perturb_venus = true;
+        config.propagator_settings.include_asteroids = true;  // Enabled by default for precision
         
         AstDynEngine engine(config);
         
@@ -239,7 +235,7 @@ int main(int argc, char** argv) {
         
         if (opts.have_initial_orbit) {
             propagation::KeplerianElements initial;
-            initial.epoch_mjd_tdb = opts.epoch_mjd;
+            initial.epoch = time::EpochTDB::from_mjd(opts.epoch_mjd);
             initial.semi_major_axis = opts.a;
             initial.eccentricity = opts.e;
             initial.inclination = opts.i_deg * constants::DEG_TO_RAD;
@@ -248,7 +244,16 @@ int main(int argc, char** argv) {
             initial.mean_anomaly = opts.M_deg * constants::DEG_TO_RAD;
             initial.gravitational_parameter = constants::GMS;
             
-            engine.set_initial_orbit(initial);
+            auto initial_typed = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+                initial.epoch,
+                initial.semi_major_axis, initial.eccentricity,
+                initial.inclination * constants::RAD_TO_DEG,
+                initial.longitude_ascending_node * constants::RAD_TO_DEG,
+                initial.argument_perihelion * constants::RAD_TO_DEG,
+                initial.mean_anomaly * constants::RAD_TO_DEG,
+                physics::GravitationalParameter::sun()
+            );
+            engine.set_initial_orbit(initial_typed);
         } else {
             std::cout << "No initial orbit provided - attempting IOD...\n";
             try {
@@ -287,13 +292,13 @@ int main(int argc, char** argv) {
             // Use observation timespan if not specified
             if (opts.ephem_start == 0.0) {
                 const auto& obs = engine.observations();
-                opts.ephem_start = obs.front().mjd_utc;
-                opts.ephem_end = obs.back().mjd_utc;
+                opts.ephem_start = obs.front().time.mjd();
+                opts.ephem_end = obs.back().time.mjd();
             }
             
             auto ephemeris = engine.compute_ephemeris(
-                opts.ephem_start,
-                opts.ephem_end,
+                time::EpochTDB::from_mjd(opts.ephem_start),
+                time::EpochTDB::from_mjd(opts.ephem_end),
                 opts.ephem_step);
             
             // Save ephemeris to file
@@ -304,13 +309,13 @@ int main(int argc, char** argv) {
             file << std::fixed << std::setprecision(9);
             
             for (const auto& state : ephemeris) {
-                file << state.epoch_mjd_tdb << "  "
-                     << state.position[0] << "  "
-                     << state.position[1] << "  "
-                     << state.position[2] << "  "
-                     << state.velocity[0] << "  "
-                     << state.velocity[1] << "  "
-                     << state.velocity[2] << "\n";
+                file << state.epoch.mjd() << "  "
+                     << state.position.x_si() << "  "
+                     << state.position.y_si() << "  "
+                     << state.position.z_si() << "  "
+                     << state.velocity.x_si() << "  "
+                     << state.velocity.y_si() << "  "
+                     << state.velocity.z_si() << "\n";
             }
             
             std::cout << "Ephemeris saved to: " << ephem_file << "\n";
@@ -328,14 +333,14 @@ int main(int argc, char** argv) {
             // Use extended timespan if not specified
             if (opts.ca_start == 0.0) {
                 const auto& obs = engine.observations();
-                double span = obs.back().mjd_utc - obs.front().mjd_utc;
-                opts.ca_start = obs.front().mjd_utc - span;
-                opts.ca_end = obs.back().mjd_utc + span;
+                double span = obs.back().time.mjd() - obs.front().time.mjd();
+                opts.ca_start = obs.front().time.mjd() - span;
+                opts.ca_end = obs.back().time.mjd() + span;
             }
             
             auto approaches = engine.find_close_approaches(
-                opts.ca_start,
-                opts.ca_end);
+                time::EpochTDB::from_mjd(opts.ca_start),
+                time::EpochTDB::from_mjd(opts.ca_end));
             
             if (!approaches.empty()) {
                 std::string ca_file = opts.output_prefix + "_close_approaches.txt";
@@ -348,14 +353,14 @@ int main(int argc, char** argv) {
                     // Convert velocity from AU/day to km/s
                     const double km_per_au = 149597870.7;
                     const double sec_per_day = 86400.0;
-                    double vel_kms = ca.relative_velocity * km_per_au / sec_per_day;
+                    double vel_kms = ca.relative_velocity_mag * km_per_au / sec_per_day;
                     
                     // Need to know planet radius for distance in radii - use Earth as default
                     double earth_radius_km = 6378.137;
                     double earth_radius_au = earth_radius_km / km_per_au;
                     
                     file << static_cast<int>(ca.body) << "  "
-                         << ca.mjd_tdb << "  "
+                         << ca.time.mjd() << "  "
                          << ca.distance << "  "
                          << ca.distance_in_radii(earth_radius_au) << "  "
                          << vel_kms << "\n";

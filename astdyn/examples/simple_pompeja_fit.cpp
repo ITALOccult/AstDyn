@@ -56,7 +56,9 @@ propagation::EquinoctialElements parse_eq1_file(const std::string& filepath) {
         }
         else if (trimmed.substr(0, 3) == "MJD") {
             std::istringstream iss(trimmed.substr(3));
-            iss >> equ.epoch_mjd_tdb;
+            double val;
+            iss >> val;
+            equ.epoch = time::EpochTDB::from_mjd(val);
             found_mjd = true;
         }
 
@@ -85,7 +87,7 @@ int main(int argc, char** argv) {
         // Convert to Keplerian (Ecliptic J2000)
         auto orbfit_orbit_ecliptic = propagation::equinoctial_to_keplerian(equ);
 
-        std::cout << "   Epoch: MJD " << std::fixed << std::setprecision(1) << orbfit_orbit_ecliptic.epoch_mjd_tdb << "\n";
+        std::cout << "   Epoch: MJD " << std::fixed << std::setprecision(1) << orbfit_orbit_ecliptic.epoch.mjd() << "\n";
         std::cout << "   a = " << std::setprecision(6) << orbfit_orbit_ecliptic.semi_major_axis << " AU\n";
         std::cout << "   e = " << std::setprecision(6) << orbfit_orbit_ecliptic.eccentricity << "\n";
         std::cout << "   i = " << std::setprecision(6) << orbfit_orbit_ecliptic.inclination * 180.0 / constants::PI << "° (Ecliptic)\n\n";
@@ -96,26 +98,17 @@ int main(int argc, char** argv) {
         // 1. Keplerian (Ecliptic) -> Cartesian (Ecliptic)
         auto cart_ecliptic_elem = propagation::keplerian_to_cartesian(orbfit_orbit_ecliptic);
         
-        // Convert to CartesianState for rotation
-        coordinates::CartesianState state_ecliptic(
-            cart_ecliptic_elem.position,
-            cart_ecliptic_elem.velocity,
-            cart_ecliptic_elem.gravitational_parameter
-        );
-        
-        // 2. Rotate Cartesian State: Ecliptic -> Equatorial
-        auto state_equatorial = coordinates::ReferenceFrame::transform_state(
-            state_ecliptic,
-            coordinates::FrameType::ECLIPTIC,
-            coordinates::FrameType::J2000
-        );
-        
-        // Convert back to CartesianElements
+        // 2. Rotate Cartesian State: Ecliptic -> Equatorial (J2000/ICRF)
+        Matrix3d R_ecl_to_j2000 = coordinates::ReferenceFrame::get_transformation(
+            coordinates::FrameType::ECLIPTIC, coordinates::FrameType::J2000);
+
         propagation::CartesianElements cart_equatorial_elem;
-        cart_equatorial_elem.epoch_mjd_tdb = cart_ecliptic_elem.epoch_mjd_tdb;
-        cart_equatorial_elem.position = state_equatorial.position();
-        cart_equatorial_elem.velocity = state_equatorial.velocity();
-        cart_equatorial_elem.gravitational_parameter = state_equatorial.mu();
+        cart_equatorial_elem.epoch = cart_ecliptic_elem.epoch;
+        cart_equatorial_elem.gravitational_parameter = cart_ecliptic_elem.gravitational_parameter;
+        cart_equatorial_elem.position = types::Vector3<core::GCRF, core::Meter>(
+            R_ecl_to_j2000 * cart_ecliptic_elem.position.to_eigen());
+        cart_equatorial_elem.velocity = types::Vector3<core::GCRF, core::Meter>(
+            R_ecl_to_j2000 * cart_ecliptic_elem.velocity.to_eigen());
         
         // 3. Cartesian (Equatorial) -> Keplerian (Equatorial)
         auto orbfit_orbit_equatorial = propagation::cartesian_to_keplerian(cart_equatorial_elem);
@@ -138,18 +131,10 @@ int main(int argc, char** argv) {
             std::cout << "   Loading configuration from " << oop_file << "...\n";
             engine.load_config(oop_file);
         } else {
-            std::cout << "   Warning: " << oop_file << " not found, using default configuration.\n";
-            std::cout << "   Forcing planetary perturbations ON (Sun+Planets).\n";
+            std::cout << "   Warning: " << oop_file << " not found, using default configuration (Full Physics).\n";
             AstDynConfig config = engine.config();
             config.propagator_settings.include_planets = true;
-            config.propagator_settings.perturb_mercury = true;
-            config.propagator_settings.perturb_venus = true;
-            config.propagator_settings.perturb_earth = true;
-            config.propagator_settings.perturb_mars = true;
-            config.propagator_settings.perturb_jupiter = true;
-            config.propagator_settings.perturb_saturn = true;
-            config.propagator_settings.perturb_uranus = true;
-            config.propagator_settings.perturb_neptune = true;
+            config.propagator_settings.include_asteroids = true; 
             engine.set_config(config);
         }
 
@@ -169,14 +154,15 @@ int main(int argc, char** argv) {
         // Calculate mean epoch
         double sum_mjd = 0.0;
         for (const auto& obs : obs_list) {
-            sum_mjd += obs.mjd_utc; 
+            sum_mjd += obs.time.mjd(); 
         }
-        double mean_epoch = obs_list.empty() ? orbfit_orbit_equatorial.epoch_mjd_tdb : (sum_mjd / obs_list.size());
+        double mean_epoch_val = obs_list.empty() ? orbfit_orbit_equatorial.epoch.mjd() : (sum_mjd / obs_list.size());
+        time::EpochTDB mean_epoch = time::EpochTDB::from_mjd(mean_epoch_val);
         
         std::cout << "   Current Working Directory: " << "(current path)" << "\n";
         
         // Debug: Check Earth Ephemeris
-        double check_epoch = 2451545.0; // J2000
+        time::EpochTDB check_epoch = time::EpochTDB::from_mjd(60000.0);
         try {
             auto earth = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, check_epoch);
             std::cout << "   DEBUG: Earth at J2000: " << earth.position().transpose() << " AU\n";
@@ -220,21 +206,21 @@ int main(int argc, char** argv) {
 
         // Fitted orbit
         auto fitted_orbit = result.orbit;
-        std::cout << "Fitted orbit at MJD " << std::setprecision(2) << fitted_orbit.epoch_mjd_tdb << ":\n";
-        std::cout << "  a = " << std::setprecision(6) << fitted_orbit.semi_major_axis << " AU\n";
-        std::cout << "  e = " << std::setprecision(6) << fitted_orbit.eccentricity << "\n";
-        std::cout << "  i = " << std::setprecision(4) << fitted_orbit.inclination * 180.0 / constants::PI << "°\n";
-        std::cout << "  Ω = " << std::setprecision(4) << fitted_orbit.longitude_ascending_node * 180.0 / constants::PI << "°\n";
-        std::cout << "  ω = " << std::setprecision(4) << fitted_orbit.argument_perihelion * 180.0 / constants::PI << "°\n";
-        std::cout << "  M = " << std::setprecision(4) << fitted_orbit.mean_anomaly * 180.0 / constants::PI << "°\n\n";
+        std::cout << "Fitted orbit at MJD " << std::setprecision(2) << fitted_orbit.epoch.mjd() << ":\n";
+        std::cout << "  a = " << std::setprecision(6) << fitted_orbit.a.to_au() << " AU\n";
+        std::cout << "  e = " << std::setprecision(6) << fitted_orbit.e << "\n";
+        std::cout << "  i = " << std::setprecision(4) << fitted_orbit.i.to_deg() << "°\n";
+        std::cout << "  Ω = " << std::setprecision(4) << fitted_orbit.node.to_deg() << "°\n";
+        std::cout << "  ω = " << std::setprecision(4) << fitted_orbit.omega.to_deg() << "°\n";
+        std::cout << "  M = " << std::setprecision(4) << fitted_orbit.M.to_deg() << "°\n\n";
 
         // Comparison
         engine.set_initial_orbit(orbfit_orbit_equatorial);
-        auto orbfit_at_result_epoch = engine.propagate_to(fitted_orbit.epoch_mjd_tdb);
+        auto orbfit_at_result_epoch = engine.propagate_to(fitted_orbit.epoch);
         
-        double delta_a_km = (fitted_orbit.semi_major_axis - orbfit_at_result_epoch.semi_major_axis) * constants::AU / 1000.0;
-        double delta_e = fitted_orbit.eccentricity - orbfit_at_result_epoch.eccentricity;
-        double delta_i_arcsec = (fitted_orbit.inclination - orbfit_at_result_epoch.inclination) * 180.0 * 3600.0 / constants::PI;
+        double delta_a_km = (fitted_orbit.a.to_au() - orbfit_at_result_epoch.a.to_au()) * constants::AU / 1000.0;
+        double delta_e = fitted_orbit.e - orbfit_at_result_epoch.e;
+        double delta_i_arcsec = (fitted_orbit.i.to_rad() - orbfit_at_result_epoch.i.to_rad()) * 180.0 * 3600.0 / constants::PI;
 
         std::cout << "Comparison with OrbFit (at result epoch):\n";
         std::cout << "  Δa = " << std::fixed << std::setprecision(2) << delta_a_km << " km\n";

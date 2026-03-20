@@ -40,35 +40,36 @@ SABA4Integrator::SABA4Integrator(double initial_step, double tolerance,
     , h_max_(max_step) {}
 
 void SABA4Integrator::split_state(const Eigen::VectorXd& y,
-                                  Eigen::Vector3d& q, Eigen::Vector3d& p) const {
-    q = y.head<3>();
-    p = y.tail<3>();
+                                  Eigen::VectorXd& q, Eigen::VectorXd& p) const {
+    const int n = y.size() / 2;
+    q = y.head(n);
+    p = y.tail(n);
 }
 
-Eigen::VectorXd SABA4Integrator::join_state(const Eigen::Vector3d& q,
-                                            const Eigen::Vector3d& p) const {
-    Eigen::VectorXd y(6);
-    y.head<3>() = q;
-    y.tail<3>() = p;
+Eigen::VectorXd SABA4Integrator::join_state(const Eigen::VectorXd& q,
+                                            const Eigen::VectorXd& p) const {
+    Eigen::VectorXd y(q.size() + p.size());
+    y.head(q.size()) = q;
+    y.tail(p.size()) = p;
     return y;
 }
 
-Eigen::Vector3d SABA4Integrator::compute_force(const DerivativeFunction& f,
+Eigen::VectorXd SABA4Integrator::compute_force(const DerivativeFunction& f,
                                                double t,
-                                               const Eigen::Vector3d& q,
-                                               const Eigen::Vector3d& p) const {
+                                               const Eigen::VectorXd& q,
+                                               const Eigen::VectorXd& p) const {
     Eigen::VectorXd y = join_state(q, p);
     Eigen::VectorXd ydot = f(t, y);
-    return ydot.tail<3>();
+    return ydot.tail(q.size());
 }
 
 Eigen::VectorXd SABA4Integrator::saba2_step(const DerivativeFunction& f,
                                             const Eigen::VectorXd& y,
                                             double t, double h) {
-    Eigen::Vector3d q, p;
+    Eigen::VectorXd q, p;
     split_state(y, q, p);
 
-    Eigen::Vector3d force = compute_force(f, t, q, p);
+    Eigen::VectorXd force = compute_force(f, t, q, p);
     p += 0.5 * h * force;
 
     q += h * p;
@@ -83,7 +84,7 @@ Eigen::VectorXd SABA4Integrator::saba2_step(const DerivativeFunction& f,
 Eigen::VectorXd SABA4Integrator::saba4_step(const DerivativeFunction& f,
                                             const Eigen::VectorXd& y,
                                             double t, double h) {
-    Eigen::Vector3d q, p;
+    Eigen::VectorXd q, p;
     split_state(y, q, p);
 
     double t_stage = t;
@@ -95,7 +96,7 @@ Eigen::VectorXd SABA4Integrator::saba4_step(const DerivativeFunction& f,
         }
 
         if (d_coeffs_[i] != 0.0) {
-            Eigen::Vector3d force = compute_force(f, t_stage, q, p);
+            Eigen::VectorXd force = compute_force(f, t_stage, q, p);
             p += h * d_coeffs_[i] * force;
             stats_.num_function_evals++;
         }
@@ -120,80 +121,39 @@ double SABA4Integrator::adapt_step_size(double h_current,
 }
 
 double SABA4Integrator::compute_energy(const Eigen::VectorXd& y) const {
-    Eigen::Vector3d q, p;
-    split_state(y, q, p);
+    // Energy computation only defined for 6D Keplerian state in unified AU/day
+    if (y.size() != 6) return 0.0;
+
+    Eigen::VectorXd q = y.head<3>();
+    Eigen::VectorXd p = y.tail<3>();
 
     double r = q.norm();
     if (r < 1e-10) return 0.0;
 
     double kinetic = 0.5 * p.squaredNorm();
-    double potential = -GMS / r;
+    double mu = constants::GMS;
+    double potential = -mu / r;
 
     return kinetic + potential;
 }
 
-Eigen::VectorXd SABA4Integrator::integrate(const DerivativeFunction& f,
-                                           const Eigen::VectorXd& y0,
-                                           double t0, double tf) {
-    reset_stats();
+Eigen::VectorXd SABA4Integrator::integrate(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf) {
     Integrator::reset_statistics();
-
-    double t = t0;
-    Eigen::VectorXd y = y0;
-    double h = h_initial_;
-
-    initial_energy_ = compute_energy(y0);
-
-    const int max_steps = 5000000;  // safety: avoid runaway with very tight tolerance
-    static const int progress_interval = 300;
-    while (t < tf) {
-        if (stats_.num_steps >= max_steps) {
-            std::cerr << "[SABA4] Warning: max steps " << max_steps << " reached at t=" << t << " (tf=" << tf << "). Stopping.\n";
-            break;
-        }
-        if (stats_.num_steps > 0 && stats_.num_steps % progress_interval == 0) {
-            std::cerr << "[SABA4] steps=" << stats_.num_steps << " t=" << t << " h=" << h << " (tf=" << tf << ")\n" << std::flush;
-        }
-        if (t + h > tf) h = tf - t;
-
-        Eigen::VectorXd y_saba4 = saba4_step(f, y, t, h);
-        Eigen::VectorXd y_saba2 = saba2_step(f, y, t, h);
-
-        double error = (y_saba4 - y_saba2).norm() / std::max(h, 1e-20);
-
-        if (error <= tolerance_) {
-            y = y_saba4;
-            t += h;
-            stats_.num_steps++;
-            stats_.num_accepted++;
-
-            double current_energy = compute_energy(y);
-            stats_.energy_drift = std::abs(initial_energy_) > 1e-30
-                ? std::abs(current_energy - initial_energy_) / std::abs(initial_energy_)
-                : 0.0;
-
-            h = adapt_step_size(h, error, true);
+    double t = t0, h = ((tf > t0) ? 1.0 : -1.0) * std::abs(h_initial_);
+    Eigen::VectorXd y = y0; initial_energy_ = compute_energy(y0);
+    while (std::abs(tf - t) > 1e-14 && stats_.num_steps < 5000000) {
+        double current_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
+        Eigen::VectorXd y_saba4 = saba4_step(f, y, t, current_h);
+        Eigen::VectorXd y_saba2 = saba2_step(f, y, t, current_h);
+        double err = (y_saba4 - y_saba2).norm() / std::max(std::abs(current_h), 1e-20);
+        if (y_saba4.allFinite() && (err <= tolerance_ || std::abs(current_h) <= h_min_)) {
+            y = y_saba4; t += current_h; stats_.num_steps++;
+            h = adapt_step_size(current_h, err, true);
         } else {
-            stats_.num_rejected++;
-            h = adapt_step_size(h, error, false);
-
-            if (h < h_min_) {
-                std::cerr << "[SABA4] Warning: Step size below minimum at t=" << t << std::endl;
-                h = h_min_;
-                y = y_saba4;
-                t += h;
-                stats_.num_steps++;
-            }
+            stats_.num_rejected_steps++; h = adapt_step_size(current_h, err, false);
         }
     }
-
-    stats_.final_time = t;
-    Integrator::stats_.num_steps = stats_.num_steps;
-    Integrator::stats_.num_function_evals = stats_.num_function_evals;
-    Integrator::stats_.final_time = stats_.final_time;
-    Integrator::stats_.num_rejected_steps = stats_.num_rejected;
-
-    return y;
+    stats_.final_time = t; return y;
 }
 
 void SABA4Integrator::integrate_steps(const DerivativeFunction& f,
@@ -201,53 +161,67 @@ void SABA4Integrator::integrate_steps(const DerivativeFunction& f,
                                       double t0, double tf,
                                       std::vector<double>& t_out,
                                       std::vector<Eigen::VectorXd>& y_out) {
-    reset_stats();
     Integrator::reset_statistics();
 
     double t = t0;
     Eigen::VectorXd y = y0;
-    double h = h_initial_;
-
+    double direction = (tf > t0) ? 1.0 : -1.0;
+    double h = direction * std::abs(h_initial_);
+    
     t_out.clear();
     y_out.clear();
     t_out.push_back(t);
     y_out.push_back(y);
 
-    initial_energy_ = compute_energy(y0);
-
     const int max_steps = 5000000;
-    while (t < tf) {
-        if (stats_.num_steps >= max_steps) {
-            std::cerr << "[SABA4] Warning: max steps " << max_steps << " reached in integrate_steps.\n";
-            break;
-        }
-        if (t + h > tf) h = tf - t;
 
-        Eigen::VectorXd y_saba4 = saba4_step(f, y, t, h);
-        Eigen::VectorXd y_saba2 = saba2_step(f, y, t, h);
+    while (std::abs(tf - t) > 1e-14 && stats_.num_steps < max_steps) {
+        double current_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
 
-        double error = (y_saba4 - y_saba2).norm() / std::max(h, 1e-20);
+        Eigen::VectorXd y_saba4 = saba4_step(f, y, t, current_h);
+        Eigen::VectorXd y_saba2 = saba2_step(f, y, t, current_h);
 
-        if (error <= tolerance_ || h <= h_min_) {
+        double error = (y_saba4 - y_saba2).norm() / std::max(std::abs(current_h), 1e-20);
+
+        if (y_saba4.allFinite() && (error <= tolerance_ || std::abs(current_h) <= h_min_)) {
             y = y_saba4;
-            t += h;
+            t += current_h;
             stats_.num_steps++;
 
             t_out.push_back(t);
             y_out.push_back(y);
 
-            h = adapt_step_size(h, error, true);
+            h = adapt_step_size(current_h, error, true);
         } else {
-            stats_.num_rejected++;
-            h = adapt_step_size(h, error, false);
+            stats_.num_rejected_steps++;
+            h = adapt_step_size(current_h, error, false);
         }
     }
 
     stats_.final_time = t;
-    Integrator::stats_.num_steps = stats_.num_steps;
-    Integrator::stats_.num_function_evals = stats_.num_function_evals;
-    Integrator::stats_.final_time = stats_.final_time;
-    Integrator::stats_.num_rejected_steps = stats_.num_rejected;
+}
+
+std::vector<Eigen::VectorXd> SABA4Integrator::integrate_at(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, const std::vector<double>& t_targets) {
+    Integrator::reset_statistics();
+    std::vector<Eigen::VectorXd> res; res.reserve(t_targets.size());
+    double t = t0, h = ((t_targets.empty() || t_targets[0] >= t0) ? 1.0 : -1.0) * std::abs(h_initial_);
+    Eigen::VectorXd y = y0; initial_energy_ = compute_energy(y0);
+    for (double tf : t_targets) {
+        while (std::abs(tf - t) > 1e-14 && stats_.num_steps < 5000000) {
+            double current_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
+            Eigen::VectorXd y_saba4 = saba4_step(f, y, t, current_h);
+            Eigen::VectorXd y_saba2 = saba2_step(f, y, t, current_h);
+            double err = (y_saba4 - y_saba2).norm() / std::max(std::abs(current_h), 1e-20);
+            if (y_saba4.allFinite() && (err <= tolerance_ || std::abs(current_h) <= h_min_)) {
+                y = y_saba4; t += current_h; stats_.num_steps++;
+                h = adapt_step_size(current_h, err, true);
+            } else {
+                stats_.num_rejected_steps++; h = adapt_step_size(current_h, err, false);
+            }
+        }
+        res.push_back(y);
+    }
+    stats_.final_time = t; return res;
 }
 
 } // namespace astdyn::propagation

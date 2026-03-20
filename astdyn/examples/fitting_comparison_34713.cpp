@@ -1,5 +1,5 @@
 #include <astdyn/AstDyn.hpp>
-#include <astdyn/api/OrbitFitAPI.hpp>
+#include <astdyn/orbit_determination/OrbFitAPI.hpp>
 #include <iostream>
 #include <iomanip>
 
@@ -44,7 +44,7 @@ int main() {
 
     // --- CASE A: NO FIT (ASTDYS ELEMENTS) ---
     std::cout << "\n--- Case A: Nominal Propagation (AstDys Elements, No Fit) ---\n";
-    auto initial_equ = api::OrbitFitAPI::parse_eq1(eq1_file);
+    auto initial_equ = orbit_determination::OrbFitAPI::parse_eq1(eq1_file);
     auto initial_kep_ecl = propagation::equinoctial_to_keplerian(initial_equ);
 
     auto res_a = propagator.calculateGeocentricObservation(initial_kep_ecl, target_jd_tdb, propagation::HighPrecisionPropagator::InputFrame::ECLIPTIC);
@@ -59,12 +59,19 @@ int main() {
 
     // --- CASE B: WITH FIT ---
     std::cout << "\n--- Case B: Differential Correction (Fitting Observations) ---\n";
-    auto fit_result = api::OrbitFitAPI::run_fit(eq1_file, rwo_file, "", true, config.de441_path);
+    auto fit_result = orbit_determination::OrbFitAPI::run_fit(eq1_file, rwo_file, "", true, config.de441_path);
     
-    if (fit_result.success) {
-        std::cout << "\nFit success. RMS RA: " << fit_result.rms_ra << ", RMS Dec: " << fit_result.rms_dec << " arcsec\n";
-        auto res_b = propagator.calculateGeocentricObservation(fit_result.fitted_orbit, target_jd_tdb, propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL);
-        auto state_b = propagator.propagate_cartesian(fit_result.fitted_orbit, target_mjd_tdb, propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL);
+    if (fit_result.success && fit_result.fitted_state) {
+        std::cout << "\nFit success. RMS RA: " << fit_result.rms_ra.value / 1000.0 << ", RMS Dec: " << fit_result.rms_dec.value / 1000.0 << " arcsec\n";
+        // Convert OrbitalState to physics::KeplerianStateTyped for propagator
+        const auto& fs = *fit_result.fitted_state;
+        auto engine_orbit = physics::KeplerianStateTyped<core::GCRF>::from_traditional(
+            initial_equ.epoch, fs.a(), fs.e(), fs.i() * constants::RAD_TO_DEG,
+            fs.raan() * constants::RAD_TO_DEG, fs.arg_peri() * constants::RAD_TO_DEG,
+            fs.m_anomaly() * constants::RAD_TO_DEG
+        );
+        auto res_b = propagator.calculateGeocentricObservation(engine_orbit, target_jd_tdb, propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL);
+        auto state_b = propagator.propagate_cartesian(engine_orbit, target_mjd_tdb, propagation::HighPrecisionPropagator::InputFrame::EQUATORIAL);
         
         std::cout << "Fitted RA:   " << res_b.ra_deg << " deg\n";
         std::cout << "Fitted Dec:  " << res_b.dec_deg << " deg\n";

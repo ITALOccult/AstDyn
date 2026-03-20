@@ -1,12 +1,11 @@
 /**
  * @file DE441Provider.hpp
- * @brief JPL DE441 ephemeris provider via CSPICE
+ * @brief JPL DE441 ephemeris provider (Native SPK Reader)
  * @author AstDyn Team
  * @date 2025-12-09
  * 
  * Requires:
- * - CSPICE library
- * - de441.bsp file (~3.3 GB)
+ * - de441.bsp file (~3.3 GB) or equivalent SPK kernels
  * 
  * Accuracy: ~cm level
  * Epoch: 1550-2650
@@ -16,6 +15,7 @@
 #define ASTDYN_DE441_PROVIDER_HPP
 
 #include "EphemerisProvider.hpp"
+#include "astdyn/time/epoch.hpp"
 #include <string>
 #include <stdexcept>
 #include <memory> 
@@ -47,8 +47,9 @@ public:
     
     ~DE441Provider() override;
     
-    Eigen::Vector3d getPosition(CelestialBody body, double jd_tdb) override;
-    Eigen::Vector3d getVelocity(CelestialBody body, double jd_tdb) override;
+    math::Vector3<core::GCRF, physics::Distance> getPosition(CelestialBody body, time::EpochTDB t) override;
+    math::Vector3<core::GCRF, physics::Velocity> getVelocity(CelestialBody body, time::EpochTDB t) override;
+    physics::CartesianStateTyped<core::GCRF> getState(CelestialBody body, time::EpochTDB t) override;
     
     std::string getName() const override { return "JPL DE441 (Native)"; }
     double getAccuracy() const override { return 0.001; } // ~1 mas
@@ -65,14 +66,9 @@ private:
     int bodyToNAIFId(CelestialBody body) const;
     
     /**
-     * @brief Convert JD (TDB) to ET (ephemeris time)
+     * @brief Read full state from SPK (Single access)
      */
-    double jdToET(double jd_tdb) const;
-    
-    /**
-     * @brief Rotate from J2000 equatorial to ecliptic
-     */
-    Eigen::Vector3d equatorialToEcliptic(const Eigen::Vector3d& vec) const;
+    Eigen::Matrix<double, 6, 1> readState(CelestialBody body, time::EpochTDB t) const;
 };
 
 } // namespace astdyn::ephemeris

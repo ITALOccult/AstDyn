@@ -12,8 +12,13 @@ file(GLOB_RECURSE ASTDYN_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/propagation/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/orbit_determination/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/close_approach/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/api/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/astrometry/*.cpp
 )
+
+if(ASTDYN_BUILD_CATALOG)
+    file(GLOB CATALOG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/catalog/*.cpp)
+    list(APPEND ASTDYN_SOURCES ${CATALOG_SOURCES})
+endif()
 
 # Add AstDynEngine to the library
 list(APPEND ASTDYN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AstDynEngine.cpp)
@@ -46,17 +51,30 @@ target_link_libraries(astdyn
         Boost::filesystem
         Boost::program_options
         Boost::date_time
+        $<BUILD_INTERFACE:nlohmann_json::nlohmann_json>
+    PRIVATE
+        $<BUILD_INTERFACE:CURL::libcurl>
 )
 
-# Optionally link CSPICE
-if(ASTDYN_USE_SPICE AND CSPICE_FOUND)
-    target_link_libraries(astdyn PUBLIC CSPICE::CSPICE)
+if(ASTDYN_BUILD_CATALOG)
+    target_link_libraries(astdyn PRIVATE 
+        ioc_gaialib
+        SQLite::SQLite3
+        LibXml2::LibXml2
+        ZLIB::ZLIB
+    )
 endif()
+
+if(OpenMP_FOUND)
+    target_link_libraries(astdyn PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
 
 # Include directories for static library
 target_include_directories(astdyn
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
@@ -69,15 +87,29 @@ if(ASTDYN_BUILD_SHARED)
             Boost::filesystem
             Boost::program_options
             Boost::date_time
+            $<BUILD_INTERFACE:nlohmann_json::nlohmann_json>
+        PRIVATE
+            $<BUILD_INTERFACE:CURL::libcurl>
     )
-    
-    if(ASTDYN_USE_SPICE AND CSPICE_FOUND)
-        target_link_libraries(astdyn_shared PUBLIC CSPICE::CSPICE)
+
+    if(ASTDYN_BUILD_CATALOG)
+        target_link_libraries(astdyn_shared PRIVATE 
+            ioc_gaialib
+            SQLite::SQLite3
+            LibXml2::LibXml2
+            ZLIB::ZLIB
+        )
     endif()
+    
+    if(OpenMP_FOUND)
+        target_link_libraries(astdyn_shared PUBLIC OpenMP::OpenMP_CXX)
+    endif()
+    
     
     target_include_directories(astdyn_shared
         PUBLIC
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
             $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
             $<INSTALL_INTERFACE:include>
     )

@@ -8,6 +8,7 @@
 #include "astdyn/orbit_determination/Residuals.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/observations/ObservatoryDatabase.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include <cmath>
@@ -22,574 +23,329 @@ using namespace astdyn::observations;
 using namespace astdyn::propagation;
 using namespace astdyn::constants;
 
-// WGS84 ellipsoid parameters
-static constexpr double WGS84_A = 6378.137;        // Semi-major axis [km]
-// WGS84 flattening (reserved for future use with geodetic coordinates)
-// static constexpr double WGS84_F = 1.0 / 298.257223563;
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * @brief Convert UTC to TDB (Barycentric Dynamical Time)
- * 
- * TDB = TT + periodic terms
- * TT = TAI + 32.184 s
- * TAI = UTC + ΔAT (leap seconds)
- * 
- * For dates 2017-2025, ΔAT = 37 seconds
- * Periodic terms ≈ 0.001658 sin(g) + 0.000014 sin(2g) [seconds]
- * where g = 357.53 + 0.9856003 * (JD - 2451545.0) [degrees]
- * 
- * @param mjd_utc Modified Julian Date in UTC
- * @return MJD in TDB time scale
- */
-static double utc_to_tdb_internal(double mjd_utc) {
-    // Leap seconds TAI-UTC (valid 2017-2025)
-    // TODO: Load from leap seconds file for dates outside this range
-    double delta_at = 37.0; // seconds
-    
-    // TT = TAI + 32.184 s
-    double tt_offset = 32.184; // seconds
-    
-    // MJD in TT
-    double mjd_tt = mjd_utc + (delta_at + tt_offset) / 86400.0;
-    
-    // TDB periodic correction (Fairhead & Bretagnon 1990)
-    // Simplified formula accurate to ~10 microseconds
-    double jd_tt = mjd_tt + 2400000.5;
-    // Julian centuries from J2000.0
-    
-    // Mean anomaly of Sun [degrees]
-    double g = 357.53 + 0.9856003 * (jd_tt - 2451545.0);
-    g = std::fmod(g, 360.0) * astdyn::constants::DEG_TO_RAD; // Convert to radians
-    
-    // TDB correction [seconds]
-    double tdb_correction = 0.001658 * std::sin(g) 
-                          + 0.000014 * std::sin(2.0 * g);
-    
-    // MJD in TDB
-    double mjd_tdb = mjd_tt + tdb_correction / 86400.0;
-    
-    return mjd_tdb;
-}
-
-/**
- * @brief Compute Greenwich Mean Sidereal Time
- * 
- * Uses IAU 1982 formula (Aoki et al. 1982, A&A 105, 359)
- * Accuracy: ~0.1 seconds for dates 1900-2100
- * 
- * @param mjd_ut1 Modified Julian Date in UT1 time scale
- * @return GMST [radians], normalized to [0, 2π)
- */
-static double compute_gmst(double mjd_ut1) {
-    // Julian centuries from J2000.0 (UT1)
-    double T = (mjd_ut1 - MJD2000) / 36525.0;
-    
-    // GMST at 0h UT1 (IAU 1982 formula)
-    // GMST = 24110.54841 + 8640184.812866 T + 0.093104 T² - 6.2e-6 T³ [seconds]
-    double gmst_seconds = 24110.54841 
-                        + 8640184.812866 * T
-                        + 0.093104 * T * T
-                        - 6.2e-6 * T * T * T;
-    
-    // Fraction of day
-    double frac_day = std::fmod(mjd_ut1, 1.0);
-    
-    // Add Earth rotation for fraction of day (1.00273790935 sidereal/solar day ratio)
-    gmst_seconds += frac_day * 86400.0 * 1.00273790935;
-    
-    // Convert to radians and normalize to [0, 2π)
-    double gmst_rad = gmst_seconds * (TWO_PI / 86400.0);
-    gmst_rad = std::fmod(gmst_rad, TWO_PI);
-    if (gmst_rad < 0.0) gmst_rad += TWO_PI;
-    
-    return gmst_rad;
-}
-
 // ============================================================================
 // ResidualCalculator Implementation
 // ============================================================================
 
-ResidualCalculator::ResidualCalculator(
+template <typename Frame>
+ResidualCalculator<Frame>::ResidualCalculator(
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris,
     std::shared_ptr<astdyn::propagation::Propagator> propagator)
     : ephemeris_(ephemeris),
       propagator_(propagator) {
 }
 
-std::vector<ObservationResidual> ResidualCalculator::compute_residuals(
+template <typename Frame>
+std::vector<ObservationResidual> ResidualCalculator<Frame>::compute_residuals(
     const std::vector<OpticalObservation>& observations,
-    const CartesianElements& state) const {
+    const physics::CartesianStateTyped<Frame>& state) const {
     
     std::vector<ObservationResidual> residuals;
     residuals.reserve(observations.size());
     
-    for (const auto& obs : observations) {
-        // Convert observation time from UTC to TDB
-        double obs_mjd_tdb = utc_to_tdb_internal(obs.mjd_utc);
+    // Optimized Path: Use propagate_ephemeris for batch efficiency
+    if (propagator_) {
+        std::vector<time::EpochTDB> target_times;
+        target_times.reserve(observations.size());
+        for (const auto& obs : observations) target_times.push_back(time::to_tdb(obs.time));
         
-        // Propagate state to observation epoch if propagator available
-        // State is assumed to be in EQUATORIAL J2000 (ICRF)
-        CartesianElements state_at_obs = state;
-        if (propagator_ && std::abs(obs_mjd_tdb - state.epoch_mjd_tdb) > 1e-6) {
-            // Propagate from reference epoch to observation epoch
-            // Propagator works in Equatorial J2000
-            state_at_obs = propagator_->propagate_cartesian(state, obs_mjd_tdb);
+        auto states = propagator_->propagate_ephemeris(state, target_times);
+        
+        for (size_t i = 0; i < observations.size(); ++i) {
+            auto residual = compute_residual(observations[i], states[i]);
+            if (residual) residuals.push_back(*residual);
         }
-        
-        auto residual = compute_residual(obs, state_at_obs);
-        if (residual) {
-            residuals.push_back(*residual);
+    } else {
+        // Fallback for Two-body (could also be optimized if needed)
+        for (const auto& obs : observations) {
+            auto residual = compute_residual(obs, state);
+            if (residual) residuals.push_back(*residual);
         }
     }
     
     return residuals;
 }
-
-// Public static wrapper
-double ResidualCalculator::utc_to_tdb(double mjd_utc) {
-    return utc_to_tdb_internal(mjd_utc);
+template <typename Frame>
+std::vector<ObservationResidual> ResidualCalculator<Frame>::batch_compute(
+    const std::vector<OpticalObservation>& observations,
+    const physics::CartesianStateTyped<Frame>& state) const {
+    // Current implementation of compute_residuals already uses sequential propagation
+    // which is the "batch" optimized path.
+    return compute_residuals(observations, state);
 }
 
-std::optional<ObservationResidual> ResidualCalculator::compute_residual(
+template <typename Frame>
+std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
     const OpticalObservation& obs,
-    const CartesianElements& state) const {
+    const physics::CartesianStateTyped<Frame>& state) const {
     
     ObservationResidual result;
-    result.mjd_utc = obs.mjd_utc;
+    result.time = obs.time;
     result.observatory_code = obs.observatory_code;
     result.outlier = false;
     
-    // Get observer position (Heliocentric EQUATORIAL J2000)
+    // 1. Get observer position (Always GCRF for RA/Dec matching)
     auto observer_pos_opt = get_observer_position(obs);
-    if (!observer_pos_opt) {
-        return std::nullopt;
-    }
-    Vector3d observer_pos = *observer_pos_opt;
+    if (!observer_pos_opt) return std::nullopt;
+    math::Vector3<core::GCRF, physics::Distance> observer_pos_gcrf = *observer_pos_opt;
     
-    // Get observer velocity (Heliocentric EQUATORIAL J2000)
     auto observer_vel_opt = get_observer_velocity(obs);
-    if (!observer_vel_opt) {
-        return std::nullopt;
-    }
-    Vector3d observer_vel = *observer_vel_opt;
+    if (!observer_vel_opt) return std::nullopt;
+    math::Vector3<core::GCRF, physics::Velocity> observer_vel_gcrf = *observer_vel_opt;
     
-    // Object state is already in EQUATORIAL J2000 (from Propagator)
-    Vector3d object_pos = state.position;
-    Vector3d object_vel = state.velocity;
+    // 2. Object state in integration frame
+    math::Vector3<Frame, physics::Distance> object_pos_frame = state.position;
+    math::Vector3<Frame, physics::Velocity> object_vel_frame = state.velocity;
     
-    // Light-time correction (iterate to find retarded position)
-    // The observer sees the object where it was tau = distance/c ago
+    // 3. Transform object to GCRF for light-time and matching
+    auto object_pos_gcrf = coordinates::ReferenceFrame::transform_pos<Frame, core::GCRF>(object_pos_frame, state.epoch);
+    auto object_vel_gcrf = coordinates::ReferenceFrame::transform_vel<Frame, core::GCRF>(object_pos_frame, object_vel_frame, state.epoch);
+    
+    // 4. Light-time correction
+    time::TimeDuration tau = time::TimeDuration::zero();
     if (light_time_correction_) {
-        double tau = 0.0; // Light travel time [days]
-        constexpr int max_iter = 3;
-        constexpr double tau_tol = 1e-10; // ~10 microseconds
+        const int max_iter = 5;
+        const double tau_tol_s = 1e-8; // 10ns tolerance
+        
+        auto base_pos_gcrf = object_pos_gcrf; // Store original heliocentric position
         
         for (int iter = 0; iter < max_iter; ++iter) {
-            Vector3d rho = object_pos - observer_pos;
-            double tau_new = rho.norm() / SPEED_OF_LIGHT_AU_PER_DAY;
+            math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos_gcrf - observer_pos_gcrf;
+            double rho_m = rho_vec.norm().to_m();
+            double c_ms = physics::SpeedOfLight::to_ms();
+            double tau_new_s = rho_m / c_ms;
             
-            // Check convergence
-            if (iter > 0 && std::abs(tau_new - tau) < tau_tol) {
-                break;
-            }
+            if (iter > 0 && std::abs(tau_new_s - tau.to_seconds()) < tau_tol_s) break;
             
-            tau = tau_new;
-            
-            // Propagate state backward by tau to get retarded position
-            // Simple approximation: object_pos ≈ state.position - state.velocity * tau
-            object_pos = state.position - state.velocity * tau;
+            tau = time::TimeDuration::from_seconds(tau_new_s);
+            // Back-propagate from base position: r(t - tau) = r(t) - v * tau
+            auto pos_corr_si = base_pos_gcrf.to_eigen_si() - (object_vel_gcrf.to_eigen_si() * tau.to_seconds());
+            object_pos_gcrf = math::Vector3<core::GCRF, physics::Distance>::from_si(pos_corr_si.x(), pos_corr_si.y(), pos_corr_si.z());
         }
     }
     
-    // Compute topocentric vector (EQUATORIAL J2000)
-    Vector3d rho = object_pos - observer_pos;
-    double range = rho.norm();
-    Vector3d direction = rho.normalized();
+    // 5. Compute topocentric vector and direction
+    math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos_gcrf - observer_pos_gcrf;
+    double range_m = rho_vec.norm().to_m();
     
-    // Compute range rate
-    Vector3d rho_dot = object_vel - observer_vel;
-    double range_rate = rho_dot.dot(direction);
-    
-    result.range = range;
-    result.range_rate = range_rate;
-    
-    // Convert to RA/Dec (directly from Equatorial vector)
-    double computed_ra_deg, computed_dec_deg;
-    
-    // Note: The first parameter 'direction' logic is handled inside cartesian_to_radec using rho_vec
-    // We pass rho as the "direction" placeholder (unused) and rho as the vector to be normalized.
-    // Plus observer_pos for deflection.
-    cartesian_to_radec(direction, rho, observer_pos, observer_vel, computed_ra_deg, computed_dec_deg);
-    
-    // Convert to Radians for consistent residual calculation
-    double computed_ra_rad = computed_ra_deg * DEG_TO_RAD;
-    double computed_dec_rad = computed_dec_deg * DEG_TO_RAD;
-    
-    result.computed_ra = computed_ra_rad;
-    result.computed_dec = computed_dec_rad;
-    
-    // Compute residuals O-C (Radians)
-    double d_ra = obs.ra - computed_ra_rad;
-    
-    // Normalize angular difference to [-PI, PI]
-    while (d_ra > astdyn::constants::PI) d_ra -= astdyn::constants::TWO_PI;
-    while (d_ra < -astdyn::constants::PI) d_ra += astdyn::constants::TWO_PI;
-    
-    result.residual_ra = d_ra;
-    result.residual_dec = obs.dec - computed_dec_rad;
-    
-    // Normalize RA residual by cos(dec) for spherical geometry
-    result.residual_ra *= std::cos(obs.dec);
-    
-    // DEBUG: Output RA/Dec comparison
-    std::cout << "[Residuals Debug] MJD=" << std::fixed << std::setprecision(5) << obs.mjd_utc
-              << " Obs RA=" << (obs.ra * constants::RAD_TO_DEG) << " Dec=" << (obs.dec * constants::RAD_TO_DEG)
-              << " Comp RA=" << (computed_ra_rad * constants::RAD_TO_DEG) << " Dec=" << (computed_dec_rad * constants::RAD_TO_DEG)
-              << " ResRA=" << (result.residual_ra * constants::RAD_TO_ARCSEC) << " ResDec=" << (result.residual_dec * constants::RAD_TO_ARCSEC)
-              << std::endl;
+    // Safety check for range
+    if (range_m < 1.0) range_m = 1.0;
 
-    // Normalized residuals
-    result.normalized_ra = result.residual_ra / obs.sigma_ra;
-    result.normalized_dec = result.residual_dec / obs.sigma_dec;
+    auto direction = math::Vector3<core::GCRF, physics::Distance>::from_si(
+        rho_vec.x_si() / range_m, 
+        rho_vec.y_si() / range_m, 
+        rho_vec.z_si() / range_m);
     
-    // Weights (1/sigma^2)
-    // Avoid division by zero
-    double sig_ra = (obs.sigma_ra > 0.0) ? obs.sigma_ra : 1e-5;
-    double sig_dec = (obs.sigma_dec > 0.0) ? obs.sigma_dec : 1e-5;
-    result.weight_ra = 1.0 / (sig_ra * sig_ra);
-    result.weight_dec = 1.0 / (sig_dec * sig_dec);
+    math::Vector3<core::GCRF, physics::Velocity> rho_dot = object_vel_gcrf - observer_vel_gcrf;
+    double range_rate_ms = rho_dot.to_eigen_si().dot(direction.to_eigen_si());
     
-    // Chi-squared
+    result.range = physics::Distance::from_si(range_m);
+    result.range_rate = physics::Velocity::from_si(range_rate_ms);
+    
+    // 6. Convert to RA/Dec (includes Aberration, Light Bending)
+    astrometry::RightAscension computed_ra;
+    astrometry::Declination computed_dec;
+    cartesian_to_radec(direction, rho_vec, observer_pos_gcrf, observer_vel_gcrf, computed_ra, computed_dec);
+    
+    result.computed_ra = computed_ra;
+    result.computed_dec = computed_dec;
+    
+    // 7. Compute residuals O-C
+    astrometry::Angle d_ra = obs.ra - computed_ra;
+    d_ra = d_ra.wrap_pi();
+
+    // Residual for RA is projected using COMPUTED dec (consistent with the design matrix
+    // partial d(RA*cos(dec))/dx which is also evaluated at the computed position).
+    const double cos_comp_dec = std::cos(computed_dec.to_rad());
+    result.residual_ra = d_ra * cos_comp_dec;
+    result.residual_dec = obs.dec - computed_dec;
+
+    double sig_ra_rad = obs.sigma_ra.to_rad();
+    double sig_dec_rad = obs.sigma_dec.to_rad();
+    if (sig_ra_rad <= 0.0) sig_ra_rad = 1e-10;
+    if (sig_dec_rad <= 0.0) sig_dec_rad = 1e-10;
+
+    // Weight for projected RA residual: sigma must also be projected so that
+    // chi_sq = residual_ra^2 * weight_ra = (d_ra*cos(dec))^2 / (sigma_ra*cos(dec))^2
+    //        = d_ra^2 / sigma_ra^2  (correct unprojected chi-squared contribution).
+    const double sig_ra_proj = sig_ra_rad * std::max(cos_comp_dec, 1e-6);
+    result.weight_ra  = 1.0 / (sig_ra_proj  * sig_ra_proj);
+    result.weight_dec = 1.0 / (sig_dec_rad  * sig_dec_rad);
+
+    // Normalised residuals: divide projected residual by projected sigma → ratio = d_ra / sigma_ra
+    result.normalized_ra  = result.residual_ra.to_rad()  / sig_ra_proj;
+    result.normalized_dec = result.residual_dec.to_rad() / sig_dec_rad;
+    
     result.chi_squared = result.normalized_ra * result.normalized_ra +
                         result.normalized_dec * result.normalized_dec;
     
     return result;
 }
 
-Vector3d ResidualCalculator::compute_topocentric_direction(
-    const Vector3d& heliocentric_pos,
-    const Vector3d& observer_pos,
-    const Vector3d& observer_vel,
-    double& range,
-    double& range_rate) const {
+template <typename Frame>
+void ResidualCalculator<Frame>::cartesian_to_radec(
+    const math::Vector3<core::GCRF, physics::Distance>& direction_in,
+    const math::Vector3<core::GCRF, physics::Distance>& rho_vec,
+    const math::Vector3<core::GCRF, physics::Distance>& observer_pos,
+    const math::Vector3<core::GCRF, physics::Velocity>& observer_vel,
+    astrometry::RightAscension& ra,
+    astrometry::Declination& dec) const {
     
-    // Topocentric position vector
-    Vector3d rho = heliocentric_pos - observer_pos;
-    range = rho.norm();
-    
-    // Unit direction vector
-    Vector3d direction = rho / range;
-    
-    // Range rate computation moved to compute_residual() where object velocity is available
-    // Set placeholder value here (will be overwritten by caller)
-    range_rate = 0.0;
-    
-    return direction;
-}
+    auto eval_dir = direction_in.to_eigen_si();
+    auto eval_obs = observer_pos.to_eigen_si();
+    auto eval_vel = observer_vel.to_eigen_si();
 
-void ResidualCalculator::cartesian_to_radec(
-    const Vector3d& direction_placeholder, // Unused
-    const Vector3d& rho_vec,
-    const Vector3d& observer_pos,
-    const Vector3d& observer_vel,
-    double& ra_deg,
-    double& dec_deg) const {
-    
-    // Unit direction vector (Geometric)
-    Eigen::Vector3d direction = rho_vec.normalized();
-
-    // --------------------------------------------------------
-    // GRAVITATIONAL DEFLECTION (Relativistic Light Bending)
-    // --------------------------------------------------------
-    // Effect: Light passing near the Sun is bent.
-    // Formula: Δφ = (1 + γ) * GM_sun / (c^2 * d) * tan(φ/2)
-    // Vector form (simplified for Sun only):
-    // s_hat = n_hat + (2*GM/c^2) * ( (n_hat x (q_hat x n_hat)) / ( |q| (1 + q_hat . n_hat) ) )
-    
-    // Sun position is Origin (0,0,0) in Heliocentric
-    Eigen::Vector3d p_sun = -observer_pos; // Vector Observer -> Sun
+    // Relativistic Light Bending (Sun)
+    Eigen::Vector3d p_sun = -eval_obs; 
     double d_sun = p_sun.norm();
-    Eigen::Vector3d u_sun = p_sun.normalized();
+    auto u_sun = p_sun.normalized();
+    double cos_elongation = u_sun.dot(eval_dir);
     
-    // Check elongation 
-    double cos_elongation = u_sun.dot(direction);
-    
-    // Thresholds: d_sun > 1e-6 AU (not inside Sun), cos < 0.999 (not directly at Sun)
-    if (d_sun > 1e-6 && cos_elongation < 0.999) { 
-        constexpr double TWO_GM_C2_AU = 1.97412422e-8; 
-        
-        Eigen::Vector3d cross_prod = u_sun.cross(direction);
-        if (cross_prod.norm() > 1e-10) { 
-            Eigen::Vector3d delta_dir = (TWO_GM_C2_AU / d_sun) * (cross_prod.cross(direction)) / (1.0 + cos_elongation);
-            direction = (direction + delta_dir).normalized();
+    if (d_sun > 1e6 && cos_elongation < 0.999) { 
+        // BUG-13: Use derived constant for 2GM/c^2 instead of magic number
+        const double TWO_GM_C2 = 2.0 * physics::GravitationalParameter::sun().to_m3_s2() / 
+                                (physics::SpeedOfLight::to_ms() * physics::SpeedOfLight::to_ms());
+        auto cross_prod = u_sun.cross(eval_dir);
+        if (cross_prod.norm() > 1e-12) { 
+            auto delta_dir = (TWO_GM_C2 / d_sun) * (cross_prod.cross(eval_dir)) / (1.0 + cos_elongation);
+            eval_dir = (eval_dir + delta_dir).normalized();
         }
     }
 
-    // --------------------------------------------------------
-    // STELLAR ABERRATION (Annual)
-    // --------------------------------------------------------
-    // Effect: Apparent displacement due to observer velocity.
-    // Vector form (Newtonian approx sufficient for < 0.1 mas):
-    // u_app = u_geom + (v_obs / c) - (u_geom . v_obs / c) * u_geom
-    // Rigorous relativistic form:
-    // u_app = [1/gamma * u_geom + beta + (gamma/(1+gamma))*(beta . u_geom)*beta] / (1 + beta . u_geom)
-    // where beta = v/c.
-    
+    // Stellar Aberration
+    // eval_vel is in m/s; C_LIGHT constant is in km/s, so use SpeedOfLight::to_ms() to stay in SI.
     if (aberration_correction_) {
-        // Observer velocity v in units of c
-        Eigen::Vector3d beta = observer_vel / constants::SPEED_OF_LIGHT_AU_PER_DAY;
+        auto beta = eval_vel / (physics::SpeedOfLight::to_ms());
         double beta_sq = beta.squaredNorm();
-        double gamma = 1.0 / std::sqrt(1.0 - beta_sq);
-        double beta_dot_u = beta.dot(direction);
-        
-        // Relativistic aberration formula
-        double factor = gamma / (1.0 + gamma);
-        Eigen::Vector3d num = (1.0/gamma) * direction + beta + (factor * beta_dot_u) * beta;
-        double den = 1.0 + beta_dot_u;
-        
-        direction = (num / den).normalized();
+        if (beta_sq < 1.0) {
+            double gamma = 1.0 / std::sqrt(1.0 - beta_sq);
+            double beta_dot_u = beta.dot(eval_dir);
+            double factor = gamma / (1.0 + gamma);
+            auto num = (1.0/gamma) * eval_dir + beta + (factor * beta_dot_u) * beta;
+            double den = 1.0 + beta_dot_u;
+            eval_dir = (num / den).normalized();
+        }
     }
     
-    double x = direction[0];
-    double y = direction[1];
-    double z = direction[2];
+    double dec_rad = std::asin(eval_dir.z());
+    double ra_rad = std::atan2(eval_dir.y(), eval_dir.x());
     
-    // Declination: arcsin(z)
-    // z is sin(dec) because direction is normalized
-    double dec_rad = std::asin(z);
-    
-    // Right ascension: atan2(y, x)
-    double ra_rad = std::atan2(y, x);
-    
-    // Normalize RA to [0, 2π)
-    if (ra_rad < 0.0) {
-        ra_rad += TWO_PI;
-    }
-    
-    ra_deg = ra_rad / DEG_TO_RAD;
-    dec_deg = dec_rad / DEG_TO_RAD;
+    dec = astrometry::Declination(astrometry::Angle::from_rad(dec_rad));
+    ra = astrometry::RightAscension(astrometry::Angle::from_rad(ra_rad));
 }
 
-std::optional<Vector3d> ResidualCalculator::get_observer_position(
+template <typename Frame>
+std::optional<math::Vector3<core::GCRF, physics::Distance>> ResidualCalculator<Frame>::get_observer_position(
     const OpticalObservation& obs) const {
     
-    // Convert observation time from UTC to TDB
-    double mjd_tdb = utc_to_tdb_internal(obs.mjd_utc);
-    double jd_tdb = mjd_tdb + 2400000.5;
+    time::EpochTDB t_tdb = time::to_tdb(obs.time);
+    auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
+    auto earth_state = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t_tdb);
     
-    // Get Earth position from ephemeris (PlanetaryEphemeris returns BARYCENTRIC EQUATORIAL J2000)
-    auto earth_state = ephemeris::PlanetaryEphemeris::getState(
-        ephemeris::CelestialBody::EARTH, jd_tdb);
-        
-    // Get Sun position (BARYCENTRIC) to compute Heliocentric
-    auto sun_state = ephemeris::PlanetaryEphemeris::getState(
-        ephemeris::CelestialBody::SUN, jd_tdb);
+    // earth_state is heliocentric GCRF
+    math::Vector3<core::GCRF, physics::Distance> earth_center_vec = earth_state.position;
     
-    // Earth Heliocentric Position = Earth_Bary - Sun_Bary
-    Vector3d earth_center = earth_state.position() - sun_state.position();
-    
-    // Get observatory topocentric position
     const auto& obs_db = observations::ObservatoryDatabase::getInstance();
     auto obs_info_opt = obs_db.getObservatory(obs.observatory_code);
+    if (!obs_info_opt) return earth_center_vec;
     
-    if (!obs_info_opt) {
-        // Unknown observatory, use geocenter (Heliocentric)
-        return earth_center;
-    }
-    
-    const auto& obs_info = *obs_info_opt;
-    
-    // Compute observatory position relative to Earth center
-    double rho_cos_phi = obs_info.rho_cos_phi;
-    double rho_sin_phi = obs_info.rho_sin_phi;
-    double longitude = obs_info.longitude;
-    
-    // Compute Greenwich Mean Sidereal Time
-    // GMST is the angle between the Greenwich meridian and the vernal equinox
-    // Uses UTC (approx UT1) for Earth rotation angle
-    // Note: detailed UT1 correction requires resolving namespace clash with system time()
-    double gmst = compute_gmst(obs.mjd_utc);
-    
-    // Local sidereal time = GMST + longitude
-    double lst = gmst + longitude;
-    
-    // Observatory position in GEOCENTRIC EQUATORIAL coordinates [Earth radii]
-    // The Z axis aligns with Earth's rotation axis
-    // The X axis points to the vernal equinox
-    double cos_lst = std::cos(lst);
-    double sin_lst = std::sin(lst);
-    
-    Vector3d obs_geocentric_equatorial;
-    obs_geocentric_equatorial[0] = rho_cos_phi * cos_lst;
-    obs_geocentric_equatorial[1] = rho_cos_phi * sin_lst;
-    obs_geocentric_equatorial[2] = rho_sin_phi;
-    
-    // Convert from Earth radii to AU
-    double earth_radius_au = WGS84_A / AU_TO_KM;
-    obs_geocentric_equatorial *= earth_radius_au;
-    
-    // NO ROTATION TO ECLIPTIC NEEDED
-    // The system assumes everything is in Equatorial J2000
-    
-    // Observatory HELIOCENTRIC position (in EQUATORIAL J2000)
-    Vector3d observer_pos = earth_center + obs_geocentric_equatorial;
-    
-    return observer_pos;
+    auto obs_gcrf = obs_info_opt->getPositionGCRF(obs.time);
+    return earth_center_vec + math::Vector3<core::GCRF, physics::Distance>::from_si(obs_gcrf.x_si(), obs_gcrf.y_si(), obs_gcrf.z_si());
 }
 
-std::optional<Vector3d> ResidualCalculator::get_observer_velocity(
+template <typename Frame>
+std::optional<math::Vector3<core::GCRF, physics::Velocity>> ResidualCalculator<Frame>::get_observer_velocity(
     const OpticalObservation& obs) const {
     
-    // Convert to TDB
-    double mjd_tdb = utc_to_tdb_internal(obs.mjd_utc);
-    double jd_tdb = mjd_tdb + 2400000.5;
+    time::EpochTDB t_tdb = time::to_tdb(obs.time);
+    auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
+    auto earth_state = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t_tdb);
     
-    // Get Earth velocity (EQUATORIAL J2000)
-    auto earth_state = ephemeris::PlanetaryEphemeris::getState(
-        ephemeris::CelestialBody::EARTH, jd_tdb);
-    
-    Vector3d earth_vel = earth_state.velocity();
-    
-    // Get observatory position to compute rotation velocity
-    const auto& obs_db = observations::ObservatoryDatabase::getInstance();
-    auto obs_info_opt = obs_db.getObservatory(obs.observatory_code);
-    
-    if (!obs_info_opt) {
-        return earth_vel;
-    }
-    
-    // Re-calculate geocentric position (code reuse justified for now)
-    const auto& obs_info = *obs_info_opt;
-    double rho_cos_phi = obs_info.rho_cos_phi;
-    double rho_sin_phi = obs_info.rho_sin_phi;
-    double longitude = obs_info.longitude;
-    double gmst = compute_gmst(obs.mjd_utc);
-    double lst = gmst + longitude;
-    
-    double cos_lst = std::cos(lst);
-    double sin_lst = std::sin(lst);
-    
-    // Geocentric position in Earth radii
-    Vector3d obs_geo_radii;
-    obs_geo_radii[0] = rho_cos_phi * cos_lst;
-    obs_geo_radii[1] = rho_cos_phi * sin_lst;
-    obs_geo_radii[2] = rho_sin_phi;
-    
-    // Convert to AU
-    double earth_radius_au = WGS84_A / AU_TO_KM;
-    Vector3d obs_geocentric = obs_geo_radii * earth_radius_au;
-    
-    // Earth rotation angular velocity [rad/day]
-    // ω = 2π/T_sid where T_sid ≈ 0.99726958 solar days
-    double omega_earth = TWO_PI / 0.99726958;  // rad/day
-    
-    // Rotation vector in Equatorial frame is simply along Z
-    Vector3d omega_vec(0.0, 0.0, omega_earth);
-    
-    // Velocity due to rotation: v = ω × r
-    Vector3d v_rotation = omega_vec.cross(obs_geocentric);
-    
-    // Total observer velocity (EQUATORIAL J2000)
-    Vector3d observer_vel = earth_vel + v_rotation;
-    
-    return observer_vel;
+    return earth_state.velocity;
 }
 
-// ============================================================================
-// Statistics
-// ============================================================================
-
-ResidualStatistics ResidualCalculator::compute_statistics(
+template <typename Frame>
+ResidualStatistics ResidualCalculator<Frame>::compute_statistics(
     const std::vector<ObservationResidual>& residuals,
     int num_parameters) {
     
     ResidualStatistics stats;
-    
-    // Count non-outlier observations
-    int n_valid = 0;
-    for (const auto& r : residuals) {
-        if (!r.outlier) n_valid++;
-    }
-    
     stats.num_observations = residuals.size();
-    stats.num_outliers = stats.num_observations - n_valid;
-    stats.degrees_of_freedom = 2 * n_valid - num_parameters;
+    stats.num_outliers = 0;
     
-    if (n_valid == 0) {
-        stats.rms_ra = stats.rms_dec = stats.rms_total = 0.0;
-        stats.weighted_rms = 0.0;
+    double sum_sq_ra = 0.0;
+    double sum_sq_dec = 0.0;
+    double chi_squared = 0.0;
+    int accepted_count = 0;
+    
+    stats.max_abs_ra = astrometry::Angle::zero();
+    stats.max_abs_dec = astrometry::Angle::zero();
+    
+    for (const auto& res : residuals) {
+        if (res.outlier) {
+            stats.num_outliers++;
+            continue;
+        }
+        
+        accepted_count++;
+        double res_ra_rad = res.residual_ra.to_rad();
+        double res_dec_rad = res.residual_dec.to_rad();
+        
+        sum_sq_ra += res_ra_rad * res_ra_rad;
+        sum_sq_dec += res_dec_rad * res_dec_rad;
+        chi_squared += res.chi_squared;
+        
+        stats.max_abs_ra = astrometry::Angle::from_rad(std::max(stats.max_abs_ra.to_rad(), std::abs(res_ra_rad)));
+        stats.max_abs_dec = astrometry::Angle::from_rad(std::max(stats.max_abs_dec.to_rad(), std::abs(res_dec_rad)));
+    }
+    
+    if (accepted_count > 0) {
+        stats.rms_ra = astrometry::Angle::from_rad(std::sqrt(sum_sq_ra / accepted_count));
+        stats.rms_dec = astrometry::Angle::from_rad(std::sqrt(sum_sq_dec / accepted_count));
+        stats.rms_total = astrometry::Angle::from_rad(std::sqrt((sum_sq_ra + sum_sq_dec) / (2.0 * accepted_count)));
+        
+        stats.chi_squared = chi_squared;
+        stats.degrees_of_freedom = 2 * accepted_count - num_parameters;
+        
+        if (stats.degrees_of_freedom > 0) {
+            stats.reduced_chi_squared = chi_squared / stats.degrees_of_freedom;
+            stats.weighted_rms = std::sqrt(stats.reduced_chi_squared);
+        } else {
+            stats.reduced_chi_squared = 0.0;
+            stats.weighted_rms = 0.0;
+        }
+    } else {
+        stats.rms_ra = astrometry::Angle::zero();
+        stats.rms_dec = astrometry::Angle::zero();
+        stats.rms_total = astrometry::Angle::zero();
         stats.chi_squared = 0.0;
+        stats.degrees_of_freedom = 0;
         stats.reduced_chi_squared = 0.0;
-        return stats;
+        stats.weighted_rms = 0.0;
     }
-    
-    // Compute RMS
-    double sum_ra2 = 0.0, sum_dec2 = 0.0;
-    double sum_chi2 = 0.0;
-    double max_ra = 0.0, max_dec = 0.0;
-    
-    for (const auto& r : residuals) {
-        if (r.outlier) continue;
-        
-        sum_ra2 += r.residual_ra * r.residual_ra;
-        sum_dec2 += r.residual_dec * r.residual_dec;
-        sum_chi2 += r.chi_squared;
-        
-        max_ra = std::max(max_ra, std::abs(r.residual_ra));
-        max_dec = std::max(max_dec, std::abs(r.residual_dec));
-    }
-    
-    // RMS in arcseconds
-    stats.rms_ra = std::sqrt(sum_ra2 / n_valid) * RAD_TO_ARCSEC;
-    stats.rms_dec = std::sqrt(sum_dec2 / n_valid) * RAD_TO_ARCSEC;
-    stats.rms_total = std::sqrt((sum_ra2 + sum_dec2) / (2.0 * n_valid)) * RAD_TO_ARCSEC;
-    
-    // Weighted RMS (dimensionless)
-    stats.weighted_rms = std::sqrt(sum_chi2 / (2.0 * n_valid));
-    
-    // Chi-squared
-    stats.chi_squared = sum_chi2;
-    stats.reduced_chi_squared = (stats.degrees_of_freedom > 0) ?
-        stats.chi_squared / stats.degrees_of_freedom : 0.0;
-    
-    // Max residuals in arcseconds
-    stats.max_abs_ra = max_ra * RAD_TO_ARCSEC;
-    stats.max_abs_dec = max_dec * RAD_TO_ARCSEC;
     
     return stats;
 }
 
-int ResidualCalculator::identify_outliers(
+template <typename Frame>
+int ResidualCalculator<Frame>::identify_outliers(
     std::vector<ObservationResidual>& residuals,
     double sigma_threshold) {
     
-    int num_outliers = 0;
-    
-    // Iterative 3-sigma clipping
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        
-        // Compute current statistics (excluding already marked outliers)
-        (void)compute_statistics(residuals, 6); // Just recompute for next iteration
-        
-        // Mark new outliers
-        for (auto& r : residuals) {
-            if (r.outlier) continue;
-            
-            if (r.is_outlier(sigma_threshold)) {
-                r.outlier = true;
-                changed = true;
-                num_outliers++;
+    int outliers_found = 0;
+    for (auto& res : residuals) {
+        if (!res.outlier) {
+            if (res.is_outlier(sigma_threshold)) {
+                res.outlier = true;
+                outliers_found++;
             }
         }
     }
-    
-    return num_outliers;
+    return outliers_found;
 }
+
+// Explicit instantiations
+template class ResidualCalculator<core::GCRF>;
+template class ResidualCalculator<core::ECLIPJ2000>;
 
 } // namespace astdyn::orbit_determination

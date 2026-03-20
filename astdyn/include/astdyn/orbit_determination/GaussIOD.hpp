@@ -21,8 +21,12 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/observations/Observation.hpp"
-#include "astdyn/propagation/OrbitalElements.hpp"
+#include "astdyn/core/physics_state.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/astrometry/sky_types.hpp"
+#include "astdyn/core/frame_tags.hpp"
 #include <vector>
 #include <optional>
 
@@ -32,12 +36,13 @@ namespace astdyn::orbit_determination {
  * @brief Settings for Gauss IOD
  */
 struct GaussIODSettings {
-    int max_iterations = 50;             ///< Maximum iterations for slant range
-    double tolerance = 1e-8;             ///< Convergence tolerance [AU]
-    double min_separation_days = 1.0;    ///< Minimum separation between obs [days]
-    double max_separation_days = 60.0;   ///< Maximum separation between obs [days]
-    bool use_light_time = true;          ///< Apply light-time correction
-    bool verbose = false;                ///< Print debug information
+    int max_iterations = 50;
+    physics::Distance tolerance = physics::Distance::from_au(1e-8);
+    time::TimeDuration min_separation = time::TimeDuration::from_days(1.0);
+    time::TimeDuration max_separation = time::TimeDuration::from_days(60.0);
+    physics::GravitationalParameter mu = physics::GravitationalParameter::sun();
+    bool use_light_time = true;
+    bool verbose = false;
 };
 
 /**
@@ -48,13 +53,13 @@ struct GaussIODResult {
     std::string error_message;
     
     // Resulting orbit
-    astdyn::propagation::CartesianElements state;   ///< Heliocentric state at middle obs
-    double epoch_mjd_tdb;                           ///< Epoch of solution [MJD TDB]
+    physics::CartesianStateTyped<core::GCRF> state;   ///< Heliocentric state at middle obs
+    time::EpochTDB epoch;                           ///< Epoch of solution
     
     // Quality indicators
-    double slant_range_1;                ///< Distance to object [AU] at obs 1
-    double slant_range_2;                ///< Distance to object [AU] at obs 2
-    double slant_range_3;                ///< Distance to object [AU] at obs 3
+    physics::Distance slant_range_1;     ///< Distance to object at obs 1
+    physics::Distance slant_range_2;     ///< Distance to object at obs 2
+    physics::Distance slant_range_3;     ///< Distance to object at obs 3
     int iterations;                      ///< Iterations required
     
     // Indices of observations used
@@ -79,7 +84,8 @@ public:
     /**
      * @brief Constructor
      */
-    explicit GaussIOD(const GaussIODSettings& settings = GaussIODSettings());
+    explicit GaussIOD(std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem = nullptr, 
+                      const GaussIODSettings& settings = GaussIODSettings());
     
     /**
      * @brief Determine orbit from observations
@@ -113,6 +119,7 @@ public:
 
 private:
     GaussIODSettings settings_;
+    std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
     
     /**
      * @brief Select three optimal observations
@@ -132,7 +139,7 @@ private:
      * @param dec Declination [rad]
      * @return Unit vector in equatorial frame
      */
-    Vector3d compute_line_of_sight(double ra, double dec) const;
+    Eigen::Vector3d compute_line_of_sight(astrometry::RightAscension ra, astrometry::Declination dec) const;
     
     /**
      * @brief Solve Gauss polynomial for slant ranges
@@ -141,9 +148,9 @@ private:
      * 
      * @param tau1 Time interval t2-t1 [days]
      * @param tau3 Time interval t3-t2 [days]
-     * @param los1 Line of sight vector at obs 1
-     * @param los2 Line of sight vector at obs 2
-     * @param los3 Line of sight vector at obs 3
+     * @param l1 Line of sight vector at obs 1
+     * @param l2 Line of sight vector at obs 2
+     * @param l3 Line of sight vector at obs 3
      * @param R1 Earth position at obs 1 [AU]
      * @param R2 Earth position at obs 2 [AU]
      * @param R3 Earth position at obs 3 [AU]
@@ -154,10 +161,14 @@ private:
      * @return true if converged
      */
     bool solve_slant_ranges(
-        double tau1, double tau3,
-        const Vector3d& los1, const Vector3d& los2, const Vector3d& los3,
-        const Vector3d& R1, const Vector3d& R2, const Vector3d& R3,
-        double& rho1, double& rho2, double& rho3,
+        time::TimeDuration tau1, time::TimeDuration tau3,
+        const Eigen::Vector3d& l1, 
+        const Eigen::Vector3d& l2, 
+        const Eigen::Vector3d& l3,
+        const math::Vector3<core::GCRF, physics::Distance>& R1, 
+        const math::Vector3<core::GCRF, physics::Distance>& R2, 
+        const math::Vector3<core::GCRF, physics::Distance>& R3,
+        physics::Distance& rho1, physics::Distance& rho2, physics::Distance& rho3,
         int& iterations);
     
     /**
@@ -172,7 +183,9 @@ private:
      * @return (f, g) coefficients
      */
     std::pair<double, double> compute_f_g_coefficients(
-        const Vector3d& r, const Vector3d& v, double dt, double mu) const;
+        const math::Vector3<core::GCRF, physics::Distance>& r, 
+        const math::Vector3<core::GCRF, physics::Velocity>& v, 
+        double dt, double mu) const;
 };
 
 } // namespace astdyn::orbit_determination

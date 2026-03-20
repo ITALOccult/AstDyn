@@ -1,0 +1,104 @@
+\chapter{Library Data Types and Strong Typing}
+\label{ch:data_types}
+
+\section{Introduction}
+
+In celestial mechanics, unit confusion (e.g., mixing AU and km) and reference frame misalignment (e.g., using Ecliptic coordinates where Equatorial are expected) are the most common sources of catastrophic errors. AstDyn addresses this by implementing a \textbf{Strongly-Typed Architecture}.
+
+Instead of using raw \texttt{double} values for all physics quantities, the library defines dedicated classes that:
+\begin{enumerate}
+    \item Enforce unit consistency at compile-time.
+    \item Explicitly document the intended units via factory methods.
+    \item Prevent nonsensical additions (e.g., adding a Distance to a Velocity).
+\end{enumerate}
+
+\section{Core Physics Types}
+
+The core units are defined in \texttt{astdyn::physics}. Each type uses an internal SI representation for maximum precision but provides convenient interfaces for astronomical units.
+
+\subsection{Distance}
+Represents a length. The internal representation is always meters (SI).
+
+\begin{lstlisting}[style=cpp, caption={Using the Distance type}]
+using namespace astdyn::physics;
+
+// Factory methods
+auto d1 = Distance::from_au(1.0);     // 1 Astronomical Unit
+auto d2 = Distance::from_km(149.6e6);  // 149.6 million km
+auto d3 = Distance::from_m(100.0);     // 100 meters
+
+// Extraction
+double auVal = d1.to_au();
+double kmVal = d1.to_km();
+\end{lstlisting}
+
+\subsection{Velocity and Acceleration}
+Handled similarly, preserving the relationship between distance and time.
+
+\begin{lstlisting}[style=cpp, caption={Using Velocity and Acceleration}]
+auto v = Velocity::from_km_s(30.0);   // Earth's approx velocity
+auto v_aud = v.to_au_d();             // ~0.017 AU/day
+
+auto a = Acceleration::from_au_d2(1.0); 
+\end{lstlisting}
+
+\subsection{Gravitational Parameter (GM)}
+A fundamental type for orbital mechanics, preventing confusion between $km^3/s^2$ and $AU^3/day^2$.
+
+\begin{lstlisting}[style=cpp, caption={Using GravitationalParameter}]
+auto mu_sun = GravitationalParameter::sun();
+double mu_si = mu_sun.to_km3_s2();
+double mu_ast = mu_sun.to_au3_d2();
+\end{lstlisting}
+
+\section{Angle and Astrometry Types}
+
+The \texttt{astdyn::astrometry} namespace provides types for angular measurements, including specialized types for Right Ascension and Declination.
+
+\begin{lstlisting}[style=cpp, caption={Astrometric angle types}]
+using namespace astdyn::astrometry;
+
+auto ra = RightAscension::from_deg(180.0);
+auto dec = Declination::from_deg(-45.0);
+
+std::cout << ra.to_hms() << std::endl;  // "12 00 00.000"
+std::cout << dec.to_dms() << std::endl; // "-45 00 00.00"
+\end{lstlisting}
+
+\section{Strongly-Typed States}
+
+The most powerful feature of AstDyn's type system is the binding of states to their reference frames.
+
+\subsection{CartesianStateTyped<Frame>}
+
+A Cartesian state is template-tagged with its reference frame (e.g., \texttt{ECLIPJ2000}, \texttt{GCRF}, \texttt{ITRF}).
+
+\begin{lstlisting}[style=cpp, caption={Frame-safe Cartesian states}]
+using namespace astdyn::core;
+
+// A state in Ecliptic J2000
+CartesianStateTyped<ECLIPJ2000> state_ecl = ...;
+
+// This will NOT compile (prevents frame confusion):
+// CartesianStateTyped<GCRF> state_equatorial = state_ecl; 
+
+// Explicit conversion required:
+auto state_equatorial = state_ecl.cast_frame<GCRF>();
+\end{lstlisting}
+
+\subsection{KeplerianStateTyped<Frame>}
+
+Similarly, Keplerian elements are bound to a frame. This is crucial when loading elements from databases like AstDyS (which uses Ecliptic) versus the MPC (which uses Equatorial).
+
+\begin{lstlisting}[style=cpp, caption={Frame-safe Keplerian elements}]
+auto k = KeplerianStateTyped<ECLIPJ2000>::from_traditional(
+    epoch, a_au, e, i_deg, node_deg, omega_deg, M_deg);
+\end{lstlisting}
+
+\section{Guidelines for Users}
+
+\begin{itemize}
+    \item \textbf{Avoid raw doubles}: Use \texttt{Distance}, \texttt{Velocity}, and \texttt{Angle} whenever possible.
+    \item \textbf{Use Factory Methods}: Instead of \texttt{val = 1.0}, use \texttt{Distance::from_au(1.0)}. This makes the code self-documenting and safe.
+    \item \textbf{Check Frame Tags}: Always verify that the template parameter of your state matches the data source (e.g., use \texttt{ECLIPJ2000} for OrbFit/AstDyS files).
+\end{itemize}

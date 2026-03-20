@@ -76,13 +76,13 @@ int main(int argc, char* argv[]) {
 
         // Fitted orbital elements
         std::cout << "Fitted Orbital Elements:\n";
-        std::cout << "  a = " << std::setprecision(6) << result.fitted_orbit.semi_major_axis << " AU\n";
-        std::cout << "  e = " << std::setprecision(6) << result.fitted_orbit.eccentricity << "\n";
-        std::cout << "  i = " << std::setprecision(4) << result.fitted_orbit.inclination * 180.0 / M_PI << "°\n";
-        std::cout << "  Ω = " << std::setprecision(4) << result.fitted_orbit.longitude_ascending_node * 180.0 / M_PI << "°\n";
-        std::cout << "  ω = " << std::setprecision(4) << result.fitted_orbit.argument_perihelion * 180.0 / M_PI << "°\n";
-        std::cout << "  M = " << std::setprecision(4) << result.fitted_orbit.mean_anomaly * 180.0 / M_PI << "°\n";
-        std::cout << "  Epoch: MJD " << std::setprecision(6) << result.fitted_orbit.epoch_mjd_tdb << " TDB\n\n";
+        std::cout << "  a = " << std::setprecision(6) << result.fitted_orbit.a.to_au() << " AU\n";
+        std::cout << "  e = " << std::setprecision(6) << result.fitted_orbit.e << "\n";
+        std::cout << "  i = " << std::setprecision(4) << result.fitted_orbit.i.to_deg() << "°\n";
+        std::cout << "  Ω = " << std::setprecision(4) << result.fitted_orbit.node.to_deg() << "°\n";
+        std::cout << "  ω = " << std::setprecision(4) << result.fitted_orbit.omega.to_deg() << "°\n";
+        std::cout << "  M = " << std::setprecision(4) << result.fitted_orbit.M.to_deg() << "°\n";
+        std::cout << "  Epoch: MJD " << std::setprecision(6) << result.fitted_orbit.epoch.mjd() << " TDB\n\n";
 
         // Comparison with reference orbit
         if (result.delta_a_km.has_value()) {

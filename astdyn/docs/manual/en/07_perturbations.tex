@@ -91,7 +91,18 @@ Accurate N-body modeling requires high-precision planetary positions. Common sou
     \item \textbf{SPICE}: NASA's toolkit for spacecraft and planetary geometry
 \end{itemize}
 
-AstDyn can use SPICE kernels to obtain planetary states at any epoch.
+AstDyn can use SPICE kernels or high-precision binary SPKs (DE440/DE441) to obtain planetary states at any epoch.
+
+\subsection{Asteroid Perturbations}
+
+For highest precision (milliarcsecond level), the gravitational influence of the most massive asteroids must be considered. AstDyn supports several levels of asteroid modeling:
+\begin{itemize}
+    \item \textbf{Default 17 Set}: Includes Ceres, Pallas, Vesta, and 14 other major perturbers (standard in IAU resolutions).
+    \item \textbf{Extended 30 Set}: Includes 30 massive asteroids for longer integrations.
+    \item \textbf{SPK Support}: Can load arbitrary sets of perturbers from JPL SPK files.
+\end{itemize}
+
+The acceleration is computed similarly to planetary perturbations, accounting for both direct and indirect terms relative to the Sun.
 
 \section{Oblateness Perturbations (J$_2$)}
 
@@ -152,6 +163,10 @@ where $n = \sqrt{\mu/a^3}$ is the mean motion.
 \end{itemize}
 
 For low Earth orbit (LEO), J$_2$ can cause $\Omega$ to change by several degrees per day.
+
+\subsection{Sun J2 Perturbation}
+
+AstDyn also includes the effect of the Sun's oblateness, which is critical for long-term stability and precise propagation of inner-solar system bodies. The Sun's $J_2 \approx 2 \times 10^{-7}$ is small but persistent, contributing to the secular precession of perihelia.
 
 \section{Solar Radiation Pressure}
 
@@ -223,7 +238,7 @@ General relativity introduces corrections to Newtonian gravity. The dominant ter
     \mathbf{a}_{\text{GR}} = \frac{\mu}{c^2 r^3}\left[4\frac{\mu}{r}\mathbf{r} - (\mathbf{v} \cdot \mathbf{v})\mathbf{r} + 4(\mathbf{r} \cdot \mathbf{v})\mathbf{v}\right]
 \end{equation}
 
-This is the first-order post-Newtonian (1PN) approximation.
+This is the first-order post-Newtonian (1PN) approximation. AstDyn allows the user to specify the Parametrized Post-Newtonian (PPN) parameters $\beta$ and $\gamma$, which are equal to 1 in General Relativity but can be varied for testing alternative gravity theories.
 
 \subsection{Perihelion Precession}
 
@@ -364,67 +379,52 @@ Modern orbit determination often uses:
     \item Analytical theory to identify important perturbations
     \item Simplified models (e.g., averaged J$_2$) for faster computation
 \end{enumerate}
-
 \section{AstDyn Implementation}
 
-AstDyn provides a modular perturbation framework:
+AstDyn provides a modular perturbation framework centered around the \texttt{PropagatorSettings} and \texttt{ForceField} classes.
 
-\begin{lstlisting}[language=C++,caption={Perturbations in AstDyn}]
-#include <astdyn/dynamics/Perturbations.hpp>
-#include <astdyn/dynamics/NBody.hpp>
+\begin{lstlisting}[language=C++,caption={Configuring Perturbations via PropagatorSettings}]
+using namespace astdyn::propagation;
 
-using namespace astdyn;
+// 1. Define high-precision settings
+PropagatorSettings settings;
+settings.include_planets = true;
+settings.include_moon = true;
+settings.include_asteroids = true;
+settings.use_default_asteroid_set = true; // Pluto + 16 massive asteroids
+settings.include_relativity = true;
+settings.include_sun_j2 = true;           // Sun oblateness
+settings.include_earth_j2 = false;        // Not needed for heliocentric
 
-// Create state vector
-Vector6d state = ...;  // [x, y, z, vx, vy, vz]
+// 2. Initialize necessary providers
+auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();
 
-// N-body perturbations from planets
-PlanetaryEphemeris ephem("de440.bsp");
-Vector3d acc_planets = NBody::compute_perturbation(
-    state, time, ephem, {"Jupiter", "Saturn", "Earth"}
+// 3. Create a force field aggregator
+ForceField field(settings, ephem);
+
+// 4. Computation (Internal or Advanced use)
+using namespace astdyn::time;
+auto acc = field.total_acceleration(
+    EpochTDB::from_mjd(60000.0),
+    pos_au,  // Eigen::Vector3d
+    vel_aud  // Eigen::Vector3d
 );
-
-// J2 perturbation (for Earth orbiter)
-Vector3d acc_j2 = Perturbations::j2_acceleration(
-    state, MU_EARTH, R_EARTH, J2_EARTH
-);
-
-// Solar radiation pressure
-double area_mass_ratio = 0.01;  // m^2/kg
-double Cr = 1.3;
-Vector3d sun_direction = ...;   // Unit vector to Sun
-Vector3d acc_srp = Perturbations::solar_radiation_pressure(
-    state, area_mass_ratio, Cr, sun_direction
-);
-
-// Relativistic correction
-Vector3d acc_gr = Perturbations::schwarzschild_correction(
-    state, MU_SUN
-);
-
-// Total perturbing acceleration
-Vector3d acc_total = acc_planets + acc_j2 + acc_srp + acc_gr;
-
-// Add to equations of motion
-Vector6d derivatives;
-derivatives.head<3>() = state.tail<3>();  // velocity
-derivatives.tail<3>() = -MU_SUN * state.head<3>() / r^3 + acc_total;
 \end{lstlisting}
 
-\subsection{Perturbation Selection}
+\subsection{Programmatic Control}
 
-AstDyn allows users to enable/disable perturbations:
+The \texttt{Propagator} class automatically handles these settings during integration:
 
-\begin{lstlisting}[language=C++,caption={Configuring perturbations}]
-PerturbationModel model;
-model.enable_planets({"Jupiter", "Saturn", "Uranus", "Neptune"});
-model.enable_j2(false);  // Not relevant for heliocentric orbits
-model.enable_srp(true);
-model.enable_relativity(true);
+\begin{lstlisting}[language=C++,caption={Propagation with perturbations}]
+// Create propagator with chosen integrator and settings
+auto integrator = std::make_shared<RKF78Integrator>(0.1, 1e-13);
+Propagator prop(integrator, ephem, settings);
 
-// Use in propagation
-Propagator prop(model);
-auto final_state = prop.propagate(initial_state, t0, tf);
+// Propagate a strongly-typed state
+auto final_state = prop.propagate_cartesian<astdyn::core::GCRF>(
+    initial_state, 
+    target_epoch
+);
 \end{lstlisting}
 
 \section{Summary}

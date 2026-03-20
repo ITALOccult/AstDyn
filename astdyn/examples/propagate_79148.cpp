@@ -38,7 +38,7 @@ propagation::EquinoctialElements parse_eq1_file(const std::string& filepath) {
     propagation::EquinoctialElements equ;
     std::string line;
     bool found_equ = false;
-    bool found_mjd = false;
+    bool found_epoch = false;
 
     while (std::getline(file, line)) {
         std::string trimmed = ltrim(line);
@@ -53,14 +53,16 @@ propagation::EquinoctialElements parse_eq1_file(const std::string& filepath) {
         }
         else if (trimmed.substr(0, 3) == "MJD") {
             std::istringstream iss(trimmed.substr(3));
-            iss >> equ.epoch_mjd_tdb;
-            found_mjd = true;
+            double mjd_val;
+            iss >> mjd_val;
+            equ.epoch = time::EpochTDB::from_mjd(mjd_val);
+            found_epoch = true;
         }
 
-        if (found_equ && found_mjd) break;
+        if (found_equ && found_epoch) break;
     }
 
-    if (!found_equ || !found_mjd) {
+    if (!found_equ || !found_epoch) {
         throw std::runtime_error("Could not parse equinoctial elements from file");
     }
 
@@ -92,7 +94,7 @@ int main(int argc, char** argv) {
         // Example: Asteroid 79148 (1992 SN3)
         // Epoch: 58749.5 MJD TDB
         propagation::CartesianElements cart_eq;
-        cart_eq.epoch_mjd_tdb = time::jd_to_mjd(2458749.5);
+        cart_eq.epoch = time::EpochTDB::from_jd(2458749.5);
         cart_eq.gravitational_parameter = constants::GMS;
         
         // Horizons State Vector (Heliocentric ICRF)
@@ -102,7 +104,7 @@ int main(int argc, char** argv) {
         // For display
         auto kep_eq = propagation::cartesian_to_keplerian(cart_eq);
         
-        std::cout << "Initial Epoch: " << std::fixed << std::setprecision(5) << kep_eq.epoch_mjd_tdb << " MJD TDB\n";
+        std::cout << "Initial Epoch: " << std::fixed << std::setprecision(5) << kep_eq.epoch.mjd() << " MJD TDB\n";
         std::cout << "Initial State (Equatorial J2000):\n";
         std::cout << "  X = " << cart_eq.position[0] << " AU\n";
         std::cout << "  Y = " << cart_eq.position[1] << " AU\n";
@@ -143,11 +145,11 @@ int main(int argc, char** argv) {
         
         std::cout << "Propagating to " << target_mjd << " MJD (2026-04-30 00:00 UTC/TDB)...\n";
         
-        auto final_state = engine.propagate_to(target_mjd);
+        auto final_state = engine.propagate_to(time::EpochTDB::from_mjd(target_mjd));
         auto final_cart = propagation::keplerian_to_cartesian(final_state);
         
         std::cout << "\n=== FINAL STATE (2026-04-30 00:00:00) ===\n";
-        std::cout << "Epoch: " << final_cart.epoch_mjd_tdb << " MJD TDB\n";
+        std::cout << "Epoch: " << final_cart.epoch.mjd() << " MJD TDB\n";
         
         std::cout << std::setprecision(12);
         std::cout << "Position (AU) [J2000 Eq]:\n";
@@ -161,12 +163,12 @@ int main(int argc, char** argv) {
         std::cout << " VZ = " << final_cart.velocity[2] << "\n";
         
         std::cout << "\nKeplerian Elements (J2000 Eq):\n";
-        std::cout << " a = " << final_state.semi_major_axis << " AU\n";
-        std::cout << " e = " << final_state.eccentricity << "\n";
-        std::cout << " i = " << final_state.inclination * constants::RAD_TO_DEG << " deg\n";
-        std::cout << " Ω = " << final_state.longitude_ascending_node * constants::RAD_TO_DEG << " deg\n";
-        std::cout << " ω = " << final_state.argument_perihelion * constants::RAD_TO_DEG << " deg\n";
-        std::cout << " M = " << final_state.mean_anomaly * constants::RAD_TO_DEG << " deg\n";
+        std::cout << " a = " << final_state.a.to_au() << " AU\n";
+        std::cout << " e = " << final_state.e << "\n";
+        std::cout << " i = " << final_state.i.to_deg() << " deg\n";
+        std::cout << " Ω = " << final_state.node.to_deg() << " deg\n";
+        std::cout << " ω = " << final_state.omega.to_deg() << " deg\n";
+        std::cout << " M = " << final_state.M.to_deg() << " deg\n";
 
         // 4. Compute Geocentric Equatorial Coordinates
         std::cout << "\n=== GEOCENTRIC COORDINATES (Astrometric J2000) ===\n";
@@ -179,23 +181,25 @@ int main(int argc, char** argv) {
         // Since we are forcing DE441 now, we assume Equatorial output.
         
         double target_jd_tdb = time::mjd_to_jd(target_mjd);
-        auto earth_state_raw = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, target_jd_tdb);
+        auto target_epoch = time::EpochTDB::from_jd(target_jd_tdb);
+        auto earth_state_raw = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::EARTH, target_epoch);
         
         // Check if we need to transform (Analytical = Ecliptic, DE441 = Equatorial)
         // For this specific verification with DE441 loaded:
-        Vector3d earth_pos_bary = earth_state_raw.position();
+        Vector3d earth_pos_bary = earth_state_raw.position.to_eigen_si() / constants::AU / 1000.0;
         
         // CORRECTION: Convert Earth Barycentric -> Heliocentric
         // Propagator integrates in Heliocentric frame. DE441 returns Barycentric.
         // Earth_Helio = Earth_Bary - Sun_Bary
-        auto sun_state_raw = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, target_jd_tdb);
-        Vector3d sun_pos_bary = sun_state_raw.position();
+        auto sun_state_raw = ephemeris::PlanetaryEphemeris::getState(ephemeris::CelestialBody::SUN, target_epoch);
+        Vector3d sun_pos_bary = sun_state_raw.position.to_eigen_si() / constants::AU / 1000.0;
         
         Vector3d earth_pos = earth_pos_bary - sun_pos_bary;
         
         // If we were using Analytical, we would need:
-        // auto earth_eq = coordinates::ReferenceFrame::transform_state(earth_state_raw, ECLIPTIC, J2000);
-        // earth_pos = earth_eq.position();
+        // Matrix3d R = coordinates::ReferenceFrame::get_transformation(
+        //     coordinates::FrameType::ECLIPTIC, coordinates::FrameType::J2000);
+        // earth_pos = R * earth_state_raw.position();
         
         // Correzione per il Tempo Luce (Light-Time Correction)
         // JPL "Astrometric" include solitamente la correzione per il tempo luce.
@@ -209,10 +213,10 @@ int main(int argc, char** argv) {
         // Iterazione per il tempo luce (3 iterazioni sono sufficienti)
         for(int k=0; k<3; ++k) {
             tau = range / c_au_day;
-            double retarded_mjd = target_mjd - tau;
+            time::EpochTDB retarded_epoch = time::EpochTDB::from_mjd(target_mjd - tau);
             
             // Propaghiamo l'asteroide al tempo ritardato
-            auto state_retarded = engine.propagate_to(retarded_mjd);
+            auto state_retarded = engine.propagate_to(retarded_epoch);
             auto cart_retarded = propagation::keplerian_to_cartesian(state_retarded);
             asteroid_pos_retarded = cart_retarded.position;
             
