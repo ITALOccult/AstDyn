@@ -13,6 +13,7 @@ Propagator::Propagator(std::shared_ptr<Integrator> integrator,
     : integrator_(std::move(integrator)), ephemeris_(std::move(ephemeris)), settings_(settings) {
     mat_ecl_ = coordinates::ReferenceFrame::j2000_to_ecliptic();
     setup_aas_parameters();
+    force_field_ = std::make_shared<ForceField>(settings_, ephemeris_);
 }
 
 void Propagator::setup_aas_parameters() {
@@ -32,9 +33,9 @@ Eigen::VectorXd Propagator::compute_derivatives(time::EpochTDB t, const Eigen::V
     Eigen::Vector3d position = state.head<3>();
     Eigen::Vector3d velocity = state.tail<3>();
     
-    // Use centralized ForceField (on the fly or cached)
-    ForceField force(settings_, ephemeris_);
-    Eigen::Vector3d acc = force.total_acceleration(t, position, velocity);
+    // Use persistent ForceField (avoids re-loading asteroid files every step)
+    if (!force_field_) force_field_ = std::make_shared<ForceField>(settings_, ephemeris_);
+    Eigen::Vector3d acc = force_field_->total_acceleration(t, position, velocity);
 
     if (!acc.allFinite()) throw std::runtime_error("Propagator: acceleration contains NaN/Inf");
 
@@ -57,7 +58,10 @@ std::vector<Eigen::VectorXd> Propagator::integrate_raw_au_batch(const Eigen::Vec
 }
 
 // Stubs for legacy methods (removed from header?)
-void Propagator::update_force_cache(time::EpochTDB t) {}
+void Propagator::update_force_cache(time::EpochTDB t) {
+    // Rebuild force field (e.g., after settings change or at integration start)
+    force_field_ = std::make_shared<ForceField>(settings_, ephemeris_);
+}
 void Propagator::setup_asteroid_perturbations() {}
 Eigen::Vector3d Propagator::compute_n_body_acceleration(const Eigen::Vector3d& position) { return Eigen::Vector3d::Zero(); }
 Eigen::Vector3d Propagator::compute_harmonic_acceleration(const Eigen::Vector3d& pos, time::EpochTDB t) { return Eigen::Vector3d::Zero(); }

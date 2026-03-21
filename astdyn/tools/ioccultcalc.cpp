@@ -30,7 +30,9 @@ namespace po = boost::program_options;
 /**
  * @brief Helper to convert an internal candidate to an XML-formatted event structure.
  */
-OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std::string& ast_id, const physics::KeplerianStateTyped<core::ECLIPJ2000>& el) {
+OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std::string& ast_id,
+                                    const physics::KeplerianStateTyped<core::ECLIPJ2000>& el,
+                                    double diameter_km, double h_mag) {
     OccultationEvent ev;
     ev.event_id = cand.params.star_id + "_" + std::to_string((int)cand.params.t_ca.mjd());
     ev.mjd = cand.params.t_ca.mjd();
@@ -52,8 +54,8 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.object_name = ast_id;
     try { ev.object_number = std::stoi(ast_id); } catch(...) { ev.object_number = 0; }
     ev.object_type = "Asteroid";
-    ev.diameter_km = cand.params.cross_track_uncertainty.to_km(); 
-    ev.h_mag = cand.params.star_mag; 
+    ev.diameter_km = diameter_km;
+    ev.h_mag = h_mag;
     ev.apparent_rate_arcsec_hr = cand.params.total_apparent_rate;
     
     ev.longitude_deg = cand.params.center_lon.to_deg();
@@ -174,7 +176,12 @@ int main(int argc, char** argv) {
     }
 
     // --- 2. Engine Setup ---
-    std::string bsp_path = adv_cfg.get<std::string>("ephemeris.file", "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp");
+    // B5 fix: use $HOME env var instead of hardcoded personal path
+    auto default_bsp_path = []() -> std::string {
+        const char* home = std::getenv("HOME");
+        return home ? std::string(home) + "/.ioccultcalc/ephemerides/de441.bsp" : "";
+    };
+    std::string bsp_path = adv_cfg.get<std::string>("ephemeris.file", default_bsp_path());
     
     AstDynEngine engine;
     if (vm.count("conf")) {
@@ -193,7 +200,9 @@ int main(int argc, char** argv) {
         auto provider = std::make_shared<ephemeris::DE441Provider>(engine.config().ephemeris_file);
         ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
         ephem_ptr = std::make_shared<ephemeris::PlanetaryEphemeris>(provider);
-        catalog::GaiaDR3Catalog::initialize(R"({"catalog_type":"online_esa"})");
+        // M2 fix: catalog config from --conf or hardcoded default
+        std::string catalog_json = adv_cfg.get<std::string>("catalog_config", R"({"catalog_type":"online_esa"})");
+        catalog::GaiaDR3Catalog::initialize(catalog_json);
     } catch (const std::exception& e) { 
         std::cerr << "Error initializing engine: " << e.what() << "\n";
         return 1; 
@@ -238,6 +247,10 @@ int main(int argc, char** argv) {
     HorizonsClient horizons;
     std::map<std::string, physics::CartesianStateTyped<core::GCRF>> stored_states;
     std::map<std::string, physics::KeplerianStateTyped<core::ECLIPJ2000>> stored_elements;
+    // M3: named constants for fallback physical properties
+    constexpr double DEFAULT_ASTEROID_DIAMETER_KM = 100.0;
+    constexpr double DEFAULT_SATELLITE_DIAMETER_KM = 10.0;
+    constexpr double DEFAULT_SATELLITE_H_MAG       = 15.0;
     std::map<std::string, std::pair<double, double>> stored_props; // {H, D}
     std::unique_ptr<io::SPKReader> system_reader;
 
@@ -260,8 +273,8 @@ int main(int argc, char** argv) {
                     stored_props[id] = {props->h_mag, props->diameter_km};
                     manager.set_diameter(id, props->diameter_km);
                 } else {
-                    stored_props[id] = {0.0, 100.0};
-                    manager.set_diameter(id, 100.0);
+                    stored_props[id] = {0.0, DEFAULT_ASTEROID_DIAMETER_KM};
+                    manager.set_diameter(id, DEFAULT_ASTEROID_DIAMETER_KM);
                 }
             }
         }
@@ -277,11 +290,17 @@ int main(int argc, char** argv) {
         
         system_reader = std::make_unique<io::SPKReader>(system_bsp);
         for (const auto& id_str : system_ids) {
-            int naif_id = std::stoi(id_str);
+            int naif_id = 0;
+            try {
+                naif_id = std::stoi(id_str);
+            } catch (const std::exception& e) {
+                std::cerr << "[ioccultcalc] Skipping invalid NAIF ID '" << id_str << "': " << e.what() << "\n";
+                continue;
+            }
             manager.add_system_body(id_str, naif_id, *system_reader, start_epoch, end_epoch);
-            asteroid_ids.push_back(id_str); // Add to search list
-            stored_props[id_str] = {15.0, 10.0}; // Default for satellites (H, D)
-            manager.set_diameter(id_str, 10.0);
+            asteroid_ids.push_back(id_str);
+            stored_props[id_str] = {DEFAULT_SATELLITE_H_MAG, DEFAULT_SATELLITE_DIAMETER_KM};
+            manager.set_diameter(id_str, DEFAULT_SATELLITE_DIAMETER_KM);
         }
     }
 
@@ -337,7 +356,9 @@ int main(int argc, char** argv) {
                     OccultationLogic::apply_uncertainty(res.params, res.star, cov_t0, stored_states[res.asteroid_id], engine);
                 }
             }
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            std::cerr << "[ioccultcalc] Warning: covariance application failed (" << e.what() << "). Results will have no uncertainty.\n";
+        }
     }
 
     // --- 3e. Regional Filter ---
@@ -350,22 +371,39 @@ int main(int argc, char** argv) {
     }
 
     if (has_location && !results.empty()) {
+        // B4 fix: haversine great-circle distance instead of flat Euclidean degrees
+        auto haversine_deg = [](double lat1_deg, double lon1_deg, double lat2_deg, double lon2_deg) -> double {
+            constexpr double DEG_TO_RAD = M_PI / 180.0;
+            double dlat = (lat2_deg - lat1_deg) * DEG_TO_RAD;
+            double dlon = (lon2_deg - lon1_deg) * DEG_TO_RAD;
+            double a = std::sin(dlat/2)*std::sin(dlat/2)
+                     + std::cos(lat1_deg*DEG_TO_RAD) * std::cos(lat2_deg*DEG_TO_RAD)
+                     * std::sin(dlon/2)*std::sin(dlon/2);
+            return 2.0 * std::atan2(std::sqrt(a), std::sqrt(1.0-a)) / DEG_TO_RAD;
+        };
         std::vector<OccultationCandidate> filtered;
         for (const auto& res : results) {
-            double d_lat = res.params.center_lat.to_deg() - obs_lat;
-            double d_lon = res.params.center_lon.to_deg() - obs_lon;
-            while (d_lon > 180.0) d_lon -= 360.0;
-            while (d_lon < -180.0) d_lon += 360.0;
-            if (std::sqrt(d_lat*d_lat + d_lon*d_lon) < 25.0) filtered.push_back(res);
+            if (haversine_deg(obs_lat, obs_lon,
+                              res.params.center_lat.to_deg(),
+                              res.params.center_lon.to_deg()) < 25.0) {
+                filtered.push_back(res);
+            }
         }
         results = filtered;
     }
 
     // --- 4. Outputs ---
     if (!results.empty()) {
-        std::vector<OccultationPath> paths;
-        std::vector<std::string> labels;
-        std::vector<std::string> colors = {"#ef4444", "#3b82f6", "#22c55e", "#eab308", "#8b5cf6"};
+        // B1 fix: keep result and path paired so --star filter never creates index desync.
+        // B2 fix: each event gets its own orbital elements from stored_elements.
+        struct MatchedResult {
+            OccultationCandidate result;
+            OccultationPath      path;
+            std::string          label;
+        };
+
+        const std::vector<std::string> colors = {"#ef4444", "#3b82f6", "#22c55e", "#eab308", "#8b5cf6"};
+        std::vector<MatchedResult> matched;
 
         for (auto& res : results) {
             if (vm.count("star") && std::to_string(res.star.source_id) != vm["star"].as<std::string>()) continue;
@@ -375,55 +413,78 @@ int main(int argc, char** argv) {
                 res.star.ra = RightAscension::from_deg(res.star.ra.to_deg() + offset_deg / std::cos(res.star.dec.to_rad()));
             }
 
-            double diam = 100.0;
-            auto it = stored_props.find(res.asteroid_id);
-            if (it != stored_props.end()) diam = it->second.second;
-            
-            time::EpochUTC tca_utc = time::to_utc(res.params.t_ca);
-
-            // Refinement with High-Precision MultiBody if requested
-            if (vm["multibody"].as<bool>() && !system_bsp.empty()) {
-                std::cout << "[ioccultcalc] Raffinamento alta precisione per " << res.asteroid_id << "..." << std::endl;
-                // Simplified logic: ensure OccultationLogic used correct methods if multibody flag was detected globally.
+            if (vm["multibody"].as<bool>()) {
+                // M1: high-precision multibody refinement not yet implemented
+                std::cerr << "[ioccultcalc] Warning: --multibody requested but not yet implemented; using standard propagation.\n";
             }
 
-            auto path = OccultationMapper::compute_path(res.params, res.star.ra, res.star.dec, physics::Distance::from_km(diam), tca_utc, ephem_ptr);
-            paths.push_back(path);
-            labels.push_back(res.asteroid_id + " - " + std::to_string(res.star.source_id));
+            double diam = DEFAULT_ASTEROID_DIAMETER_KM;
+            auto it = stored_props.find(res.asteroid_id);
+            if (it != stored_props.end()) diam = it->second.second;
+
+            time::EpochUTC tca_utc = time::to_utc(res.params.t_ca);
+            auto path = OccultationMapper::compute_path(res.params, res.star.ra, res.star.dec,
+                                                        physics::Distance::from_km(diam), tca_utc, ephem_ptr);
+            matched.push_back({res, path, res.asteroid_id + " - " + std::to_string(res.star.source_id)});
+        }
+
+        // Collect flat arrays for batch SVG export
+        std::vector<OccultationPath> paths;
+        std::vector<std::string> labels;
+        paths.reserve(matched.size());
+        labels.reserve(matched.size());
+        for (const auto& m : matched) {
+            paths.push_back(m.path);
+            labels.push_back(m.label);
         }
 
         std::string xml_file = vm.count("xml-output") ? vm["xml-output"].as<std::string>() : adv_cfg.get<std::string>("xml-output", "");
         if (!xml_file.empty()) {
             std::vector<OccultationEvent> events;
-            for (const auto& res : results) {
-                physics::KeplerianStateTyped<core::ECLIPJ2000> el; // Placeholder or retrieve from engine
-                if (engine.has_orbit()) el = engine.orbit();
-                events.push_back(candidate_to_event(res, res.asteroid_id, el));
+            for (const auto& m : matched) {
+                // B2 fix: use per-asteroid elements from stored_elements
+                physics::KeplerianStateTyped<core::ECLIPJ2000> el;
+                auto el_it = stored_elements.find(m.result.asteroid_id);
+                if (el_it != stored_elements.end()) {
+                    el = el_it->second;
+                } else if (engine.has_orbit()) {
+                    el = engine.orbit();
+                }
+                // Diameter fix: use real H mag and diameter from Horizons, not fallback
+                double ev_h_mag  = 0.0;
+                double ev_diam   = DEFAULT_ASTEROID_DIAMETER_KM;
+                auto props_it = stored_props.find(m.result.asteroid_id);
+                if (props_it != stored_props.end()) {
+                    ev_h_mag = props_it->second.first;
+                    ev_diam  = props_it->second.second;
+                }
+                events.push_back(candidate_to_event(m.result, m.result.asteroid_id, el, ev_diam, ev_h_mag));
             }
             std::filesystem::path p = std::filesystem::path(out_dir) / xml_file;
             OccultationXMLIO::write_file(events, p.string());
-            std::cout << "[ioccultcalc] Saved 1-sigma results to " << p.string() << std::endl;
+            std::cout << "[ioccultcalc] Saved " << events.size() << " events to " << p.string() << "\n";
         }
 
         std::string svg_file = vm.count("svg-output") ? vm["svg-output"].as<std::string>() : adv_cfg.get<std::string>("svg-output", "");
         if (!svg_file.empty()) {
             std::filesystem::path p = std::filesystem::path(out_dir) / svg_file;
-            double zoom = vm["zoom"].as<double>();
+            double zoom    = vm["zoom"].as<double>();
             double map_lat = vm.count("map-lat") ? vm["map-lat"].as<double>() : obs_lat;
             double map_lon = vm.count("map-lon") ? vm["map-lon"].as<double>() : obs_lon;
-            
-            OccultationMapper::export_global_svg(paths, labels, colors, p.string(), ephem_ptr, 
+            OccultationMapper::export_global_svg(paths, labels, colors, p.string(), ephem_ptr,
                                                  Angle::from_deg(map_lat), Angle::from_deg(map_lon), zoom);
         }
 
         if (!out_dir.empty()) {
-            for (size_t i = 0; i < results.size(); ++i) {
-                const auto& res = results[i];
+            for (size_t i = 0; i < matched.size(); ++i) {
+                const auto& m = matched[i];
                 std::stringstream ss;
-                ss << prefix << "_" << res.asteroid_id << "_" << res.star.source_id << "_" << (int)res.params.t_ca.mjd() << ".svg";
+                ss << prefix << "_" << m.result.asteroid_id << "_"
+                   << m.result.star.source_id << "_" << (int)m.result.params.t_ca.mjd() << ".svg";
                 std::filesystem::path ip = std::filesystem::path(out_dir) / ss.str();
-                OccultationMapper::export_global_svg({paths[i]}, {labels[i]}, {colors[i % colors.size()]}, 
-                                                     ip.string(), ephem_ptr, res.params.center_lat, res.params.center_lon, 4.0);
+                OccultationMapper::export_global_svg({m.path}, {m.label}, {colors[i % colors.size()]},
+                                                     ip.string(), ephem_ptr,
+                                                     m.result.params.center_lat, m.result.params.center_lon, 4.0);
             }
         }
     }

@@ -17,6 +17,7 @@
 
 #include "astdyn/propagation/OrbitalElements.hpp"
 #include "astdyn/propagation/Integrator.hpp"
+#include "astdyn/propagation/ForceField.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/AsteroidPerturbations.hpp"
 #include "astdyn/core/physics_state.hpp"
@@ -143,10 +144,11 @@ public:
     }
     
     /**
-     * @brief Update propagation settings
+     * @brief Update propagation settings (invalidates force field cache)
      */
     void set_settings(const PropagatorSettings& settings) {
         settings_ = settings;
+        force_field_.reset(); // Rebuild on next compute_derivatives()
     }
     
     const PropagatorSettings& settings() const { return settings_; }
@@ -205,6 +207,7 @@ private:
     std::shared_ptr<Integrator> integrator_;
     std::shared_ptr<ephemeris::PlanetaryEphemeris> ephemeris_;
     std::shared_ptr<ephemeris::AsteroidPerturbations> asteroids_;
+    std::shared_ptr<ForceField> force_field_; ///< Persistent force field (avoids re-loading asteroid files)
     PropagatorSettings settings_;
     Eigen::Matrix3d mat_ecl_; ///< Cached rotation matrix J2000 -> Ecliptic
 

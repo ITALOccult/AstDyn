@@ -535,17 +535,118 @@ TEST(CometaryElementsTest, CartesianConversion) {
     double Omega = 0.0;
     double omega = 0.0;
     double T = 0.0;
-    
+
     CometaryElements comet(q, e, i, Omega, omega, T);
-    
+
     // Convert to Cartesian at perihelion
     CartesianState cart = comet.to_cartesian(T);
-    
+
     // At perihelion: r = q, v perpendicular
     EXPECT_NEAR(cart.radius(), q, 1e-3);
-    
+
     // Velocity should be √(μ(1+e)/q)
     double v_peri = std::sqrt(GM_SUN * (1.0 + e) / q);
     EXPECT_NEAR(cart.speed(), v_peri, 1e-3);
+}
+
+// ========== Edge Case: Parabolic Orbit (Barker's Equation) ==========
+
+TEST(CometaryElementsTest, ParabolicAtPerihelion) {
+    // Parabolic comet with perihelion at 1 AU
+    double q = AU; // km
+    CometaryElements comet(q, 1.0, 0.0, 0.0, 0.0, 0.0, GM_SUN);
+
+    CartesianState cart = comet.to_cartesian(0.0); // t == T (perihelion)
+
+    // At perihelion: r = q
+    EXPECT_NEAR(cart.radius(), q, 1.0); // 1 km tolerance
+
+    // Parabolic escape velocity at perihelion: v = sqrt(2*mu/q)
+    double v_expected = std::sqrt(2.0 * GM_SUN / q);
+    EXPECT_NEAR(cart.speed(), v_expected, 1e-3);
+}
+
+TEST(CometaryElementsTest, ParabolicAfterPerihelion) {
+    double q = AU;
+    CometaryElements comet(q, 1.0, 0.0, 0.0, 0.0, 0.0, GM_SUN);
+
+    // 10 days after perihelion: object moves outward
+    CartesianState cart = comet.to_cartesian(10.0);
+    EXPECT_GT(cart.radius(), q);
+
+    // Cartesian components must be finite
+    EXPECT_TRUE(cart.position().allFinite());
+    EXPECT_TRUE(cart.velocity().allFinite());
+}
+
+TEST(CometaryElementsTest, ParabolicTrueAnomalySymmetry) {
+    // Barker's equation: nu(-dt) == -nu(+dt)
+    double q = 0.5 * AU;
+    CometaryElements comet(q, 1.0, 0.0, 0.0, 0.0, 0.0, GM_SUN);
+
+    double nu_plus  = comet.true_anomaly_at_time( 30.0);
+    double nu_minus = comet.true_anomaly_at_time(-30.0);
+    EXPECT_NEAR(nu_plus, -nu_minus, 1e-10);
+}
+
+// ========== Edge Case: Hyperbolic Orbit ==========
+
+TEST(CometaryElementsTest, HyperbolicAtPerihelion) {
+    double q = 0.5 * AU; // km, perihelion at 0.5 AU
+    double e = 2.0;
+    CometaryElements comet(q, e, 0.0, 0.0, 0.0, 0.0, GM_SUN);
+
+    CartesianState cart = comet.to_cartesian(0.0);
+
+    EXPECT_NEAR(cart.radius(), q, 1.0);
+
+    // v at perihelion = sqrt(mu*(1+e)/q)
+    double v_expected = std::sqrt(GM_SUN * (1.0 + e) / q);
+    EXPECT_NEAR(cart.speed(), v_expected, 1e-3);
+}
+
+TEST(CometaryElementsTest, HyperbolicAfterPerihelion) {
+    double q = 0.5 * AU;
+    double e = 1.5;
+    CometaryElements comet(q, e, 0.3, 1.2, 0.8, 0.0, GM_SUN);
+
+    CartesianState cart = comet.to_cartesian(50.0); // 50 days after perihelion
+    EXPECT_GT(cart.radius(), q);
+    EXPECT_TRUE(cart.position().allFinite());
+    EXPECT_TRUE(cart.velocity().allFinite());
+}
+
+// ========== Edge Case: Near-Retrograde Orbit (i ≈ π) ==========
+
+TEST(KeplerianElementsTest, NearRetrogradeOrbit) {
+    // i = 179.9°, eccentricity = 0.5 — tests tan(i/2) singularity guard
+    double i_near_retrograde = 179.9 * DEG_TO_RAD;
+    KeplerianElements kep(1.0 * AU, 0.5, i_near_retrograde, 0.0, 0.0, 0.5, GM_SUN);
+
+    CartesianState cart = kep.to_cartesian();
+    EXPECT_TRUE(cart.position().allFinite());
+    EXPECT_TRUE(cart.velocity().allFinite());
+}
+
+// ========== Edge Case: Exactly Zero Eccentricity (e = 0) ==========
+
+TEST(KeplerianElementsTest, ExactlyCircularOrbit) {
+    KeplerianElements kep(AU, 0.0, 0.0, 0.0, 0.0, 1.0, GM_SUN);
+    CartesianState cart = kep.to_cartesian();
+    EXPECT_NEAR(cart.radius(), AU, 1.0);
+    EXPECT_TRUE(cart.position().allFinite());
+}
+
+// ========== Edge Case: acos Argument Clamp ==========
+
+TEST(CometaryElementsTest, AcosArgumentClampDoesNotNaN) {
+    // Very small eccentricity combined with near-circular velocity
+    // can push acos arguments to 1+eps — verify no NaN
+    double q = AU * (1.0 - 0.001);
+    KeplerianElements kep(AU, 0.001, 0.01, 0.0, 0.0, 0.0, GM_SUN);
+    CartesianState cart_k = kep.to_cartesian();
+    KeplerianElements kep2 = KeplerianElements::from_cartesian(cart_k);
+    EXPECT_TRUE(std::isfinite(kep2.eccentricity()));
+    EXPECT_TRUE(std::isfinite(kep2.inclination()));
 }
 

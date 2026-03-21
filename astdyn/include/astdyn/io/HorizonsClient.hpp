@@ -79,7 +79,7 @@ private:
     std::string build_elements_url(const std::string& target, const time::EpochTDB& epoch);
     std::string build_vectors_url(const std::string& target, const time::EpochTDB& epoch, const std::string& center);
     std::string build_observer_url(const std::string& target, const time::EpochTDB& epoch, const std::string& center);
-    double parse_token(const std::string& text, const std::string& token);
+    std::expected<double, HorizonsError> parse_token(const std::string& text, const std::string& token);
 };
 
 } // namespace astdyn::io

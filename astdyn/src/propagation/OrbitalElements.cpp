@@ -14,7 +14,9 @@
 #include "astdyn/coordinates/state_conversions.hpp"
 #include "astdyn/core/Constants.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace astdyn::propagation {
@@ -165,7 +167,13 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     // Semi-major axis from specific energy
     // ε = v²/2 - μ/r = -μ/(2a)  =>  a = -μ/(2ε)
     double specific_energy = 0.5 * v_mag * v_mag - mu / r_mag;
-    double a = -mu / (2.0 * specific_energy);
+    double a;
+    if (std::abs(specific_energy) < 1e-10) {
+        // Parabolic orbit: semi-major axis is infinite
+        a = std::numeric_limits<double>::infinity();
+    } else {
+        a = -mu / (2.0 * specific_energy);
+    }
     // CartesianElements is always SI (m, m/s, m³/s²), so 'a' is in meters.
     // KeplerianElements.semi_major_axis is always in AU. AU_M defined above.
     double a_au = a / AU_M;
@@ -174,38 +182,38 @@ KeplerianElements cartesian_to_keplerian(const CartesianElements& cart) {
     kep.eccentricity = e;
     
     // Inclination
-    double i = std::acos(h(2) / h_mag);
+    double i = std::acos(std::clamp(h(2) / h_mag, -1.0, 1.0));
     kep.inclination = i;
-    
+
     // Node vector (k × h)
     Eigen::Vector3d k(0, 0, 1);
     Eigen::Vector3d n = k.cross(h);
     double n_mag = n.norm();
-    
+
     // Longitude of ascending node
     double Omega = 0.0;
     if (n_mag > 1e-10) {
-        Omega = std::acos(n(0) / n_mag);
+        Omega = std::acos(std::clamp(n(0) / n_mag, -1.0, 1.0));
         if (n(1) < 0.0) {
             Omega = constants::TWO_PI - Omega;
         }
     }
     kep.longitude_ascending_node = Omega;
-    
+
     // Argument of perihelion
     double omega = 0.0;
     if (n_mag > 1e-10 && e > 1e-10) {
-        omega = std::acos(n.dot(e_vec) / (n_mag * e));
+        omega = std::acos(std::clamp(n.dot(e_vec) / (n_mag * e), -1.0, 1.0));
         if (e_vec(2) < 0.0) {
             omega = constants::TWO_PI - omega;
         }
     }
     kep.argument_perihelion = omega;
-    
+
     // True anomaly
     double nu = 0.0;
     if (e > 1e-10) {
-        nu = std::acos(e_vec.dot(r) / (e * r_mag));
+        nu = std::acos(std::clamp(e_vec.dot(r) / (e * r_mag), -1.0, 1.0));
         if (r.dot(v) < 0.0) {
             nu = constants::TWO_PI - nu;
         }
@@ -237,8 +245,20 @@ EquinoctialElements keplerian_to_equinoctial(const KeplerianElements& kep) {
     eq.a = kep.semi_major_axis;
     eq.h = e * std::sin(omega + Omega);
     eq.k = e * std::cos(omega + Omega);
-    eq.p = std::tan(i / 2.0) * std::sin(Omega);
-    eq.q = std::tan(i / 2.0) * std::cos(Omega);
+    // For retrograde orbits (i → π), tan(i/2) → ∞.
+    // Use the equivalent sin(i)/(1+cos(i)) form which is numerically safe for i < π.
+    // For i very close to π (within ~1e-9 rad), the equinoctial elements diverge
+    // by design — this is a known singularity of the prograde equinoctial set.
+    double tan_half_i;
+    double cos_i = std::cos(i);
+    if (std::abs(1.0 + cos_i) < 1e-10) {
+        // Exactly retrograde: equinoctial elements singular — clamp to large value.
+        tan_half_i = 1.0 / 1e-10;
+    } else {
+        tan_half_i = std::sin(i) / (1.0 + cos_i);
+    }
+    eq.p = tan_half_i * std::sin(Omega);
+    eq.q = tan_half_i * std::cos(Omega);
     eq.lambda = M + omega + Omega;
     
     return eq;
@@ -329,7 +349,10 @@ KeplerianElements mean_to_osculating(const KeplerianElements& mean, double j2, d
     double sin_i = std::sin(i), cos_i = std::cos(i), sin2nu = std::sin(2.0*nu), cos2nu = std::cos(2.0*nu);
     osc.eccentricity += (k/8.0) * e * eta * (1.0 - 11.0*cos_i*cos_i) * sin2nu;
     osc.inclination += -(k/2.0) * e * sin_i * cos_i * cos2nu;
-    osc.argument_perihelion += (k/8.0) * (4.0 - 5.0*sin_i*sin_i) * (2.0 + e*std::cos(nu)) * sin2nu / eta;
+    // Guard: eta → 0 for near-parabolic orbits (e → 1); skip the singular correction.
+    if (eta > 1e-10) {
+        osc.argument_perihelion += (k/8.0) * (4.0 - 5.0*sin_i*sin_i) * (2.0 + e*std::cos(nu)) * sin2nu / eta;
+    }
     if (a > 1.8 && a < 4.0) apply_planetary_corrections(osc, mean);
     return osc;
 }

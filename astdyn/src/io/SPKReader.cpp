@@ -150,8 +150,13 @@ void SPKReader::init_type2_segment(SPKSegment& seg) {
     double p[4]; file_.seekg(static_cast<long long>(seg.end_addr - 4) * 8, std::ios::beg);
     file_.read(reinterpret_cast<char*>(p), 32);
     if (big_endian_ != isSystemBigEndian()) for (double& v : p) v = swapEndian(v);
-    seg.init_sec = p[0]; seg.intlen = p[1]; seg.rsize = (int)p[2];
-    seg.order = ((int)p[2] - 2) / 3 - 1; seg.n_comp = 3;
+    seg.init_sec = p[0]; seg.intlen = p[1];
+    // Validate rsize before casting: must be finite, positive, and within a sane range.
+    if (!std::isfinite(p[2]) || p[2] < 2.0 || p[2] > 1e6) {
+        throw std::runtime_error("Invalid SPK Type 2 rsize: " + std::to_string(p[2]));
+    }
+    seg.rsize = static_cast<int>(p[2]);
+    seg.order = (seg.rsize - 2) / 3 - 1; seg.n_comp = 3;
 }
 
 void SPKReader::seekToRecord(int record_idx) {
@@ -244,8 +249,14 @@ Eigen::Matrix<double, 6, 1> SPKReader::evaluateType21(const SPKSegment& seg, dou
 }
 
 void SPKReader::refresh_type2_cache(const SPKSegment& seg, int idx, Type2Cache& cache) {
-    long long addr = static_cast<long long>(seg.start_addr + idx * seg.rsize - 1);
-    if (addr < seg.start_addr - 1 || addr + seg.rsize > seg.end_addr) {
+    if (idx < 0) {
+        throw std::runtime_error("Negative SPK record index: " + std::to_string(idx));
+    }
+    // Use long long arithmetic throughout to prevent int overflow before bounds check.
+    long long addr = static_cast<long long>(seg.start_addr)
+                   + static_cast<long long>(idx) * static_cast<long long>(seg.rsize) - 1;
+    if (addr < static_cast<long long>(seg.start_addr) - 1
+            || addr + static_cast<long long>(seg.rsize) > static_cast<long long>(seg.end_addr)) {
          throw std::runtime_error("SPK address out of segment bounds: addr=" + std::to_string(addr) + " seg=" + std::to_string(seg.start_addr) + "-" + std::to_string(seg.end_addr));
     }
     cache.seg = &seg; cache.rec_idx = idx; cache.coeffs.resize(seg.rsize);

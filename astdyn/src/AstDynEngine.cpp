@@ -84,16 +84,24 @@ void AstDynEngine::load_ephemeris_provider() {
     static std::shared_ptr<ephemeris::EphemerisProvider> cache;
     std::lock_guard lock(mtx);
 
+    std::shared_ptr<ephemeris::EphemerisProvider> provider;
     if (last_path != config_.ephemeris_file) {
         try {
-            auto provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
-            ephemeris_->setProvider(provider);
-            ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
-            cache = provider; last_path = config_.ephemeris_file; ephemeris_loaded_ = true;
-        } catch (...) { ephemeris_loaded_ = false; }
+            auto new_provider = std::make_shared<ephemeris::DE441Provider>(config_.ephemeris_file);
+            cache = new_provider; last_path = config_.ephemeris_file;
+            provider = new_provider;
+        } catch (...) { ephemeris_loaded_ = false; return; }
     } else {
-        ephemeris_->setProvider(cache); ephemeris::PlanetaryEphemeris::setGlobalProvider(cache); ephemeris_loaded_ = true;
+        provider = cache;
     }
+    // setProvider and ephemeris_loaded_ write are per-instance; safe under static lock.
+    ephemeris_->setProvider(provider);
+    ephemeris_loaded_ = true;
+    // setGlobalProvider mutates global state — set outside the static lock scope
+    // to avoid holding the lock longer than necessary. Callers in single-threaded
+    // contexts rely on this for astrometry; in multi-threaded use, pass the provider
+    // explicitly via AstDynEngine::getEphemeris().
+    ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
 }
 
 void AstDynEngine::update_propagator() {
@@ -303,7 +311,42 @@ void AstDynEngine::print_residuals_summary(std::ostream& os) const {
 }
 
 void AstDynEngine::export_orbit(const std::string& filename, const std::string& format) {
-    // (Implementation omitted)
+    if (!has_orbit_) throw std::runtime_error("No orbit available to export");
+    if (filename.empty()) throw std::runtime_error("export_orbit: filename cannot be empty");
+
+    std::ofstream out(filename);
+    if (!out.is_open()) throw std::runtime_error("export_orbit: cannot open file for writing: " + filename);
+
+    const auto& o = current_orbit_;
+
+    if (format == "json") {
+        nlohmann::json j;
+        j["frame"]         = "ECLIPJ2000";
+        j["epoch_mjd_tdb"] = o.epoch.mjd();
+        j["elements"] = {
+            {"a_au",      o.a.to_au()},
+            {"e",         o.e},
+            {"i_deg",     o.i.to_deg()},
+            {"node_deg",  o.node.to_deg()},
+            {"omega_deg", o.omega.to_deg()},
+            {"M_deg",     o.M.to_deg()}
+        };
+        j["gm_au3_d2"] = o.gm.to_au3_d2();
+        out << j.dump(4) << "\n";
+    } else {
+        // Plain text (default)
+        out << std::fixed << std::setprecision(10);
+        out << "# AstDyn Orbit Export\n";
+        out << "# Frame: ECLIPJ2000\n";
+        out << "# Epoch [MJD TDB]  = " << o.epoch.mjd() << "\n";
+        out << "a [AU]             = " << o.a.to_au()       << "\n";
+        out << "e                  = " << o.e               << "\n";
+        out << "i [deg]            = " << o.i.to_deg()      << "\n";
+        out << "node [deg]         = " << o.node.to_deg()   << "\n";
+        out << "omega [deg]        = " << o.omega.to_deg()  << "\n";
+        out << "M [deg]            = " << o.M.to_deg()      << "\n";
+        out << "GM [AU^3/day^2]    = " << o.gm.to_au3_d2()  << "\n";
+    }
 }
 
 double AstDynEngine::shadow_hamiltonian_drift() const {

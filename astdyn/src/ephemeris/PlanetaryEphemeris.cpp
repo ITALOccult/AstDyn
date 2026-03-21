@@ -118,26 +118,6 @@ std::shared_ptr<EphemerisProvider> PlanetaryEphemeris::getGlobalProvider() {
     return global_provider_;
 }
 
-// ============================================================================
-// Private Implementation
-// ============================================================================
-
-// Analytical helper methods removed (deprecated)
-void PlanetaryEphemeris::computeOrbitalElements(CelestialBody, double, double[6]) {
-    throw std::runtime_error("computeOrbitalElements is deprecated and disabled.");
-}
-
-Vector3d PlanetaryEphemeris::elementsToPosition(const double[6]) {
-    throw std::runtime_error("elementsToPosition is deprecated and disabled.");
-}
-
-Vector3d PlanetaryEphemeris::elementsToVelocity(const double[6], double) {
-    throw std::runtime_error("elementsToVelocity is deprecated and disabled.");
-}
-
-Vector3d PlanetaryEphemeris::computePerturbations(CelestialBody, double) {
-    throw std::runtime_error("computePerturbations is deprecated and disabled.");
-}
 
 } // namespace ephemeris
 } // namespace astdyn

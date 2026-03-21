@@ -165,19 +165,20 @@ public:
      * @return Mean anomaly [rad] (for elliptic) or hyperbolic mean anomaly (for hyperbolic)
      */
     double mean_anomaly_at_time(double t) const {
-        double dt = t - T_;
-        
+        double dt_s = (t - T_) * 86400.0; // days → seconds
+
         if (e_ < 1.0) {
             // Elliptic: M = n·Δt
-            return mean_motion() * dt;
+            double a = semi_major_axis();
+            return std::sqrt(mu_ / (a * a * a)) * dt_s;
         } else if (e_ > 1.0) {
             // Hyperbolic: M_h = √(μ/(-a)³)·Δt
             double a = semi_major_axis(); // negative for hyperbolic
-            return std::sqrt(mu_ / (-a * a * a)) * dt;
+            return std::sqrt(mu_ / (-a * a * a)) * dt_s;
         } else {
-            // Parabolic: use Barker's equation (not implemented here)
-            // For now, return a placeholder
-            return 0.0;
+            // Parabolic: not a mean anomaly — returns Barker's W parameter
+            // W = (3/2) * Δt * sqrt(μ/(2q³))
+            return 1.5 * dt_s * std::sqrt(mu_ / (2.0 * q_ * q_ * q_));
         }
     }
     
@@ -214,12 +215,96 @@ public:
     }
     
     /**
-     * @brief Convert to Cartesian state at given time
-     * @param t Time [same units as T]
-     * @return Cartesian state
+     * @brief Compute true anomaly at given time (all orbit types).
+     *
+     * - Elliptic (e<1):  solves Kepler's equation via Newton-Raphson
+     * - Parabolic (e≈1): Barker's equation — D³+3D = 3W, ν = 2·atan(D)
+     * - Hyperbolic (e>1): solves e·sinh(H)−H = Mh, ν = 2·atan(√((e+1)/(e-1))·tanh(H/2))
+     *
+     * @param t Time [same units as T_]
+     * @return True anomaly [rad]
+     */
+    double true_anomaly_at_time(double t) const {
+        double dt_s = (t - T_) * 86400.0; // days → seconds
+
+        if (is_parabolic(1e-8)) {
+            // Barker's equation: W = (3/2)·Δt·√(μ/(2q³))
+            // Solve D³ + 3D − 3W = 0  →  D = ∛(W+√(1+W²)) + ∛(W−√(1+W²))
+            double W = 1.5 * dt_s * std::sqrt(mu_ / (2.0 * q_ * q_ * q_));
+            double Y = std::cbrt(W + std::sqrt(1.0 + W * W));
+            double Z = std::cbrt(W - std::sqrt(1.0 + W * W)); // negative cube root
+            return 2.0 * std::atan(Y + Z);
+        } else if (e_ > 1.0) {
+            // Hyperbolic: compute hyperbolic eccentric anomaly H
+            double a = semi_major_axis(); // negative
+            double Mh = std::sqrt(mu_ / (-a * a * a)) * dt_s;
+            double H = (std::abs(Mh) < 1.0) ? Mh / (e_ - 1.0)
+                                             : std::copysign(std::log(2.0 * std::abs(Mh) / e_ + 1.8), Mh);
+            for (int i = 0; i < 100; ++i) {
+                double f  = e_ * std::sinh(H) - H - Mh;
+                double fp = e_ * std::cosh(H) - 1.0;
+                if (std::abs(fp) < 1e-15) break;
+                double delta = -f / fp;
+                H += delta;
+                if (std::abs(delta) < 1e-12) break;
+            }
+            return 2.0 * std::atan(std::sqrt((e_ + 1.0) / (e_ - 1.0)) * std::tanh(H / 2.0));
+        } else {
+            // Elliptic: solve Kepler's equation E − e·sin(E) = M
+            double a = semi_major_axis();
+            double M = std::sqrt(mu_ / (a * a * a)) * dt_s;
+            double E = M;
+            for (int i = 0; i < 100; ++i) {
+                double f  = E - e_ * std::sin(E) - M;
+                double fp = 1.0 - e_ * std::cos(E);
+                double delta = -f / fp;
+                E += delta;
+                if (std::abs(delta) < 1e-12) break;
+            }
+            return 2.0 * std::atan2(std::sqrt(1.0 + e_) * std::sin(E / 2.0),
+                                    std::sqrt(1.0 - e_) * std::cos(E / 2.0));
+        }
+    }
+
+    /**
+     * @brief Convert to Cartesian state at given time.
+     *
+     * For elliptic orbits delegates to KeplerianElements::to_cartesian().
+     * For parabolic/hyperbolic orbits uses direct perifocal construction,
+     * bypassing the semi-major axis singularity.
+     *
+     * @param t Time [same units as T_]
+     * @return Cartesian state [km, km/s]
      */
     CartesianState to_cartesian(double t) const {
-        return to_keplerian(t).to_cartesian();
+        if (is_elliptic()) {
+            return to_keplerian(t).to_cartesian();
+        }
+
+        double nu = true_anomaly_at_time(t);
+        double p  = q_ * (1.0 + e_); // semi-latus rectum [km]
+        double r  = p / (1.0 + e_ * std::cos(nu));
+        double sqrt_mu_p = std::sqrt(mu_ / p);
+
+        // Perifocal coordinates
+        double x_P  =  r * std::cos(nu);
+        double y_P  =  r * std::sin(nu);
+        double vx_P = -sqrt_mu_p * std::sin(nu);
+        double vy_P =  sqrt_mu_p * (e_ + std::cos(nu));
+
+        // Rotation from perifocal to inertial (ecliptic)
+        double cO = std::cos(Omega_), sO = std::sin(Omega_);
+        double co = std::cos(omega_), so = std::sin(omega_);
+        double ci = std::cos(i_),     si = std::sin(i_);
+
+        // P̂ and Q̂ unit vectors in inertial frame
+        double Px = cO*co - sO*so*ci,  Qx = -cO*so - sO*co*ci;
+        double Py = sO*co + cO*so*ci,  Qy = -sO*so + cO*co*ci;
+        double Pz = so*si,             Qz =  co*si;
+
+        Vector3d pos(Px*x_P + Qx*y_P, Py*x_P + Qy*y_P, Pz*x_P + Qz*y_P);
+        Vector3d vel(Px*vx_P + Qx*vy_P, Py*vx_P + Qy*vy_P, Pz*vx_P + Qz*vy_P);
+        return CartesianState(pos, vel, mu_);
     }
     
     /**

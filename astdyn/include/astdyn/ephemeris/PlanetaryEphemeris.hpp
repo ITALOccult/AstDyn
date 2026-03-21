@@ -118,48 +118,6 @@ private:
     static double julianCenturies(double jd_tdb) {
         return (jd_tdb - constants::JD2000) / 36525.0;
     }
-    
-    /**
-     * @brief Compute planetary orbital elements at epoch
-     * @param body Celestial body
-     * @param T Julian centuries from J2000.0
-     * @param elements Output: [a, e, i, L, omega_bar, Omega] in AU, radians
-     * 
-     * Uses Simon et al. (1994) low-precision formulae.
-     * L = mean longitude, omega_bar = longitude of perihelion
-     */
-    [[deprecated("VSOP87 analytical elements are no longer supported. Use a provider.")]]
-    static void computeOrbitalElements(
-        CelestialBody body, 
-        double T,
-        double elements[6]
-    );
-    
-    /**
-     * @brief Convert orbital elements to Cartesian position
-     * @param elements [a, e, i, L, omega_bar, Omega]
-     * @return Position [AU] in ecliptic frame
-     */
-    static Eigen::Vector3d elementsToPosition(const double elements[6]);
-    
-    /**
-     * @brief Convert orbital elements to Cartesian velocity
-     * @param elements [a, e, i, L, omega_bar, Omega]
-     * @param gm Gravitational parameter of central body (Sun) [AU³/day²]
-     * @return Velocity [AU/day] in ecliptic frame
-     */
-    static Eigen::Vector3d elementsToVelocity(const double elements[6], double gm);
-    
-    /**
-     * @brief Compute perturbations for high-precision planets
-     * @param body Planet
-     * @param T Julian centuries
-     * @return Correction to position [AU]
-     * 
-     * Includes major perturbations (e.g., Jupiter on Saturn).
-     * Currently returns zero; can be extended with VSOP87 terms.
-     */
-    static Eigen::Vector3d computePerturbations(CelestialBody body, double T);
 };
 
 } // namespace ephemeris

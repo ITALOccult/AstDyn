@@ -5,6 +5,7 @@
 
 #include "astdyn/coordinates/KeplerianElements.hpp"
 #include "astdyn/math/MathUtils.hpp"
+#include <algorithm>
 #include <stdexcept>
 
 namespace astdyn {
@@ -100,12 +101,12 @@ KeplerianElements KeplerianElements::from_cartesian(const CartesianState& state)
     }
     
     // Inclination
-    double i = std::acos(h.z() / h_mag);
+    double i = std::acos(std::clamp(h.z() / h_mag, -1.0, 1.0));
     
     // RAAN (Right Ascension of Ascending Node)
     double Omega;
     if (n_mag > 1e-10) {
-        Omega = std::acos(n.x() / n_mag);
+        Omega = std::acos(std::clamp(n.x() / n_mag, -1.0, 1.0));
         if (n.y() < 0.0) {
             Omega = 2.0 * constants::PI - Omega;
         }
@@ -117,7 +118,7 @@ KeplerianElements KeplerianElements::from_cartesian(const CartesianState& state)
     // Argument of periapsis
     double omega;
     if (n_mag > 1e-10 && e > 1e-10) {
-        omega = std::acos(n.dot(e_vec) / (n_mag * e));
+        omega = std::acos(std::clamp(n.dot(e_vec) / (n_mag * e), -1.0, 1.0));
         if (e_vec.z() < 0.0) {
             omega = 2.0 * constants::PI - omega;
         }
@@ -132,14 +133,14 @@ KeplerianElements KeplerianElements::from_cartesian(const CartesianState& state)
     // True anomaly
     double nu;
     if (e > 1e-10) {
-        nu = std::acos(e_vec.dot(r) / (e * r_mag));
+        nu = std::acos(std::clamp(e_vec.dot(r) / (e * r_mag), -1.0, 1.0));
         if (r.dot(v) < 0.0) {
             nu = 2.0 * constants::PI - nu;
         }
     } else {
         // Circular orbit - use argument of latitude
         if (n_mag > 1e-10) {
-            nu = std::acos(n.dot(r) / (n_mag * r_mag));
+            nu = std::acos(std::clamp(n.dot(r) / (n_mag * r_mag), -1.0, 1.0));
             if (r.z() < 0.0) {
                 nu = 2.0 * constants::PI - nu;
             }

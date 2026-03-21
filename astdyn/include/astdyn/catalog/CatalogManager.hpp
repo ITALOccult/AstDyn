@@ -8,6 +8,9 @@
 
 #include "astdyn/catalog/StellarCatalog.hpp"
 #include "astdyn/catalog/GaiaDR3Catalog.hpp"
+#include "astdyn/catalog/UCAC4Catalog.hpp"
+#include "astdyn/catalog/Tycho2Catalog.hpp"
+#include "astdyn/catalog/HipparcosCatalog.hpp"
 #include <memory>
 #include <string>
 #include <map>
@@ -35,7 +38,15 @@ public:
                 return nullptr;
             }
         }
-        // Placeholders for future catalogs
+        if (type == "ucac4") {
+            try { return &UCAC4Catalog::instance(); } catch (...) { return nullptr; }
+        }
+        if (type == "tycho2") {
+            try { return &Tycho2Catalog::instance(); } catch (...) { return nullptr; }
+        }
+        if (type == "hipparcos") {
+            try { return &HipparcosCatalog::instance(); } catch (...) { return nullptr; }
+        }
         return nullptr;
     }
 

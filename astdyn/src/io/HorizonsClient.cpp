@@ -76,20 +76,32 @@ std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, HorizonsError> Hor
         if (start == std::string::npos) return std::unexpected(HorizonsError::TargetNotFound);
         std::string block = res.substr(start);
         
+        auto a   = parse_token(block, "A =");
+        auto ec  = parse_token(block, "EC=");
+        auto in_ = parse_token(block, "IN=");
+        auto om  = parse_token(block, "OM=");
+        auto w   = parse_token(block, "W =");
+        auto ma  = parse_token(block, "MA=");
+        if (!a || !ec || !in_ || !om || !w || !ma)
+            return std::unexpected(HorizonsError::ParsingError);
         return physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
-            epoch, 
-            parse_token(block, "A ="), parse_token(block, "EC="),
-            parse_token(block, "IN="), parse_token(block, "OM="),
-            parse_token(block, "W ="), parse_token(block, "MA="),
+            epoch,
+            *a, *ec, *in_, *om, *w, *ma,
             physics::GravitationalParameter::sun()
         );
     } catch (...) { return std::unexpected(HorizonsError::ParsingError); }
 }
 
-double HorizonsClient::parse_token(const std::string& text, const std::string& token) {
+std::expected<double, HorizonsError> HorizonsClient::parse_token(const std::string& text, const std::string& token) {
     size_t pos = text.find(token);
-    if (pos == std::string::npos) throw std::runtime_error("Horizons token not found");
-    return std::stod(text.substr(text.find_first_of("0123456789+-.", pos + token.length())));
+    if (pos == std::string::npos) return std::unexpected(HorizonsError::ParsingError);
+    size_t num_pos = text.find_first_of("0123456789+-.", pos + token.length());
+    if (num_pos == std::string::npos) return std::unexpected(HorizonsError::ParsingError);
+    try {
+        return std::stod(text.substr(num_pos));
+    } catch (...) {
+        return std::unexpected(HorizonsError::ParsingError);
+    }
 }
 
 std::expected<physics::CartesianStateTyped<core::GCRF>, HorizonsError> HorizonsClient::query_vectors(const std::string& target, const time::EpochTDB& epoch, const std::string& center) {
@@ -100,10 +112,18 @@ std::expected<physics::CartesianStateTyped<core::GCRF>, HorizonsError> HorizonsC
         size_t start = res.find("$$SOE");
         if (start == std::string::npos) return std::unexpected(HorizonsError::TargetNotFound);
         std::string block = res.substr(start);
+        auto x  = parse_token(block, " X =");
+        auto y  = parse_token(block, " Y =");
+        auto z  = parse_token(block, " Z =");
+        auto vx = parse_token(block, " VX=");
+        auto vy = parse_token(block, " VY=");
+        auto vz = parse_token(block, " VZ=");
+        if (!x || !y || !z || !vx || !vy || !vz)
+            return std::unexpected(HorizonsError::ParsingError);
         double gm = (center.find("399") != std::string::npos) ? constants::GM_EARTH : constants::GM_SUN;
         return physics::CartesianStateTyped<core::GCRF>::from_si(epoch,
-            parse_token(block, " X =") * 1000.0, parse_token(block, " Y =") * 1000.0, parse_token(block, " Z =") * 1000.0,
-            parse_token(block, " VX=") * 1000.0, parse_token(block, " VY=") * 1000.0, parse_token(block, " VZ=") * 1000.0,
+            *x * 1000.0, *y * 1000.0, *z * 1000.0,
+            *vx * 1000.0, *vy * 1000.0, *vz * 1000.0,
             gm * 1e9);
     } catch (...) { return std::unexpected(HorizonsError::ParsingError); }
 }

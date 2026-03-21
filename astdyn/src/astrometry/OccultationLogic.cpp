@@ -245,12 +245,6 @@ void OccultationLogic::evaluate_candidate(
         max_sep_angle,
         720); // 2-minute sampling for a 1-day segment is enough for detection
 
-    if (ca_results.empty()) {
-        std::cout << "[DEBUG] No close approaches found for star " << star.source_id << " within " << max_sep_angle.to_arcsec() << " arcsec" << std::endl;
-    } else {
-        std::cout << "[DEBUG] Found " << ca_results.size() << " close approaches for star " << star.source_id << std::endl;
-    }
-
     for (const auto& ca : ca_results) {
         // Map ClosestApproachResult to OccultationParameters
         auto [pos, vel] = segment.evaluate_full(ca.t_ca.jd());
@@ -346,7 +340,6 @@ void OccultationLogic::evaluate_candidate(
             ca.t_ca, engine.getEphemeris());
 
         if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) {
-            std::cout << "[DEBUG] Filtered by daylight: sun_alt=" << params.sun_altitude.to_deg() << ", is_daylight=" << params.is_daylight << std::endl;
             continue;
         }
 
@@ -354,23 +347,19 @@ void OccultationLogic::evaluate_candidate(
 
         // 1. Duration filter
         if (config.min_duration_s > 0.1 && params.max_duration.to_seconds() < config.min_duration_s) {
-            std::cout << "[DEBUG] Filtered by duration: " << params.max_duration.to_seconds() << " < " << config.min_duration_s << std::endl;
             continue;
         }
 
         // 2. Gaia Quality Filter (RUWE)
         if (star.ruwe > config.max_gaia_ruwe) {
-            std::cout << "[DEBUG] Filtered by RUWE: " << star.ruwe << " > " << config.max_gaia_ruwe << std::endl;
             continue;
         }
 
         // 3. Moon Filters
         if (params.moon_dist.to_deg() < config.min_moon_dist) {
-            std::cout << "[DEBUG] Filtered by moon dist: " << params.moon_dist.to_deg() << " < " << config.min_moon_dist << std::endl;
             continue;
         }
         if (params.moon_phase > config.max_moon_phase + 0.001) {
-            std::cout << "[DEBUG] Filtered by moon phase: " << params.moon_phase << " > " << config.max_moon_phase << std::endl;
             continue;
         }
 
@@ -565,14 +554,8 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
                 }
 
                 Angle radius = Angle::from_rad((config.max_shadow_distance.to_m() * 1.5) / (dist_au * constants::AU * 1000.0));
-                
-                std::cout << "[OccultationLogic] Segment check at JD " << jd << std::endl;
-                std::cout << "  - Pos: RA=" << std::get<0>(pos) << " deg, Dec=" << std::get<1>(pos) << " deg" << std::endl;
-                std::cout << "  - Search Radius: " << radius.to_arcsec() << " arcsec" << std::endl;
 
                 auto stars = catalog::find_stars_near_segment(catalog::GaiaDR3Catalog::instance(), segment, radius, config.max_mag_star);
-                
-                std::cout << "[OccultationLogic] Found " << stars.size() << " stars near segment." << std::endl;
 
                 for (const auto& star : stars) {
                     evaluate_candidate(results, segment, star, config, engine, start.jd(), end.jd());

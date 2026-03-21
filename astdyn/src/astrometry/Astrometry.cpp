@@ -29,10 +29,16 @@ std::shared_ptr<::astdyn::ephemeris::DE441Provider> AstrometryReducer::sync_ephe
     if (path.empty()) return nullptr;
     static std::mutex mtx;
     static std::unordered_map<std::string, std::shared_ptr<::astdyn::ephemeris::DE441Provider>> cache;
-    std::lock_guard lock(mtx);
-    if (!cache.contains(path)) cache[path] = std::make_shared<::astdyn::ephemeris::DE441Provider>(path);
-    ::astdyn::ephemeris::PlanetaryEphemeris::setGlobalProvider(cache[path]);
-    return cache[path];
+    std::shared_ptr<::astdyn::ephemeris::DE441Provider> provider;
+    {
+        std::lock_guard lock(mtx);
+        if (!cache.contains(path)) cache[path] = std::make_shared<::astdyn::ephemeris::DE441Provider>(path);
+        provider = cache[path];
+    }
+    // Set global provider outside the cache lock. Callers should prefer using the
+    // returned provider directly rather than relying on the global state.
+    ::astdyn::ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
+    return provider;
 }
 
 Eigen::Vector3d AstrometryReducer::compute_earth_helio(std::shared_ptr<::astdyn::ephemeris::DE441Provider> de441, const time::EpochTDB& t_obs) {

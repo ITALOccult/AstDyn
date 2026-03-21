@@ -53,6 +53,41 @@ struct KeplerSolverOptions {
     return std::nullopt;
 }
 
+/**
+ * @brief Solves the hyperbolic Kepler equation for hyperbolic orbits (e > 1).
+ *
+ * Solves: e * sinh(H) - H = Mh,  where Mh is the hyperbolic mean anomaly.
+ * Uses Newton-Raphson iteration: H_new = H - (e*sinh(H) - H - Mh) / (e*cosh(H) - 1)
+ *
+ * @param Mh Hyperbolic mean anomaly (dimensionless).
+ * @param options Solver options (eccentricity must be > 1, tolerance, max_iterations).
+ * @return std::optional<double> Hyperbolic eccentric anomaly H, or empty if failed / e <= 1.
+ */
+[[nodiscard]] inline std::optional<double> solve_kepler_hyperbolic(const double Mh, const KeplerSolverOptions& options) noexcept {
+    const double e = options.eccentricity;
+    if (e <= 1.0) return std::nullopt; // Guard: only for hyperbolic orbits
+
+    // Initial guess: for small |Mh|, H ≈ Mh/(e-1); for large |Mh|, H ≈ sign(Mh)*log(2|Mh|/e).
+    double H;
+    if (std::abs(Mh) < 1.0) {
+        H = Mh / (e - 1.0);
+    } else {
+        H = std::copysign(std::log(2.0 * std::abs(Mh) / e + 1.8), Mh);
+    }
+
+    for (int iter = 0; iter < options.max_iterations; ++iter) {
+        const double f      = e * std::sinh(H) - H - Mh;
+        const double f_prime = e * std::cosh(H) - 1.0;
+        if (std::abs(f_prime) < 1e-15) return std::nullopt; // Degenerate
+        const double delta  = -f / f_prime;
+        H += delta;
+        if (std::abs(delta) < options.tolerance) {
+            return H;
+        }
+    }
+    return std::nullopt; // Did not converge
+}
+
 } // namespace astdyn::math
 
 #endif // ASTDYN_MATH_KEPLER_SOLVER_HPP

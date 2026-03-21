@@ -15,6 +15,7 @@ add_executable(astdyn_unit_tests
     test_integrator_comparative.cpp
     test_occultation.cpp
     test_asteroid_perturbations.cpp
+    test_kepler_solver.cpp
 )
 
 target_link_libraries(astdyn_unit_tests

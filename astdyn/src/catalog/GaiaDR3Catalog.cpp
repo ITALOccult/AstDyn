@@ -10,6 +10,8 @@
 #include <ioc_gaialib/types.h>
 
 #include <atomic>
+#include <memory>
+#include <mutex>
 
 namespace astdyn::catalog {
 
@@ -149,35 +151,42 @@ struct GaiaDR3Catalog::Impl {
 // ============================================================================
 
 namespace {
+    std::mutex g_mutex;
     std::atomic<bool> g_initialized{false};
-    GaiaDR3Catalog* g_instance = nullptr;
+    std::unique_ptr<GaiaDR3Catalog> g_instance;
 }
 
 void GaiaDR3Catalog::initialize(const std::string& json_config_path) {
+    std::lock_guard<std::mutex> lock(g_mutex);
     bool ok = ioc::gaia::UnifiedGaiaCatalog::initialize(json_config_path);
     if (!ok) {
         throw CatalogError("GaiaDR3Catalog: failed to initialize from config: " + json_config_path);
     }
     if (!g_instance) {
-        g_instance = new GaiaDR3Catalog();
+        g_instance = std::make_unique<GaiaDR3Catalog>();
     }
     g_instance->impl_->initialized = true;
-    g_initialized.store(true);
+    g_initialized.store(true, std::memory_order_release);
 }
 
 GaiaDR3Catalog& GaiaDR3Catalog::instance() {
-    if (!g_initialized.load()) {
+    if (!g_initialized.load(std::memory_order_acquire)) {
+        throw CatalogNotInitialized{};
+    }
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_instance) {
         throw CatalogNotInitialized{};
     }
     return *g_instance;
 }
 
 void GaiaDR3Catalog::shutdown() noexcept {
+    std::lock_guard<std::mutex> lock(g_mutex);
     if (g_instance) {
+        // Mark as uninitialized before destruction to prevent concurrent access.
+        g_initialized.store(false, std::memory_order_release);
         ioc::gaia::UnifiedGaiaCatalog::shutdown();
-        delete g_instance;
-        g_instance = nullptr;
-        g_initialized.store(false);
+        g_instance.reset();
     }
 }
 
