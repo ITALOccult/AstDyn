@@ -5,9 +5,9 @@
 
 #include "astdyn/catalog/GaiaDR3Catalog.hpp"
 
-// IOC_GaiaLib upstream headers
-#include <ioc_gaialib/unified_gaia_catalog.h>
-#include <ioc_gaialib/types.h>
+// Gaia catalog — now internalized under astdyn/catalog/gaia/
+#include <astdyn/catalog/gaia/unified_gaia_catalog.h>
+#include <astdyn/catalog/gaia/types.h>
 
 #include <atomic>
 #include <memory>
@@ -163,7 +163,7 @@ void GaiaDR3Catalog::initialize(const std::string& json_config_path) {
         throw CatalogError("GaiaDR3Catalog: failed to initialize from config: " + json_config_path);
     }
     if (!g_instance) {
-        g_instance = std::make_unique<GaiaDR3Catalog>();
+        g_instance.reset(new GaiaDR3Catalog());
     }
     g_instance->impl_->initialized = true;
     g_initialized.store(true, std::memory_order_release);

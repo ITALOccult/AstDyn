@@ -23,8 +23,21 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <cstdlib>
 
 namespace astdyn {
+
+/// Returns the default path for the DE441 ephemeris file.
+/// Priority: ASTDYN_EPHEMERIS_PATH env var → ~/.ioccultcalc/ephemerides/de441.bsp → "de441.bsp"
+inline std::string resolve_default_ephemeris_path() {
+    if (const char* env = std::getenv("ASTDYN_EPHEMERIS_PATH")) {
+        return std::string(env);
+    }
+    if (const char* home = std::getenv("HOME")) {
+        return std::string(home) + "/.ioccultcalc/ephemerides/de441.bsp";
+    }
+    return "de441.bsp";
+}
 
 /**
  * @brief Configuration for OrbFit engine
@@ -41,7 +54,7 @@ struct AstDynConfig {
 
     // Ephemeris Configuration
     EphemerisType ephemeris_type = EphemerisType::DE441; ///< Analytical, DE441 (Default to high precision)
-    std::string ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp";
+    std::string ephemeris_file = resolve_default_ephemeris_path();
     std::string asteroid_ephemeris_file = "";
     
     // Differential correction settings
@@ -187,13 +200,13 @@ OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
     OrbitFitter<Frame> fitter(ephemeris_, propagator_);
     fitter.set_corrections(config_.aberrazione_differenziale, config_.light_time_correction);
     DifferentialCorrectorSettings dc_settings;
-    dc_settings.max_iterations = config_.max_iterations;
+    dc_settings.max_iterations        = config_.max_iterations;
     dc_settings.convergence_tolerance = physics::Distance::from_au(config_.convergence_threshold);
-    dc_settings.outlier_sigma = config_.outlier_sigma;
-    dc_settings.outlier_max_sigma = std::max(100.0, config_.outlier_sigma * 10.0); 
-    dc_settings.outlier_min_sigma = config_.outlier_sigma;
-    dc_settings.reject_outliers = true;
-    dc_settings.verbose = config_.verbose;
+    dc_settings.outlier_sigma         = config_.outlier_sigma;
+    dc_settings.outlier_max_sigma     = config_.outlier_max_sigma;
+    dc_settings.outlier_min_sigma     = config_.outlier_min_sigma;
+    dc_settings.reject_outliers       = true;
+    dc_settings.verbose               = config_.verbose;
     auto cart_legacy = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(current_orbit_);
     physics::CartesianStateTyped<Frame> initial_state;
     if constexpr (std::is_same_v<Frame, core::ECLIPJ2000>) {

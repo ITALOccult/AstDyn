@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 OLD)
+endif()
+
 project(OrbFit
     VERSION 0.9.0
     DESCRIPTION "High-precision Asteroid Dynamics Library (beta 0.9)"
@@ -159,17 +163,12 @@ if(ASTDYN_BUILD_PYTHON)
     FetchContent_MakeAvailable(pybind11)
 endif()
 
-# Catalog module dependencies (SQLite3, LibXml2, ZLIB — CURL already required above)
-if(ASTDYN_BUILD_CATALOG)
-    find_package(SQLite3 REQUIRED)
-    find_package(LibXml2 REQUIRED)
-    find_package(ZLIB REQUIRED)
-
-    # Disable ioc_gaialib examples and tests to avoid build noise
-    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(BUILD_TESTING  OFF CACHE BOOL "" FORCE)
-    add_subdirectory(external/ioc_gaialib)
-endif()
+# Catalog bridge symbols are referenced by core astrometry code even when the
+# local Gaia dataset is not enabled at runtime.
+# ioc_gaialib has been internalized into src/catalog/gaia/ and include/astdyn/catalog/gaia/
+find_package(SQLite3 REQUIRED)
+find_package(LibXml2 REQUIRED)
+find_package(ZLIB REQUIRED)
 
 # Optional: Profiling
 if(ASTDYN_ENABLE_PROFILING)
@@ -228,10 +227,6 @@ include_directories(
 # ============================================================================
 
 add_subdirectory(src)
-
-if(ASTDYN_BUILD_CATALOG)
-    add_subdirectory(src/catalog)
-endif()
 
 if(ASTDYN_BUILD_TESTS)
     add_subdirectory(tests)

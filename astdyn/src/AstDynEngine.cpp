@@ -119,24 +119,26 @@ void AstDynEngine::load_integrator_settings(const core::IOCConfig& ioc) {
 }
 
 void AstDynEngine::load_physics_settings(const core::IOCConfig& ioc) {
-    auto& ps = config_.propagator_settings;
-    ps.include_sun_j2 = ioc.get<bool>("physics.sun_j2", true); ps.include_earth_j2 = ioc.get<bool>("physics.earth_j2", true);
-    ps.include_asteroids = ioc.get<bool>("physics.asteroids.enabled", true);
-    ps.use_default_asteroid_set = ioc.get<bool>("physics.asteroids.use_default_17", true);
-    ps.use_default_30_set = ioc.get<bool>("physics.asteroids.use_default_30", false);
-    ps.include_relativity = ioc.get<bool>("physics.relativity", true);
+    // Delegate all physics/force-model flags to PropagatorSettings::from_config()
+    // which covers per-planet flags, Yarkovsky, J2, PPN, etc.
+    config_.propagator_settings = propagation::PropagatorSettings::from_config(ioc);
+    // Also preserve legacy key for asteroid default set (separate from use_30_set)
+    config_.propagator_settings.use_default_asteroid_set =
+        ioc.get<bool>("physics.asteroids.use_default_17", config_.propagator_settings.use_default_asteroid_set);
     config_.ephemeris_type = string_to_ephemeris(ioc.get<std::string>("ephemeris.type", "DE441"));
-    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", "/Users/michelebigi/.ioccultcalc/ephemerides/de441.bsp");
+    config_.ephemeris_file = ioc.get<std::string>("ephemeris.file", config_.ephemeris_file);
     config_.asteroid_ephemeris_file = ioc.get<std::string>("ephemeris.asteroid_file", "");
 }
 
 void AstDynEngine::load_fitting_settings(const core::IOCConfig& ioc) {
-    config_.max_iterations = ioc.get<int>("diffcorr.max_iter", 10);
-    config_.convergence_threshold = ioc.get<double>("diffcorr.convergence", 1e-6);
-    config_.outlier_sigma = ioc.get<double>("diffcorr.outlier_threshold", 3.0);
-    config_.light_time_correction = ioc.get<bool>("diffcorr.light_time", true);
-    config_.aberrazione_differenziale = ioc.get<bool>("diffcorr.aberration", true);
-    config_.deflessione_relativistica = ioc.get<bool>("diffcorr.light_deflection", true);
+    config_.max_iterations        = ioc.get<int>   ("diffcorr.max_iter",          config_.max_iterations);
+    config_.convergence_threshold = ioc.get<double>("diffcorr.convergence",        config_.convergence_threshold);
+    config_.outlier_sigma         = ioc.get<double>("diffcorr.outlier_sigma",      config_.outlier_sigma);
+    config_.outlier_max_sigma     = ioc.get<double>("diffcorr.outlier_max_sigma",  config_.outlier_max_sigma);
+    config_.outlier_min_sigma     = ioc.get<double>("diffcorr.outlier_min_sigma",  config_.outlier_min_sigma);
+    config_.light_time_correction      = ioc.get<bool>("diffcorr.light_time",       config_.light_time_correction);
+    config_.aberrazione_differenziale  = ioc.get<bool>("diffcorr.aberration",       config_.aberrazione_differenziale);
+    config_.deflessione_relativistica  = ioc.get<bool>("diffcorr.light_deflection", config_.deflessione_relativistica);
 }
 
 void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {

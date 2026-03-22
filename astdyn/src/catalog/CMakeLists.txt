@@ -14,7 +14,6 @@ target_link_libraries(astdyn_catalog
     PUBLIC
         astdyn
     PRIVATE
-        ioc_gaialib
         CURL::libcurl
         SQLite::SQLite3
         LibXml2::LibXml2

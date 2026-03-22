@@ -101,10 +101,14 @@ GaussIODResult GaussIOD::compute_from_three(
     // result.state is CartesianStateTyped<core::GCRF>, it will be initialized later via from_si
     
     // Get Earth position at each observation time (Heliocentric)
-    auto actual_ephem = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
-    auto earth1 = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t1_tdb);
-    auto earth2 = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t2_tdb);
-    auto earth3 = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t3_tdb);
+    // BUG-4: a default PlanetaryEphemeris() has no data loaded → garbage Earth positions.
+    // Require a valid ephemeris to be injected via the constructor.
+    if (!ephemeris_) {
+        throw std::runtime_error("GaussIOD: a valid ephemeris is required — set it via the constructor");
+    }
+    auto earth1 = ephemeris_->getState(ephemeris::CelestialBody::EARTH, t1_tdb);
+    auto earth2 = ephemeris_->getState(ephemeris::CelestialBody::EARTH, t2_tdb);
+    auto earth3 = ephemeris_->getState(ephemeris::CelestialBody::EARTH, t3_tdb);
 
     // Apply topocentric correction: add the observatory displacement from Earth's
     // center to each observer position vector. Without this, the IOD uses the
@@ -305,11 +309,16 @@ bool GaussIOD::solve_slant_ranges(
         double g3 = tau3_days - (1.0/6.0) * u * tau3_days * tau3_days * tau3_days;
 
         double det = f1 * g3 - f3 * g1;
-        if (std::abs(det) < 1e-15) return false;
+        // BUG-3: absolute 1e-15 is near machine epsilon — use relative threshold to
+        // prevent catastrophic cancellation when det is small but non-zero.
+        const double det_threshold = 1e-10 * (std::abs(f1 * g3) + std::abs(f3 * g1));
+        if (std::abs(det) < std::max(1e-12, det_threshold)) return false;
         double c1 = g3 / det;
         double c3 = -g1 / det;
 
-        if (std::abs(c1) < 1e-15 || std::abs(c3) < 1e-15) return false;
+        // Guard against overflow in subsequent rho calculations.
+        constexpr double max_c = 1e10;
+        if (std::abs(c1) > max_c || std::abs(c3) > max_c) return false;
 
         double rho1_new_au = (D21 - c1 * D11 - c3 * D31) / (c1 * D0);
         double rho2_new_au = -(c1 * D12 - D22 + c3 * D32) / D0;

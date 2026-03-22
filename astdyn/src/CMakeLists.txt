@@ -15,10 +15,9 @@ file(GLOB_RECURSE ASTDYN_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/astrometry/*.cpp
 )
 
-if(ASTDYN_BUILD_CATALOG)
-    file(GLOB CATALOG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/catalog/*.cpp)
-    list(APPEND ASTDYN_SOURCES ${CATALOG_SOURCES})
-endif()
+file(GLOB CATALOG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/catalog/*.cpp)
+file(GLOB GAIA_SOURCES   ${CMAKE_CURRENT_SOURCE_DIR}/catalog/gaia/*.cpp)
+list(APPEND ASTDYN_SOURCES ${CATALOG_SOURCES} ${GAIA_SOURCES})
 
 # Add AstDynEngine to the library
 list(APPEND ASTDYN_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AstDynEngine.cpp)
@@ -56,14 +55,11 @@ target_link_libraries(astdyn
         $<BUILD_INTERFACE:CURL::libcurl>
 )
 
-if(ASTDYN_BUILD_CATALOG)
-    target_link_libraries(astdyn PRIVATE 
-        ioc_gaialib
-        SQLite::SQLite3
-        LibXml2::LibXml2
-        ZLIB::ZLIB
-    )
-endif()
+target_link_libraries(astdyn PRIVATE
+    SQLite::SQLite3
+    LibXml2::LibXml2
+    ZLIB::ZLIB
+)
 
 if(OpenMP_FOUND)
     target_link_libraries(astdyn PUBLIC OpenMP::OpenMP_CXX)
@@ -92,14 +88,11 @@ if(ASTDYN_BUILD_SHARED)
             $<BUILD_INTERFACE:CURL::libcurl>
     )
 
-    if(ASTDYN_BUILD_CATALOG)
-        target_link_libraries(astdyn_shared PRIVATE 
-            ioc_gaialib
-            SQLite::SQLite3
-            LibXml2::LibXml2
-            ZLIB::ZLIB
-        )
-    endif()
+    target_link_libraries(astdyn_shared PRIVATE
+        SQLite::SQLite3
+        LibXml2::LibXml2
+        ZLIB::ZLIB
+    )
     
     if(OpenMP_FOUND)
         target_link_libraries(astdyn_shared PUBLIC OpenMP::OpenMP_CXX)

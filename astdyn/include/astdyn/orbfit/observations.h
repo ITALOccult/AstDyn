@@ -83,7 +83,10 @@ inline std::pair<double,double> residual(const OrbitalElements& el,
                                           const IntegratorOptions& iopt = {})
 {
     auto pred = predict(el, obs, iopt);
-    double dra  = (obs.ra  - pred.ra ) * std::cos(obs.dec);
+    // Use computed (predicted) declination for the RA*cos(dec) projection so that
+    // residuals and their partials share the same reference frame.
+    // This matches the convention in astdyn::orbit_determination::Residuals.
+    double dra  = (obs.ra  - pred.ra ) * std::cos(pred.dec);
     double ddec =  obs.dec - pred.dec;
 
     // Wrap dra to [-pi, pi]
@@ -114,8 +117,8 @@ inline Matrix obs_partials(const OrbitalElements& el,
     };
 
     auto p0 = pack(el);
-    auto pred0 = predict(el, obs, iopt);
-    double cosd = std::cos(obs.dec);
+    // Use predicted (computed) declination as projection reference — consistent with residual().
+    double cosd = std::cos(predict(el, obs, iopt).dec);
 
     for(int j=0; j<6; j++){
         auto pp = p0; pp[j] += EPS*std::max(std::abs(p0[j]),1e-10);

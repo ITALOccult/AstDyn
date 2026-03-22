@@ -8,6 +8,7 @@
 
 #include "astdyn/core/Types.hpp"
 #include "astdyn/core/physics_state.hpp"
+#include "astdyn/core/IOCConfig.hpp"
 #include "astdyn/observations/Observation.hpp"
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/math/frame_algebra.hpp"
@@ -38,6 +39,22 @@ struct DifferentialCorrectorSettings {
     double rms_tolerance_arcsec = 0.001;
     bool check_energy_barrier = true;
     double energy_barrier_fraction = 0.5;
+
+    static DifferentialCorrectorSettings from_config(const core::IOCConfig& cfg) {
+        DifferentialCorrectorSettings s;
+        s.max_iterations       = cfg.get<int>   ("diffcorr.max_iter",            s.max_iterations);
+        s.outlier_sigma        = cfg.get<double>("diffcorr.outlier_sigma",        s.outlier_sigma);
+        s.outlier_max_sigma    = cfg.get<double>("diffcorr.outlier_max_sigma",    s.outlier_max_sigma);
+        s.outlier_min_sigma    = cfg.get<double>("diffcorr.outlier_min_sigma",    s.outlier_min_sigma);
+        s.rms_tolerance_arcsec = cfg.get<double>("diffcorr.rms_tolerance_arcsec",s.rms_tolerance_arcsec);
+        s.reject_outliers      = cfg.get<bool>  ("diffcorr.reject_outliers",      s.reject_outliers);
+        s.compute_covariance   = cfg.get<bool>  ("diffcorr.compute_covariance",   s.compute_covariance);
+        s.use_line_search      = cfg.get<bool>  ("diffcorr.use_line_search",      s.use_line_search);
+        s.check_energy_barrier = cfg.get<bool>  ("diffcorr.check_energy_barrier", s.check_energy_barrier);
+        s.energy_barrier_fraction = cfg.get<double>("diffcorr.energy_barrier_fraction", s.energy_barrier_fraction);
+        s.verbose              = cfg.get<bool>  ("diffcorr.verbose",              s.verbose);
+        return s;
+    }
 };
 
 template <typename Frame>
