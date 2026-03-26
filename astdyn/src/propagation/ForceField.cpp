@@ -1,4 +1,5 @@
 #include "astdyn/propagation/ForceField.hpp"
+#include "astdyn/math/kahan_sum.hpp"
 #include "astdyn/core/Constants.hpp"
 #include <cmath>
 
@@ -65,7 +66,6 @@ Eigen::Vector3d ForceField::n_body_perturbation(time::EpochTDB t, const Eigen::V
     if (!provider) return acc_p;
 
     auto sun_ssb = ephemeris_->getSunBarycentricPosition(t).to_eigen_si() / (constants::AU * 1000.0);
-    auto rot_icrf_to_ecl = coordinates::ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>();
     
     using ephemeris::CelestialBody;
     static const CelestialBody bodies[] = {
@@ -74,22 +74,25 @@ Eigen::Vector3d ForceField::n_body_perturbation(time::EpochTDB t, const Eigen::V
         CelestialBody::MOON
     };
     
-    int count = settings_.include_moon ? 9 : 8;
-    
+    const int count = settings_.include_moon ? 9 : 8;
+
+    Eigen::Vector3d compensation = Eigen::Vector3d::Zero();
     for (int i = 0; i < count; ++i) {
-        double gm = ephemeris::PlanetaryEphemeris::planet_gm(bodies[i]);
-        auto p_ssb = provider->getPosition(bodies[i], t).to_eigen_si() / (constants::AU * 1000.0);
-        
+        const double gm    = ephemeris::PlanetaryEphemeris::planet_gm(bodies[i]);
+        const auto   p_ssb = provider->getPosition(bodies[i], t).to_eigen_si()
+                             / (constants::AU * 1000.0);
+
+        Eigen::Vector3d term;
         if (settings_.baricentric_integration) {
-            // Absolute acceleration in SSB frame
-            Eigen::Vector3d delta = p_ssb - pos_au;
-            acc_p += gm * delta / std::pow(delta.norm(), 3);
+            const Eigen::Vector3d delta = p_ssb - pos_au;
+            term = gm * delta / std::pow(delta.norm(), 3);
         } else {
-            // Relative acceleration in Heliocentric frame
-            Eigen::Vector3d rp = p_ssb - sun_ssb;
-            Eigen::Vector3d r1p = pos_au - rp;
-            acc_p += gm * ( -r1p / std::pow(r1p.norm(), 3) - rp / std::pow(rp.norm(), 3) );
+            const Eigen::Vector3d rp  = p_ssb - sun_ssb;
+            const Eigen::Vector3d r1p = pos_au - rp;
+            term = gm * (-r1p / std::pow(r1p.norm(), 3)
+                         - rp  / std::pow(rp.norm(),  3));
         }
+        math::kahan_add(acc_p, compensation, term);
     }
     return acc_p;
 }

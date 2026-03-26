@@ -32,6 +32,18 @@ target_link_libraries(example_basic PRIVATE astdyn)
 add_executable(fitorb_api_demo fitorb_api_demo.cpp)
 target_link_libraries(fitorb_api_demo PRIVATE astdyn)
 
+# Covariance propagation minimal test (no external ephemeris required)
+add_executable(test_covariance test_covariance.cpp)
+target_link_libraries(test_covariance PRIVATE astdyn)
+
+# ClosestApproachFinder minimal test (synthetic segment, no external data)
+add_executable(test_closest_approach test_closest_approach.cpp)
+target_link_libraries(test_closest_approach PRIVATE astdyn)
+
+# Kahan compensated summation: accuracy test + 1-year energy conservation
+add_executable(test_kahan_energy test_kahan_energy.cpp)
+target_link_libraries(test_kahan_energy PRIVATE astdyn)
+
 # Example: Configurable parsers system
 # add_executable(example_configurable_parsers example_configurable_parsers.cpp)
 # target_link_libraries(example_configurable_parsers PRIVATE astdyn)
