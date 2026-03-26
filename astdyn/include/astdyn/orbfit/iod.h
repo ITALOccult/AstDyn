@@ -190,9 +190,6 @@ inline GaussSolution laplace_iod(const Observation& obs1,
     for(int it=0; it<50; it++){
         double r3=r*r*r;
         double f  = r3 + Dc*r3 + GM_SUN; // simplification
-        // Full: rddot term
-        Vec3 Rddot2 = L*Dc - Rddot;
-        double f2 = r3 - (-R.dot(L) - Rddot2.dot(L)*r3/GM_SUN)*r3;
         double df = 3*r*r;
         r -= 0.01*(f/df);
         r = std::max(r, 0.1);

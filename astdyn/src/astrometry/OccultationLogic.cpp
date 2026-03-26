@@ -21,55 +21,6 @@
 
 namespace astdyn::astrometry {
 
-namespace {
-
-    double compute_squared_angular_distance(double t, const astdyn::catalog::ChebyshevSegment& segment, double target_ra, double target_dec) {
-        auto [pos, vel] = segment.evaluate_full(t);
-        double dra = std::get<0>(pos) - target_ra;
-        double ddec = std::get<1>(pos) - target_dec;
-        if (dra > 180.0) dra -= 360.0;
-        if (dra < -180.0) dra += 360.0;
-        dra *= std::cos(std::get<1>(pos) * astdyn::constants::DEG_TO_RAD);
-        return dra*dra + ddec*ddec;
-    }
-
-    double find_tca(const astdyn::catalog::ChebyshevSegment& segment, const astdyn::catalog::Star& star, double t_start, double t_end) {
-        auto target_ra = star.ra.to_deg();
-        auto target_dec = star.dec.to_deg();
-        auto dist_sq = [&](double t) { return compute_squared_angular_distance(t, segment, target_ra, target_dec); };
-
-        double best_t = t_start + (t_end - t_start) / 2.0;
-        double min_d2 = 1e18;
-        int samples = 48; 
-        for (int i = 0; i <= samples; ++i) {
-            double t = t_start + (t_end - t_start) * i / samples;
-            double d2 = dist_sq(t);
-            if (d2 < min_d2) {
-                min_d2 = d2;
-                best_t = t;
-            }
-        }
-        
-        double step = (t_end - t_start) / samples / 2.0;
-        for (int iter = 0; iter < 10; ++iter) {
-            double t1 = best_t - step;
-            double t2 = best_t + step;
-            double d1 = (t1 >= t_start) ? dist_sq(t1) : 1e18;
-            double d2 = (t2 <= t_end) ? dist_sq(t2) : 1e18;
-            if (d1 < min_d2 && d1 < d2) {
-                min_d2 = d1;
-                best_t = t1;
-            } else if (d2 < min_d2) {
-                min_d2 = d2;
-                best_t = t2;
-            }
-            step /= 2.0;
-        }
-        return best_t;
-    }
-
-} // namespace
-
 OccultationParameters OccultationLogic::compute_parameters(
     const RightAscension& star_ra, const Declination& star_dec,
     const RightAscension& ast_ra, const Declination& ast_dec,

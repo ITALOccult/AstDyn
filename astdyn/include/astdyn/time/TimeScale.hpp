@@ -13,6 +13,7 @@
 #define ASTDYN_TIME_TIMESCALE_HPP
 
 #include <astdyn/core/Types.hpp>
+
 #include <astdyn/core/Constants.hpp>
 #include <astdyn/time/epoch.hpp>
 #include <string>

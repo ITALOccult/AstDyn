@@ -76,7 +76,6 @@ inline StateVector elements_to_state(const OrbitalElements& el, double t) {
     double sqrt1e2 = std::sqrt(1.0 - el.e*el.e);
 
     // Position in orbital plane
-    double r    = el.a * (1.0 - el.e*cosE);
     double x_op = el.a * (cosE - el.e);
     double y_op = el.a * sqrt1e2 * sinE;
 
@@ -161,8 +160,6 @@ inline OrbitalElements state_to_elements(const StateVector& sv) {
     }
 
     // Mean anomaly from true anomaly
-    double cosf = std::cos(f), sinf = std::sin(f);
-    double tanE2 = std::sin(f)*std::sqrt(1.0-e*e) / (1.0+e*cosf);
     double E  = 2.0*std::atan(std::sqrt((1.0-e)/(1.0+e))*std::tan(f/2.0));
     if(E < 0) E += 2.0*M_PI;
     double M0 = E - e*std::sin(E);
@@ -196,7 +193,6 @@ inline Matrix elements_jacobian(const OrbitalElements& el, double t) {
         return base;
     };
 
-    auto sv0 = elements_to_state(el, t);
     std::array<double,6> p0 = pack(el);
 
     for(int j=0;j<6;j++){

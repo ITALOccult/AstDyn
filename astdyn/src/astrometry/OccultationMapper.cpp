@@ -5,7 +5,14 @@
 #include "astdyn/astrometry/OccultationMapper.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/TimeScale.hpp"
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Woverlength-strings"
+#endif
 #include "astdyn/astrometry/WorldMapData.hpp"
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include <fstream>
 #include <cmath>

@@ -152,8 +152,6 @@ int main() {
         time::EpochTDB tca_tdb = time::EpochTDB::from_mjd(t_ca_mjd);
         auto state_at_tca = engine.propagate_to(tca_tdb);
         auto cart_at_tca = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(state_at_tca);
-        // Rates at TCA (convert from keplerian state or cartesian velocity)
-        auto cart_vel_ecl = cart_at_tca.velocity.to_eigen_si();
         // Angular rates are easier to get by finite difference around TCA
         auto t1 = time::EpochTDB::from_mjd(t_ca_mjd - 1.0/86400.0);
         auto t2 = time::EpochTDB::from_mjd(t_ca_mjd + 1.0/86400.0);

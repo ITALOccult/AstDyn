@@ -10,10 +10,38 @@
 #include "astdyn/core/Constants.hpp"
 #include <iostream>
 #include <iomanip>
+#include <filesystem>
+
+namespace {
+
+std::string resolve_input_path(const std::string& input_path) {
+    if (input_path.empty()) {
+        return input_path;
+    }
+
+    const std::filesystem::path path(input_path);
+    if (path.is_absolute() || std::filesystem::exists(path)) {
+        return input_path;
+    }
+
+    const std::filesystem::path candidate_in_tools = std::filesystem::path("tools") / path;
+    if (std::filesystem::exists(candidate_in_tools)) {
+        return candidate_in_tools.string();
+    }
+
+    const std::filesystem::path candidate_in_repo_tools = std::filesystem::path("astdyn") / "tools" / path;
+    if (std::filesystem::exists(candidate_in_repo_tools)) {
+        return candidate_in_repo_tools.string();
+    }
+
+    return input_path;
+}
+
+} // namespace
 
 int main(int argc, char** argv) {
-    std::string eq1_file = (argc > 1) ? argv[1] : "203_astdys.eq1";
-    std::string rwo_file = (argc > 2) ? argv[2] : "203.rwo";
+    std::string eq1_file = resolve_input_path((argc > 1) ? argv[1] : "203_astdys.eq1");
+    std::string rwo_file = resolve_input_path((argc > 2) ? argv[2] : "203.rwo");
     std::string oop_file = (argc > 3) ? argv[3] : ""; // Optional configuration
 
     std::cout << "=== Running OrbFitAPI Demo ===\n";

@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 OLD)
+endif()
+
 # Project name
 project(ASTDYN LANGUAGES CXX)
 
@@ -39,6 +43,8 @@ endif()
 include_directories(${GTEST_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS} ${LIBXML2_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS} ${SQLite3_INCLUDE_DIRS})
 
 # Add external libraries
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(astdyn/external/ioc_gaialib)
 
 # AstDyn Library

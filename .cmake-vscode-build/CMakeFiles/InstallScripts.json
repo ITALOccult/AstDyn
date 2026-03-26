@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/.cmake-vscode-build/cmake_install.cmake",
+		"/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/.cmake-vscode-build/astdyn/external/ioc_gaialib/cmake_install.cmake",
+		"/Users/michelebigi/Documents/Develop/ASTDYN/IOccultLibrary/.cmake-vscode-build/astdyn/tools/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

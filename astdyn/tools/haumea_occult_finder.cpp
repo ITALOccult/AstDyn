@@ -28,7 +28,6 @@ int main() {
         auto field = std::make_shared<ForceField>(cfg.propagator_settings, de441);
         
         RelativeMultiBodyPropagator mb_prop(integrator, field);
-        auto start_time = time::EpochTDB::from_mjd(61164.0);
         
         std::vector<MultiBodyState> initial;
         MultiBodyState h;

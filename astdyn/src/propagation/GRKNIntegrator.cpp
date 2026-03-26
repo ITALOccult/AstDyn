@@ -162,7 +162,6 @@ void GRKNIntegrator::adaptive_loop(const DerivativeFunction& f, Vec3& r, Vec3& v
     int cp_idx = 0;
     Stages K;
     err_prev_ = 1.0;
-    bool first_step = true;
 
     while (std::abs(t_end - t) > 1e-14) {
         if (std::abs(h) > std::abs(t_end - t)) h = t_end - t;

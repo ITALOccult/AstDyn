@@ -124,14 +124,12 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     
     auto rho_helio_ecl = math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(ast_pos_helio.x() - observer_helio_ecl.x(), ast_pos_helio.y() - observer_helio_ecl.y(), ast_pos_helio.z() - observer_helio_ecl.z());
     if (engine_cfg.verbose) {
-        double r = rho_helio_ecl.norm().to_m();
         double lon = std::atan2(rho_helio_ecl.y_si(), rho_helio_ecl.x_si());
         if (lon < 0) lon += 2.0 * 3.14159265;
         std::cout << "[Astrometry] Ecliptic Lon: " << lon * 180.0/3.14159265 << " deg\n";
     }
     auto rho_eq = coordinates::ReferenceFrame::transform_pos<core::ECLIPJ2000, core::GCRF>(rho_helio_ecl).to_eigen_si();
     if (engine_cfg.verbose) {
-        double r = rho_eq.norm();
         double ra = std::atan2(rho_eq(1), rho_eq(0));
         if (ra < 0) ra += 2.0 * 3.14159265;
         std::cout << "[Astrometry] Equatorial RA (Geometric): " << ra * 180.0/3.14159265 << " deg\n";

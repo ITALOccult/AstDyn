@@ -80,7 +80,6 @@ int main(int argc, char** argv) {
             // 1. Position from Chebyshev
             auto eval_res = ephem.evaluate(t_epoch);
             double c_ra = std::get<0>(eval_res);
-            double c_dec = std::get<1>(eval_res);
 
             // 2. Position from high-precision reducer
             auto res = astdyn::astrometry::AstrometryReducer::compute_observation(

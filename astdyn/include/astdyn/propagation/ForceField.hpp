@@ -6,7 +6,7 @@
 #include "astdyn/time/epoch.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/AsteroidPerturbations.hpp"
-#include "astdyn/propagation/Propagator.hpp"
+#include "astdyn/propagation/PropagatorSettings.hpp"
 #include <Eigen/Core>
 #include <memory>
 #include <vector>

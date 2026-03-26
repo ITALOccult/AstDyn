@@ -82,13 +82,18 @@ OrbFitResult OrbFitAPI::run_fit(const std::string& eq1_file, const std::string& 
         if (verbose) std::cout << "   Loaded " << obs_list.size() << " observations\n";
 
         AstDynEngine engine;
-        if (!de441_path.empty()) {
-            AstDynConfig cfg = engine.config(); cfg.ephemeris_type = EphemerisType::DE441;
-            cfg.ephemeris_file = de441_path; engine.set_config(cfg);
+        if (!config_file.empty()) {
+            engine.load_config(config_file);
         }
-        
-        auto config = engine.config(); config.propagator_settings.include_planets = true;
-        config.integrator_type = IntegratorType::RKF78; config.verbose = verbose; engine.set_config(config);
+
+        auto config = engine.config();
+        config.propagator_settings.include_planets = true;
+        config.verbose = verbose;
+        if (!de441_path.empty()) {
+            config.ephemeris_type = EphemerisType::DE441;
+            config.ephemeris_file = de441_path;
+        }
+        engine.set_config(config);
         for (const auto& obs : obs_list) engine.add_observation(obs);
 
         auto kep_ecl_old = propagation::equinoctial_to_keplerian(equ);
@@ -111,6 +116,7 @@ OrbFitResult OrbFitAPI::run_fit(const std::string& eq1_file, const std::string& 
         result.rms_ra = core::MilliArcSecond(engine_result.rms_ra * 1000.0);
         result.rms_dec = core::MilliArcSecond(engine_result.rms_dec * 1000.0);
         result.num_observations = engine_result.num_observations;
+        result.num_outliers = engine_result.num_rejected;
         result.iterations = engine_result.num_iterations;
         result.delta_a_km = std::abs(engine_result.orbit.a.to_au() - initial_state.a()) * constants::AU;
         result.delta_e = std::abs(engine_result.orbit.e - initial_state.e());

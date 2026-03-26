@@ -199,9 +199,12 @@ Eigen::VectorXd AASIntegrator::integrate(const DerivativeFunction& f, const Eige
     
     const size_t n6 = n_bodies_ * 6;
     Eigen::MatrixXd phi; 
-    if (y0.size() == n6 + n6 * n6) { 
+    const Eigen::Index phi_size = static_cast<Eigen::Index>(n6 + n6 * n6);
+    if (y0.size() == phi_size) {
         phi.resize(n6, n6); 
-        for (int i=0; i < n6 * n6; ++i) phi(i/n6, i%n6) = y0[n6 + i]; 
+        for (size_t index = 0; index < n6 * n6; ++index) {
+            phi(index / n6, index % n6) = y0[static_cast<Eigen::Index>(n6 + index)];
+        }
     }
     
     while (std::abs(tf - t) > 1e-14 && stats_.num_steps < 1000000) {
@@ -229,9 +232,12 @@ void AASIntegrator::integrate_steps(const DerivativeFunction& f, const Eigen::Ve
     
     const size_t n6 = n_bodies_ * 6;
     Eigen::MatrixXd phi; 
-    if (y0.size() == n6 + n6 * n6) { 
+    const Eigen::Index phi_size = static_cast<Eigen::Index>(n6 + n6 * n6);
+    if (y0.size() == phi_size) {
         phi.resize(n6, n6); 
-        for (int i=0; i < n6 * n6; ++i) phi(i/n6, i%n6) = y0[n6 + i]; 
+        for (size_t index = 0; index < n6 * n6; ++index) {
+            phi(index / n6, index % n6) = y0[static_cast<Eigen::Index>(n6 + index)];
+        }
     }
     
     t_out.push_back(t); y_out.push_back(y0);
@@ -250,9 +256,12 @@ std::vector<Eigen::VectorXd> AASIntegrator::integrate_at(const DerivativeFunctio
     
     const size_t n6 = n_bodies_ * 6;
     Eigen::MatrixXd phi; 
-    if (y0.size() == n6 + n6 * n6) { 
+    const Eigen::Index phi_size = static_cast<Eigen::Index>(n6 + n6 * n6);
+    if (y0.size() == phi_size) {
         phi.resize(n6, n6); 
-        for (int i=0; i < n6 * n6; ++i) phi(i/n6, i%n6) = y0[n6 + i]; 
+        for (size_t index = 0; index < n6 * n6; ++index) {
+            phi(index / n6, index % n6) = y0[static_cast<Eigen::Index>(n6 + index)];
+        }
     }
     
     for (double target : t_targets) {

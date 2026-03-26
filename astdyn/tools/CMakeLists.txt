@@ -2,6 +2,10 @@
 # AstDyn Tools
 # ============================================================================
 
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 OLD)
+endif()
+
 project(AstDynTools)
 
 # Find Boost program_options

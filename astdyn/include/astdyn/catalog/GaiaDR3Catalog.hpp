@@ -5,8 +5,7 @@
  * Wraps IOC_GaiaLib's UnifiedGaiaCatalog, exposing its functionality under
  * the astdyn::catalog namespace with AstDyn-compatible types.
  *
- * @note Requires local Gaia DR3 catalog data (~19 GB).
- *       Build with -DASTDYN_BUILD_CATALOG=ON.
+ * @note Requires local Gaia DR3 catalog data (~19 GB) at runtime.
  *
  * Usage:
  * @code
@@ -156,9 +155,10 @@ public:
     GaiaDR3Catalog(const GaiaDR3Catalog&) = delete;
     GaiaDR3Catalog& operator=(const GaiaDR3Catalog&) = delete;
 
+    ~GaiaDR3Catalog();
+
 private:
     GaiaDR3Catalog();
-    ~GaiaDR3Catalog();
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

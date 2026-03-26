@@ -211,10 +211,6 @@ inline StateVector propagate(const StateVector& sv0, double t_end,
     auto ax = [](const State6& a, const State6& b, double s)->State6{
         State6 r; for(int i=0;i<6;i++) r[i]=a[i]+b[i]*s; return r;
     };
-    auto axby = [](const State6& a, double sa,
-                   const State6& b, double sb)->State6{
-        State6 r; for(int i=0;i<6;i++) r[i]=a[i]*sa+b[i]*sb; return r;
-    };
     auto addN = [](std::initializer_list<std::pair<const State6*,double>> terms)->State6{
         State6 r{}; r.fill(0.0);
         for(auto& [v,c]: terms) for(int i=0;i<6;i++) r[i]+=(*v)[i]*c;
