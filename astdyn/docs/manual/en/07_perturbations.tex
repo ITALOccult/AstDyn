@@ -395,9 +395,18 @@ settings.include_planets = true;
 settings.include_moon = true;
 settings.include_asteroids = true;
 settings.use_default_asteroid_set = true; // Pluto + 16 massive asteroids
+settings.use_default_30_set = false;      // Extended set
+settings.include_asteroids_list = {1, 2, 4}; // Custom Ceres, Pallas, Vesta
+settings.exclude_asteroids_list = {10};      // Exclude Hygiea
+
 settings.include_relativity = true;
+settings.ppn_beta = 1.0;                  // GR value
+settings.ppn_gamma = 1.0;                 // GR value
+
 settings.include_sun_j2 = true;           // Sun oblateness
-settings.include_earth_j2 = false;        // Not needed for heliocentric
+settings.include_earth_j2 = true;         // Earth oblateness
+settings.include_yarkovsky = false;
+settings.yarkovsky_a2 = 0.0;             // [AU/Myr^2]
 
 // 2. Initialize necessary providers
 auto ephem = std::make_shared<ephemeris::PlanetaryEphemeris>();

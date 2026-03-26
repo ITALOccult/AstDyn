@@ -1,17 +1,17 @@
 # AstDyn Scientific Manual - Status Report
 
-**Last Update**: 26 November 2025
-**Current State**: 200 pages, 15/26 chapters complete (58%)
-**Current PDF**: `docs/build/manual/main.pdf` (674 KB)
+**Last Update**: 25 March 2026
+**Current State**: 220 pages, 19/26 chapters complete (73%)
+**Current PDF**: `docs/build/manual/main.pdf` (910 KB)
 
 ## 🎯 Progress Overview
 
 - ✅ **Part I: Theoretical Foundations** (Chapters 1-7) - COMPLETE
-- ✅ **Part II: Numerical Methods** (Chapters 8-11) - COMPLETE
+- ✅ **Part II: Numerical Methods** (Chapters 8-11) - COMPLETE (Updated with Uncertainty Propagation)
 - ✅ **Part III: Orbit Determination** (Chapters 12-15) - COMPLETE
 - ⏳ **Part IV: Software Implementation** (Chapters 16-20) - Next
-- ⏳ **Part V: Applications** (Chapters 21-25) - Pending
-- ⏳ **Chapter 26: Future Developments** - Pending
+- ✅ **Part V: Applications** (Chapters 21-25) - COMPLETE
+- ⏳ **Chapter 26: Future Developments** - UPDATED (Revised Roadmap)
 
 ## 📚 Detailed Chapter Status
 

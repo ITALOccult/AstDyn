@@ -34,70 +34,26 @@ public:
 \subsection{Cometary Outgassing}
 % ... (existing Marsden model content)
 
-\section{Uncertainty Propagation}
+\section{Propagating Uncertainties}
 
-\subsection{Covariance Propagation}
+\subsection{Current Implementation}
 
-\textbf{Current}: Single STM per iteration.
+As of v1.0, AstDyn includes a complete suite of both linear and non-linear uncertainty propagation tools:
+\begin{itemize}
+    \item \textbf{CovariancePropagator}: Linear propagation via numeric or analytical STM, including process noise support.
+    \item \textbf{MonteCarloUncertainty}: Non-linear ensemble propagation with OpenMP parallelization and full statistical reduction.
+\end{itemize}
 
-\textbf{Planned}: Full covariance matrix propagation with process noise.
+These features, previously planned as future enhancements, are now core components of the library and are detailed in Chapter~\ref{ch:state_transition}.
 
-\begin{lstlisting}[language=C++]
-class CovariancePropagator {
-public:
-    struct Result {
-        CartesianState mean_state;
-        Matrix6d covariance;
-    };
-    
-    Result propagate_with_covariance(
-        const CartesianState& initial_state,
-        const Matrix6d& initial_covariance,
-        double target_epoch,
-        const Matrix6d& process_noise
-    );
-};
-\end{lstlisting}
+\subsection{Future Enhancements}
 
-\textbf{Application}: Uncertainty forecasting, collision probability.
-
-\subsection{Monte Carlo Methods}
-
-\textbf{Motivation}: Non-linear uncertainty propagation.
-
-\textbf{Planned}:
-\begin{lstlisting}[language=C++]
-class MonteCarloUncertainty {
-public:
-    struct Sample {
-        orbit::KeplerianElements elements;
-        double weight;
-    };
-    
-    std::vector<Sample> generate_samples(
-        const orbit::KeplerianElements& nominal,
-        const Matrix6d& covariance,
-        size_t n_samples = 10000
-    );
-    
-    std::vector<CartesianState> propagate_ensemble(
-        const std::vector<Sample>& samples,
-        double target_epoch
-    );
-    
-    // Statistical summary
-    struct Statistics {
-        CartesianState mean;
-        CartesianState median;
-        Matrix6d covariance;
-        double position_rms;
-    };
-    
-    Statistics compute_statistics(
-        const std::vector<CartesianState>& ensemble
-    );
-};
-\end{lstlisting}
+Planned extensions to the uncertainty engine include:
+\begin{itemize}
+    \item \textbf{Gaussian Mixture Models (GMM)}: For representing highly non-Gaussian distributions in non-linear regimes.
+    \item \textbf{Covariance Refinement}: Automatic iterative refinement of the covariance matrix during orbit determination.
+    \item \textbf{Process Noise Modeling}: Advanced models for integration noise and dynamical mismodeling.
+\end{itemize}
 
 \textbf{Use case}: Collision avoidance, close approach analysis.
 
@@ -457,20 +413,20 @@ emcc -O3 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 \
 
 Priority features:
 \begin{itemize}
-    \item Yarkovsky effect modeling.
-    \item Python bindings (pybind11).
-    \item Covariance-based automated refinement.
-    \item Radar observations support.
+    \item Yarkovsky effect modeling and estimation.
+    \item Python bindings (pybind11) complete release.
+    \item Radar observations support and integration.
+    \item Gaussian Mixture Models (GMM) for non-linear propagation.
 \end{itemize}
 
 \subsection{Version 1.2 (Q4 2026)}
 
 Extended capabilities:
 \begin{itemize}
-    \item Monte Carlo uncertainty quantification.
-    \item Cometary outgassing model.
+    \item Cometary outgassing model (Marsden).
     \item Symplectic integrators for long-term stability.
     \item IAU-CSN star catalog integration.
+    \item Automated survey processing pipelines.
 \end{itemize}
 
 \subsection{Version 2.0 (2027)}

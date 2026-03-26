@@ -1,9 +1,9 @@
-\chapter{State Transition Matrix}
+\chapter{State Transition and Uncertainty Propagation}
 \label{ch:state_transition}
 
 \section{Introduction}
 
-The \textbf{state transition matrix} (STM) is fundamental to orbit determination, tracking small perturbations in orbital motion and propagating uncertainties. This chapter develops the mathematical theory and practical computation of the STM.
+The \textbf{state transition matrix} (STM) is fundamental to orbit determination, tracking small perturbations in orbital motion and enabling both linear and non-linear uncertainty propagation. This chapter develops the mathematical theory of the STM and describes the implemented tools in AstDyn for propagating covariance matrices and performing Monte Carlo analysis.
 
 \section{Mathematical Foundation}
 
@@ -492,27 +492,94 @@ It satisfies:
 
 This reveals how orbital motion depends on physical parameters.
 
-\section{Summary}
+\section{Uncertainty Propagation}
 
-Key concepts about the state transition matrix:
+\subsection{Linear Covariance Propagation}
 
+For systems where the deviations from the nominal trajectory remain small, the uncertainty can be represented by a $6 \times 6$ covariance matrix $\mathbf{P}$. AstDyn implements linear propagation via the \texttt{CovariancePropagator} class, which uses the state transition matrix $\mathbf{\Phi}$ and an optional process noise matrix $\mathbf{Q}$.
+
+\subsubsection{Mathematical Formulation}
+
+The covariance matrix at a future time $t_f$ is computed as:
+\begin{equation}
+    \mathbf{P}(t_f) = \mathbf{\Phi}(t_f, t_0) \mathbf{P}(t_0) \mathbf{\Phi}^T(t_f, t_0) + \mathbf{Q}
+\end{equation}
+where $\mathbf{Q}$ accounts for unmodeled dynamical noise or integration errors accumulation.
+
+\subsubsection{Numerical STM via Finite Differences}
+
+While high-precision propagation can use the variational equations (Chapter 10.4), the \texttt{CovariancePropagator} also supports a robust numerical STM established via symmetric finite differences:
+\begin{equation}
+    \mathbf{\Phi}_{ij} \approx \frac{\mathbf{y}_i(t_f, \mathbf{y}_0 + \Delta\mathbf{y}_j) - \mathbf{y}_i(t_f, \mathbf{y}_0 - \Delta\mathbf{y}_j)}{2 \Delta y_j}
+\end{equation}
+This approach is particularly stable for complex force models where analytical partials might be unavailable or computationally prohibitive.
+
+\begin{lstlisting}[language=C++,caption={Linear Covariance Propagation Example}]
+#include "astdyn/propagation/CovariancePropagator.hpp"
+
+// 1. Setup the propagator
+auto cov_prop = CovariancePropagator::make(propagator);
+
+// 2. Propagate mean state and covariance
+auto result = cov_prop.propagate_with_covariance(
+    initial_state,
+    initial_covariance,
+    target_epoch,
+    process_noise // Q matrix
+);
+
+std::cout << "Final uncertainty (1-sigma): " 
+          << result.covariance.sigma_pos_km() << " km\n";
+\end{lstlisting}
+
+\subsection{Non-linear Monte Carlo Uncertainty}
+
+When the dynamics are highly non-linear (e.g., during close planetary encounters) or the initial uncertainty is large, linear propagation via the STM may become inaccurate. AstDyn provides a high-performance \texttt{MonteCarloUncertainty} module for ensemble propagation.
+
+\subsubsection{Algorithm}
+
+The Monte Carlo engine follows a three-step process:
 \begin{enumerate}
-    \item The \textbf{STM} $\Phi(t, t_0)$ propagates small perturbations linearly
-    \item It satisfies \textbf{variational equations}: $\dot{\Phi} = \mathbf{A}(t)\Phi$
-    \item \textbf{Jacobian matrix} $\mathbf{A}$ contains force model derivatives
-    \item \textbf{Numerical computation} requires integrating 42 ODEs (6 state + 36 STM)
-    \item \textbf{Applications}: orbit determination, covariance propagation, sensitivity analysis
-    \item \textbf{Conditioning} degrades for long arcs; use relinearization
-    \item \textbf{Extended STM} includes parameter sensitivity
+    \item \textbf{Sampling}: Generate an ensemble of $N$ states by sampling from the multivariate normal distribution $\mathcal{N}(\mathbf{y}_{\text{nominal}}, \mathbf{P}_0)$ using Cholesky decomposition of the covariance matrix.
+    \item \textbf{Propagation}: Parallel propagation of all $N$ samples to the target epoch using the system's numerical integrators.
+    \item \textbf{Statistics}: Re-computation of the mean state and covariance matrix from the final ensemble.
 \end{enumerate}
 
-Understanding the STM is essential for:
-\begin{itemize}
-    \item Precise orbit determination (Chapter 14)
-    \item Uncertainty quantification
-    \item Mission design and targeting
-    \item Parameter estimation
-    \item Impact probability assessment
-\end{itemize}
+\subsubsection{Parallel Execution}
 
-The next chapter covers ephemeris computation and interpolation methods for efficient state lookup.
+To handle the significant computational cost of propagating thousands of samples, the \texttt{MonteCarloUncertainty} module leverages OpenMP multi-threading, achieving near-linear speedup on multi-core workstations.
+
+\begin{lstlisting}[language=C++,caption={Monte Carlo Uncertainty Analysis}]
+#include "astdyn/propagation/MonteCarloUncertainty.hpp"
+
+auto mc = MonteCarloUncertainty::make(propagator);
+
+// 1. Generate 10,000 samples
+auto ensemble = mc.generate_samples(nominal_state, P0, 10000);
+
+// 2. Propagate in parallel (OpenMP)
+auto final_states = mc.propagate_ensemble(ensemble, target_epoch, *propagator);
+
+// 3. Compute statistics
+auto stats = mc.compute_statistics(final_states);
+std::cout << "MC Mean position: " << stats.mean.position() << "\n";
+std::cout << "MC Position RMS: " << stats.position_rms_km << " km\n";
+\end{lstlisting}
+
+\section{Summary}
+
+Key concepts about state transition and uncertainty propagation:
+
+\begin{enumerate}
+    \item The \textbf{STM} $\Phi(t, t_0)$ propagates small perturbations linearly.
+    \item \textbf{Linear Covariance Propagation} uses $\mathbf{\Phi} \mathbf{P} \mathbf{\Phi}^T + \mathbf{Q}$ for efficient uncertainty forecasting.
+    \item \textbf{Monte Carlo methods} handle non-linear dynamics and large initial errors via ensemble sampling.
+    \item AstDyn provides specialized classes (\texttt{CovariancePropagator}, \texttt{MonteCarloUncertainty}) optimized for both accuracy and performance.
+\end{enumerate}
+
+Understanding these tools is essential for:
+\begin{itemize}
+    \item Impact probability assessment and collision avoidance.
+    \item Observation planning and survey optimization.
+    \item Validating the limits of linear approximation in complex dynamical environments.
+\end{itemize}
