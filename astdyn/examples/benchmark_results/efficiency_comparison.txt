@@ -1,0 +1,8 @@
+Phaethon:
+  SABA4 floor: 7.00315e-05
+  AAS at crossover: 70644 func_evals vs SABA4 29220 func_evals
+  Factor: 2.42 (AAS cost factor at floor, while achieving 10^8 better accuracy)
+Apophis:
+  SABA4 floor: 9.72561e-06
+  AAS at crossover: 69825 func_evals vs SABA4 29220 func_evals
+  Factor: 2.39 (AAS cost factor at floor, while achieving 10^8 better accuracy)

@@ -90,6 +90,14 @@ target_link_libraries(scientific_validation PRIVATE astdyn Eigen3::Eigen curl)
 # add_executable(aas_propagation_demo aas_propagation_demo.cpp)
 # target_link_libraries(aas_propagation_demo PRIVATE astdyn Eigen3::Eigen)
 
+# AAS vs SABA4 vs RKF78 integrator benchmark suite
+add_executable(benchmark_integrators benchmark_integrators.cpp)
+target_link_libraries(benchmark_integrators PRIVATE astdyn Eigen3::Eigen curl)
+
+# Long-term benchmark: 12 asteroids × 3 integrators × 6 tests
+add_executable(benchmark_long_term benchmark_long_term.cpp)
+target_link_libraries(benchmark_long_term PRIVATE astdyn Eigen3::Eigen curl)
+
 # Install examples (optional)
 install(TARGETS example_basic
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples
