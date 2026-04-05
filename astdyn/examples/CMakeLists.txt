@@ -98,7 +98,19 @@ target_link_libraries(benchmark_integrators PRIVATE astdyn Eigen3::Eigen curl)
 add_executable(benchmark_long_term benchmark_long_term.cpp)
 target_link_libraries(benchmark_long_term PRIVATE astdyn Eigen3::Eigen curl)
 
+# IAS15/REBOUND Comparison Benchmarks
+add_executable(benchmark_short_term benchmark_short_term.cpp)
+target_link_libraries(benchmark_short_term PRIVATE astdyn Eigen3::Eigen curl)
+
+add_executable(benchmark_long_term_v2 benchmark_long_term_v2.cpp)
+target_link_libraries(benchmark_long_term_v2 PRIVATE astdyn Eigen3::Eigen curl)
+
+# SABA4 Reversibility Test
+add_executable(test_reversibility_saba4 test_reversibility_saba4.cpp)
+target_link_libraries(test_reversibility_saba4 PRIVATE astdyn)
+
 # Install examples (optional)
 install(TARGETS example_basic
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples
 )
+

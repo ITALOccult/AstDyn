@@ -1,0 +1,100 @@
+\documentclass[11pt]{article}
+
+% ============================================================================
+% DIMENSIONI PERSONALIZZATE (Modifica qui!)
+% ============================================================================
+% Esempio per 200 pagine su carta bianca (Dorso = 0.45in)
+% Larghezza totale = 6 (front) + 6 (back) + 0.45 (spine) + 0.25 (bleed) = 12.7in
+\usepackage[paperwidth=12.7in, paperheight=9.25in, margin=0in]{geometry}
+
+% ============================================================================
+% PACKAGES
+% ============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{mathpazo} % Mantiene il font Palatino sobrio di AstDyn
+\usepackage{tikz}
+
+% Colore tema (usiamo il blu link di AstDyn o nero sobrio)
+\definecolor{themecolor}{rgb}{0.0,0.1,0.4}
+
+% Modifica questo valore con lo spessore reale del tuo dorso
+\newcommand{\spinewidth}{0.45in} 
+
+\begin{document}
+\thispagestyle{empty}
+
+\begin{tikzpicture}[remember picture, overlay]
+    % Sfondo totale (Bianco o crema sobrio)
+    \fill[white] (current page.north west) rectangle (current page.south east);
+
+    % ------------------------------------------------------------------------
+    % QUARTA DI COPERTINA (Back Cover - Sinistra)
+    % ------------------------------------------------------------------------
+    \node[anchor=north west, minimum width=6in, minimum height=9in, text width=5in, align=left, inner sep=1in] 
+        at (current page.north west) {
+            {\Large\bfseries\color{themecolor} About AstDyn}\\[1ex]
+            \small
+            This manual provides a comprehensive scientific reference for the \textbf{AstDyn} library, 
+            part of the ITALOccult framework. It covers the theoretical foundations of celestial mechanics, 
+            orbit determination algorithms, numerical integration methodologies, and practical implementation details.
+            Designed for researchers, engineers, and astronomy enthusiasts, this guide ensures high-precision dynamics 
+            for asteroid and comet simulations.
+            
+            \vspace{2cm}
+            % Spazio per il codice a barre di Amazon
+            \hfill \fbox{\phantom{\rule{2in}{1.2in}}}
+        };
+
+    % ------------------------------------------------------------------------
+    % DORSO (Spine - Centro)
+    % ------------------------------------------------------------------------
+    % Linea di demarcazione del dorso (opzionale, utile per verifica)
+    \draw[gray!30, dashed] ({6in + 0.125in}, 0) -- ({6in + 0.125in}, -9.25in);
+    \draw[gray!30, dashed] ({6in + 0.125in + \spinewidth}, 0) -- ({6in + 0.125in + \spinewidth}, -9.25in);
+
+    \node[anchor=center, minimum width=\spinewidth, minimum height=9in, rotate=-90] 
+        at ({6in + 0.125in + \spinewidth/2}, -9in/2 - 0.125in) {
+            {\small\fboxsep=2pt\color{themecolor}\bfseries AstDyn: Scientific Reference Manual}
+            \hfill {\small Michele Bigi}
+        };
+
+    % ------------------------------------------------------------------------
+    % PRIMA DI COPERTINA (Front Cover - Destra)
+    % ------------------------------------------------------------------------
+    \node[anchor=north east, minimum width=6in, minimum height=9in, inner sep=0pt] 
+        at ({12in + 0.125in}, -0.125in) {
+            \begin{tikzpicture}[remember picture, overlay]
+                % Fascia decorativa (Blu notte)
+                \fill[themecolor] (0,0) rectangle (6in, -2.5in);
+                
+                % Titolo Principale
+                \node[anchor=west, text width=5in, font=\fontsize{36}{40}\selectfont\bfseries\color{white}] 
+                    at (0.5in, -1.25in) {AstDyn};
+                
+                % Sottotitolo
+                \node[anchor=west, text width=5in, font=\fontsize{14}{16}\selectfont\color{white!90}] 
+                    at (0.5in, -2in) {Scientific Reference Manual};
+
+                % Sottotitolo esteso
+                \node[anchor=west, text width=5in, font=\large\scshape\color{themecolor}] 
+                    at (0.5in, -3in) {The ITALOccult Framework for\\ High-Precision Asteroid Dynamics};
+
+                % Grafico o Diagramma (Se ne hai uno PNG/JPG di AstDyn, inseriscilo qui)
+                \node[anchor=center] at (3in, -6in) {
+                    % \includegraphics[width=4in]{tuo_grafico_orbita.png} 
+                    % Rimuovi il commento sopra se hai un'immagine
+                    \fbox{\phantom{\rule{4in}{3in}}} % Segnaposto
+                };
+
+                % Autore
+                \node[anchor=south east, font=\large\bfseries\color{themecolor}] 
+                    at (5.5in, -8.5in) {Michele Bigi};
+            \end{tikzpicture}
+        };
+
+\end{tikzpicture}
+
+\end{document}

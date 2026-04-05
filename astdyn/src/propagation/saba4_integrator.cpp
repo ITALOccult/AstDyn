@@ -12,24 +12,19 @@ namespace astdyn::propagation {
 
 using namespace astdyn::constants;
 
-const double SABA4Integrator::c_coeffs_[num_stages_] = {
-    0.0792036964311957,
-    0.353172906049774,
-    -0.0420650803577195,
-    0.2193769557534996,
-    -0.0420650803577195,
-    0.353172906049774,
-    0.0792036964311957
+const double SABA4Integrator::c_coeffs_[5] = {
+    0.1610444315367623,
+    0.3389555684632377,
+    0.0, // Calculated as 0.5 - (c1+c2) = 0
+    0.3389555684632377,
+    0.1610444315367623
 };
 
-const double SABA4Integrator::d_coeffs_[num_stages_] = {
-    0.209515106613362,
-    -0.143851773179818,
-    0.434336666566456,
-    0.0,
-    0.434336666566456,
-    -0.143851773179818,
-    0.209515106613362
+const double SABA4Integrator::d_coeffs_[num_d_] = {
+    0.5144243472499723,
+    0.5 - 0.5144243472499723,
+    0.5 - 0.5144243472499723,
+    0.5144243472499723
 };
 
 SABA4Integrator::SABA4Integrator(double initial_step, double tolerance,
@@ -41,16 +36,23 @@ SABA4Integrator::SABA4Integrator(double initial_step, double tolerance,
 
 void SABA4Integrator::split_state(const Eigen::VectorXd& y,
                                   Eigen::VectorXd& q, Eigen::VectorXd& p) const {
-    const int n = y.size() / 2;
-    q = y.head(n);
-    p = y.tail(n);
+    const int n_bodies = y.size() / 6;
+    q.resize(n_bodies * 3);
+    p.resize(n_bodies * 3);
+    for (int i = 0; i < n_bodies; ++i) {
+        q.segment<3>(i * 3) = y.segment<3>(i * 6);
+        p.segment<3>(i * 3) = y.segment<3>(i * 6 + 3);
+    }
 }
 
 Eigen::VectorXd SABA4Integrator::join_state(const Eigen::VectorXd& q,
                                             const Eigen::VectorXd& p) const {
-    Eigen::VectorXd y(q.size() + p.size());
-    y.head(q.size()) = q;
-    y.tail(p.size()) = p;
+    const int n_bodies = q.size() / 3;
+    Eigen::VectorXd y(n_bodies * 6);
+    for (int i = 0; i < n_bodies; ++i) {
+        y.segment<3>(i * 6) = q.segment<3>(i * 3);
+        y.segment<3>(i * 6 + 3) = p.segment<3>(i * 3);
+    }
     return y;
 }
 
@@ -84,23 +86,22 @@ Eigen::VectorXd SABA4Integrator::saba2_step(const DerivativeFunction& f,
 Eigen::VectorXd SABA4Integrator::saba4_step(const DerivativeFunction& f,
                                             const Eigen::VectorXd& y,
                                             double t, double h) {
-    Eigen::VectorXd q, p;
-    split_state(y, q, p);
+    // SABA4 (Blanes & Moan 2002): D(c1) K(d1) D(c2) K(d2) D(c3) K(d2) D(c2) K(d1) D(c1)
+    Eigen::VectorXd q, p; split_state(y, q, p);
+    auto kick = [&](double h_k) { 
+        p += h_k * compute_force(f, t, q, p); 
+        stats_.num_function_evals++;
+    };
+    auto drift = [&](double h_d) { 
+        q += h_d * p; 
+        t += h_d; 
+    };
 
-    double t_stage = t;
-
-    for (int i = 0; i < num_stages_; ++i) {
-        if (c_coeffs_[i] != 0.0) {
-            q += h * c_coeffs_[i] * p;
-            t_stage += h * c_coeffs_[i];
-        }
-
-        if (d_coeffs_[i] != 0.0) {
-            Eigen::VectorXd force = compute_force(f, t_stage, q, p);
-            p += h * d_coeffs_[i] * force;
-            stats_.num_function_evals++;
-        }
-    }
+    drift(c_coeffs_[0] * h); kick(d_coeffs_[0] * h); 
+    drift(c_coeffs_[1] * h); kick(d_coeffs_[1] * h);
+    drift(c_coeffs_[2] * h); kick(d_coeffs_[2] * h); // Middle kick (d2) and no drift (c3=0)
+    drift(c_coeffs_[3] * h); kick(d_coeffs_[3] * h);
+    drift(c_coeffs_[4] * h);
 
     return join_state(q, p);
 }

@@ -11,12 +11,23 @@
 
 namespace astdyn::propagation {
 
+namespace {
+    constexpr int    MAX_INTEGRATION_STEPS    = 20'000'000;
+    constexpr double MIN_STEP_SIZE_DAYS       = 1e-8;
+    constexpr double MAX_STEP_SIZE_DAYS       = 100.0;
+    constexpr double MIN_GRADIENT_FLOOR       = 1e-20;
+    constexpr double MIN_RADIUS_AU            = 1e-6;
+    constexpr double PERIHELION_RADIUS_AU     = 2.0 * constants::R_SUN_AU;
+    constexpr double PERIHELION_MAX_STEP_DAYS = 60.0 / constants::SECONDS_PER_DAY; // 1 minute
+    constexpr double PERIOD_FRACTION_LIMIT    = 20.0; // max step = T_local / 20
+} // namespace
+
 AASIntegrator::AASIntegrator(double precision, std::vector<double> gms, double j2, double r_eq)
     : precision_(precision),
       gms_(gms),
       n_bodies_(gms.size()),
       j2_(j2),
-      r_eq_(r_eq) 
+      r_eq_(r_eq)
 {
     const double k = std::pow(2.0, 1.0/3.0);
     w1 = 1.0 / (2.0 - k);
@@ -33,7 +44,7 @@ void AASIntegrator::set_central_body(double mu, double J2, double R_eq) {
 
 void AASIntegrator::split_state(const Eigen::VectorXd& y,
                                 Eigen::VectorXd& q, Eigen::VectorXd& p) const {
-    const size_t n = n_bodies_ * 3; 
+    const size_t n = n_bodies_ * 3;
     q.resize(n);
     p.resize(n);
     for (size_t i = 0; i < n_bodies_; ++i) {
@@ -52,11 +63,22 @@ Eigen::VectorXd AASIntegrator::join_state(const Eigen::VectorXd& q,
     return y;
 }
 
+Eigen::MatrixXd AASIntegrator::init_phi_from_state(const Eigen::VectorXd& y0) const {
+    const size_t n6 = n_bodies_ * 6;
+    const Eigen::Index phi_size = static_cast<Eigen::Index>(n6 + n6 * n6);
+    if (y0.size() != phi_size)
+        return {};
+    Eigen::MatrixXd phi(n6, n6);
+    for (size_t i = 0; i < n6 * n6; ++i)
+        phi(i / n6, i % n6) = y0[static_cast<Eigen::Index>(n6 + i)];
+    return phi;
+}
+
 double AASIntegrator::compute_force_gradient(const Eigen::VectorXd& q) const {
     double max_grad = 0.0;
     for (size_t i = 0; i < n_bodies_; ++i) {
         const double r = q.segment<3>(i * 3).norm();
-        if (r < 1e-6) continue;
+        if (r < MIN_RADIUS_AU) continue;
         double grad = std::abs(2.0 * gms_[i] / (r * r * r));
         if (i == 0 && j2_ != 0.0) { // Primary only
             const double r2 = r * r;
@@ -71,20 +93,15 @@ Eigen::Matrix3d AASIntegrator::compute_hessian(const Eigen::VectorXd& q_body) co
     const double r = q_body.norm();
     const double r3 = r * r * r;
     const double r5 = r3 * r * r;
-    
+
     Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
-    // Use gms_[0] assuming we are in the field of the primary for the relative step
-    // or Sun for the absolute step. This is a simplification.
+    // Use gms_[0]: simplified — primary field for relative/absolute step
     Eigen::Matrix3d H = (-gms_[0] / r3) * I + (3.0 * gms_[0] / r5) * (q_body * q_body.transpose());
-    
-    if (j2_ != 0.0) {
-        // ... (J2 Hessian remains same for the primary body)
-    }
     return H;
 }
 
 /**
- * @brief Hamiltonian (Total Energy) calculation for drift monitoring
+ * @brief Hamiltonian (Total Energy) for drift monitoring
  */
 double AASIntegrator::compute_total_energy(const Eigen::VectorXd& q, const Eigen::VectorXd& p) const {
     double r = q.head<3>().norm();
@@ -99,64 +116,45 @@ double AASIntegrator::compute_total_energy(const Eigen::VectorXd& q, const Eigen
 }
 
 /**
- * @brief Compute Shadow Hamiltonian (Modified Hamiltonian) for Yoshida-4
- * The dominance of O(h^4) terms provides a non-secular energy error metric.
+ * @brief Shadow Hamiltonian (Modified Hamiltonian) for Yoshida-4
+ * The O(h^4) correction provides a non-secular energy error metric.
+ * Derived from Poisson Algebra expansion — Yoshida 1990, eq. (3.7).
  */
 double AASIntegrator::compute_modified_hamiltonian(const Eigen::VectorXd& q,
                                                    const Eigen::VectorXd& p,
                                                    double h) const {
     double H0 = compute_total_energy(q, p);
-    
-    // Shadow Hamiltonian Lead Terms (C1 and C2 for Yoshida-4)
-    // Formula derived from Poisson Algebra expansion of H_shadow
-    // H_shadow = H + h^4 * [ sigma_V * {V,{V,{V,{V,T}}}} + sigma_T * {T,{T,{T,{T,V}}}} ]
-    // where {T,{T,{T,{T,V}}}} relates to the Hessian and velocities.
-    
-    // exact coefficient for Yoshida-4 (Shadow Hamiltonian lead term)
-    // Yoshida 1990, eq. (3.7)
+
     const double sigma_4 = (2.0 * std::pow(w1, 4) + std::pow(w0, 4)) / 24.0;
-    
+
     const double r = q.head<3>().norm();
     const double r3 = r * r * r;
-    const double V_pp = gms_[0] / r3; 
+    const double V_pp = gms_[0] / r3;
     const double gradV = gms_[0] / (r * r);
     const double term_V = (gradV * gradV) * V_pp;
-    
+
     const Eigen::Matrix3d H_hess = compute_hessian(q);
     const double pHp = p.dot(H_hess * p);
-    const double term_T = pHp * V_pp; 
-    
+    const double term_T = pHp * V_pp;
+
     const double correction = std::pow(h, 4) * sigma_4 * (term_V + term_T);
-    
+
     return H0 + correction;
 }
 
-void AASIntegrator::update_phi_kick(const DerivativeFunction&, double, double step, const Eigen::VectorXd& q, const Eigen::VectorXd&, Eigen::MatrixXd& phi) {
-    if (phi.size() == 0) return;
-    
-    // Gravitational force model: f only depends on position q.
-    // JV (Jacobian w.r.t velocity) is zero.
-    // JF (Jacobian w.r.t position) is the Hessian of the potential.
-    Eigen::Matrix3d JF = compute_hessian(q);
-    
-    // Symplectic update of the Momentum-Position and Momentum-Momentum STM blocks
-    phi.block<3, 6>(3, 0) += step * JF * phi.block<3, 6>(0, 0);
-}
-
 void AASIntegrator::symplectic_step(const DerivativeFunction& f, double t, Eigen::VectorXd& q, Eigen::VectorXd& p, Eigen::MatrixXd& phi, double ds) {
-    auto drift = [&](double h) { 
-        q += p * h; 
+    auto drift = [&](double h) {
+        q += p * h;
         if (phi.size() > 0) {
             const size_t n6 = n_bodies_ * 6;
             const size_t n3 = n_bodies_ * 3;
             phi.block(0, 0, n3, n6) += h * phi.block(n3, 0, n3, n6);
         }
     };
-    auto kick = [&](double h) { 
-        Eigen::VectorXd force = f(t, join_state(q, p)).tail(n_bodies_ * 3); 
-        p += force * h; 
+    auto kick = [&](double h) {
+        Eigen::VectorXd force = f(t, join_state(q, p)).tail(n_bodies_ * 3);
+        p += force * h;
         if (phi.size() > 0) {
-            // Update phi with block diagonal Hessian
             const size_t n3 = n_bodies_ * 3;
             const size_t n6 = n_bodies_ * 6;
             for (size_t i = 0; i < n_bodies_; ++i) {
@@ -164,59 +162,45 @@ void AASIntegrator::symplectic_step(const DerivativeFunction& f, double t, Eigen
                 phi.block(n3 + i*3, 0, 3, n6) += h * JF * phi.block(i*3, 0, 3, n6);
             }
         }
-        stats_.num_function_evals++; 
+        stats_.num_function_evals++;
     };
     drift(c1*ds); kick(d1*ds); drift(c2*ds); kick(d2*ds); drift(c2*ds); kick(d1*ds); drift(c1*ds);
 }
 
 double AASIntegrator::estimate_step_size(const Eigen::VectorXd& q, const Eigen::VectorXd& p, double target_dt) const {
-    double min_r = 1e20;
-    for (size_t i = 0; i < n_bodies_; ++i) min_r = std::min(min_r, q.segment<3>(i * 3).norm());
-    
-    if (!std::isfinite(min_r)) return 1e-8;
-    
-    double scaled_precision = precision_ * 50.0;
-    double grad = compute_force_gradient(q);
-    double g_n = scaled_precision / std::sqrt(std::max(grad, 1e-20));
-    
-    Eigen::VectorXd q_next = q + p * g_n;
-    double g_p = scaled_precision / std::sqrt(std::max(compute_force_gradient(q_next), 1e-20));
-    
+    double min_r_au = 1e20;
+    for (size_t i = 0; i < n_bodies_; ++i)
+        min_r_au = std::min(min_r_au, q.segment<3>(i * 3).norm());
+
+    if (!std::isfinite(min_r_au)) return MIN_STEP_SIZE_DAYS;
+
+    // Sundman step: ds = epsilon / sqrt(rho(H(q)))
+    // rho(H) = 2*mu/r^3 [AU^-3 day^-2] (spectral radius of potential Hessian)
+    // For Keplerian orbit: dt = epsilon * r^(3/2) / sqrt(mu)
+    // giving |ΔE/E| ~ (dt/T)^4 for Yoshida-4.  (Preto & Tremaine 1999)
+    const double rho_H = compute_force_gradient(q);
+    const double g_n = precision_ / std::sqrt(std::max(rho_H, MIN_GRADIENT_FLOOR));
+
+    // Symmetrized via harmonic mean for time-reversibility (Preto & Tremaine 1999)
+    const Eigen::VectorXd q_next = q + p * g_n;
+    const double rho_H_next = compute_force_gradient(q_next);
+    const double g_p = precision_ / std::sqrt(std::max(rho_H_next, MIN_GRADIENT_FLOOR));
     double g_avg = 2.0 * g_n * g_p / (g_n + g_p);
-    
-    // Physical bounds (use min orbit period)
-    double T_min = 2.0 * constants::PI * std::sqrt(min_r * min_r * min_r / gms_[0]);
-    g_avg = std::min(g_avg, T_min / 20.0);
-    
-    g_avg = std::clamp(g_avg, 1e-8, 100.0);
+
+    // Hard upper bound: 5% of local Keplerian period
+    const double T_local = constants::TWO_PI * std::sqrt(min_r_au * min_r_au * min_r_au / gms_[0]);
+    g_avg = std::min(g_avg, T_local / PERIOD_FRACTION_LIMIT);
+
+    g_avg = std::clamp(g_avg, MIN_STEP_SIZE_DAYS, MAX_STEP_SIZE_DAYS);
+
+    // Perihelion protection: r < 2 R_sun
+    if (min_r_au < PERIHELION_RADIUS_AU)
+        g_avg = std::min(g_avg, PERIHELION_MAX_STEP_DAYS);
+
     return std::min(g_avg, target_dt);
 }
 
-Eigen::VectorXd AASIntegrator::integrate(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf) {
-    stats_.reset();
-    double t = t0, dir = (tf > t0) ? 1.0 : -1.0;
-    Eigen::VectorXd q, p; split_state(y0, q, p);
-    
-    const size_t n6 = n_bodies_ * 6;
-    Eigen::MatrixXd phi; 
-    const Eigen::Index phi_size = static_cast<Eigen::Index>(n6 + n6 * n6);
-    if (y0.size() == phi_size) {
-        phi.resize(n6, n6); 
-        for (size_t index = 0; index < n6 * n6; ++index) {
-            phi(index / n6, index % n6) = y0[static_cast<Eigen::Index>(n6 + index)];
-        }
-    }
-    
-    while (std::abs(tf - t) > 1e-14 && stats_.num_steps < 1000000) {
-        double dt = estimate_step_size(q, p, std::abs(tf - t));
-        symplectic_step(f, t, q, p, phi, dt * dir);
-        t += dt * dir; stats_.num_steps++;
-    }
-    stats_.final_time = t;
-    return (phi.size() > 0) ? finalize_state_phi(y0, q, p, phi) : join_state(q, p);
-}
-
-Eigen::VectorXd AASIntegrator::finalize_state_phi(const Eigen::VectorXd&, const Eigen::VectorXd& q, const Eigen::VectorXd& p, const Eigen::MatrixXd& phi) {
+Eigen::VectorXd AASIntegrator::finalize_state_phi(const Eigen::VectorXd& q, const Eigen::VectorXd& p, const Eigen::MatrixXd& phi) const {
     const size_t n6 = n_bodies_ * 6;
     Eigen::VectorXd r(n6 + n6 * n6);
     r.head(n_bodies_ * 3) = q;
@@ -225,27 +209,33 @@ Eigen::VectorXd AASIntegrator::finalize_state_phi(const Eigen::VectorXd&, const 
     return r;
 }
 
+Eigen::VectorXd AASIntegrator::integrate(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf) {
+    stats_.reset();
+    double t = t0, dir = (tf > t0) ? 1.0 : -1.0;
+    Eigen::VectorXd q, p; split_state(y0, q, p);
+    Eigen::MatrixXd phi = init_phi_from_state(y0);
+
+    while (std::abs(tf - t) > constants::DEFAULT_TOLERANCE && stats_.num_steps < MAX_INTEGRATION_STEPS) {
+        double dt = estimate_step_size(q, p, std::abs(tf - t));
+        symplectic_step(f, t, q, p, phi, dt * dir);
+        t += dt * dir; stats_.num_steps++;
+    }
+    stats_.final_time = t;
+    return (phi.size() > 0) ? finalize_state_phi(q, p, phi) : join_state(q, p);
+}
+
 void AASIntegrator::integrate_steps(const DerivativeFunction& f, const Eigen::VectorXd& y0, double t0, double tf, std::vector<double>& t_out, std::vector<Eigen::VectorXd>& y_out) {
     stats_.reset(); t_out.clear(); y_out.clear();
     double t = t0, dir = (tf > t0) ? 1.0 : -1.0;
     Eigen::VectorXd q, p; split_state(y0, q, p);
-    
-    const size_t n6 = n_bodies_ * 6;
-    Eigen::MatrixXd phi; 
-    const Eigen::Index phi_size = static_cast<Eigen::Index>(n6 + n6 * n6);
-    if (y0.size() == phi_size) {
-        phi.resize(n6, n6); 
-        for (size_t index = 0; index < n6 * n6; ++index) {
-            phi(index / n6, index % n6) = y0[static_cast<Eigen::Index>(n6 + index)];
-        }
-    }
-    
+    Eigen::MatrixXd phi = init_phi_from_state(y0);
+
     t_out.push_back(t); y_out.push_back(y0);
-    while (std::abs(tf - t) > 1e-14 && stats_.num_steps < 1000000) {
+    while (std::abs(tf - t) > constants::DEFAULT_TOLERANCE && stats_.num_steps < MAX_INTEGRATION_STEPS) {
         double dt = estimate_step_size(q, p, std::abs(tf - t));
         symplectic_step(f, t, q, p, phi, dt * dir); t += dt * dir; stats_.num_steps++;
-        t_out.push_back(t); 
-        y_out.push_back((phi.size() > 0) ? finalize_state_phi(y0, q, p, phi) : join_state(q, p));
+        t_out.push_back(t);
+        y_out.push_back((phi.size() > 0) ? finalize_state_phi(q, p, phi) : join_state(q, p));
     }
 }
 
@@ -253,24 +243,15 @@ std::vector<Eigen::VectorXd> AASIntegrator::integrate_at(const DerivativeFunctio
     stats_.reset();
     std::vector<Eigen::VectorXd> res; res.reserve(t_targets.size());
     double t = t0; Eigen::VectorXd q, p; split_state(y0, q, p);
-    
-    const size_t n6 = n_bodies_ * 6;
-    Eigen::MatrixXd phi; 
-    const Eigen::Index phi_size = static_cast<Eigen::Index>(n6 + n6 * n6);
-    if (y0.size() == phi_size) {
-        phi.resize(n6, n6); 
-        for (size_t index = 0; index < n6 * n6; ++index) {
-            phi(index / n6, index % n6) = y0[static_cast<Eigen::Index>(n6 + index)];
-        }
-    }
-    
+    Eigen::MatrixXd phi = init_phi_from_state(y0);
+
     for (double target : t_targets) {
         double dir = (target > t) ? 1.0 : -1.0;
-        while (std::abs(target - t) > 1e-14 && stats_.num_steps < 1000000) {
+        while (std::abs(target - t) > constants::DEFAULT_TOLERANCE && stats_.num_steps < MAX_INTEGRATION_STEPS) {
             double dt = estimate_step_size(q, p, std::abs(target - t));
             symplectic_step(f, t, q, p, phi, dt * dir); t += dt * dir; stats_.num_steps++;
         }
-        res.push_back((phi.size() > 0) ? finalize_state_phi(y0, q, p, phi) : join_state(q, p));
+        res.push_back((phi.size() > 0) ? finalize_state_phi(q, p, phi) : join_state(q, p));
     }
     return res;
 }

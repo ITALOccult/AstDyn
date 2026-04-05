@@ -10,6 +10,7 @@
 #define ASTDYN_AAS_INTEGRATOR_HPP
 
 #include "astdyn/propagation/Integrator.hpp"
+#include "astdyn/core/Constants.hpp"
 #include <Eigen/Dense>
 #include <vector>
 
@@ -54,7 +55,7 @@ public:
 
     void set_precision(double p) { precision_ = p; }
     void set_system_gms(const std::vector<double>& gms) { gms_ = gms; n_bodies_ = gms.size(); }
-    void set_central_body(double mu, double J2 = 0.0, double R_eq = 6378137.0);
+    void set_central_body(double mu, double J2 = 0.0, double R_eq = constants::R_SUN_AU);
 
 private:
     // Yoshida Order 4 Coefficients (Calculated in constructor)
@@ -68,10 +69,10 @@ private:
     double compute_force_gradient(const Eigen::VectorXd& q) const;
     double compute_total_energy(const Eigen::VectorXd& q, const Eigen::VectorXd& p) const;
     double estimate_step_size(const Eigen::VectorXd& q, const Eigen::VectorXd& p, double target_dt) const;
-    void update_phi_kick(const DerivativeFunction& f, double t, double step, const Eigen::VectorXd& q, const Eigen::VectorXd& p, Eigen::MatrixXd& phi);
     void split_state(const Eigen::VectorXd& y, Eigen::VectorXd& q, Eigen::VectorXd& p) const;
     Eigen::VectorXd join_state(const Eigen::VectorXd& q, const Eigen::VectorXd& p) const;
-    Eigen::VectorXd finalize_state_phi(const Eigen::VectorXd& y0, const Eigen::VectorXd& q, const Eigen::VectorXd& p, const Eigen::MatrixXd& phi);
+    Eigen::MatrixXd init_phi_from_state(const Eigen::VectorXd& y0) const;
+    Eigen::VectorXd finalize_state_phi(const Eigen::VectorXd& q, const Eigen::VectorXd& p, const Eigen::MatrixXd& phi) const;
 
     double precision_;
     std::vector<double> gms_;

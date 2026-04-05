@@ -39,9 +39,10 @@ public:
     // Use base class statistics() and reset_statistics()
 
 private:
-    static constexpr int num_stages_ = 7;
-    static const double c_coeffs_[num_stages_];
-    static const double d_coeffs_[num_stages_];
+    static constexpr int num_c_ = 5;
+    static constexpr int num_d_ = 4;
+    static const double c_coeffs_[num_c_];
+    static const double d_coeffs_[num_d_];
 
     Eigen::VectorXd saba4_step(const DerivativeFunction& f,
                                const Eigen::VectorXd& y,
