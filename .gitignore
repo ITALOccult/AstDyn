@@ -34,3 +34,4 @@ cmake_output.txt
 *.csv
 results_*/
 ephemerides/
+build/
