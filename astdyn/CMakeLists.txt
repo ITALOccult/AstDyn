@@ -285,7 +285,7 @@ install(FILES
 
 message(STATUS "")
 message(STATUS "╔════════════════════════════════════════════════════════════╗")
-message(STATUS "║              OrbFit C++ Configuration Summary              ║")
+message(STATUS "║              AstDyn C++ Configuration Summary              ║")
 message(STATUS "╠════════════════════════════════════════════════════════════╣")
 message(STATUS "║ Version:          beta 0.9")
 message(STATUS "║ Build Type:       ${CMAKE_BUILD_TYPE}")

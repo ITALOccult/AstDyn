@@ -34,22 +34,20 @@ std::optional<GeoPoint> OccultationMapper::project_to_earth(
     const physics::Distance& xi, const physics::Distance& eta,
     const RightAscension& ra, const Declination& dec, const time::EpochUTC& t)
 {
-    // Distinct epoch types: TT drives precession-nutation, UT1 drives the Earth
-    // rotation. Swapping them is now a compile error rather than a ~30 km one.
-    const time::EpochTT  tt  = time::to_tt(t);
-    const time::EpochUT1 ut1 = time::to_ut1(t);
+    // GCRF -> ITRF requires R3(ERA) * Q(t): ERA alone maps CIRS -> TIRS and
+    // omits bias-precession-nutation (~16.6 km of ground error in 2026).
+    // The intersection is solved against the WGS84 ellipsoid in ITRF and the
+    // result is returned as GEODETIC latitude, as reported by Occult4.
+    const double jd_ut1 = time::mjd_to_jd(t.mjd() + time::get_dut1(t.mjd()) / constants::SECONDS_PER_DAY);
+    const double jd_tt  = time::mjd_to_jd(time::utc_to_tt(t.mjd()));
 
-    // The star direction is tagged GCRF, so shadow_point() can only compose it
-    // with the full W*R*Q chain; ERA alone would not bind.
-    const double a = ra.to_rad(), d = dec.to_rad();
-    const auto star_dir = math::Direction<core::GCRF>::from_xyz(
-        std::cos(d) * std::cos(a), std::cos(d) * std::sin(a), std::sin(d));
-
-    const auto sp = coordinates::shadow_point(xi, eta, star_dir, tt, ut1);
-    if (!sp) return std::nullopt;   // the axis misses the Earth
-
-    // sp->lat is a GeodeticLatitude: a geocentric one could not have got here.
-    return GeoPoint{sp->lat.angle(), sp->lon};
+    double lat = 0.0, lon = 0.0;
+    if (!coordinates::shadow_point_geodetic(xi.to_m(), eta.to_m(),
+                                            ra.to_rad(), dec.to_rad(),
+                                            jd_tt, jd_ut1, lat, lon)) {
+        return std::nullopt;
+    }
+    return GeoPoint{Angle::from_rad(lat), Angle::from_rad(lon)};
 }
 
 OccultationPath OccultationMapper::compute_path(

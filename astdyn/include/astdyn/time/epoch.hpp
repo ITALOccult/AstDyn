@@ -12,6 +12,8 @@ struct UTC_tag {};
 struct TDB_tag {};
 struct TT_tag {};
 struct TAI_tag {};
+/// Universal Time 1: UTC + DUT1. The scale the Earth Rotation Angle needs.
+struct UT1_tag {};
 
 // ============================================================================
 // Time Duration
@@ -122,6 +124,7 @@ using EpochUTC = Epoch<UTC_tag>;
 using EpochTDB = Epoch<TDB_tag>;
 using EpochTT  = Epoch<TT_tag>;
 using EpochTAI = Epoch<TAI_tag>;
+using EpochUT1 = Epoch<UT1_tag>;
 
 } // namespace astdyn::time
 

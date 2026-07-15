@@ -17,7 +17,7 @@ add_executable(astdyn_unit_tests
     test_asteroid_perturbations.cpp
     test_kepler_solver.cpp
     test_stt.cpp
-    test_celestial_to_terrestrial.cpp 
+    test_frame_types.cpp
 )
 
 target_link_libraries(astdyn_unit_tests

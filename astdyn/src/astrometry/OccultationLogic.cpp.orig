@@ -55,17 +55,15 @@ void OccultationLogic::compute_shadow_centre(
     // displaced from the sub-asteroid point by the impact parameter (xi, eta),
     // i.e. by up to several thousand km for a non-central event.
     const time::EpochUTC t   = time::to_utc(t_ca);
-    const time::EpochTT  tt  = time::to_tt(t);
-    const time::EpochUT1 ut1 = time::to_ut1(t);
+    const double jd_ut1 = time::mjd_to_jd(t.mjd() + time::get_dut1(t.mjd()) / constants::SECONDS_PER_DAY);
+    const double jd_tt  = time::mjd_to_jd(time::utc_to_tt(t.mjd()));
 
-    const double a = star_ra.to_rad(), d = star_dec.to_rad();
-    const auto star_dir = math::Direction<core::GCRF>::from_xyz(
-        std::cos(d) * std::cos(a), std::cos(d) * std::sin(a), std::sin(d));
-
-    if (const auto sp = coordinates::shadow_point(params.xi_ca, params.eta_ca,
-                                                  star_dir, tt, ut1)) {
-        params.center_lat = sp->lat.angle();
-        params.center_lon = sp->lon;
+    double lat = 0.0, lon = 0.0;
+    if (coordinates::shadow_point_geodetic(params.xi_ca.to_m(), params.eta_ca.to_m(),
+                                           star_ra.to_rad(), star_dec.to_rad(),
+                                           jd_tt, jd_ut1, lat, lon)) {
+        params.center_lat = Angle::from_rad(lat);
+        params.center_lon = Angle::from_rad(lon);
     }
 }
 

@@ -268,16 +268,6 @@ double gps_to_tai(double mjd_gps);
 double get_dut1(double mjd_utc);
 
 /**
- * @brief Convert EpochUTC to EpochUT1 by applying DUT1.
- *
- * The single place where DUT1 is applied, so it cannot drift between callers.
- */
-inline EpochUT1 to_ut1(EpochUTC t_utc) {
-    return EpochUT1::from_mjd(t_utc.mjd() + get_dut1(t_utc.mjd()) / constants::SECONDS_PER_DAY);
-}
-
-
-/**
  * @brief Convert UTC to UT1
  * 
  * UT1 = UTC + DUT1
