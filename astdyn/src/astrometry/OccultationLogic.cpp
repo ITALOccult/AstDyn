@@ -1,4 +1,5 @@
 #include "astdyn/astrometry/OccultationLogic.hpp"
+#include "astdyn/coordinates/CelestialToTerrestrial.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/catalog/CatalogIntegration.hpp"
 #include "astdyn/io/MPCClient.hpp"
@@ -40,28 +41,29 @@ OccultationParameters OccultationLogic::compute_parameters(
     
     if (ephem) {
         compute_sky_conditions(params, t_ca, ast_ra, ast_dec, ast_dist, star_ra, star_dec, ephem);
-        compute_sub_asteroid_point(params, t_ca, ast_ra, ast_dec, ast_dist);
+        compute_shadow_centre(params, t_ca, star_ra, star_dec);
     }
     return params;
 }
 
-void OccultationLogic::compute_sub_asteroid_point(
+void OccultationLogic::compute_shadow_centre(
     OccultationParameters& params,
     const time::EpochTDB& t_ca,
-    const RightAscension& ast_ra, const Declination& ast_dec,
-    const physics::Distance& ast_dist)
+    const RightAscension& star_ra, const Declination& star_dec)
 {
-    double a = ast_ra.to_rad();
-    double d = ast_dec.to_rad();
-    Eigen::Vector3d r_ast_vec = ast_dist.to_m() * Eigen::Vector3d(std::cos(d) * std::cos(a), std::cos(d) * std::sin(a), std::sin(d));
-    
-    auto pos_ast_gcrf = math::Vector3<core::GCRF, physics::Distance>::from_si(r_ast_vec.x(), r_ast_vec.y(), r_ast_vec.z());
-    auto pos_ast_itrf = coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ITRF>(pos_ast_gcrf, t_ca);
-    
-    double r_itrf = pos_ast_itrf.norm().to_m();
-    if (r_itrf > 1.0) {
-        params.center_lat = Angle::from_rad(std::asin(pos_ast_itrf.z_si() / r_itrf));
-        params.center_lon = Angle::from_rad(std::atan2(pos_ast_itrf.y_si(), pos_ast_itrf.x_si()));
+    // The shadow centre is where the star-asteroid axis meets the Earth. It is
+    // displaced from the sub-asteroid point by the impact parameter (xi, eta),
+    // i.e. by up to several thousand km for a non-central event.
+    const time::EpochUTC t   = time::to_utc(t_ca);
+    const double jd_ut1 = time::mjd_to_jd(t.mjd() + time::get_dut1(t.mjd()) / constants::SECONDS_PER_DAY);
+    const double jd_tt  = time::mjd_to_jd(time::utc_to_tt(t.mjd()));
+
+    double lat = 0.0, lon = 0.0;
+    if (coordinates::shadow_point_geodetic(params.xi_ca.to_m(), params.eta_ca.to_m(),
+                                           star_ra.to_rad(), star_dec.to_rad(),
+                                           jd_tt, jd_ut1, lat, lon)) {
+        params.center_lat = Angle::from_rad(lat);
+        params.center_lon = Angle::from_rad(lon);
     }
 }
 

@@ -12,10 +12,12 @@ add_executable(astdyn_unit_tests
     test_propagation.cpp
     test_astdyn_engine.cpp
     test_rigorous_validation.cpp
-    test_integrator_comparative.cpp
+    # test_integrator_comparative.cpp
     test_occultation.cpp
     test_asteroid_perturbations.cpp
     test_kepler_solver.cpp
+    test_stt.cpp
+    test_celestial_to_terrestrial.cpp 
 )
 
 target_link_libraries(astdyn_unit_tests

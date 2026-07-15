@@ -10,6 +10,7 @@
 #pragma clang diagnostic ignored "-Woverlength-strings"
 #endif
 #include "astdyn/astrometry/WorldMapData.hpp"
+#include "astdyn/coordinates/CelestialToTerrestrial.hpp"
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
@@ -29,47 +30,24 @@ double OccultationMapper::compute_era(const time::EpochUTC& t) {
     return (era < 0) ? era + constants::TWO_PI : era;
 }
 
-GeoPoint OccultationMapper::project_to_earth(
-    const physics::Distance& xi, const physics::Distance& eta, const physics::Distance& zeta, 
-    const RightAscension& ra, const Declination& dec, const time::EpochUTC& t) 
+std::optional<GeoPoint> OccultationMapper::project_to_earth(
+    const physics::Distance& xi, const physics::Distance& eta,
+    const RightAscension& ra, const Declination& dec, const time::EpochUTC& t)
 {
-    double as = ra.to_rad();
-    double ds = dec.to_rad();
-    
-    // 1. Basis vectors in GCRF (Mean Equator J2000)
-    // k_star points from Earth center to Star
-    Eigen::Vector3d k_star(std::cos(as) * std::cos(ds), std::sin(as) * std::cos(ds), std::sin(ds));
-    // i_basis points East on Equator
-    Eigen::Vector3d i_basis(-std::sin(as), std::cos(as), 0.0);
-    // j_basis points North on Fundamental Plane
-    Eigen::Vector3d j_basis = k_star.cross(i_basis).normalized();
+    // GCRF -> ITRF requires R3(ERA) * Q(t): ERA alone maps CIRS -> TIRS and
+    // omits bias-precession-nutation (~16.6 km of ground error in 2026).
+    // The intersection is solved against the WGS84 ellipsoid in ITRF and the
+    // result is returned as GEODETIC latitude, as reported by Occult4.
+    const double jd_ut1 = time::mjd_to_jd(t.mjd() + time::get_dut1(t.mjd()) / constants::SECONDS_PER_DAY);
+    const double jd_tt  = time::mjd_to_jd(time::utc_to_tt(t.mjd()));
 
-    // 2. Geocentric Shadow Point in GCRF
-    // p_eci = xi*i + eta*j + zeta*k (zeta is depth facing the star)
-    Eigen::Vector3d p_eci = xi.to_m() * i_basis + eta.to_m() * j_basis + zeta.to_m() * k_star;
-    
-    // 3. Rotate to ECEF using ERA
-    double era = compute_era(t);
-    double cos_e = std::cos(era);
-    double sin_e = std::sin(era);
-    
-    // Rz(-ERA) rotation matrix
-    double x_ecef =  p_eci.x() * cos_e + p_eci.y() * sin_e;
-    double y_ecef = -p_eci.x() * sin_e + p_eci.y() * cos_e;
-    double z_ecef =  p_eci.z();
-
-    // DIAGNOSTIC LOG (First call only to avoid spam)
-    static bool logged = false;
-    if (!logged) {
-        std::cout << "DIAG: k_star=" << k_star.transpose() << " | p_eci=" << p_eci.transpose() << " | p_ecef=" << x_ecef << "," << y_ecef << "," << z_ecef << "\n";
-        logged = true;
+    double lat = 0.0, lon = 0.0;
+    if (!coordinates::shadow_point_geodetic(xi.to_m(), eta.to_m(),
+                                            ra.to_rad(), dec.to_rad(),
+                                            jd_tt, jd_ut1, lat, lon)) {
+        return std::nullopt;
     }
-
-    double dist_xy = std::sqrt(x_ecef*x_ecef + y_ecef*y_ecef);
-    double lat = std::atan2(z_ecef, dist_xy);
-    double lon = std::atan2(y_ecef, x_ecef);
-
-    return {Angle::from_rad(lat), Angle::from_rad(lon)};
+    return GeoPoint{Angle::from_rad(lat), Angle::from_rad(lon)};
 }
 
 OccultationPath OccultationMapper::compute_path(
@@ -113,32 +91,26 @@ std::optional<GeoPoint> OccultationMapper::calculate_geopoint_at_epoch(
     const time::TimeDuration& dt_from_ca,
     const physics::Distance& offset_perp)
 {
-    using namespace constants;
-    double vxi = params.dxi_dt.to_ms();
-    double veta = params.deta_dt.to_ms();
-    
-    // Shadow axis position on fundamental plane
-    double xi_m = params.xi_ca.to_m() + vxi * dt_from_ca.to_seconds();
+    const double vxi  = params.dxi_dt.to_ms();
+    const double veta = params.deta_dt.to_ms();
+
+    // Shadow axis position on the fundamental plane
+    double xi_m  = params.xi_ca.to_m()  + vxi  * dt_from_ca.to_seconds();
     double eta_m = params.eta_ca.to_m() + veta * dt_from_ca.to_seconds();
-    
+
     // Offset perpendicular to track
     if (offset_perp.to_m() != 0.0) {
-        double v_norm = std::sqrt(vxi*vxi + veta*veta);
-        xi_m += offset_perp.to_m() * (-veta / v_norm);
-        eta_m += offset_perp.to_m() * ( vxi  / v_norm);
+        const double v_norm = std::sqrt(vxi*vxi + veta*veta);
+        if (v_norm > 0.0) {
+            xi_m  += offset_perp.to_m() * (-veta / v_norm);
+            eta_m += offset_perp.to_m() * ( vxi  / v_norm);
+        }
     }
 
-    double r_earth_m = constants::R_EARTH_EQUATORIAL * 1000.0;
-    double d2 = xi_m*xi_m + eta_m*eta_m;
-    
-    if (d2 >= r_earth_m * r_earth_m) return std::nullopt;
-    
-    double zeta_m = std::sqrt(r_earth_m * r_earth_m - d2);
-    time::EpochUTC t = time::to_utc(params.t_ca) + dt_from_ca;
-    
-    return project_to_earth(physics::Distance::from_m(xi_m), 
-                            physics::Distance::from_m(eta_m), 
-                            physics::Distance::from_m(zeta_m), 
+    // The ellipsoid intersection (and the miss test) is done in project_to_earth.
+    const time::EpochUTC t = time::to_utc(params.t_ca) + dt_from_ca;
+    return project_to_earth(physics::Distance::from_m(xi_m),
+                            physics::Distance::from_m(eta_m),
                             star_ra, star_dec, t);
 }
 

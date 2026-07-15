@@ -9,6 +9,7 @@
 #include "astdyn/astrometry/OccultationLogic.hpp"
 #include <vector>
 #include <string>
+#include <optional>
 
 namespace astdyn::astrometry {
 
@@ -108,9 +109,10 @@ public:
 
 private:
     // Internal coordinate transformation helpers
-    static GeoPoint project_to_earth(const physics::Distance& xi, 
+    /// Intersects the shadow axis at (xi, eta) with the WGS84 ellipsoid.
+    /// Returns geodetic lat/lon, or nullopt if the axis misses the Earth.
+    static std::optional<GeoPoint> project_to_earth(const physics::Distance& xi, 
                                      const physics::Distance& eta, 
-                                     const physics::Distance& zeta, 
                                      const RightAscension& ra, 
                                      const Declination& dec, 
                                      const time::EpochUTC& t);

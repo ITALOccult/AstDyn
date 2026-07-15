@@ -124,11 +124,12 @@ private:
         const Angle& ast_dra_dt,
         const Angle& ast_ddec_dt);
 
-    static void compute_sub_asteroid_point(
+    /// Geodetic lat/lon of the shadow centre at t_ca (uses the impact
+    /// parameter xi/eta; NOT the sub-asteroid point).
+    static void compute_shadow_centre(
         OccultationParameters& params,
         const time::EpochTDB& t_ca,
-        const RightAscension& ast_ra, const Declination& ast_dec,
-        const physics::Distance& ast_dist);
+        const RightAscension& star_ra, const Declination& star_dec);
 
     static void compute_sky_conditions(
         OccultationParameters& params,
