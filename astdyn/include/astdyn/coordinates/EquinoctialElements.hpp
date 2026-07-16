@@ -225,6 +225,66 @@ public:
     }
     
     /**
+     * @brief Jacobian of the Cartesian state w.r.t. the equinoctial elements.
+     *
+     *     J(i,j) = d x_i / d E_j
+     *     x = (X, Y, Z, VX, VY, VZ)      [km, km/s]
+     *     E = (a, h, k, p, q, lambda)    [km, -, -, -, -, rad]
+     *
+     * This is the bridge AstDyS orbits need: AstDyS publishes the orbit
+     * covariance in EQUINOCTIAL elements, while the state transition tensor
+     * propagates in CARTESIAN coordinates, so the covariance must be rotated
+     * before it can be propagated:
+     *
+     *     C_cart(t0) = J * C_eq * J^T
+     *
+     * Feeding an equinoctial covariance straight to a Cartesian propagator is
+     * silent: both are 6x6 and the multiplication succeeds regardless.
+     *
+     * Evaluated by central differences on to_cartesian(). The Kepler solver
+     * converges to 1e-12, which with the steps below leaves a relative error of
+     * order 1e-8 -- six orders of magnitude below the uncertainty of the
+     * covariance itself, so an analytical Jacobian would buy nothing here.
+     *
+     * @note Requires a in km, consistent with this class. AstDyS publishes a in
+     *       AU: convert before building the covariance, or the first row and
+     *       column come out scaled by 1.496e8.
+     */
+    Matrix6d jacobian_to_cartesian() const {
+        Matrix6d J = Matrix6d::Zero();
+
+        // One step per element: relative for the length, absolute for the
+        // dimensionless and angular ones. Near the cube root of the solver
+        // tolerance, which is where central differences are optimal.
+        const double steps[6] = {
+            std::max(std::abs(a_) * 1e-5, 1e-5),   // a      [km]
+            1e-6, 1e-6,                             // h, k   [-]
+            1e-6, 1e-6,                             // p, q   [-]
+            1e-7                                    // lambda [rad]
+        };
+
+        for (int j = 0; j < 6; ++j) {
+            const double s = steps[j];
+            EquinoctialElements ep = *this, em = *this;
+            switch (j) {
+                case 0: ep.a_ += s;      em.a_ -= s;      break;
+                case 1: ep.h_ += s;      em.h_ -= s;      break;
+                case 2: ep.k_ += s;      em.k_ -= s;      break;
+                case 3: ep.p_ += s;      em.p_ -= s;      break;
+                case 4: ep.q_ += s;      em.q_ -= s;      break;
+                case 5: ep.lambda_ += s; em.lambda_ -= s; break;
+            }
+            const CartesianState xp = ep.to_cartesian();
+            const CartesianState xm = em.to_cartesian();
+            for (int i = 0; i < 3; ++i) {
+                J(i,     j) = (xp.position()(i) - xm.position()(i)) / (2.0 * s);
+                J(i + 3, j) = (xp.velocity()(i) - xm.velocity()(i)) / (2.0 * s);
+            }
+        }
+        return J;
+    }
+
+    /**
      * @brief Construct from Cartesian state
      * @param state Cartesian state
      * @return Equinoctial elements
