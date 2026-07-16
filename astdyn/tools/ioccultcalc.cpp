@@ -322,7 +322,7 @@ int main(int argc, char** argv) {
 
     ChebyshevEphemerisManager manager(engine.config());
     HorizonsClient horizons;
-    std::map<std::string, physics::CartesianStateTyped<core::GCRF>> stored_states;
+    std::map<std::string, physics::CartesianStateTyped<core::ECLIPJ2000>> stored_states;
     std::map<std::string, physics::KeplerianStateTyped<core::ECLIPJ2000>> stored_elements;
     // M3: named constants for fallback physical properties
     constexpr double DEFAULT_ASTEROID_DIAMETER_KM = 100.0;
@@ -347,7 +347,11 @@ int main(int argc, char** argv) {
                 
                 // Convert Keplerian elements to Cartesian state in GCRF for uncertainty calculation
                 auto state_eclip = propagation::keplerian_to_cartesian(elements);
-                stored_states[id] = state_eclip.cast_frame<core::GCRF>();
+                // The state IS heliocentric ecliptic -- the variable is even named for it.
+                // It was relabelled GCRF through cast_frame, which renames without
+                // converting; nothing downstream noticed because everything treated it
+                // as ecliptic anyway. Say what it is.
+                stored_states[id] = state_eclip;
                 
                 std::cout << "[ioccultcalc] '" << id << "' caricato da Horizons OK\n";
                 auto props = horizons.query_physical_properties(id);

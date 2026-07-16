@@ -21,7 +21,7 @@ using astdyn::Matrix6d;
 using astdyn::math::Tensor3;
 using astdyn::math::Tensor6;
 
-StateTransitionTensor::StateTransitionTensor(ForceModel model, double precision)
+StateTransitionTensor::StateTransitionTensor(PotentialModel model, double precision)
     : model_(std::move(model)), precision_(precision) {
     const double k = std::pow(2.0, 1.0 / 3.0);
     w1_ = 1.0 / (2.0 - k);
@@ -32,7 +32,7 @@ StateTransitionTensor::StateTransitionTensor(ForceModel model, double precision)
 
 // --- AAS force-gradient metric: max local |2 mu / r^3| (+ J2), all attractors -
 double StateTransitionTensor::force_gradient(const Vector3d& r,
-                                             const ForceModel& m) const {
+                                             const PotentialModel& m) const {
     const double rc = r.norm();
     double g = std::abs(2.0 * m.central_gm / (rc * rc * rc));
     if (m.j2 != 0.0) {
@@ -47,7 +47,7 @@ double StateTransitionTensor::force_gradient(const Vector3d& r,
 }
 
 double StateTransitionTensor::estimate_step(const Vector3d& q, const Vector3d& p,
-                                            double target_dt, const ForceModel& m) const {
+                                            double target_dt, const PotentialModel& m) const {
     double min_r = q.norm();
     for (const auto& s : m.perturber_pos) min_r = std::min(min_r, (q - s).norm());
     if (!std::isfinite(min_r)) return 1e-8;
@@ -68,7 +68,7 @@ double StateTransitionTensor::estimate_step(const Vector3d& q, const Vector3d& p
 // --- Kick K(h): p += h a; momentum-row STM/STT updates (Eqs. B7-B8) -----------
 void StateTransitionTensor::kick(const Vector3d& q, Vector3d& p,
                                  Matrix6d& phi, Tensor6& psi,
-                                 double h, const ForceModel& m) const {
+                                 double h, const PotentialModel& m) const {
     const Matrix3d G = -potential_hessian(q, m);          // acc. gradient = -U_ij
     Tensor3 T3 = potential_third_derivative(q, m);
     T3 *= -1.0;                                           // = -U_ijk
@@ -96,7 +96,7 @@ void StateTransitionTensor::drift(Vector3d& q, const Vector3d& p,
 // --- one seven-stage Yoshida-4 macro-step (Eq. B12) --------------------------
 void StateTransitionTensor::step(Vector3d& q, Vector3d& p,
                                  Matrix6d& phi, Tensor6& psi,
-                                 double dt, const ForceModel& m) const {
+                                 double dt, const PotentialModel& m) const {
     drift(q, p, phi, psi, c1_ * dt);
     kick (q, p, phi, psi, d1_ * dt, m);
     drift(q, p, phi, psi, c2_ * dt);
@@ -124,7 +124,7 @@ StateTransitionTensor::to_state(const Vector3d& q, const Vector3d& p,
 StateTransitionTensor::Result
 StateTransitionTensor::propagate(const State& x0, time::EpochTDB t1,
                                  const EphemerisRefresh& refresh) const {
-    ForceModel m = model_;                                  // per-call, refreshable
+    PotentialModel m = model_;                                  // per-call, refreshable
     const Eigen::Matrix<double, 6, 1> y0 = x0.to_eigen_au_aud();
     Vector3d q = y0.head<3>();
     Vector3d p = y0.tail<3>();
@@ -149,7 +149,7 @@ StateTransitionTensor::propagate(const State& x0, time::EpochTDB t1,
 StateTransitionTensor::Result
 StateTransitionTensor::propagate_fixed(const State& x0, time::EpochTDB t1,
                                        int n_steps) const {
-    ForceModel m = model_;
+    PotentialModel m = model_;
     const Eigen::Matrix<double, 6, 1> y0 = x0.to_eigen_au_aud();
     Vector3d q = y0.head<3>();
     Vector3d p = y0.tail<3>();

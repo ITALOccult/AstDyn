@@ -53,6 +53,10 @@ struct Star {
     // --- Astrometry (ICRS, epoch J2016.0) ---
     RightAscension ra;                  ///< Right Ascension
     Declination    dec;                 ///< Declination
+    /// Position uncertainties [mas]. Gaia's ra_error is already in the alpha*
+    /// sense. Zero means "not populated by the catalogue reader", not "exact".
+    double         ra_error_mas  = 0.0;
+    double         dec_error_mas = 0.0;
     Parallax       parallax;            ///< Parallax (mas)
     double         parallax_error_mas = 0.0;
     ProperMotion   pm_ra_cosdec;        ///< Proper motion in RA * cos(dec)

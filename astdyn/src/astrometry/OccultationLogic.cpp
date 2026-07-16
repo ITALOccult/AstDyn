@@ -1,5 +1,8 @@
 #include "astdyn/astrometry/OccultationLogic.hpp"
 #include "astdyn/coordinates/CelestialToTerrestrial.hpp"
+#include "astdyn/propagation/StateTransitionTensor.hpp"
+#include "astdyn/astrometry/StellarCovariance.hpp"
+#include "astdyn/astrometry/OccultationCovariance.hpp"
 #include <cstdlib>
 #include <iostream>
 #include "astdyn/core/Constants.hpp"
@@ -32,6 +35,55 @@ inline bool occ_debug() {
 }
 } // namespace
 
+
+namespace {
+
+    double compute_squared_angular_distance(double t, const astdyn::catalog::ChebyshevSegment& segment, double target_ra, double target_dec) {
+        auto [pos, vel] = segment.evaluate_full(t);
+        double dra = std::get<0>(pos) - target_ra;
+        double ddec = std::get<1>(pos) - target_dec;
+        if (dra > 180.0) dra -= 360.0;
+        if (dra < -180.0) dra += 360.0;
+        dra *= std::cos(std::get<1>(pos) * astdyn::constants::DEG_TO_RAD);
+        return dra*dra + ddec*ddec;
+    }
+
+    double find_tca(const astdyn::catalog::ChebyshevSegment& segment, const astdyn::catalog::Star& star, double t_start, double t_end) {
+        auto target_ra = star.ra.to_deg();
+        auto target_dec = star.dec.to_deg();
+        auto dist_sq = [&](double t) { return compute_squared_angular_distance(t, segment, target_ra, target_dec); };
+
+        double best_t = t_start + (t_end - t_start) / 2.0;
+        double min_d2 = 1e18;
+        int samples = 48; 
+        for (int i = 0; i <= samples; ++i) {
+            double t = t_start + (t_end - t_start) * i / samples;
+            double d2 = dist_sq(t);
+            if (d2 < min_d2) {
+                min_d2 = d2;
+                best_t = t;
+            }
+        }
+        
+        double step = (t_end - t_start) / samples / 2.0;
+        for (int iter = 0; iter < 10; ++iter) {
+            double t1 = best_t - step;
+            double t2 = best_t + step;
+            double d1 = (t1 >= t_start) ? dist_sq(t1) : 1e18;
+            double d2 = (t2 <= t_end) ? dist_sq(t2) : 1e18;
+            if (d1 < min_d2 && d1 < d2) {
+                min_d2 = d1;
+                best_t = t1;
+            } else if (d2 < min_d2) {
+                min_d2 = d2;
+                best_t = t2;
+            }
+            step /= 2.0;
+        }
+        return best_t;
+    }
+
+} // namespace
 
 OccultationParameters OccultationLogic::compute_parameters(
     const RightAscension& star_ra, const Declination& star_dec,
@@ -85,13 +137,11 @@ void OccultationLogic::compute_shadow_centre(
         params.center_lon = sp->lon;
     }
 
-    // Sub-star point: the same axis with zero impact parameter. This is the
-    // fundamental-plane reference that Occult4 reports in <Earth>, so it must
-    // be kept distinct from the shadow centre above.
+    // Sub-star point: where the star is at the zenith, i.e. the fundamental-plane
+    // reference Occult4 reports in <Earth>. It is simply the star direction
+    // rotated into ITRF, and its latitude is GEOCENTRIC -- which is why it comes
+    // out exactly equal to the star's apparent declination, as Occult4 publishes.
     {
-        // The sub-star point is the star direction rotated into ITRF. Its
-        // latitude is GEOCENTRIC, which is why it equals the star's apparent
-        // declination -- the convention Occult4 uses in <Earth>.
         const auto k_itrf = coordinates::gcrf_to_itrf(tt, ut1) * star_dir;
         params.substar_lat = Angle::from_rad(std::asin(std::clamp(k_itrf.z(), -1.0, 1.0)));
         params.substar_lon = Angle::from_rad(std::atan2(k_itrf.y(), k_itrf.x()));
@@ -192,9 +242,9 @@ void OccultationLogic::compute_sky_conditions(
 
     // Sub-solar point (geocentric), for the day/night terminator.
     {
-        const time::EpochUTC t_ss = time::to_utc(t_ca);
-        const auto Css = coordinates::gcrf_to_itrf(time::to_tt(t_ss), time::to_ut1(t_ss));
-        const Eigen::Vector3d s_itrf = Css.matrix() * n_sun;
+        const time::EpochUTC t_utc = time::to_utc(t_ca);
+        const auto C = coordinates::gcrf_to_itrf(time::to_tt(t_utc), time::to_ut1(t_utc));
+        const Eigen::Vector3d s_itrf = C.matrix() * n_sun;
         params.subsolar_lat = Angle::from_rad(std::asin(std::clamp(s_itrf.z(), -1.0, 1.0)));
         params.subsolar_lon = Angle::from_rad(std::atan2(s_itrf.y(), s_itrf.x()));
     }
@@ -294,6 +344,9 @@ void OccultationLogic::evaluate_candidate(
             ca.t_ca, engine.getEphemeris());
 
         // Maximum duration: the full shadow width traversed at the shadow speed.
+        // Without this max_duration stays at zero, and the moment min_duration_s
+        // is configured above 0.1 the filter below rejects every event -- the
+        // same trap the daylight filter had.
         if (diameter_km > 0.0 && params.shadow_velocity.to_ms() > 0.0) {
             params.max_duration = time::TimeDuration::from_seconds(
                 diameter_km * 1000.0 / params.shadow_velocity.to_ms());
@@ -638,27 +691,93 @@ void OccultationLogic::apply_uncertainty(
     OccultationParameters& params,
     const catalog::Star& star,
     const Eigen::Matrix<double, 6, 6>& covariance_t0,
-    const physics::CartesianStateTyped<core::GCRF>& initial_state,
+    const physics::CartesianStateTyped<core::ECLIPJ2000>& initial_state,
     AstDynEngine& engine)
 {
-    using namespace orbit_determination;
-    StateTransitionMatrix<core::GCRF> stm_engine(engine.propagator());
-    auto stm_res = stm_engine.compute(initial_state, params.t_ca);
-    Eigen::Matrix<double, 6, 6> cov_tca = stm_res.map_covariance(covariance_t0);
-    
-    auto state_tca = stm_res.final_state;
-    auto earth_tca = engine.getEphemeris()->getState(ephemeris::CelestialBody::EARTH, params.t_ca);
-    Eigen::Vector3d rho_geo = state_tca.position.to_eigen_si() - earth_tca.position.to_eigen_si();
+    // ---- 1. Transport: Phi AND Psi ------------------------------------------
+    // The state transition MATRIX gives only Phi, which is the whole of the
+    // linear theory. The tensor gives Psi as well, and Psi is what makes the
+    // bias, the skewness and the index N computable at all.
+    propagation::PotentialModel model;              // Kepler + J2; perturbers pending
+    propagation::StateTransitionTensor stt(model);
+    const auto tr = stt.propagate(initial_state, params.t_ca);
 
-    params.cross_track_uncertainty = physics::Distance::from_km(
-        AstrometryReducer::compute_cross_track_uncertainty(
-            cov_tca, 
-            rho_geo,
-            state_tca.velocity.to_eigen_si(),
-            star.ra.to_rad(), 
-            star.dec.to_rad()
-        )
-    );
+    // ---- 2. Geometry at the event, in AU, ecliptic ---------------------------
+    const auto x_ast = tr.final_state.to_eigen_au_aud();
+    const auto earth = engine.getEphemeris()->getState(ephemeris::CelestialBody::EARTH,
+                                                       params.t_ca);
+    const auto x_obs = earth.to_eigen_au_aud();
+    const Vector3d r_ast = x_ast.head<3>();
+    const Vector3d r_obs = x_obs.head<3>();
+
+    // ---- 3. Plane-of-sky basis ----------------------------------------------
+    // The star direction is equatorial, the dynamics is ecliptic, so the line of
+    // sight must be rotated. Rotating the EQUATORIAL POLE too, and using it as
+    // the roll reference, makes the resulting basis exactly (alpha*, delta) --
+    // expressed in ecliptic components. That is what lets C_star, which Gaia
+    // publishes in (alpha*, delta), be added without any further rotation.
+    const auto star_ep = star.predict_at(params.t_ca);
+    const double sa = star_ep.ra().to_rad(), sd = star_ep.dec().to_rad();
+    const Vector3d s_eq(std::cos(sd) * std::cos(sa),
+                        std::cos(sd) * std::sin(sa),
+                        std::sin(sd));
+    const Matrix3d eq2ecl = coordinates::ReferenceFrame::j2000_to_ecliptic();
+    const Vector3d s_hat    = eq2ecl * s_eq;
+    const Vector3d pole_ecl = eq2ecl * Vector3d::UnitZ();
+    const auto basis = tangent_basis(s_hat, pole_ecl);
+
+    // ---- 4. Composite map and moments ---------------------------------------
+    const auto pm = projection_maps(r_ast, basis, r_obs);
+    const auto cm = composite_map(pm, tr.phi, tr.psi);
+    const auto m  = moments(cm, covariance_t0);
+
+    // ---- 5. The star's own uncertainty (Eq. 17) ------------------------------
+    // Independent of the orbit, so the plane-of-sky covariances simply add.
+    Eigen::Matrix<double, 5, 1> serr;
+    serr << star.ra_error_mas, star.dec_error_mas, star.parallax_error_mas,
+            star.pmra_error_mas_yr, star.pmdec_error_mas_yr;
+    Eigen::Matrix2d C_total = m.C_xi;
+    if ((serr.array() > 0.0).any()) {
+        const double dt_yr = dt_from_epoch(2000.0 + (params.t_ca.mjd() - constants::MJD2000)
+                                                    / 365.25);
+        C_total += stellar_covariance(build_c5(serr), dt_yr);
+    }
+
+    // ---- 6. Cross-track direction, in the plane of sky ------------------------
+    // The shadow moves along (dxi/dt, deta/dt); cross-track is perpendicular to
+    // it, and it is the only direction where the uncertainty displaces the path.
+    const double vx = params.dxi_dt.to_ms(), vy = params.deta_dt.to_ms();
+    const double vn = std::hypot(vx, vy);
+    const Eigen::Vector2d n_hat = (vn > 0.0) ? Eigen::Vector2d(-vy / vn, vx / vn)
+                                             : Eigen::Vector2d(1.0, 0.0);
+
+    // ---- 7. Fill the parameters ---------------------------------------------
+    const double rho_au = (r_ast - r_obs).norm();
+    const double au_km  = constants::AU;
+
+    // Cross-track sigma: angle -> distance at the object.
+    const double sig_n_rad = std::sqrt(n_hat.transpose() * C_total * n_hat);
+    params.cross_track_uncertainty = physics::Distance::from_km(sig_n_rad * rho_au * au_km);
+
+    // Second-order bias along cross-track (Eq. 14). Identically zero in the
+    // linear theory, so it is worth reporting on its own.
+    params.bias_cross_track = physics::Distance::from_km(
+        n_hat.dot(m.bias) * rho_au * au_km);
+
+    // 1-sigma error ellipse.
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> es(C_total);
+    if (es.info() == Eigen::Success) {
+        const double l0 = std::max(es.eigenvalues()(0), 0.0);
+        const double l1 = std::max(es.eigenvalues()(1), 0.0);
+        params.err_major = Angle::from_rad(std::sqrt(l1));
+        params.err_minor = Angle::from_rad(std::sqrt(l0));
+        // PA measured from north (delta) towards east (alpha*).
+        const Eigen::Vector2d v = es.eigenvectors().col(1);
+        params.err_pa = Angle::from_rad(std::atan2(v(0), v(1)));
+    }
+
+    // The index: available a priori, no Monte Carlo.
+    params.nonlinearity_index = nonlinearity_index(cm, covariance_t0, n_hat);
 }
 
 } // namespace astdyn::astrometry

@@ -52,8 +52,8 @@ Vec6 nominal_state() {
     return y;
 }
 
-ForceModel kepler_model() {
-    ForceModel m;
+PotentialModel kepler_model() {
+    PotentialModel m;
     m.central_gm = MU_SUN;
     return m;
 }
@@ -62,7 +62,7 @@ ForceModel kepler_model() {
 
 // ---- 1. Closed-form third derivative vs finite differences of U_ij ---------
 TEST(StateTransitionTensor, UijkMatchesFiniteDifference) {
-    ForceModel m = kepler_model();
+    PotentialModel m = kepler_model();
     m.j2 = 2.2e-7; m.r_eq = 4.65e-3;                       // stress J2 too
     m.perturber_gm = {MU_SUN * 9.54e-4};
     m.perturber_pos = {Vector3d(3.0, 3.5, 0.1)};

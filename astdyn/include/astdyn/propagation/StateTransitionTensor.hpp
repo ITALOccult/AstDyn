@@ -38,7 +38,7 @@ public:
 
     /// Optional hook to refresh perturber positions at a given epoch
     /// (e.g. from the planetary ephemeris) at the start of each macro-step.
-    using EphemerisRefresh = std::function<void(time::EpochTDB, ForceModel&)>;
+    using EphemerisRefresh = std::function<void(time::EpochTDB, PotentialModel&)>;
 
     struct Result {
         State final_state;              ///< propagated mean state at t1
@@ -50,7 +50,7 @@ public:
      * @param model     force model (central GM, J2, perturbers) in au/day units
      * @param precision AAS step-metric precision (as in AASIntegrator)
      */
-    explicit StateTransitionTensor(ForceModel model, double precision = 1e-4);
+    explicit StateTransitionTensor(PotentialModel model, double precision = 1e-4);
 
     /**
      * @brief Propagate (state, Phi, Psi) from x0.epoch to t1 (forward in time).
@@ -75,21 +75,21 @@ private:
     // one adaptive macro-step (7-stage Yoshida DKD) advancing dt days
     void step(astdyn::Vector3d& q, astdyn::Vector3d& p,
               astdyn::Matrix6d& phi, astdyn::math::Tensor6& psi,
-              double dt, const ForceModel& m) const;
+              double dt, const PotentialModel& m) const;
     void kick(const astdyn::Vector3d& q, astdyn::Vector3d& p,
               astdyn::Matrix6d& phi, astdyn::math::Tensor6& psi,
-              double h, const ForceModel& m) const;
+              double h, const PotentialModel& m) const;
     void drift(astdyn::Vector3d& q, const astdyn::Vector3d& p,
                astdyn::Matrix6d& phi, astdyn::math::Tensor6& psi, double h) const;
 
     // AAS adaptive metric
     [[nodiscard]] double force_gradient(const astdyn::Vector3d& r,
-                                        const ForceModel& m) const;
+                                        const PotentialModel& m) const;
     [[nodiscard]] double estimate_step(const astdyn::Vector3d& q,
                                        const astdyn::Vector3d& p,
-                                       double target_dt, const ForceModel& m) const;
+                                       double target_dt, const PotentialModel& m) const;
 
-    ForceModel model_;
+    PotentialModel model_;
     double precision_;
     double w1_, w0_, c1_, c2_, d1_, d2_;   ///< Yoshida-4 coefficients
 };

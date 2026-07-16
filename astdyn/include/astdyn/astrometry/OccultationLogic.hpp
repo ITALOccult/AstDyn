@@ -35,19 +35,23 @@ struct OccultationParameters {
     /// Sub-star point: where the star is at the zenith. This is the reference
     /// point of the fundamental plane, and what Occult4 stores in <Earth>;
     /// the shadow centre above is displaced from it by the impact parameter.
+    /// GEOCENTRIC latitude: this is exactly the star's apparent declination,
+    /// which is the convention Occult4 uses in <Earth>.
     Angle substar_lat;                 
     Angle substar_lon;                 
-    /// Sub-solar point (geocentric); drives the day/night terminator.
-    Angle subsolar_lat;
-    Angle subsolar_lon;
+    /// Sub-solar point (geocentric). Occult4 carries it in <Earth> fields 3-4
+    /// so that the day/night terminator can be drawn.
+    Angle subsolar_lat;                
+    Angle subsolar_lon;                
     double star_mag;                      
     double mag_drop;                      
     bool is_daylight;                     
     double total_apparent_rate; // arcsec/hr
     /// Geocentric distance of the occulting object at t_ca.
     physics::Distance geocentric_distance;
-    /// Apparent hourly rates, kept apart because the occelmnt format reports
-    /// them separately (and dRA there is in seconds of time, not arcsec).
+    /// Apparent hourly rates of the object. Kept separately from
+    /// total_apparent_rate because the occelmnt format reports them apart, and
+    /// dRA there is in SECONDS OF TIME per hour, not arcsec.
     double d_ra_arcsec_hr = 0.0;
     double d_dec_arcsec_hr = 0.0;
     time::TimeDuration max_duration;
@@ -55,6 +59,20 @@ struct OccultationParameters {
     double moon_phase;                   // 0.0 (new) to 1.0 (full)
     
     physics::Distance cross_track_uncertainty;
+
+    // ---- SCOPE: plane-of-sky uncertainty at the event ----
+    /// A priori nonlinearity index N (Eq. 18): RMS of the second-order term over
+    /// RMS of the first. Available WITHOUT a Monte Carlo. Around 1e-7 for a
+    /// well-determined main-belt asteroid a few weeks out, i.e. the linear
+    /// theory is exact and N says so; large for a short-arc NEO, and N says that
+    /// too. Zero means it was never computed.
+    double nonlinearity_index = 0.0;
+    /// 1-sigma error ellipse in the plane of sky, semi-axes and position angle
+    /// of the major axis. Includes the stellar contribution (Eq. 17).
+    Angle err_major, err_minor, err_pa;
+    /// Second-order bias of the shadow position (Eq. 14), cross-track. The
+    /// linear theory predicts exactly zero, so this is a pure second-order term.
+    physics::Distance bias_cross_track;
     Eigen::Vector3d shadow_velocity_vector;
     physics::Velocity shadow_velocity_fundamental_plane;
 };
@@ -118,11 +136,22 @@ public:
         const struct OccultationConfig& config,
         AstDynEngine& engine);
 
+    /**
+     * @brief SCOPE: propagate the orbit covariance to the event and project it.
+     *
+     * @param covariance_t0  Orbit covariance at the epoch of @p initial_state,
+     *        in AU and AU/day, ECLIPJ2000. From AstDyS via
+     *        EquinoctialElements::jacobian_to_cartesian().
+     * @param initial_state  State at t0. The frame tag is ECLIPJ2000 and it is
+     *        meant literally: the previous signature said GCRF while being fed a
+     *        heliocentric ecliptic state through cast_frame, which is exactly the
+     *        kind of silent relabelling the frame tags exist to prevent.
+     */
     static void apply_uncertainty(
         OccultationParameters& params,
         const catalog::Star& star,
         const Eigen::Matrix<double, 6, 6>& covariance_t0,
-        const physics::CartesianStateTyped<core::GCRF>& initial_state,
+        const physics::CartesianStateTyped<core::ECLIPJ2000>& initial_state,
         AstDynEngine& engine);
 
 private:
@@ -161,6 +190,9 @@ private:
         AstDynEngine& engine,
         double t_start_jd, double t_end_jd);
 
+    /// @param diameter_km  Occulting object's diameter, needed for the maximum
+    ///        duration. Zero leaves max_duration at zero, which the duration
+    ///        filter reads: pass it whenever it is known.
     static void evaluate_candidate(
         std::vector<OccultationCandidate>& results,
         const catalog::ChebyshevSegment& segment,

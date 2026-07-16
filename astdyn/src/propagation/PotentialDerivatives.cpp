@@ -94,7 +94,7 @@ static Vector3d j2_accel(const Vector3d& r, double mu, double j2, double r_eq) {
     return -g;
 }
 
-Vector3d acceleration(const Vector3d& r, const ForceModel& m) {
+Vector3d acceleration(const Vector3d& r, const PotentialModel& m) {
     Vector3d a = kepler_accel(r, m.central_gm);
     if (m.j2 != 0.0) a += j2_accel(r, m.central_gm, m.j2, m.r_eq);
     for (size_t l = 0; l < m.perturber_gm.size(); ++l)
@@ -103,7 +103,7 @@ Vector3d acceleration(const Vector3d& r, const ForceModel& m) {
 }
 
 // ---- aggregates ---------------------------------------------------------
-Matrix3d potential_hessian(const Vector3d& r, const ForceModel& m) {
+Matrix3d potential_hessian(const Vector3d& r, const PotentialModel& m) {
     Matrix3d H = kepler_hessian(r, m.central_gm);
     if (m.j2 != 0.0) H += j2_hessian(r, m.central_gm, m.j2, m.r_eq);
     for (size_t l = 0; l < m.perturber_gm.size(); ++l)
@@ -111,7 +111,7 @@ Matrix3d potential_hessian(const Vector3d& r, const ForceModel& m) {
     return H;
 }
 
-Tensor3 potential_third_derivative(const Vector3d& r, const ForceModel& m) {
+Tensor3 potential_third_derivative(const Vector3d& r, const PotentialModel& m) {
     Tensor3 T = kepler_third(r, m.central_gm);
     if (m.j2 != 0.0) T += j2_third(r, m.central_gm, m.j2, m.r_eq);
     for (size_t l = 0; l < m.perturber_gm.size(); ++l)
