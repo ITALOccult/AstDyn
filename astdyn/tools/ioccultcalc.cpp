@@ -35,7 +35,9 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
                                     double diameter_km, double h_mag) {
     OccultationEvent ev;
     ev.event_id = cand.params.star_id + "_" + std::to_string((int)cand.params.t_ca.mjd());
-    ev.mjd = cand.params.t_ca.mjd();
+    // Occult4 expects UT here; t_ca is TDB, and writing it raw put the event
+    // 69.184 s late.
+    ev.mjd = time::to_utc(cand.params.t_ca).mjd();
     
     ev.star_catalog_id = cand.params.star_id;
     ev.ra_event_h = cand.star.ra.to_deg() / 15.0;
@@ -58,8 +60,12 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.h_mag = h_mag;
     ev.apparent_rate_arcsec_hr = cand.params.total_apparent_rate;
     
-    ev.longitude_deg = cand.params.center_lon.to_deg();
-    ev.latitude_deg = cand.params.center_lat.to_deg();
+    // <Earth> is the fundamental-plane reference, i.e. the sub-star point --
+    // not the shadow centre. Occult4 stores the sub-star point here (its
+    // latitude is exactly the star's apparent declination), and the shadow
+    // centre is recovered from it via the Besselian x, y.
+    ev.longitude_deg = cand.params.substar_lon.to_deg();
+    ev.latitude_deg = cand.params.substar_lat.to_deg();
     ev.alt_or_other = 0.0; 
     ev.max_duration_sec = cand.params.max_duration.to_seconds();
     ev.is_daylight = cand.params.is_daylight;
@@ -259,6 +265,10 @@ int main(int argc, char** argv) {
         std::cout << "[ioccultcalc] Pre-calcolo polinomi per " << asteroid_ids.size() << " corpi over " << duration << " giorni...\n";
         for (const auto& id : asteroid_ids) {
             auto elements_opt = horizons.query_elements(id, start_epoch);
+            if (!elements_opt) {
+                std::cerr << "[ioccultcalc] ERRORE: JPL Horizons non ha restituito elementi per '"
+                          << id << "'. L'asteroide sara' ignorato.\n";
+            }
             if (elements_opt) {
                 auto elements = *elements_opt;
                 manager.add_asteroid(id, elements, start_epoch, end_epoch);

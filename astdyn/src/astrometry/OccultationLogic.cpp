@@ -80,6 +80,16 @@ void OccultationLogic::compute_shadow_centre(
         params.center_lat = sp->lat.angle();
         params.center_lon = sp->lon;
     }
+
+    // Sub-star point: the same axis with zero impact parameter. This is the
+    // fundamental-plane reference that Occult4 reports in <Earth>, so it must
+    // be kept distinct from the shadow centre above.
+    if (const auto ss = coordinates::shadow_point(physics::Distance::from_m(0.0),
+                                                  physics::Distance::from_m(0.0),
+                                                  star_dir, tt, ut1)) {
+        params.substar_lat = ss->lat.angle();
+        params.substar_lon = ss->lon;
+    }
 }
 
 OccultationParameters OccultationLogic::compute_fundamental_plane_geometry(

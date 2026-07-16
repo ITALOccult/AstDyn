@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <regex>
+#include <cmath>
 #include <mutex>
 
 namespace astdyn::io {
@@ -225,8 +226,12 @@ HorizonsClient::query_physical_properties(const std::string& target) {
         std::string result = data["result"];
         PhysicalProperties props;
 
-        // Use regex for robust finding
-        std::regex h_regex(R"(H\s*=\s*([0-9.]+))");
+        // Use regex for robust finding.
+        //
+        // The \b matters: without it, "H\s*=" also matches inside "EPOCH=",
+        // which appears earlier in the Horizons block, so regex_search returned
+        // the osculating epoch (e.g. 2458898.5) as the absolute magnitude.
+        std::regex h_regex(R"(\bH\s*=\s*([0-9.]+))");
         std::regex diam_regex(R"(Radius\s*\(km\)\s*=\s*([0-9.]+))");
         std::regex diam_regex2(R"(Diameter\s*\(km\)\s*=\s*([0-9.]+))");
 
@@ -238,6 +243,18 @@ HorizonsClient::query_physical_properties(const std::string& target) {
             props.diameter_km = std::stod(match[1]) * 2.0; // Radius to Diameter
         } else if (std::regex_search(result, match, diam_regex2)) {
             props.diameter_km = std::stod(match[1]);
+        } else if (props.h_mag > 0.0) {
+            // Horizons reports "RAD= n.a." for most small asteroids, which left
+            // the diameter at zero and collapsed the shadow width and the event
+            // duration to zero. Fall back to the standard photometric diameter,
+            // which is what Occult4 reports as "Augmented":
+            //
+            //     D [km] = 1329 / sqrt(pV) * 10^(-H/5)
+            //
+            // with a default albedo pV = 0.15 in the absence of a measured one.
+            constexpr double kDefaultAlbedo = 0.15;
+            props.diameter_km = 1329.0 / std::sqrt(kDefaultAlbedo)
+                              * std::pow(10.0, -0.2 * props.h_mag);
         }
 
         return props;

@@ -32,6 +32,11 @@ struct OccultationParameters {
     Angle moon_dist;                     
     Angle center_lat;                  
     Angle center_lon;                  
+    /// Sub-star point: where the star is at the zenith. This is the reference
+    /// point of the fundamental plane, and what Occult4 stores in <Earth>;
+    /// the shadow centre above is displaced from it by the impact parameter.
+    Angle substar_lat;                 
+    Angle substar_lon;                 
     double star_mag;                      
     double mag_drop;                      
     bool is_daylight;                     
