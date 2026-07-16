@@ -1,5 +1,7 @@
 #include "astdyn/astrometry/OccultationLogic.hpp"
 #include "astdyn/coordinates/CelestialToTerrestrial.hpp"
+#include <cstdlib>
+#include <iostream>
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/catalog/CatalogIntegration.hpp"
 #include "astdyn/io/MPCClient.hpp"
@@ -22,6 +24,15 @@
 
 namespace astdyn::astrometry {
 
+namespace {
+/// Diagnostics for the occultation search: set ASTDYN_OCC_DEBUG=1 to enable.
+inline bool occ_debug() {
+    static const bool on = (std::getenv("ASTDYN_OCC_DEBUG") != nullptr);
+    return on;
+}
+} // namespace
+
+
 OccultationParameters OccultationLogic::compute_parameters(
     const RightAscension& star_ra, const Declination& star_dec,
     const RightAscension& ast_ra, const Declination& ast_dec,
@@ -40,8 +51,10 @@ OccultationParameters OccultationLogic::compute_parameters(
                                            ast_ddec_dt.to_arcsec() * ast_ddec_dt.to_arcsec());
     
     if (ephem) {
-        compute_sky_conditions(params, t_ca, ast_ra, ast_dec, ast_dist, star_ra, star_dec, ephem);
+        // Order matters: the shadow centre defines the point at which the Sun's
+        // altitude is evaluated, so it must be computed first.
         compute_shadow_centre(params, t_ca, star_ra, star_dec);
+        compute_sky_conditions(params, t_ca, ast_ra, ast_dec, ast_dist, star_ra, star_dec, ephem);
     }
     return params;
 }
@@ -126,16 +139,39 @@ void OccultationLogic::compute_sky_conditions(
     const RightAscension& star_ra, const Declination& star_dec,
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem)
 {
-    // Sun Altitude
-    auto sun_state = ephem->getState(ephemeris::CelestialBody::SUN, t_ca);
-    Eigen::Vector3d n_sun = sun_state.position.to_eigen_si().normalized();
+    // Geocentric direction to the Sun.
+    //
+    // NOTE: the ephemeris is HELIOCENTRIC, so getState(SUN) returns (0,0,0) by
+    // construction. Normalising that yields (0,0,0) -- Eigen returns the vector
+    // unchanged rather than NaN when the norm is zero -- which silently made
+    // sun_altitude exactly 0 deg, is_daylight permanently true, and the daylight
+    // filter reject every single event. The Sun as seen from the Earth is minus
+    // the Earth's heliocentric position.
+    const auto earth_state = ephem->getState(ephemeris::CelestialBody::EARTH, t_ca);
+    const Eigen::Vector3d n_sun = (-earth_state.position.to_eigen_si()).normalized();
+
     Eigen::Vector3d n_ast = Eigen::Vector3d(
         std::cos(ast_dec.to_rad()) * std::cos(ast_ra.to_rad()),
         std::cos(ast_dec.to_rad()) * std::sin(ast_ra.to_rad()),
         std::sin(ast_dec.to_rad())
     );
-    
-    params.sun_altitude = Angle::from_rad(std::asin(std::clamp(n_ast.dot(n_sun), -1.0, 1.0)));
+
+    // Altitude of the Sun above the horizon AT THE SHADOW CENTRE. The previous
+    // asin(n_ast . n_sun) was not an altitude at all: that dot product is the
+    // cosine of the solar elongation, and an altitude depends on where on the
+    // Earth the shadow falls, not on the direction of the asteroid.
+    // params.center_lat is geodetic, so the local zenith is the ellipsoid normal.
+    {
+        const time::EpochUTC t_utc = time::to_utc(t_ca);
+        const auto C = coordinates::gcrf_to_itrf(time::to_tt(t_utc), time::to_ut1(t_utc));
+        const Eigen::Vector3d sun_itrf = C.matrix() * n_sun;
+        const double la = params.center_lat.to_rad(), lo = params.center_lon.to_rad();
+        const Eigen::Vector3d zenith(std::cos(la) * std::cos(lo),
+                                     std::cos(la) * std::sin(lo),
+                                     std::sin(la));
+        params.sun_altitude = Angle::from_rad(
+            std::asin(std::clamp(zenith.dot(sun_itrf), -1.0, 1.0)));
+    }
     params.is_daylight = params.sun_altitude.to_deg() > constants::SUN_ALTITUDE_LIMIT_DEG;
 
     // Moon Geometry
@@ -200,6 +236,9 @@ void OccultationLogic::evaluate_candidate(
         max_sep_angle,
         720); // 2-minute sampling for a 1-day segment is enough for detection
 
+    if (occ_debug()) std::cerr << "[DBG]     star " << star.source_id << " G=" << star.g_mag
+        << " -> " << ca_results.size() << " CA entro " << max_sep_angle.to_arcsec() << "\"\n";
+
     for (const auto& ca : ca_results) {
         // Map ClosestApproachResult to OccultationParameters
         auto [pos, vel] = segment.evaluate_full(ca.t_ca.jd());
@@ -208,7 +247,12 @@ void OccultationLogic::evaluate_candidate(
         physics::Distance impact_dist = physics::Distance::from_m(
             ca.separation.to_rad() * dist_au_at_ca * constants::AU * 1000.0);
 
-        if (impact_dist > config.max_shadow_distance) continue;
+        if (occ_debug()) std::cerr << "[DBG]       CA jd=" << ca.t_ca.jd() << " sep=" << ca.separation.to_arcsec()
+            << "\" -> impatto=" << impact_dist.to_km() << " km (max=" << config.max_shadow_distance.to_km() << ")\n";
+        if (impact_dist > config.max_shadow_distance) {
+            if (occ_debug()) std::cerr << "[DBG]       SCARTATO: impatto oltre max_shadow_distance\n";
+            continue;
+        }
 
         auto star_at_tca = star.predict_at(ca.t_ca);
         
@@ -224,6 +268,8 @@ void OccultationLogic::evaluate_candidate(
             ca.t_ca, engine.getEphemeris());
 
         if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) {
+            if (occ_debug()) std::cerr << "[DBG]       SCARTATO: giorno (sole alt="
+                << params.sun_altitude.to_deg() << " > " << config.min_sun_altitude << ")\n";
             continue;
         }
 
@@ -231,19 +277,27 @@ void OccultationLogic::evaluate_candidate(
 
         // 1. Duration filter
         if (config.min_duration_s > 0.1 && params.max_duration.to_seconds() < config.min_duration_s) {
+            if (occ_debug()) std::cerr << "[DBG]       SCARTATO: durata " << params.max_duration.to_seconds()
+                << "s < " << config.min_duration_s << "s\n";
             continue;
         }
 
         // 2. Gaia Quality Filter (RUWE)
         if (star.ruwe > config.max_gaia_ruwe) {
+            if (occ_debug()) std::cerr << "[DBG]       SCARTATO: RUWE " << star.ruwe
+                << " > " << config.max_gaia_ruwe << "\n";
             continue;
         }
 
         // 3. Moon Filters
         if (params.moon_dist.to_deg() < config.min_moon_dist) {
+            if (occ_debug()) std::cerr << "[DBG]       SCARTATO: Luna a " << params.moon_dist.to_deg()
+                << " deg < " << config.min_moon_dist << "\n";
             continue;
         }
         if (params.moon_phase > config.max_moon_phase + 0.001) {
+            if (occ_debug()) std::cerr << "[DBG]       SCARTATO: fase Luna " << params.moon_phase
+                << " > " << config.max_moon_phase << "\n";
             continue;
         }
 
@@ -482,10 +536,17 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
     std::vector<OccultationCandidate> results;
     // Iterate over the list of managed asteroids (pre-calculated with polynomials)
     for (const auto& id : asteroid_ids) {
-        if (!manager.has_body(id)) continue;
+        if (!manager.has_body(id)) {
+            if (occ_debug()) std::cerr << "[DBG] '" << id
+                << "' NON e' nel manager -> Horizons non ha restituito elementi\n";
+            continue;
+        }
+        if (occ_debug()) std::cerr << "[DBG] '" << id << "' diametro=" << manager.get_diameter(id)
+            << " km (filtro min=" << config.min_asteroid_diameter_km << ")\n";
 
         // --- NEW: Diameter Filter ---
         if (config.min_asteroid_diameter_km > 0.1 && manager.get_diameter(id) < config.min_asteroid_diameter_km) {
+            if (occ_debug()) std::cerr << "[DBG]   SCARTATO: diametro sotto soglia\n";
             continue; 
         }
         
@@ -510,7 +571,13 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
 
                 Angle radius = Angle::from_rad((config.max_shadow_distance.to_m() * 1.5) / (dist_au * constants::AU * 1000.0));
 
+                if (occ_debug()) std::cerr << "[DBG]   segmento [" << segment.t_start << ", " << segment.t_end
+                    << "] dist=" << dist_au << " AU  raggio_cono=" << radius.to_arcsec()
+                    << "\"  mag_max=" << config.max_mag_star << "\n";
+
                 auto stars = catalog::find_stars_near_segment(catalog::GaiaDR3Catalog::instance(), segment, radius, config.max_mag_star);
+
+                if (occ_debug()) std::cerr << "[DBG]   stelle restituite dal catalogo: " << stars.size() << "\n";
 
                 for (const auto& star : stars) {
                     evaluate_candidate(results, segment, star, config, engine, start.jd(), end.jd());
@@ -522,7 +589,11 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
                 
                 // Advance to next segment
                 jd = segment.t_end;
+            } catch (const std::exception& e) {
+                std::cerr << "[DBG] ECCEZIONE @ jd=" << jd << " : " << e.what() << "\n";
+                jd += 1.0; // Fallback
             } catch (...) {
+                std::cerr << "[DBG] ECCEZIONE SCONOSCIUTA @ jd=" << jd << "\n";
                 jd += 1.0; // Fallback
             }
         }

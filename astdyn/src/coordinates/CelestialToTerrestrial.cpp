@@ -107,7 +107,7 @@ math::Rotation<core::GCRF, core::CIRS> cip_rotation(time::EpochTT tt) {
 astrometry::Angle earth_rotation_angle(time::EpochUT1 ut1) {
     const double jd = ut1.jd();
     const double tu = jd - 2451545.0;
-    const double f  = std::fmod(jd, 1.0) + 0.5;
+    const double f  = std::fmod(jd, 1.0);
     double era = D2PI * (f + 0.7790572732640 + 0.00273781191135448 * tu);
     era = std::fmod(era, D2PI);
     if (era < 0.0) era += D2PI;

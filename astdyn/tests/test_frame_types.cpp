@@ -75,6 +75,34 @@ TEST(FrameTypes, CipRotationMatchesErfa) {
     }
 }
 
+TEST(FrameTypes, EraMatchesErfa) {
+    // This test exists because it was missing. Q(t) was validated against ERFA
+    // while the Earth Rotation Angle was assumed correct, and a spurious +0.5
+    // day in the fractional-day term went unnoticed: exactly 180 degrees of
+    // error, i.e. the shadow on the opposite side of the planet, with the
+    // latitude left intact so that nothing looked obviously wrong.
+    struct EraRef { double jd_ut1; double era_rad; };
+    static const EraRef kEra[] = {
+    {2451545.0000000, 4.89496121282375629e+00},
+    {2455197.5000000, 1.75247638601582167e+00},
+    {2458849.5000000, 1.74298312301005609e+00},
+    {2461236.5000000, 5.10547392603933048e+00},
+    {2461248.5478515, 5.61338307340346176e+00},
+    {2462687.5000000, 4.93309526099962881e+00},
+    {2469807.5000000, 1.74890769314321659e+00},
+    };
+    for (const auto& r : kEra) {
+        const double era = coordinates::earth_rotation_angle(
+            time::EpochUT1::from_jd(r.jd_ut1)).to_rad();
+        double d = era - r.era_rad;
+        while (d >  M_PI) d -= 2.0 * M_PI;
+        while (d < -M_PI) d += 2.0 * M_PI;
+        // 1 arcsec of ERA is ~31 m at the equator; require far better.
+        EXPECT_LT(std::abs(d) * 6378137.0, 0.1)
+            << "JD_UT1 " << r.jd_ut1 << ": " << d * 206264.806 << " arcsec";
+    }
+}
+
 TEST(FrameTypes, GeodeticConversionIsExactOnTheEllipsoid) {
     const auto E = coordinates::Ellipsoid::wgs84();
     // A known pair: geocentric 45 deg -> geodetic 45.1924232 deg on WGS84.
