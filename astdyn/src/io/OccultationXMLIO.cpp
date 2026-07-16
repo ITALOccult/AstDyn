@@ -253,7 +253,9 @@ std::vector<OccultationEvent> OccultationXMLIO::read_file(const std::string& fil
 
 std::string OccultationXMLIO::write_string(const std::vector<OccultationEvent>& events) {
     std::stringstream ss;
-    ss << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+    // No XML declaration: Occult4 and OccultWatcher reject the file when one is
+    // present ("The file is not occelmnt XML file"), and Occult4's own output
+    // starts straight at <Occultations>.
     ss << "<Occultations>\n";
     for (const auto& ev : events) ss << format_event_node(ev);
     ss << "</Occultations>\n";
