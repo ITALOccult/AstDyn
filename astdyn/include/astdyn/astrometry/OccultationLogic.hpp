@@ -37,10 +37,19 @@ struct OccultationParameters {
     /// the shadow centre above is displaced from it by the impact parameter.
     Angle substar_lat;                 
     Angle substar_lon;                 
+    /// Sub-solar point (geocentric); drives the day/night terminator.
+    Angle subsolar_lat;
+    Angle subsolar_lon;
     double star_mag;                      
     double mag_drop;                      
     bool is_daylight;                     
     double total_apparent_rate; // arcsec/hr
+    /// Geocentric distance of the occulting object at t_ca.
+    physics::Distance geocentric_distance;
+    /// Apparent hourly rates, kept apart because the occelmnt format reports
+    /// them separately (and dRA there is in seconds of time, not arcsec).
+    double d_ra_arcsec_hr = 0.0;
+    double d_dec_arcsec_hr = 0.0;
     time::TimeDuration max_duration;
     std::string star_id;
     double moon_phase;                   // 0.0 (new) to 1.0 (full)
@@ -158,7 +167,8 @@ private:
         const catalog::Star& star,
         const OccultationConfig& config,
         AstDynEngine& engine,
-        double t_start_jd, double t_end_jd);
+        double t_start_jd, double t_end_jd,
+        double diameter_km = 0.0);
 
     static void evaluate_candidate(
         const std::string& id,

@@ -49,6 +49,10 @@ OccultationParameters OccultationLogic::compute_parameters(
     
     params.total_apparent_rate = std::sqrt(ast_dra_dt.to_arcsec() * ast_dra_dt.to_arcsec() + 
                                            ast_ddec_dt.to_arcsec() * ast_ddec_dt.to_arcsec());
+    // Kept for the occelmnt export, which reports them separately.
+    params.geocentric_distance = ast_dist;
+    params.d_ra_arcsec_hr  = ast_dra_dt.to_arcsec();
+    params.d_dec_arcsec_hr = ast_ddec_dt.to_arcsec();
     
     if (ephem) {
         // Order matters: the shadow centre defines the point at which the Sun's
@@ -84,11 +88,13 @@ void OccultationLogic::compute_shadow_centre(
     // Sub-star point: the same axis with zero impact parameter. This is the
     // fundamental-plane reference that Occult4 reports in <Earth>, so it must
     // be kept distinct from the shadow centre above.
-    if (const auto ss = coordinates::shadow_point(physics::Distance::from_m(0.0),
-                                                  physics::Distance::from_m(0.0),
-                                                  star_dir, tt, ut1)) {
-        params.substar_lat = ss->lat.angle();
-        params.substar_lon = ss->lon;
+    {
+        // The sub-star point is the star direction rotated into ITRF. Its
+        // latitude is GEOCENTRIC, which is why it equals the star's apparent
+        // declination -- the convention Occult4 uses in <Earth>.
+        const auto k_itrf = coordinates::gcrf_to_itrf(tt, ut1) * star_dir;
+        params.substar_lat = Angle::from_rad(std::asin(std::clamp(k_itrf.z(), -1.0, 1.0)));
+        params.substar_lon = Angle::from_rad(std::atan2(k_itrf.y(), k_itrf.x()));
     }
 }
 
@@ -184,6 +190,15 @@ void OccultationLogic::compute_sky_conditions(
     }
     params.is_daylight = params.sun_altitude.to_deg() > constants::SUN_ALTITUDE_LIMIT_DEG;
 
+    // Sub-solar point (geocentric), for the day/night terminator.
+    {
+        const time::EpochUTC t_ss = time::to_utc(t_ca);
+        const auto Css = coordinates::gcrf_to_itrf(time::to_tt(t_ss), time::to_ut1(t_ss));
+        const Eigen::Vector3d s_itrf = Css.matrix() * n_sun;
+        params.subsolar_lat = Angle::from_rad(std::asin(std::clamp(s_itrf.z(), -1.0, 1.0)));
+        params.subsolar_lon = Angle::from_rad(std::atan2(s_itrf.y(), s_itrf.x()));
+    }
+
     // Moon Geometry
     auto moon_ssb = ephem->getState(ephemeris::CelestialBody::MOON, t_ca);
     auto earth_ssb = ephem->getState(ephemeris::CelestialBody::EARTH, t_ca);
@@ -232,7 +247,8 @@ void OccultationLogic::evaluate_candidate(
     const catalog::Star& star,
     const OccultationConfig& config,
     AstDynEngine& engine,
-    double t_start_jd, double t_end_jd)
+    double t_start_jd, double t_end_jd,
+    double diameter_km)
 {
     // Use the high-precision ClosestApproachFinder
     auto [pos_center, vel_center] = segment.evaluate_full((segment.t_start + segment.t_end) / 2.0);
@@ -276,6 +292,12 @@ void OccultationLogic::evaluate_candidate(
             Angle::from_arcsec(dra_hr), Angle::from_arcsec(ddec_hr),
             physics::Velocity::from_au_d(std::get<2>(vel)),
             ca.t_ca, engine.getEphemeris());
+
+        // Maximum duration: the full shadow width traversed at the shadow speed.
+        if (diameter_km > 0.0 && params.shadow_velocity.to_ms() > 0.0) {
+            params.max_duration = time::TimeDuration::from_seconds(
+                diameter_km * 1000.0 / params.shadow_velocity.to_ms());
+        }
 
         if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) {
             if (occ_debug()) std::cerr << "[DBG]       SCARTATO: giorno (sole alt="
@@ -590,7 +612,8 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
                 if (occ_debug()) std::cerr << "[DBG]   stelle restituite dal catalogo: " << stars.size() << "\n";
 
                 for (const auto& star : stars) {
-                    evaluate_candidate(results, segment, star, config, engine, start.jd(), end.jd());
+                    evaluate_candidate(results, segment, star, config, engine,
+                                       start.jd(), end.jd(), manager.get_diameter(id));
                     // Assign proper ID to results
                     if (!results.empty() && results.back().asteroid_id.empty()) {
                         results.back().asteroid_id = id;

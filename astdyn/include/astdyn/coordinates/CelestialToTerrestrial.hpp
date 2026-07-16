@@ -42,6 +42,16 @@ namespace astdyn::coordinates {
 [[nodiscard]] astrometry::Angle earth_rotation_angle(time::EpochUT1 ut1);
 
 /// CIP coordinates X, Y in GCRS (IAU 2006/2000B).
+/**
+ * @brief Apparent place: ICRS -> true equator and equinox of date.
+ *
+ * Applies bias, precession and nutation. Annual aberration (up to 20.5") is NOT
+ * applied, so this is the "of date" position rather than the fully apparent one.
+ */
+void apparent_place(time::EpochTT tt,
+                    astrometry::Angle ra_icrs, astrometry::Angle dec_icrs,
+                    astrometry::Angle& ra_date, astrometry::Angle& dec_date);
+
 void cip_xy(time::EpochTT tt, astrometry::Angle& X, astrometry::Angle& Y);
 
 /// A point on the Earth's surface. The latitude type is geodetic by

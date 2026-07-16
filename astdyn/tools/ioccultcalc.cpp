@@ -12,6 +12,9 @@
 #include "astdyn/math/MultivariateSampler.hpp"
 #include "astdyn/core/IOCConfig.hpp"
 #include "astdyn/time/TimeScale.hpp"
+#include "astdyn/coordinates/CelestialToTerrestrial.hpp"
+#include <cstdio>
+#include <chrono>
 
 #include <boost/program_options.hpp>
 #include <iostream>
@@ -33,60 +36,128 @@ namespace po = boost::program_options;
 OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std::string& ast_id,
                                     const physics::KeplerianStateTyped<core::ECLIPJ2000>& el,
                                     double diameter_km, double h_mag) {
+    constexpr double kEarthRadiusM = 6378137.0;
+    const auto& pr = cand.params;
     OccultationEvent ev;
-    ev.event_id = cand.params.star_id + "_" + std::to_string((int)cand.params.t_ca.mjd());
-    // Occult4 expects UT here; t_ca is TDB, and writing it raw put the event
-    // 69.184 s late.
-    ev.mjd = time::to_utc(cand.params.t_ca).mjd();
-    
-    ev.star_catalog_id = cand.params.star_id;
-    ev.ra_event_h = cand.star.ra.to_deg() / 15.0;
-    ev.dec_event_deg = cand.star.dec.to_deg();
-    
-    ev.ra_cat_h = ev.ra_event_h; 
-    ev.dec_cat_deg = ev.dec_event_deg;
-    ev.pm_ra_as_yr = cand.star.pm_ra_cosdec.to_arcsec_yr(); 
-    ev.pm_dec_as_yr = cand.star.pm_dec.to_arcsec_yr();
-    ev.parallax_as = cand.star.parallax.to_arcsec();
-    
-    ev.mag_v = cand.star.g_mag;
-    ev.mag_r = cand.star.rp_mag; 
-    ev.mag_k = cand.star.g_mag;  
-    
-    ev.object_name = ast_id;
-    try { ev.object_number = std::stoi(ast_id); } catch(...) { ev.object_number = 0; }
-    ev.object_type = "Asteroid";
-    ev.diameter_km = diameter_km;
-    ev.h_mag = h_mag;
-    ev.apparent_rate_arcsec_hr = cand.params.total_apparent_rate;
-    
-    // <Earth> is the fundamental-plane reference, i.e. the sub-star point --
-    // not the shadow centre. Occult4 stores the sub-star point here (its
-    // latitude is exactly the star's apparent declination), and the shadow
-    // centre is recovered from it via the Besselian x, y.
-    ev.longitude_deg = cand.params.substar_lon.to_deg();
-    ev.latitude_deg = cand.params.substar_lat.to_deg();
-    ev.alt_or_other = 0.0; 
-    ev.max_duration_sec = cand.params.max_duration.to_seconds();
-    ev.is_daylight = cand.params.is_daylight;
-    
-    ev.combined_error_arcsec = cand.params.impact_parameter.to_km() / 150000000.0 * 206265.0; 
-    ev.star_error_ra_as = cand.star.pmra_error_mas_yr / 1000.0;
-    ev.star_error_dec_as = cand.star.pmdec_error_mas_yr / 1000.0;
-    ev.uncertainty_method = "AstDyn-GaiaDR3-JplDE441";
-    
-    ev.semi_major_axis_au = el.a.to_au();
-    ev.eccentricity = el.e;
-    ev.inclination_deg = el.i.to_deg();
-    ev.node_deg = el.node.to_deg();
-    ev.mean_anomaly_deg = el.M.to_deg(); 
-    ev.ra_node_approx = el.omega.to_deg();
 
-    auto [year, month, day, frac] = time::mjd_to_calendar(el.epoch.mjd());
-    ev.epoch_year = year;
-    ev.epoch_month = month;
-    ev.epoch_day = day;
-    
+    const time::EpochUTC t_utc = time::to_utc(pr.t_ca);
+    const time::EpochTT  t_tt  = time::to_tt(t_utc);
+    auto [ey, em, ed, efrac] = time::mjd_to_calendar(t_utc.mjd());
+
+    // ---- <Elements> : the payload Occult4 uses to draw the path -----------
+    ev.elements_source = "AstDyn-AAS-GaiaDR3";
+    ev.duration_s   = pr.max_duration.to_seconds();
+    ev.year = ey; ev.month = em; ev.day = ed;
+    ev.ut_closest_h = efrac * 24.0;
+    ev.x  = pr.xi_ca.to_m()  / kEarthRadiusM;
+    ev.y  = pr.eta_ca.to_m() / kEarthRadiusM;
+    ev.dx = pr.dxi_dt.to_ms()  * 3600.0 / kEarthRadiusM;
+    ev.dy = pr.deta_dt.to_ms() * 3600.0 / kEarthRadiusM;
+    // The higher-order terms would need the Chebyshev segment differentiated a
+    // second time; over a ~40 min event they are worth a few km at the path ends.
+    ev.d2x = ev.d2y = ev.d3x = ev.d3y = 0.0;
+
+    // ---- <Earth> ----------------------------------------------------------
+    ev.substellar_lon_deg = pr.substar_lon.to_deg();
+    ev.substellar_lat_deg = pr.substar_lat.to_deg();   // geocentric == apparent Dec
+    ev.subsolar_lon_deg   = pr.subsolar_lon.to_deg();
+    ev.subsolar_lat_deg   = pr.subsolar_lat.to_deg();
+    ev.jwst = false;
+
+    // ---- <Star> -----------------------------------------------------------
+    ev.star_id = cand.star.source_id != 0
+               ? "Gaia DR3 " + std::to_string(cand.star.source_id)
+               : pr.star_id;
+    // The spec asks for the BCRS position at the epoch of the event with NO
+    // parallax applied, which is exactly what predict_at() returns when it is
+    // called without an observer position.
+    const auto s_ep = cand.star.predict_at(pr.t_ca);
+    ev.star_ra_h    = s_ep.ra().to_deg() / 15.0;
+    ev.star_dec_deg = s_ep.dec().to_deg();
+    // Gaia BP/G/RP are the closest available proxies for B/V/R.
+    ev.mag_b = cand.star.bp_mag;
+    ev.mag_v = cand.star.g_mag;
+    ev.mag_r = cand.star.rp_mag;
+    ev.star_diameter_mas = 0.0;   // not modelled
+    ev.double_star_code  = 0;
+    ev.k2_flag           = "";
+    {
+        Angle ra_app, dec_app;
+        coordinates::apparent_place(t_tt, s_ep.ra(), s_ep.dec(), ra_app, dec_app);
+        ev.star_app_ra_h    = ra_app.to_deg() / 15.0;
+        ev.star_app_dec_deg = dec_app.to_deg();
+    }
+    ev.mag_drop_v = pr.mag_drop;
+    ev.mag_drop_r = pr.mag_drop;
+    ev.mag_drops_adjusted  = 0;
+    ev.bright_nearby_count = -1;   // no nearby-star check is performed
+    ev.total_nearby_count  = -1;
+
+    // ---- <Object> ---------------------------------------------------------
+    ev.object_number = ast_id;
+    ev.object_name   = ast_id;
+    ev.object_mag    = 0.0;        // apparent magnitude not modelled (needs HG + phase)
+    ev.diameter_km   = diameter_km;
+    ev.distance_au   = pr.geocentric_distance.to_au();
+    ev.n_rings = 0;
+    ev.n_moons = 0;
+    // The format wants dRA in SECONDS OF TIME per hour; our rate is dRA (not
+    // dRA*cos(dec)) in arcsec per hour, so only the 15 is needed.
+    ev.d_ra_s_hr   = pr.d_ra_arcsec_hr / 15.0;
+    ev.d_dec_as_hr = pr.d_dec_arcsec_hr;
+    ev.taxonomy = "";
+    ev.diameter_uncertainty_km = 0.0;
+    ev.moon_in_planet_shadow   = 0;
+    ev.mag_v_asteroid = 0.0;
+    ev.mag_r_asteroid = 0.0;
+
+    // ---- <Orbit> : low-precision, for plotting only -----------------------
+    auto [oy, om, od, ofrac] = time::mjd_to_calendar(el.epoch.mjd());
+    ev.equinox          = 0.0;      // J2000
+    ev.mean_anomaly_deg = el.M.to_deg();
+    ev.epoch_year = oy; ev.epoch_month = om; ev.epoch_day = od;
+    ev.peri_deg           = el.omega.to_deg();
+    ev.node_deg           = el.node.to_deg();
+    ev.inclination_deg    = el.i.to_deg();
+    ev.eccentricity       = el.e;
+    ev.semi_major_axis_au = el.a.to_au();
+    ev.perihelion_au      = el.a.to_au() * (1.0 - el.e);
+    ev.h0          = h_mag;
+    ev.coeff_log_r = 5.0;           // standard for asteroids
+    ev.g_param     = 0.15;
+
+    // ---- <Errors> ---------------------------------------------------------
+    // Placeholder until SCOPE fills these: the cross-track sigma is the only
+    // uncertainty currently propagated, and the ellipse is not yet computed.
+    ev.err_path_widths = (diameter_km > 0.0)
+                       ? pr.cross_track_uncertainty.to_km() / diameter_km : 0.0;
+    ev.err_major_as = 0.0;
+    ev.err_minor_as = 0.0;
+    ev.err_pa_deg   = 0.0;
+    ev.err_1sigma_as = 0.0;
+    ev.error_basis   = "Assumed";
+    ev.reliability   = (cand.star.ruwe > 0.0) ? cand.star.ruwe : -1.0;
+    ev.duplicate_source    = -1;
+    ev.non_gaia_pm         = -1;
+    ev.pm_added_from_ucac4 = -1;
+
+    // ---- <ID> -------------------------------------------------------------
+    // Format: yyyymmdd_xxxxxx -- the event date plus the tail of the star id.
+    {
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%04d%02d%02d", ey, em, ed);
+        const std::string sid = std::to_string(cand.star.source_id);
+        ev.event_id = std::string(buf) + "_" +
+                      (sid.size() > 6 ? sid.substr(sid.size() - 6) : sid);
+    }
+    // This field is the date the prediction was COMPUTED, not the event epoch;
+    // the latter lives in <Elements>.
+    {
+        const auto now = std::chrono::system_clock::now().time_since_epoch();
+        const double unix_s = std::chrono::duration<double>(now).count();
+        ev.prediction_mjd = 40587.0 + unix_s / 86400.0;   // MJD at 1970-01-01
+    }
+
     return ev;
 }
 
@@ -278,6 +349,7 @@ int main(int argc, char** argv) {
                 auto state_eclip = propagation::keplerian_to_cartesian(elements);
                 stored_states[id] = state_eclip.cast_frame<core::GCRF>();
                 
+                std::cout << "[ioccultcalc] '" << id << "' caricato da Horizons OK\n";
                 auto props = horizons.query_physical_properties(id);
                 if (props) {
                     stored_props[id] = {props->h_mag, props->diameter_km};

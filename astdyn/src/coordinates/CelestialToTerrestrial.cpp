@@ -1,5 +1,6 @@
 #include "astdyn/coordinates/CelestialToTerrestrial.hpp"
 #include <cmath>
+#include <algorithm>
 
 namespace astdyn::coordinates {
 namespace {
@@ -77,6 +78,34 @@ void nutation_00b(double t, double& dpsi, double& deps) {
 }
 
 } // namespace
+
+namespace {
+/// Bias-precession-nutation matrix (IAU 2006/2000B): GCRS -> true of date.
+Eigen::Matrix3d bpn_matrix(double jd_tt)
+{
+    const double t = (jd_tt - 2451545.0) / 36525.0;
+    double gamb, phib, psib, epsa, dpsi, deps;
+    precession_fw06(t, gamb, phib, psib, epsa);
+    nutation_00b(t, dpsi, deps);
+    const double fj2 = -2.7774e-6 * t;
+    dpsi += dpsi * (0.4697e-6 + fj2);
+    deps += deps * fj2;
+    return Rx(-(epsa + deps)) * Rz(-(psib + dpsi)) * Rx(phib) * Rz(gamb);
+}
+} // namespace
+
+void apparent_place(time::EpochTT tt,
+                    astrometry::Angle ra_icrs, astrometry::Angle dec_icrs,
+                    astrometry::Angle& ra_date, astrometry::Angle& dec_date)
+{
+    const double a = ra_icrs.to_rad(), d = dec_icrs.to_rad();
+    const Eigen::Vector3d v(std::cos(d)*std::cos(a), std::cos(d)*std::sin(a), std::sin(d));
+    const Eigen::Vector3d w = bpn_matrix(tt.jd()) * v;
+    double ra = std::atan2(w.y(), w.x());
+    if (ra < 0.0) ra += 6.283185307179586476925287;
+    ra_date  = astrometry::Angle::from_rad(ra);
+    dec_date = astrometry::Angle::from_rad(std::asin(std::clamp(w.z(), -1.0, 1.0)));
+}
 
 void cip_xy(time::EpochTT tt, astrometry::Angle& X, astrometry::Angle& Y) {
     const double t = (tt.jd() - 2451545.0) / 36525.0;
