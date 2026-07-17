@@ -286,8 +286,17 @@ TEST(PropagationTest, EnergyConservationTwoBody) {
     auto integrator = std::make_unique<RKF78Integrator>(0.1, 1e-10);
     auto ephemeris = std::make_shared<ephemeris::PlanetaryEphemeris>();
     
+    // Two-body means TWO BODIES. The defaults are tuned for precision, so
+    // include_asteroids, include_sun_j2 and include_earth_j2 are all true out of
+    // the box: switching off the planets alone left the seventeen massive
+    // perturbers and both J2 terms in the force model, and the Keplerian energy
+    // of course did not survive them. The comment said "two-body only" while the
+    // test integrated something else entirely.
     PropagatorSettings settings;
-    settings.include_planets = false; // Two-body only
+    settings.include_planets   = false;
+    settings.include_asteroids = false;
+    settings.include_sun_j2    = false;
+    settings.include_earth_j2  = false;
     
     Propagator prop(std::move(integrator), ephemeris, settings);
     

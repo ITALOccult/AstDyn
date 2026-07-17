@@ -55,7 +55,13 @@ TEST(AsteroidPerturbationsTest, PropagatorSettingsDefaults) {
     EXPECT_FALSE(settings.use_default_30_set);
     EXPECT_TRUE(settings.include_sun_j2);
     EXPECT_TRUE(settings.include_earth_j2);
-    EXPECT_FALSE(settings.asteroid_ephemeris_file.empty());
+
+    // No default SPK path, and that is correct: with use_default_asteroid_set
+    // ForceField calls loadAstDynDefaultSet(), which carries the seventeen
+    // massive perturbers as hardcoded Keplerian elements. The SPK file is an
+    // optional refinement, not the primary channel, so an empty path means
+    // "use the built-in set", not "no asteroids".
+    EXPECT_TRUE(settings.asteroid_ephemeris_file.empty());
 }
 
 TEST(AsteroidPerturbationsTest, AccelerationCalculation) {
