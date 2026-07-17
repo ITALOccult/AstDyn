@@ -226,6 +226,15 @@ HorizonsClient::query_physical_properties(const std::string& target) {
         std::string result = data["result"];
         PhysicalProperties props;
 
+        // Designation, from the header line:
+        //   JPL/HORIZONS   820987 (2015 BK290)   2026-Jul-15 05:57:57
+        // The parentheses are the anchor; the number alone is already known.
+        {
+            static const std::regex re_name(R"(JPL/HORIZONS\s+\S+\s+\(([^)]+)\))");
+            std::smatch m;
+            if (std::regex_search(result, m, re_name)) props.name = m[1].str();
+        }
+
         // Use regex for robust finding.
         //
         // The \b matters: without it, "H\s*=" also matches inside "EPOCH=",

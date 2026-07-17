@@ -37,7 +37,8 @@ namespace po = boost::program_options;
  */
 OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std::string& ast_id,
                                     const physics::KeplerianStateTyped<core::ECLIPJ2000>& el,
-                                    double diameter_km, double h_mag) {
+                                    double diameter_km, double h_mag,
+                                    const std::string& ast_name = "", double g_slope = 0.15) {
     constexpr double kEarthRadiusM = 6378137.0;
     const auto& pr = cand.params;
     OccultationEvent ev;
@@ -89,16 +90,30 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
         ev.star_app_ra_h    = ra_app.to_deg() / 15.0;
         ev.star_app_dec_deg = dec_app.to_deg();
     }
-    ev.mag_drop_v = pr.mag_drop;
-    ev.mag_drop_r = pr.mag_drop;
+    // Magnitude drop: during the event only the asteroid is seen, before it the
+    // combined light. Occult4's 10.69 is simply 21.11 - 10.42.
+    if (ev.object_mag > -5.0) {
+        const double comb_v = -2.5 * std::log10(std::pow(10.0, -0.4 * ev.mag_v) +
+                                                std::pow(10.0, -0.4 * ev.object_mag));
+        const double comb_r = -2.5 * std::log10(std::pow(10.0, -0.4 * ev.mag_r) +
+                                                std::pow(10.0, -0.4 * ev.object_mag));
+        ev.mag_drop_v = ev.object_mag - comb_v;
+        ev.mag_drop_r = ev.object_mag - comb_r;
+    }
     ev.mag_drops_adjusted  = 0;
     ev.bright_nearby_count = -1;   // no nearby-star check is performed
     ev.total_nearby_count  = -1;
 
     // ---- <Object> ---------------------------------------------------------
     ev.object_number = ast_id;
-    ev.object_name   = ast_id;
-    ev.object_mag    = 0.0;        // apparent magnitude not modelled (needs HG + phase)
+    ev.object_name   = ast_name.empty() ? ast_id : ast_name;
+    // HG apparent magnitude. Occult4 writes -5.00 when it cannot compute one;
+    // zero would claim an object brighter than Vega and poison the magnitude
+    // drop below, so the sentinel is honoured rather than reinvented.
+    ev.object_mag = hg_magnitude(h_mag, g_slope,
+                                 pr.heliocentric_distance.to_au(),
+                                 pr.geocentric_distance.to_au(),
+                                 pr.phase_angle);
     ev.diameter_km   = diameter_km;
     ev.distance_au   = pr.geocentric_distance.to_au();
     ev.n_rings = 0;
@@ -237,7 +252,7 @@ int main(int argc, char** argv) {
     po::options_description desc("ioccultcalc: AstDyn Occultation Tool CLI\nUsage: ioccultcalc --asteroid <num1,num2,start-end...> --jd-start <jd> --duration <days>");
     desc.add_options()
         ("help,h", "produce help message")
-        ("conf", po::value<std::string>(), "YAML or JSON configuration file")
+        ("conf", po::value<std::string>(), "JSON configuration file for AstDynEngine")
         ("asteroid", po::value<std::string>(), "asteroid designations (comma-separated, ranges like '1-100', or '@file')")
         ("jd-start", po::value<double>(), "start Julian Date for searching (TDB)")
         ("duration", po::value<double>()->default_value(1.0), "search duration in days")
@@ -361,7 +376,9 @@ int main(int argc, char** argv) {
     constexpr double DEFAULT_ASTEROID_DIAMETER_KM = 100.0;
     constexpr double DEFAULT_SATELLITE_DIAMETER_KM = 10.0;
     constexpr double DEFAULT_SATELLITE_H_MAG       = 15.0;
-    std::map<std::string, std::pair<double, double>> stored_props; // {H, D}
+    // Full properties, not just {H, D}: the designation is needed for the
+    // occelmnt <Object> record, which wants "2015 BK290" and not "820987".
+    std::map<std::string, io::PhysicalProperties> stored_props;
     std::unique_ptr<io::SPKReader> system_reader;
 
     // --- 2a. Load Primary Asteroids ---
@@ -389,10 +406,10 @@ int main(int argc, char** argv) {
                 std::cout << "[ioccultcalc] '" << id << "' caricato da Horizons OK\n";
                 auto props = horizons.query_physical_properties(id);
                 if (props) {
-                    stored_props[id] = {props->h_mag, props->diameter_km};
+                    stored_props[id] = *props;
                     manager.set_diameter(id, props->diameter_km);
                 } else {
-                    stored_props[id] = {0.0, DEFAULT_ASTEROID_DIAMETER_KM};
+                    stored_props[id] = io::PhysicalProperties{"", 0.0, DEFAULT_ASTEROID_DIAMETER_KM, 0.0};
                     manager.set_diameter(id, DEFAULT_ASTEROID_DIAMETER_KM);
                 }
             }
@@ -418,7 +435,8 @@ int main(int argc, char** argv) {
             }
             manager.add_system_body(id_str, naif_id, *system_reader, start_epoch, end_epoch);
             asteroid_ids.push_back(id_str);
-            stored_props[id_str] = {DEFAULT_SATELLITE_H_MAG, DEFAULT_SATELLITE_DIAMETER_KM};
+            stored_props[id_str] = io::PhysicalProperties{"", DEFAULT_SATELLITE_H_MAG,
+                                                          DEFAULT_SATELLITE_DIAMETER_KM, 0.0};
             manager.set_diameter(id_str, DEFAULT_SATELLITE_DIAMETER_KM);
         }
     }
@@ -591,7 +609,7 @@ int main(int argc, char** argv) {
 
             double diam = DEFAULT_ASTEROID_DIAMETER_KM;
             auto it = stored_props.find(res.asteroid_id);
-            if (it != stored_props.end()) diam = it->second.second;
+            if (it != stored_props.end()) diam = it->second.diameter_km;
 
             time::EpochUTC tca_utc = time::to_utc(res.params.t_ca);
             auto path = OccultationMapper::compute_path(res.params, res.star.ra, res.star.dec,
@@ -624,12 +642,15 @@ int main(int argc, char** argv) {
                 // Diameter fix: use real H mag and diameter from Horizons, not fallback
                 double ev_h_mag  = 0.0;
                 double ev_diam   = DEFAULT_ASTEROID_DIAMETER_KM;
+                std::string ev_name;
                 auto props_it = stored_props.find(m.result.asteroid_id);
                 if (props_it != stored_props.end()) {
-                    ev_h_mag = props_it->second.first;
-                    ev_diam  = props_it->second.second;
+                    ev_h_mag = props_it->second.h_mag;
+                    ev_diam  = props_it->second.diameter_km;
+                    ev_name  = props_it->second.name;
                 }
-                events.push_back(candidate_to_event(m.result, m.result.asteroid_id, el, ev_diam, ev_h_mag));
+                events.push_back(candidate_to_event(m.result, m.result.asteroid_id, el,
+                                                    ev_diam, ev_h_mag, ev_name));
             }
             std::filesystem::path p = std::filesystem::path(out_dir) / xml_file;
             OccultationXMLIO::write_file(events, p.string());

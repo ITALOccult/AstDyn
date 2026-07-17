@@ -13,7 +13,6 @@
 #define ASTDYN_TIME_TIMESCALE_HPP
 
 #include <astdyn/core/Types.hpp>
-
 #include <astdyn/core/Constants.hpp>
 #include <astdyn/time/epoch.hpp>
 #include <string>
@@ -439,16 +438,6 @@ int get_leap_seconds(double mjd_utc);
  */
 bool load_dut1_data(const std::string& filepath = "");
 
-/**
- * @brief Get ΔUT1 (UT1-UTC) for a given date
- * 
- * Uses linear interpolation between loaded values.
- * Auto-initializes with default values if not loaded.
- * 
- * @param mjd_utc MJD in UTC
- * @return ΔUT1 in seconds
- */
-double get_dut1(double mjd_utc);
 
 } // namespace time
 } // namespace astdyn

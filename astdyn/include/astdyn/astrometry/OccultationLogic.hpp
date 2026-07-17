@@ -17,6 +17,25 @@ namespace astdyn {
 
 namespace astdyn::astrometry {
 
+/**
+ * @brief Apparent magnitude in the IAU HG system.
+ *
+ *     V = H + 5 log10(r * delta) - 2.5 log10[(1-G) Phi1 + G Phi2]
+ *     Phi_i = exp(-A_i tan(alpha/2)^B_i)
+ *
+ * Reported as -5.00 by Occult4 when unavailable -- NOT as zero, which would
+ * claim an object brighter than Vega and wreck any magnitude drop computed from
+ * it. The same convention is used here.
+ *
+ * @param h_mag  Absolute magnitude H.
+ * @param g      Slope parameter G (0.15 by convention when unmeasured).
+ * @param r_au   Heliocentric distance.
+ * @param d_au   Geocentric distance.
+ * @param alpha  Sun-object-Earth phase angle.
+ */
+[[nodiscard]] double hg_magnitude(double h_mag, double g, double r_au, double d_au,
+                                  Angle alpha);
+
 struct OccultationParameters {
     physics::Distance xi_ca;              
     physics::Distance eta_ca;             
@@ -49,6 +68,11 @@ struct OccultationParameters {
     double total_apparent_rate; // arcsec/hr
     /// Geocentric distance of the occulting object at t_ca.
     physics::Distance geocentric_distance;
+    /// Heliocentric distance and Sun-object-Earth phase angle at t_ca. Both are
+    /// needed for the HG apparent magnitude, and neither is recoverable from the
+    /// geocentric distance alone.
+    physics::Distance heliocentric_distance;
+    Angle phase_angle;
     /// Apparent hourly rates of the object. Kept separately from
     /// total_apparent_rate because the occelmnt format reports them apart, and
     /// dRA there is in SECONDS OF TIME per hour, not arcsec.

@@ -106,6 +106,23 @@ OccultationParameters OccultationLogic::compute_parameters(
     params.geocentric_distance = ast_dist;
     params.d_ra_arcsec_hr  = ast_dra_dt.to_arcsec();
     params.d_dec_arcsec_hr = ast_ddec_dt.to_arcsec();
+
+    // Heliocentric distance and phase angle, for the HG apparent magnitude.
+    // Both the ephemeris and (ast_ra, ast_dec) are equatorial, so the geocentric
+    // vector adds to the Earth's position without any rotation.
+    if (ephem) {
+        const auto earth = ephem->getState(ephemeris::CelestialBody::EARTH, t_ca);
+        const double ca = ast_ra.to_rad(), cd = ast_dec.to_rad();
+        const Eigen::Vector3d rho = ast_dist.to_m() *
+            Eigen::Vector3d(std::cos(cd) * std::cos(ca),
+                            std::cos(cd) * std::sin(ca), std::sin(cd));
+        const Eigen::Vector3d r_helio = earth.position.to_eigen_si() + rho;
+        params.heliocentric_distance = physics::Distance::from_m(r_helio.norm());
+        // Phase angle: at the object, between the directions to Sun and to Earth.
+        const double c = std::clamp((-r_helio).normalized().dot((-rho).normalized()),
+                                    -1.0, 1.0);
+        params.phase_angle = Angle::from_rad(std::acos(c));
+    }
     
     if (ephem) {
         // Order matters: the shadow centre defines the point at which the Sun's
@@ -686,6 +703,17 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
         }
     }
     return results;
+}
+
+double hg_magnitude(double h_mag, double g, double r_au, double d_au, Angle alpha) {
+    if (h_mag <= 0.0 || r_au <= 0.0 || d_au <= 0.0) return -5.0;   // Occult4's sentinel
+    const double t = std::tan(0.5 * alpha.to_rad());
+    if (t < 0.0) return -5.0;
+    const double phi1 = std::exp(-3.33 * std::pow(t, 0.63));
+    const double phi2 = std::exp(-1.87 * std::pow(t, 1.22));
+    const double f = (1.0 - g) * phi1 + g * phi2;
+    if (f <= 0.0) return -5.0;
+    return h_mag + 5.0 * std::log10(r_au * d_au) - 2.5 * std::log10(f);
 }
 
 void OccultationLogic::apply_uncertainty(

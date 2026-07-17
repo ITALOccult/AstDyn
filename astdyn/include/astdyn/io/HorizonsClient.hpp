@@ -19,6 +19,10 @@ enum class HorizonsError {
 };
 
 struct PhysicalProperties {
+    /// Designation as Horizons prints it, e.g. "2015 BK290". Empty when the
+    /// header could not be parsed: the number is then the only handle, which is
+    /// what the occelmnt <Object> record shows.
+    std::string name;
     double h_mag = 0.0;
     double diameter_km = 0.0;
     double mass_kg = 0.0;
