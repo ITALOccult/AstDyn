@@ -1,4 +1,5 @@
 #include "astdyn/core/IOCConfig.hpp"
+#include "astdyn/third_party/fkYAML.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -6,22 +7,53 @@
 
 namespace astdyn::core {
 
+namespace {
+
+/// fkYAML node -> nlohmann::json, recursively.
+nlohmann::json yaml_to_json(const fkyaml::node& n) {
+    using J = nlohmann::json;
+    if (n.is_mapping()) {
+        J j = J::object();
+        for (const auto& kv : n.as_map()) j[kv.first.as_str()] = yaml_to_json(kv.second);
+        return j;
+    }
+    if (n.is_sequence()) {
+        J j = J::array();
+        for (const auto& e : n.as_seq()) j.push_back(yaml_to_json(e));
+        return j;
+    }
+    if (n.is_boolean())      return J(n.as_bool());
+    if (n.is_integer())      return J(n.as_int());
+    if (n.is_float_number()) return J(n.as_float());
+    if (n.is_null())         return J(nullptr);
+    return J(n.as_str());
+}
+
+std::string lowercase_extension(const std::string& filename) {
+    const auto dot = filename.find_last_of('.');
+    if (dot == std::string::npos) return {};
+    std::string ext = filename.substr(dot + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return ext;
+}
+
+} // namespace
+
 bool IOCConfig::load(const std::string& filename) {
     if (filename.empty()) return false;
 
-    std::string ext = "";
-    size_t dot_pos = filename.find_last_of(".");
-    if (dot_pos != std::string::npos) {
-        ext = filename.substr(dot_pos + 1);
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-    }
+    const std::string ext = lowercase_extension(filename);
+    if (ext == "json") return load_json(filename);
+    if (ext == "yaml" || ext == "yml") return load_yaml(filename);
 
-    if (ext == "json") {
-        return load_json(filename);
-    } else {
-        // Assume YAML/OOP for .yaml, .yml, .oop, .cfg, .txt or no extension
-        return load_yaml(filename);
-    }
+    // Anything else is refused, loudly. The previous version fell back to the
+    // OOP parser for every unknown extension, which meant a YAML file was
+    // accepted and silently ignored: load() returned true, the configuration
+    // came out empty, and every get() handed back its default. A configuration
+    // that is not read is worse than one that fails to open.
+    std::cerr << "IOCConfig: unsupported configuration format '" << ext << "' for "
+              << filename << ". Use .yaml, .yml or .json.\n";
+    return false;
 }
 
 bool IOCConfig::load_json(const std::string& filename) {
@@ -44,76 +76,30 @@ static std::string trim(const std::string& s) {
 
 bool IOCConfig::load_yaml(const std::string& filename) {
     std::ifstream f(filename);
-    if (!f.is_open()) return false;
-    
+    if (!f.is_open()) {
+        std::cerr << "IOCConfig: cannot open " << filename << "\n";
+        return false;
+    }
     std::stringstream ss;
     ss << f.rdbuf();
-    return load_oop_string(ss.str());
+    return load_yaml_string(ss.str());
 }
 
-bool IOCConfig::load_oop_string(const std::string& content) {
-    std::stringstream ss(content);
-    std::string line;
-    std::vector<std::string> scope;
-
-    while (std::getline(ss, line)) {
-        // Remove comments
-        size_t comment_pos = line.find('#');
-        if (comment_pos != std::string::npos) line = line.substr(0, comment_pos);
-        
-        line = trim(line);
-        if (line.empty()) continue;
-
-        // Handle scope entry/exit
-        if (line.back() == '{') {
-            std::string name = trim(line.substr(0, line.length() - 1));
-            if (!name.empty()) scope.push_back(name);
-            continue;
-        }
-        if (line == "}") {
-            if (!scope.empty()) scope.pop_back();
-            continue;
-        }
-
-        // Handle key = value
-        size_t eq_pos = line.find('=');
-        if (eq_pos != std::string::npos) {
-            std::string key = trim(line.substr(0, eq_pos));
-            std::string val = trim(line.substr(eq_pos + 1));
-            
-            // Build full path
-            std::string full_key = "";
-            for (const auto& s : scope) full_key += s + ".";
-            full_key += key;
-
-            // Type deduction
-            if (val == "true" || val == "True") {
-                set(full_key, true);
-            } else if (val == "false" || val == "False") {
-                set(full_key, false);
-            } else {
-                // Try number
-                try {
-                    size_t pos;
-                    double d = std::stod(val, &pos);
-                    if (pos == val.length()) {
-                        // It's a number. Check if it's integer for better precision
-                        if (val.find('.') == std::string::npos && val.find('e') == std::string::npos && val.find('E') == std::string::npos) {
-                            set(full_key, std::stoll(val));
-                        } else {
-                            set(full_key, d);
-                        }
-                    } else {
-                        set(full_key, val);
-                    }
-                } catch (...) {
-                    set(full_key, val);
-                }
-            }
-        }
+bool IOCConfig::load_yaml_string(const std::string& content) {
+    try {
+        std::istringstream in(content);
+        data_ = yaml_to_json(fkyaml::node::deserialize(in));
+    } catch (const std::exception& e) {
+        std::cerr << "IOCConfig: malformed YAML: " << e.what() << "\n";
+        return false;
+    }
+    if (!data_.is_object()) {
+        std::cerr << "IOCConfig: the YAML root must be a mapping\n";
+        return false;
     }
     return true;
 }
+
 
 nlohmann::json* IOCConfig::find_node(const std::string& path, bool create) {
     std::stringstream ss(path);

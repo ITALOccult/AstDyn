@@ -64,6 +64,30 @@ struct Star {
     double         pmra_error_mas_yr  = 0.0;
     double         pmdec_error_mas_yr = 0.0;
 
+    /// Number of astrometric parameters solved for by Gaia:
+    ///   2 = position only -- NO parallax, NO proper motion, NO correlations
+    ///   5 = full five-parameter solution
+    ///   6 = five-parameter plus pseudocolour
+    /// This is the honest flag for whether the fields below mean anything: a
+    /// correlation of 0.0 from a 2-parameter source is not "uncorrelated", it
+    /// is "never measured", and the two must not be confused.
+    int            astrometric_params_solved = 0;
+
+    /// The ten Gaia correlation coefficients, dimensionless, in [-1, 1], in the
+    /// parameter order (alpha*, delta, parallax, pmra*, pmdec). Gaia publishes
+    /// all ten precisely because ignoring them misstates the error ellipse;
+    /// they are only meaningful when astrometric_params_solved >= 5.
+    double         ra_dec_corr          = 0.0;
+    double         ra_parallax_corr     = 0.0;
+    double         ra_pmra_corr         = 0.0;
+    double         ra_pmdec_corr        = 0.0;
+    double         dec_parallax_corr    = 0.0;
+    double         dec_pmra_corr        = 0.0;
+    double         dec_pmdec_corr       = 0.0;
+    double         parallax_pmra_corr   = 0.0;
+    double         parallax_pmdec_corr  = 0.0;
+    double         pmra_pmdec_corr      = 0.0;
+
     // --- Photometry ---
     double g_mag  = 99.0;               ///< Gaia G-band magnitude
     double bp_mag = 99.0;               ///< Gaia BP-band magnitude

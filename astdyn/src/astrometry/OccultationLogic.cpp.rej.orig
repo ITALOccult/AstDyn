@@ -1,0 +1,111 @@
+@@ -89,10 +98,16 @@
+     
+     params.total_apparent_rate = std::sqrt(ast_dra_dt.to_arcsec() * ast_dra_dt.to_arcsec() + 
+                                            ast_ddec_dt.to_arcsec() * ast_ddec_dt.to_arcsec());
++    // Kept for the occelmnt export, which reports them separately.
++    params.geocentric_distance = ast_dist;
++    params.d_ra_arcsec_hr  = ast_dra_dt.to_arcsec();
++    params.d_dec_arcsec_hr = ast_ddec_dt.to_arcsec();
+     
+     if (ephem) {
+-        compute_sky_conditions(params, t_ca, ast_ra, ast_dec, ast_dist, star_ra, star_dec, ephem);
++        // Order matters: the shadow centre defines the point at which the Sun's
++        // altitude is evaluated, so it must be computed first.
+         compute_shadow_centre(params, t_ca, star_ra, star_dec);
++        compute_sky_conditions(params, t_ca, ast_ra, ast_dec, ast_dist, star_ra, star_dec, ephem);
+     }
+     return params;
+ }
+@@ -106,15 +121,27 @@
+     // displaced from the sub-asteroid point by the impact parameter (xi, eta),
+     // i.e. by up to several thousand km for a non-central event.
+     const time::EpochUTC t   = time::to_utc(t_ca);
+-    const double jd_ut1 = time::mjd_to_jd(t.mjd() + time::get_dut1(t.mjd()) / constants::SECONDS_PER_DAY);
+-    const double jd_tt  = time::mjd_to_jd(time::utc_to_tt(t.mjd()));
+-
+-    double lat = 0.0, lon = 0.0;
+-    if (coordinates::shadow_point_geodetic(params.xi_ca.to_m(), params.eta_ca.to_m(),
+-                                           star_ra.to_rad(), star_dec.to_rad(),
+-                                           jd_tt, jd_ut1, lat, lon)) {
+-        params.center_lat = Angle::from_rad(lat);
+-        params.center_lon = Angle::from_rad(lon);
++    const time::EpochTT  tt  = time::to_tt(t);
++    const time::EpochUT1 ut1 = time::to_ut1(t);
++
++    const double a = star_ra.to_rad(), d = star_dec.to_rad();
++    const auto star_dir = math::Direction<core::GCRF>::from_xyz(
++        std::cos(d) * std::cos(a), std::cos(d) * std::sin(a), std::sin(d));
++
++    if (const auto sp = coordinates::shadow_point(params.xi_ca, params.eta_ca,
++                                                  star_dir, tt, ut1)) {
++        params.center_lat = sp->lat.angle();
++        params.center_lon = sp->lon;
++    }
++
++    // Sub-star point: where the star is at the zenith, i.e. the fundamental-plane
++    // reference Occult4 reports in <Earth>. It is simply the star direction
++    // rotated into ITRF, and its latitude is GEOCENTRIC -- which is why it comes
++    // out exactly equal to the star's apparent declination, as Occult4 publishes.
++    {
++        const auto k_itrf = coordinates::gcrf_to_itrf(tt, ut1) * star_dir;
++        params.substar_lat = Angle::from_rad(std::asin(std::clamp(k_itrf.z(), -1.0, 1.0)));
++        params.substar_lon = Angle::from_rad(std::atan2(k_itrf.y(), k_itrf.x()));
+     }
+ }
+ 
+@@ -175,18 +202,50 @@
+     const RightAscension& star_ra, const Declination& star_dec,
+     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem)
+ {
+-    // Sun Altitude
+-    auto sun_state = ephem->getState(ephemeris::CelestialBody::SUN, t_ca);
+-    Eigen::Vector3d n_sun = sun_state.position.to_eigen_si().normalized();
++    // Geocentric direction to the Sun.
++    //
++    // NOTE: the ephemeris is HELIOCENTRIC, so getState(SUN) returns (0,0,0) by
++    // construction. Normalising that yields (0,0,0) -- Eigen returns the vector
++    // unchanged rather than NaN when the norm is zero -- which silently made
++    // sun_altitude exactly 0 deg, is_daylight permanently true, and the daylight
++    // filter reject every single event. The Sun as seen from the Earth is minus
++    // the Earth's heliocentric position.
++    const auto earth_state = ephem->getState(ephemeris::CelestialBody::EARTH, t_ca);
++    const Eigen::Vector3d n_sun = (-earth_state.position.to_eigen_si()).normalized();
++
+     Eigen::Vector3d n_ast = Eigen::Vector3d(
+         std::cos(ast_dec.to_rad()) * std::cos(ast_ra.to_rad()),
+         std::cos(ast_dec.to_rad()) * std::sin(ast_ra.to_rad()),
+         std::sin(ast_dec.to_rad())
+     );
+-    
+-    params.sun_altitude = Angle::from_rad(std::asin(std::clamp(n_ast.dot(n_sun), -1.0, 1.0)));
++
++    // Altitude of the Sun above the horizon AT THE SHADOW CENTRE. The previous
++    // asin(n_ast . n_sun) was not an altitude at all: that dot product is the
++    // cosine of the solar elongation, and an altitude depends on where on the
++    // Earth the shadow falls, not on the direction of the asteroid.
++    // params.center_lat is geodetic, so the local zenith is the ellipsoid normal.
++    {
++        const time::EpochUTC t_utc = time::to_utc(t_ca);
++        const auto C = coordinates::gcrf_to_itrf(time::to_tt(t_utc), time::to_ut1(t_utc));
++        const Eigen::Vector3d sun_itrf = C.matrix() * n_sun;
++        const double la = params.center_lat.to_rad(), lo = params.center_lon.to_rad();
++        const Eigen::Vector3d zenith(std::cos(la) * std::cos(lo),
++                                     std::cos(la) * std::sin(lo),
++                                     std::sin(la));
++        params.sun_altitude = Angle::from_rad(
++            std::asin(std::clamp(zenith.dot(sun_itrf), -1.0, 1.0)));
++    }
+     params.is_daylight = params.sun_altitude.to_deg() > constants::SUN_ALTITUDE_LIMIT_DEG;
+ 
++    // Sub-solar point (geocentric), for the day/night terminator.
++    {
++        const time::EpochUTC t_utc = time::to_utc(t_ca);
++        const auto C = coordinates::gcrf_to_itrf(time::to_tt(t_utc), time::to_ut1(t_utc));
++        const Eigen::Vector3d s_itrf = C.matrix() * n_sun;
++        params.subsolar_lat = Angle::from_rad(std::asin(std::clamp(s_itrf.z(), -1.0, 1.0)));
++        params.subsolar_lon = Angle::from_rad(std::atan2(s_itrf.y(), s_itrf.x()));
++    }
++
+     // Moon Geometry
+     auto moon_ssb = ephem->getState(ephemeris::CelestialBody::MOON, t_ca);
+     auto earth_ssb = ephem->getState(ephemeris::CelestialBody::EARTH, t_ca);

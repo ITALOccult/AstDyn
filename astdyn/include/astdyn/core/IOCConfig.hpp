@@ -31,14 +31,17 @@ public:
     bool load_json(const std::string& filename);
 
     /**
-     * @brief Load from YAML/OOP format
+     * @brief Load a real YAML file.
+     *
+     * Was a misnomer: the previous load_yaml() parsed OrbFit's OOP format
+     * (key = value, brace scopes) and quietly ignored anything written as
+     * actual YAML, returning true with an empty configuration -- so the program
+     * ran on defaults while appearing to have read the file. Real YAML now.
      */
     bool load_yaml(const std::string& filename);
 
-    /**
-     * @brief Load from a string containing OOP-style config (key = value)
-     */
-    bool load_oop_string(const std::string& content);
+    /// Parse a YAML string. Throws on malformed input rather than half-reading it.
+    bool load_yaml_string(const std::string& content);
 
     /**
      * @brief Get value with path-style key (e.g., "integrator.step_size")

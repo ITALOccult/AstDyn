@@ -1,0 +1,19 @@
+# Opzioni del propagatore per 203 Pompeja.
+# Convertito dal formato OOP di OrbFit: IOCConfig accetta ora solo YAML e JSON.
+
+integrator:
+  type: RK4
+  step_size: 0.1
+  tolerance: 1.0e-12
+propagator:
+  max_step: 10.0
+  min_step: 1.0e-6
+perturb:
+  planets: true
+  asteroids: false
+  relativity: false
+diffcorr:
+  max_iter: 20
+  convergence: 1.0e-6
+  outlier_threshold: 3.0
+verbose: true

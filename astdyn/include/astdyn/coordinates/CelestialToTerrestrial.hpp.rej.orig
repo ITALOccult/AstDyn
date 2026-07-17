@@ -1,0 +1,120 @@
+@@ -1,63 +1,82 @@
+ /**
+  * @file CelestialToTerrestrial.hpp
+- * @brief GCRF (ICRS) -> ITRF rotation and shadow-axis / ellipsoid intersection.
++ * @brief Typed IAU 2006/2000B celestial-to-terrestrial transformation.
+  *
+- * Implements the IAU 2006/2000B CIO-based transformation
++ *     [ITRF] = W(t) * R(ERA) * Q(t) * [GCRF]
+  *
+- *     [ITRF] = R3(ERA) * Q(t) * [GCRF]
++ * Every rotation below carries its endpoints AND its time scale in the type, so
++ * the two mistakes that actually cost us cannot be written:
+  *
+- * where Q(t) is the celestial-to-intermediate (bias-precession-nutation) matrix.
+- * Polar motion W(t) is neglected (< 15 m at the Earth's surface).
++ *   era_rotation(ut1) * p_gcrf          // ERROR: Rotation<CIRS,TIRS> * Vec3<GCRF>
++ *   cip_rotation(some_ut1_epoch)        // ERROR: EpochUT1 is not EpochTT
+  *
+- * Rationale: the Earth Rotation Angle maps CIRS -> TIRS, NOT GCRF -> ITRF.
+- * Applying ERA alone omits Q(t), which by 2026 amounts to a 535" rotation of
+- * the CIP, i.e. ~16.6 km of ground error, growing ~0.6 km/yr.
+- *
+- * Validated against ERFA/SOFA (iauC2i06a, iauGd2gc): residual rotation error
+- * < 0.007" (0.19 m at the surface) over 2000-2050.
++ * Validated against ERFA/SOFA (iauC2i06a): residual < 0.007" (0.19 m) 2000-2050.
+  */
+ #ifndef ASTDYN_COORDINATES_CELESTIAL_TO_TERRESTRIAL_HPP
+ #define ASTDYN_COORDINATES_CELESTIAL_TO_TERRESTRIAL_HPP
+ 
+-#include <Eigen/Dense>
++#include "astdyn/math/Rotation.hpp"
++#include "astdyn/math/Vec3.hpp"
++#include "astdyn/core/frame_tags.hpp"
++#include "astdyn/time/epoch.hpp"
++#include "astdyn/astrometry/sky_types.hpp"
++#include "astdyn/coordinates/GeodeticTypes.hpp"
++#include "astdyn/core/physics_types.hpp"
++#include <optional>
+ 
+ namespace astdyn::coordinates {
+ 
+-/// Fukushima-Williams precession angles (IAU 2006). t = Julian centuries TT from J2000. [rad]
+-void precession_fw06(double t_jc, double& gamb, double& phib, double& psib, double& epsa);
++/// Bias-precession-nutation Q(t): GCRF -> CIRS. Requires TT.
++[[nodiscard]] math::Rotation<core::GCRF, core::CIRS> cip_rotation(time::EpochTT tt);
++
++/// Earth rotation R(ERA): CIRS -> TIRS. Requires UT1, never UTC.
++[[nodiscard]] math::Rotation<core::CIRS, core::TIRS> era_rotation(time::EpochUT1 ut1);
++
++/// Polar motion W(t): TIRS -> ITRF. Currently identity (< 15 m).
++[[nodiscard]] math::Rotation<core::TIRS, core::ITRF> polar_motion_rotation();
+ 
+-/// Nutation in longitude/obliquity (IAU 2000B, 20 largest luni-solar terms). [rad]
+-void nutation_00b(double t_jc, double& dpsi, double& deps);
++/// The full chain. Composition order is enforced by the type system.
++[[nodiscard]] math::Rotation<core::GCRF, core::ITRF> gcrf_to_itrf(time::EpochTT tt, time::EpochUT1 ut1);
+ 
+-/// CIP coordinates X, Y in GCRS (IAU 2006/2000B). [rad]
+-void cip_xy(double jd_tt, double& X, double& Y);
++/// Earth Rotation Angle (IAU 2000).
++[[nodiscard]] astrometry::Angle earth_rotation_angle(time::EpochUT1 ut1);
+ 
+-/// Celestial-to-intermediate matrix Q(t): GCRS -> CIRS.
+-Eigen::Matrix3d celestial_to_intermediate(double jd_tt);
++/// CIP coordinates X, Y in GCRS (IAU 2006/2000B).
++void cip_xy(time::EpochTT tt, astrometry::Angle& X, astrometry::Angle& Y);
+ 
+-/// Earth Rotation Angle (IAU 2000). [rad]
+-double earth_rotation_angle(double jd_ut1);
++/**
++ * @brief Apparent place: ICRS -> true equator and equinox of date.
++ *
++ * Applies bias, precession and nutation. Annual aberration (up to 20.5") is NOT
++ * applied, so this is the "of date" position rather than the fully apparent one;
++ * the residual is ~2% of the precession term over a couple of decades.
++ */
++void apparent_place(time::EpochTT tt,
++                    astrometry::Angle ra_icrs, astrometry::Angle dec_icrs,
++                    astrometry::Angle& ra_date, astrometry::Angle& dec_date);
+ 
+-/// Full rotation GCRF -> ITRF (polar motion neglected).
+-Eigen::Matrix3d gcrf_to_itrf(double jd_tt, double jd_ut1);
++/// A point on the Earth's surface. The latitude type is geodetic by
++/// construction, so a geocentric one cannot be stored here by accident.
++struct SurfacePoint {
++    GeodeticLatitude lat;
++    astrometry::Angle lon;
++};
+ 
+ /**
+- * @brief Intersect the shadow axis with the WGS84 ellipsoid.
++ * @brief Intersect the shadow axis with the ellipsoid.
+  *
+- * The shadow axis is the line through the fundamental-plane point (xi, eta)
+- * parallel to the star direction. Returns the star-facing intersection.
++ * The axis passes through the fundamental-plane point (xi, eta) parallel to the
++ * star direction. Returns the star-facing intersection, or nullopt on a miss.
+  *
+- * @param xi_m,eta_m  Fundamental-plane coordinates of the axis [m]
+- * @param ra_rad,dec_rad  Star direction in GCRF [rad]
+- * @param jd_tt, jd_ut1   Epoch [JD]
+- * @param lat_rad  GEODETIC latitude [rad] (output)
+- * @param lon_rad  Longitude [rad] (output)
+- * @return false if the axis misses the Earth.
++ * Note the signature: the star direction is a Direction<GCRF>, so a vector in
++ * any other frame is rejected at compile time, and the two epochs cannot be
++ * swapped because EpochTT and EpochUT1 are distinct types.
+  */
+-bool shadow_point_geodetic(double xi_m, double eta_m,
+-                           double ra_rad, double dec_rad,
+-                           double jd_tt, double jd_ut1,
+-                           double& lat_rad, double& lon_rad);
++[[nodiscard]] std::optional<SurfacePoint> shadow_point(
++    physics::Distance xi, physics::Distance eta,
++    const math::Direction<core::GCRF>& star_dir,
++    time::EpochTT tt, time::EpochUT1 ut1,
++    const Ellipsoid& ellipsoid = Ellipsoid::wgs84());
+ 
+ } // namespace astdyn::coordinates
+ 

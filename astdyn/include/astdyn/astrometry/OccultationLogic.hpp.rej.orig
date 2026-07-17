@@ -1,0 +1,29 @@
+@@ -32,10 +32,28 @@
+     Angle moon_dist;                     
+     Angle center_lat;                  
+     Angle center_lon;                  
++    /// Sub-star point: where the star is at the zenith. This is the reference
++    /// point of the fundamental plane, and what Occult4 stores in <Earth>;
++    /// the shadow centre above is displaced from it by the impact parameter.
++    /// GEOCENTRIC latitude: this is exactly the star's apparent declination,
++    /// which is the convention Occult4 uses in <Earth>.
++    Angle substar_lat;                 
++    Angle substar_lon;                 
++    /// Sub-solar point (geocentric). Occult4 carries it in <Earth> fields 3-4
++    /// so that the day/night terminator can be drawn.
++    Angle subsolar_lat;                
++    Angle subsolar_lon;                
+     double star_mag;                      
+     double mag_drop;                      
+     bool is_daylight;                     
+     double total_apparent_rate; // arcsec/hr
++    /// Geocentric distance of the occulting object at t_ca.
++    physics::Distance geocentric_distance;
++    /// Apparent hourly rates of the object. Kept separately from
++    /// total_apparent_rate because the occelmnt format reports them apart, and
++    /// dRA there is in SECONDS OF TIME per hour, not arcsec.
++    double d_ra_arcsec_hr = 0.0;
++    double d_dec_arcsec_hr = 0.0;
+     time::TimeDuration max_duration;
+     std::string star_id;
+     double moon_phase;                   // 0.0 (new) to 1.0 (full)
