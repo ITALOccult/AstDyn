@@ -17,6 +17,7 @@ add_executable(astdyn_unit_tests
     test_asteroid_perturbations.cpp
     test_kepler_solver.cpp
     test_stt.cpp
+    test_force_field_gradient.cpp
     test_frame_types.cpp
 )
 

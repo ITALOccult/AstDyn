@@ -1,7 +1,9 @@
 #include "astdyn/propagation/ForceField.hpp"
+#include "astdyn/propagation/PotentialDerivatives.hpp"
 #include "astdyn/math/kahan_sum.hpp"
 #include "astdyn/core/Constants.hpp"
 #include <cmath>
+#include <vector>
 
 namespace astdyn::propagation {
 
@@ -137,6 +139,90 @@ Eigen::Vector3d ForceField::j2_correction(time::EpochTDB t, const Eigen::Vector3
     }
     
     return acc_j2;
+}
+
+// ============================================================================
+// ForceModel interface: derivate analitiche (dA/dr = -U_ij, dA/dr2 = -U_ijk)
+// ----------------------------------------------------------------------------
+// Termini inclusi nel gradiente: kepleriano centrale, J2 solare, N-body DIRETTO.
+// Esclusi DI PROPOSITO (fisica, non dimenticanza):
+//   - termine N-body INDIRETTO: dipende da r_perturbatore, non da r -> deriv. nulla
+//   - relativita' / Yarkovsky: ~1e-8 del gradiente kepleriano (vedi paper)
+//   - J2 terrestre: e' un placeholder in total_acceleration, non ancora fisico
+// I corpi e il frame N-body ricalcano ESATTAMENTE n_body_perturbation().
+// ============================================================================
+namespace {
+// posizioni eliocentriche dei perturbatori a tempo t (stesse di n_body_perturbation)
+struct Perturber { double gm; Eigen::Vector3d pos_helio; };
+std::vector<Perturber> nbody_perturbers(
+    const PropagatorSettings& st,
+    const std::shared_ptr<ephemeris::PlanetaryEphemeris>& eph,
+    time::EpochTDB t)
+{
+    std::vector<Perturber> out;
+    if (!st.include_planets || !eph) return out;
+    auto provider = eph->getProvider();
+    if (!provider) return out;
+    auto sun_ssb = eph->getSunBarycentricPosition(t).to_eigen_si() / (constants::AU * 1000.0);
+    using ephemeris::CelestialBody;
+    static const CelestialBody bodies[] = {
+        CelestialBody::MERCURY, CelestialBody::VENUS, CelestialBody::EARTH, CelestialBody::MARS,
+        CelestialBody::JUPITER, CelestialBody::SATURN, CelestialBody::URANUS, CelestialBody::NEPTUNE,
+        CelestialBody::MOON };
+    const int count = st.include_moon ? 9 : 8;
+    for (int i = 0; i < count; ++i) {
+        const double gm = ephemeris::PlanetaryEphemeris::planet_gm(bodies[i]);
+        const auto p_ssb = provider->getPosition(bodies[i], t).to_eigen_si() / (constants::AU * 1000.0);
+        out.push_back({gm, p_ssb - sun_ssb});   // eliocentrica
+    }
+    return out;
+}
+} // namespace
+
+Eigen::Matrix3d ForceField::acceleration_gradient(
+    time::EpochTDB t, const Eigen::Vector3d& pos_au,
+    const Eigen::Vector3d& /*vel_au_d*/) const
+{
+    // U_ij totale, poi restituisco -U_ij (gradiente dell'accelerazione)
+    Eigen::Matrix3d U = kepler_hessian(pos_au, settings_.central_body_gm);
+    if (settings_.include_sun_j2)
+        U += j2_hessian(pos_au, settings_.central_body_gm, constants::SUN_J2, constants::R_SUN_AU);
+    for (const auto& b : nbody_perturbers(settings_, ephemeris_, t))
+        U += kepler_hessian(pos_au - b.pos_helio, b.gm);   // solo diretto
+    return -U;
+}
+
+math::Tensor3 ForceField::acceleration_second_gradient(
+    time::EpochTDB t, const Eigen::Vector3d& pos_au,
+    const Eigen::Vector3d& /*vel_au_d*/) const
+{
+    math::Tensor3 U = kepler_third(pos_au, settings_.central_body_gm);
+    if (settings_.include_sun_j2)
+        U += j2_third(pos_au, settings_.central_body_gm, constants::SUN_J2, constants::R_SUN_AU);
+    for (const auto& b : nbody_perturbers(settings_, ephemeris_, t))
+        U += kepler_third(pos_au - b.pos_helio, b.gm);      // solo diretto
+    U *= -1.0;   // dA/dr2 = -U_ijk
+    return U;
+}
+
+double ForceField::gradient_spectral_radius(
+    time::EpochTDB t, const Eigen::Vector3d& pos_au) const
+{
+    // Metrica di passo AAS: raggio spettrale ~ max autovalore |2 mu / r^3|,
+    // sommato su tutti gli attrattori (kepler + J2 + N-body diretto).
+    const double rc = pos_au.norm();
+    double rho = 2.0 * settings_.central_body_gm / (rc * rc * rc);
+    if (settings_.include_sun_j2) {
+        // contributo J2 dominante ~ |15 C / r^5| con C = 0.5 mu J2 R^2
+        const double C = 0.5 * settings_.central_body_gm * constants::SUN_J2
+                         * constants::R_SUN_AU * constants::R_SUN_AU;
+        rho += 15.0 * std::abs(C) / std::pow(rc, 5);
+    }
+    for (const auto& b : nbody_perturbers(settings_, ephemeris_, t)) {
+        const double rp = (pos_au - b.pos_helio).norm();
+        rho += 2.0 * b.gm / (rp * rp * rp);
+    }
+    return rho;
 }
 
 } // namespace astdyn::propagation

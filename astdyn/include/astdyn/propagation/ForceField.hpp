@@ -105,7 +105,7 @@ public:
 /**
  * @brief Standard Force Field aggregator
  */
-class ForceField {
+class ForceField : public ForceModel {
 public:
     explicit ForceField(const PropagatorSettings& settings, 
                         std::shared_ptr<ephemeris::PlanetaryEphemeris> ephem = nullptr);
@@ -118,6 +118,26 @@ public:
         time::EpochTDB t, 
         const Eigen::Vector3d& pos_au, 
         const Eigen::Vector3d& vel_au_d) const;
+
+    // --- ForceModel interface (implementazioni in ForceField.cpp) ----------
+    Eigen::Vector3d compute_acceleration(
+        time::EpochTDB t, const Eigen::Vector3d& pos_au,
+        const Eigen::Vector3d& vel_au_d) const override {
+        return total_acceleration(t, pos_au, vel_au_d);
+    }
+
+    [[nodiscard]] Eigen::Matrix3d acceleration_gradient(
+        time::EpochTDB t, const Eigen::Vector3d& pos_au,
+        const Eigen::Vector3d& vel_au_d) const override;
+    [[nodiscard]] bool has_acceleration_gradient() const override { return true; }
+
+    [[nodiscard]] math::Tensor3 acceleration_second_gradient(
+        time::EpochTDB t, const Eigen::Vector3d& pos_au,
+        const Eigen::Vector3d& vel_au_d) const override;
+    [[nodiscard]] bool has_acceleration_second_gradient() const override { return true; }
+
+    [[nodiscard]] double gradient_spectral_radius(
+        time::EpochTDB t, const Eigen::Vector3d& pos_au) const override;
 
     const PropagatorSettings& settings() const { return settings_; }
     void update_settings(const PropagatorSettings& s) { settings_ = s; }
