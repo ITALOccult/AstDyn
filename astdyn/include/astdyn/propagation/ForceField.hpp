@@ -7,6 +7,7 @@
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/AsteroidPerturbations.hpp"
 #include "astdyn/propagation/PropagatorSettings.hpp"
+#include "astdyn/math/Tensor3.hpp"
 #include <Eigen/Core>
 #include <memory>
 #include <stdexcept>
@@ -65,6 +66,40 @@ public:
      * through a thrown exception mid-propagation.
      */
     [[nodiscard]] virtual bool has_acceleration_gradient() const { return false; }
+
+    /**
+     * @brief Second gradient of acceleration: d^2 A_i/dr_j dr_k [1/(AU day^2)].
+     *
+     * Third spatial derivative of the potential, U_ijk. The state transition
+     * tensor needs it for the second-order variational equations (Psi): bias,
+     * skewness, and the non-Gaussianity index N. Phi (first-order STM) needs
+     * only the Hessian above; Psi cannot be propagated without this.
+     *
+     * Default: throws, mirroring acceleration_gradient().
+     */
+    [[nodiscard]] virtual math::Tensor3 acceleration_second_gradient(
+        time::EpochTDB /*t*/,
+        const Eigen::Vector3d& /*pos_au*/,
+        const Eigen::Vector3d& /*vel_au_d*/) const {
+        throw std::logic_error(
+            "acceleration_second_gradient not implemented for this force term");
+    }
+
+    [[nodiscard]] virtual bool has_acceleration_second_gradient() const { return false; }
+
+    /**
+     * @brief Spectral radius of the acceleration gradient at pos_au [1/day^2].
+     *
+     * AAS adaptive step control needs max local |2 mu / r^3| (plus J2) across
+     * all attractors, not the full Hessian. Kept separate so the step metric
+     * does not force a full gradient assembly at every substep.
+     */
+    [[nodiscard]] virtual double gradient_spectral_radius(
+        time::EpochTDB /*t*/,
+        const Eigen::Vector3d& /*pos_au*/) const {
+        throw std::logic_error(
+            "gradient_spectral_radius not implemented for this force term");
+    }
 };
 
 /**
