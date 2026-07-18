@@ -9,6 +9,8 @@
  */
 
 #include "astdyn/propagation/StateTransitionTensor.hpp"
+#include <iostream>
+#include <cstdlib>
 #include "astdyn/core/Constants.hpp"
 #include <algorithm>
 #include <cmath>
@@ -136,12 +138,39 @@ StateTransitionTensor::propagate(const State& x0, time::EpochTDB t1,
     const double total = std::abs(span);
     const double dir = (span >= 0.0) ? 1.0 : -1.0;
     double elapsed = 0.0;
+    // Il numero di passi e la loro ampiezza: il dato che non ho mai guardato
+    // mentre tiravo a indovinare sulla causa dell'errore.
+    long n_steps = 0;
+    double g_min = 1e300, g_max = 0.0;
 
     while (elapsed < total - 1e-12) {
-        if (refresh) refresh(x0.epoch + time::TimeDuration::from_days(dir * elapsed), m);
+        const auto t_now = x0.epoch + time::TimeDuration::from_days(dir * elapsed);
+
+        // Il passo si stima con i perturbatori dove sono adesso.
+        if (refresh) refresh(t_now, m);
         const double g = estimate_step(q, p, total - elapsed, m);
+
+        // Ma il passo li tratta come FERMI per tutta la sua durata, e in dieci
+        // giorni Giove fa undici milioni di km. Valutarli all'inizio del passo
+        // e' un errore del primo ordine, e per giunta sistematico: sbaglia
+        // sempre nello stesso verso e si accumula invece di mediarsi.
+        // Valutarli a META' PASSO lo rende del secondo ordine, al prezzo di una
+        // seconda chiamata.
+        //
+        // Resta un'approssimazione: un passo esatto vorrebbe i perturbatori a
+        // ogni stadio dell'integratore, non uno solo per passo.
+        if (refresh) refresh(t_now + time::TimeDuration::from_days(dir * 0.5 * g), m);
+
         step(q, p, phi, psi, dir * g, m);
         elapsed += g;
+        ++n_steps;
+        g_min = std::min(g_min, g);
+        g_max = std::max(g_max, g);
+    }
+    if (std::getenv("ASTDYN_STT_STEPS")) {
+        std::cerr << "[stt] " << n_steps << " passi su " << total << " giorni"
+                  << "   g in [" << g_min << ", " << g_max << "] d"
+                  << "   precisione " << precision_ << "\n";
     }
     return Result{to_state(q, p, t1, x0.gm), phi, psi};
 }

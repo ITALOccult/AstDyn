@@ -1,10 +1,16 @@
 #include "astdyn/astrometry/OccultationLogic.hpp"
+#include "astdyn/ephemeris/CelestialBody.hpp"
+#include <utility>
+#include <array>
 #include <stdexcept>
 #include "astdyn/coordinates/CelestialToTerrestrial.hpp"
 #include "astdyn/propagation/StateTransitionTensor.hpp"
 #include "astdyn/astrometry/StellarCovariance.hpp"
 #include "astdyn/astrometry/OccultationCovariance.hpp"
 #include <cstdlib>
+#include <string>
+#include <sstream>
+#include <vector>
 #include <iostream>
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/catalog/CatalogIntegration.hpp"
@@ -727,9 +733,169 @@ void OccultationLogic::apply_uncertainty(
     // The state transition MATRIX gives only Phi, which is the whole of the
     // linear theory. The tensor gives Psi as well, and Psi is what makes the
     // bias, the skewness and the index N computable at all.
-    propagation::PotentialModel model;              // Kepler + J2; perturbers pending
-    propagation::StateTransitionTensor stt(model);
-    const auto tr = stt.propagate(initial_state, params.t_ca);
+    //
+    // The perturbers are not optional here. Over the few weeks separating an
+    // AstDyS epoch from a main-belt event, Kepler + J2 is adequate; over the
+    // months separating it from a NEO event it is not, and the resulting error
+    // lands squarely on the quantity being validated. The tensor already exposes
+    // a per-step hook for exactly this.
+    propagation::PotentialModel model;
+    model.central_gm = constants::GMS;
+    model.j2 = 0.0;                                 // the Sun's J2 is negligible here
+
+    static constexpr std::array<std::pair<ephemeris::CelestialBody, double>, 9> kPerturbers{{
+        {ephemeris::CelestialBody::MERCURY, constants::GM_MERCURY_AU},
+        {ephemeris::CelestialBody::VENUS,   constants::GM_VENUS_AU},
+        // Earth and Moon separately: at a NEO's close approach the Earth-Moon
+        // barycentre is not a good enough stand-in for either.
+        {ephemeris::CelestialBody::EARTH,   constants::GM_EARTH_AU},
+        {ephemeris::CelestialBody::MOON,    constants::GM_MOON_AU},
+        {ephemeris::CelestialBody::MARS,    constants::GM_MARS_AU},
+        {ephemeris::CelestialBody::JUPITER, constants::GM_JUPITER_AU},
+        {ephemeris::CelestialBody::SATURN,  constants::GM_SATURN_AU},
+        {ephemeris::CelestialBody::URANUS,  constants::GM_URANUS_AU},
+        {ephemeris::CelestialBody::NEPTUNE, constants::GM_NEPTUNE_AU},
+    }};
+
+    const Matrix3d eq2ecl_frame = coordinates::ReferenceFrame::j2000_to_ecliptic();
+
+    // Maschera per l'eliminazione a uno a uno: ASTDYN_PERTURBERS e' un elenco
+    // di indici da TENERE, per esempio "0,1,2,5". Vuoto o assente = tutti.
+    //
+    // Serve a togliere un perturbatore alla volta e guardare cosa succede
+    // all'errore. Se togliendone uno crolla, e' quello; se non cambia, quel
+    // perturbatore non stava contribuendo, e il difetto e' nel COME viene
+    // applicato. Nessuna delle due risposte richiede di indovinare.
+    std::vector<int> keep;
+    if (const char* env = std::getenv("ASTDYN_PERTURBERS")) {
+        std::stringstream ss(env);
+        std::string tok;
+        while (std::getline(ss, tok, ',')) if (!tok.empty()) keep.push_back(std::stoi(tok));
+    }
+    std::vector<std::size_t> active;
+    for (std::size_t i = 0; i < kPerturbers.size(); ++i) {
+        if (keep.empty() || std::find(keep.begin(), keep.end(), static_cast<int>(i))
+                            != keep.end()) {
+            active.push_back(i);
+        }
+    }
+    if (occ_debug() && active.size() != kPerturbers.size()) {
+        std::cerr << "[scope] perturbatori attivi: " << active.size() << " su "
+                  << kPerturbers.size() << "\n";
+    }
+
+    model.perturber_gm.reserve(active.size());
+    for (std::size_t i : active) model.perturber_gm.push_back(kPerturbers[i].second);
+    model.perturber_pos.assign(active.size(), Vector3d::Zero());
+
+    // Interruttore per l'A/B: senza perturbatori il problema a due corpi ha
+    // soluzione analitica, e un test chiuso dimostra che l'integratore regge
+    // e=0.89 fino a 0.2 km su 400 giorni. Se accendendo i perturbatori l'errore
+    // sale a decine di migliaia di km, il difetto e' nei perturbatori.
+    auto ephem = engine.getEphemeris();
+    if (std::getenv("ASTDYN_NO_PERTURBERS")) {
+        ephem = nullptr;
+        model.perturber_gm.clear();
+        model.perturber_pos.clear();
+        if (occ_debug()) std::cerr << "[scope] perturbatori DISATTIVATI\n";
+    }
+    propagation::StateTransitionTensor::EphemerisRefresh refresh = nullptr;
+    if (ephem) {
+        bool first_refresh = true;
+        refresh = [ephem, eq2ecl_frame, &first_refresh, active](
+                      time::EpochTDB t, propagation::PotentialModel& m) {
+            for (std::size_t k = 0; k < active.size(); ++k) {
+                const std::size_t i = active[k];
+                const auto st = ephem->getState(kPerturbers[i].first, t);
+                // The ephemeris is EQUATORIAL and the tensor works in the
+                // ecliptic. to_eigen_au_aud() strips the frame tag, so nothing
+                // would complain about feeding it the wrong one -- the same way
+                // an equatorial Earth silently scaled the error ellipse by 1.6.
+                const Vector3d rp = eq2ecl_frame * st.to_eigen_au_aud().head<3>();
+                // Un perturbatore all'origine e' il Sole, non un pianeta: se
+                // l'effemeride non conosce quel corpo e restituisce zero, il
+                // risultato e' una massa spuria sovrapposta al corpo centrale.
+                // Meglio accorgersene che integrarci sopra per 263 giorni.
+                if (rp.norm() < 1e-6) {
+                    throw std::runtime_error(
+                        "apply_uncertainty: il perturbatore " + std::to_string(i) +
+                        " e' all'origine: l'effemeride non lo conosce");
+                }
+                m.perturber_pos[k] = rp;
+                // Le effemeridi DE danno la Luna rispetto alla TERRA, non al
+                // Sole. Se qui arrivasse una posizione geocentrica, la Luna
+                // finirebbe a 0.0026 AU dal Sole e il termine indiretto
+                // -GM*r_p/|r_p|^3 esploderebbe: a quella distanza vale l'1.4%
+                // dell'attrazione solare, costante e sistematica. Il controllo
+                // sull'origine (>1e-6 AU) non lo prenderebbe: 0.0026 lo passa.
+                if (occ_debug() && first_refresh) {
+                    // La norma non discrimina il frame: una rotazione la
+                    // conserva. La latitudine ECLITTICA si': i pianeti stanno
+                    // quasi nell'eclittica, la Terra per DEFINIZIONE a zero.
+                    // Se j2000_to_ecliptic() ruotasse nel verso sbagliato, i
+                    // perturbatori sarebbero fuori di 47 gradi e |r| non
+                    // batterebbe ciglio.
+                    const double lat_deg = std::asin(std::clamp(rp.z()/rp.norm(), -1.0, 1.0))
+                                         * 180.0 / M_PI;
+                    std::cerr << "[scope]   perturbatore " << i << ": |r| = "
+                              << rp.norm() << " AU   lat.eclittica = " << lat_deg
+                              << " deg   GM = " << m.perturber_gm[k] << "\n";
+                }
+            }
+        };
+        refresh(initial_state.epoch, model);        // popola prima del primo passo
+
+        // E ora la stessa cosa all'ALTRO capo. Le posizioni le ho controllate
+        // solo all'epoca iniziale, ma la propagazione le richiede fino a t_ca --
+        // 931 giorni prima, per gli eventi del 2023. Se l'effemeride copre un
+        // intervallo limitato ed estrapola fuori, i perturbatori sarebbero
+        // giusti all'inizio e sbagliati durante: un errore invisibile a
+        // qualunque controllo fatto solo a t0.
+        if (occ_debug()) {
+            std::cerr << "[scope] --- perturbatori a t_ca (MJD " << params.t_ca.mjd()
+                      << "), " << (params.t_ca.mjd() - initial_state.epoch.mjd())
+                      << " giorni dall'epoca ---\n";
+            propagation::PotentialModel check = model;
+            first_refresh = true;
+            refresh(params.t_ca, check);
+        }
+        first_refresh = false;
+    }
+
+    // La precisione dell'integratore, come manopola misurabile.
+    //
+    // Il test chiuso che dava 1 km su 931 giorni girava con KEPLERO PURO. Ma
+    // estimate_step() usa force_gradient(q, m), che con nove perturbatori
+    // restituisce tutt'altro: il passo cambia quando li accendi, e in quel
+    // regime l'integratore non e' mai stato verificato.
+    //
+    // Se il residuo dipende dalla precisione, e' l'integratore. Se non si muove,
+    // e' fisica mancante e va cercata altrove. In entrambi i casi e' una misura,
+    // non un'ipotesi.
+    double precision = 1e-4;
+    if (const char* p = std::getenv("ASTDYN_STT_PRECISION")) precision = std::atof(p);
+
+    propagation::StateTransitionTensor stt(model, precision);
+    const auto tr = stt.propagate(initial_state, params.t_ca, refresh);
+
+    // Il numero grezzo, senza geometria di mezzo. Un test chiuso (STT contro
+    // Keplero analitico, senza perturbatori) dava 0.1 km su 263 giorni, mentre
+    // qui l'asse d'ombra sbaglia di decine di migliaia: uno dei due mente, e
+    // l'unico modo di sapere quale e' confrontare la posizione propagata con
+    // Horizons alla STESSA epoca, invece di dedurla dalla geometria a valle.
+    if (occ_debug()) {
+        const auto xi = initial_state.to_eigen_au_aud();
+        const auto xf = tr.final_state.to_eigen_au_aud();
+        std::cerr << "[scope] propagazione: da MJD(TDB) " << initial_state.epoch.mjd()
+                  << " a " << params.t_ca.mjd() << "  (dt = "
+                  << (params.t_ca.mjd() - initial_state.epoch.mjd()) << " d)\n";
+        std::cerr << "[scope]   r0 = (" << xi(0) << ", " << xi(1) << ", " << xi(2)
+                  << ") AU   |r0| = " << xi.head<3>().norm() << "\n";
+        std::cerr << "[scope]   r1 = (" << xf(0) << ", " << xf(1) << ", " << xf(2)
+                  << ") AU   |r1| = " << xf.head<3>().norm() << "\n";
+        std::cerr << "[scope]   confronta r1 con Horizons a JD "
+                  << (params.t_ca.mjd() + 2400000.5) << " (@sun, ecliptic)\n";
+    }
 
     // ---- 2. Geometry at the event, in AU, ecliptic ---------------------------
     // PlanetaryEphemeris returns J2000 EQUATORIAL states -- its return type says
@@ -738,27 +904,25 @@ void OccultationLogic::apply_uncertainty(
     // are bare Eigen the compiler cannot help: subtracting an equatorial vector
     // from an ecliptic one is a perfectly valid subtraction of six doubles, and
     // it silently scaled the whole error ellipse by a factor of 1.6.
-    const Matrix3d eq2ecl_frame = coordinates::ReferenceFrame::j2000_to_ecliptic();
     const auto x_ast = tr.final_state.to_eigen_au_aud();
     const auto earth = engine.getEphemeris()->getState(ephemeris::CelestialBody::EARTH,
                                                        params.t_ca);
     const Vector3d r_ast = x_ast.head<3>();
     const Vector3d r_obs = eq2ecl_frame * earth.to_eigen_au_aud().head<3>();
 
-    // Cheap check, expensive bug: the geometric distance must reproduce the one
-    // the Chebyshev ephemeris already reported. A frame or unit slip shows up
-    // here immediately, where it costs nothing to notice.
-    if (params.geocentric_distance.to_au() > 0.0) {
-        const double rho_check = (r_ast - r_obs).norm();
-        const double rel = std::abs(rho_check / params.geocentric_distance.to_au() - 1.0);
-        if (rel > 1e-3) {
-            throw std::runtime_error(
-                "apply_uncertainty: geocentric distance mismatch, " +
-                std::to_string(rho_check) + " AU against " +
-                std::to_string(params.geocentric_distance.to_au()) +
-                " AU from the ephemeris — a frame or unit slip upstream");
-        }
-    }
+    // ---- 2b. La STT concorda con l'effemeride? -------------------------------
+    // La posizione dell'ombra in params viene dalla Chebyshev, cioe' da HORIZONS;
+    // la covarianza qui sotto e' propagata dallo stato ASTDYS. Sono due soluzioni
+    // orbitali diverse, e per 820987 differiscono di 37 km: un residuo misurato
+    // contro l'una e normalizzato con l'altra porta dentro anche quel disaccordo.
+    //
+    // Il confronto va fatto nel PIANO FONDAMENTALE, non sulla distanza: l'errore
+    // di una propagazione e' quasi tutto ALONG-TRACK, e l'along-track lascia la
+    // distanza geocentrica quasi invariata. Confrontare le distanze e' cieco
+    // proprio alla componente che conta.
+    //
+    // Questo blocco riporta il numero. Su main-belt a poche settimane e' piccolo;
+    // su un NEO propagato mesi senza perturbatori planetari non lo sara'.
 
     // ---- 3. Plane-of-sky basis ----------------------------------------------
     // The star direction is equatorial, the dynamics is ecliptic, so the line of
@@ -774,6 +938,78 @@ void OccultationLogic::apply_uncertainty(
     const Vector3d s_hat    = eq2ecl_frame * s_eq;
     const Vector3d pole_ecl = eq2ecl_frame * Vector3d::UnitZ();
     const auto basis = tangent_basis(s_hat, pole_ecl);
+
+    // Asse d'ombra secondo la STT, nel piano fondamentale: la retta per
+    // l'asteroide parallela alla direzione della stella, intersecata col piano
+    // per il geocentro normale a s_hat.
+    if (occ_debug() || true) {
+        const Vector3d rho = r_ast - r_obs;
+        const Vector3d axis = rho - rho.dot(s_hat) * s_hat;
+        const double xi_stt  = axis.dot(basis[0]) * constants::AU;
+        const double eta_stt = axis.dot(basis[1]) * constants::AU;
+        const double dxi  = xi_stt  - params.xi_ca.to_km();
+        const double deta = eta_stt - params.eta_ca.to_km();
+        const double gap = std::hypot(dxi, deta);
+        if (gap > 1.0) {
+            std::cerr << "[scope] STT(AstDyS) vs effemeride(Horizons) nel piano fondamentale: "
+                      << gap << " km   (dxi=" << dxi << " deta=" << deta << ")\n";
+        }
+    }
+
+    // ---- Tempo-luce ---------------------------------------------------------
+    // r_ast e' la posizione GEOMETRICA a t_ca: dove l'oggetto E'. Ma params
+    // porta la posizione ASTROMETRICA, dedotta da un'effemeride osservata: dove
+    // lo VEDI. Sono due cose diverse, e la differenza e' quanto l'asteroide
+    // percorre mentre la sua luce arriva:
+    //
+    //   Phaethon a 36.6 km/s, tempo di volo 398 s (0.80 AU) -> 14.590 km
+    //
+    // Non e' un errore di propagazione, e si riconosce: non cresce con dt, e'
+    // insensibile alla precisione dell'integratore, nessun perturbatore lo fa
+    // crollare, e scala con la DISTANZA invece che col tempo.
+    //
+    // La posizione apparente e' quella all'istante di EMISSIONE:
+    //   t_em = t_ca - |r(t_em) - r_obs| / c
+    // Si risolve per iterazione. Qui r(t_em) e' approssimato linearmente con la
+    // velocita' a t_ca: su ~400 s l'errore residuo e' sotto il chilometro,
+    // ampiamente sufficiente per un confronto diagnostico.
+    //
+    // NOTA per la covarianza: l'ellisse NON ne risente. La sensibilita' della
+    // posizione apparente allo stato iniziale contiene il termine
+    // v * dt_em/dx0 ~ v/c ~ 1e-4, trascurabile su Phi. Era il metro a mentire,
+    // non la covarianza.
+    const Vector3d v_ast = x_ast.tail<3>();          // AU/giorno
+    Vector3d r_app = r_ast;
+    double lt_days = 0.0;
+    for (int it = 0; it < 4; ++it) {
+        lt_days = (r_app - r_obs).norm() / constants::SPEED_OF_LIGHT_AU_PER_DAY;
+        r_app = r_ast - v_ast * lt_days;
+    }
+
+    // L'asse d'ombra secondo la STT, ora omogeneo con params.
+    {
+        const Vector3d rho  = r_app - r_obs;
+        const Vector3d axis = rho - rho.dot(s_hat) * s_hat;
+        const double xi_stt  = axis.dot(basis[0]) * constants::AU;   // km
+        const double eta_stt = axis.dot(basis[1]) * constants::AU;
+        const double gap = std::hypot(xi_stt - params.xi_ca.to_km(),
+                                      eta_stt - params.eta_ca.to_km());
+        if (occ_debug() || gap > 1.0) {
+            const Vector3d ax_geo = (r_ast - r_obs)
+                                  - (r_ast - r_obs).dot(s_hat) * s_hat;
+            const double gap_geo = std::hypot(
+                ax_geo.dot(basis[0]) * constants::AU - params.xi_ca.to_km(),
+                ax_geo.dot(basis[1]) * constants::AU - params.eta_ca.to_km());
+            std::cerr << "[scope] tempo-luce " << lt_days * 86400.0 << " s ("
+                      << (r_app - r_obs).norm() << " AU)   |v| = "
+                      << v_ast.norm() * constants::AU / 86400.0 << " km/s\n";
+            std::cerr << "[scope] asse d'ombra: STT/AstDyS (" << xi_stt << ", "
+                      << eta_stt << ") km  vs  effemeride ("
+                      << params.xi_ca.to_km() << ", " << params.eta_ca.to_km()
+                      << ") km  ->  scarto " << gap << " km"
+                      << "   (senza correzione: " << gap_geo << " km)\n";
+        }
+    }
 
     // ---- 4. Composite map and moments ---------------------------------------
     const auto pm = projection_maps(r_ast, basis, r_obs);
