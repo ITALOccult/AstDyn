@@ -9,6 +9,7 @@
 #include "astdyn/propagation/PropagatorSettings.hpp"
 #include <Eigen/Core>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace astdyn::propagation {
@@ -31,6 +32,39 @@ public:
         time::EpochTDB t, 
         const Eigen::Vector3d& pos_au, 
         const Eigen::Vector3d& vel_au_d) const = 0;
+
+    /**
+     * @brief Gradient of the acceleration wrt position: dA_i/dr_j [1/day^2].
+     *
+     * This is the Hessian of the potential (with a sign), and it is what the
+     * state transition tensor needs to propagate the covariance. It is NOT the
+     * same information as the acceleration: an integrator can advance the
+     * trajectory with compute_acceleration() alone, but the variational
+     * equations of a covariance cannot.
+     *
+     * Default: throws. A force term supplies this only when its analytic
+     * derivative is worth carrying. Terms whose contribution to the tensor is
+     * negligible (relativity, Yarkovsky: ~1e-8 of the Keplerian gradient) may
+     * legitimately leave it unimplemented and contribute to the acceleration
+     * only -- that omission is physics, and belongs in the paper, not a silent
+     * shortcut.
+     */
+    [[nodiscard]] virtual Eigen::Matrix3d acceleration_gradient(
+        time::EpochTDB /*t*/,
+        const Eigen::Vector3d& /*pos_au*/,
+        const Eigen::Vector3d& /*vel_au_d*/) const {
+        throw std::logic_error(
+            "acceleration_gradient not implemented for this force term");
+    }
+
+    /**
+     * @brief Whether acceleration_gradient() is available.
+     *
+     * Lets the tensor assemble the gradient from only the terms that provide
+     * one, and record which terms were skipped, instead of discovering the gap
+     * through a thrown exception mid-propagation.
+     */
+    [[nodiscard]] virtual bool has_acceleration_gradient() const { return false; }
 };
 
 /**
