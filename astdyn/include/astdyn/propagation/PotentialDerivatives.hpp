@@ -34,33 +34,6 @@ namespace astdyn::propagation {
  * perturber_pos : perturber positions [AU], index-aligned with perturber_gm;
  *                 refreshed by the caller each macro-step from the ephemeris.
  */
-/**
- * @brief Parameters of the gravitational potential: central body, J2, perturbers.
- *
- * Named PotentialModel, not ForceModel, because propagation::ForceModel already
- * exists in ForceField.hpp and is something else entirely: an abstract interface
- * with a virtual compute_acceleration(). This is a plain data bag consumed by the
- * closed-form potential derivatives below, which the state transition tensor needs
- * to second order and a polymorphic acceleration cannot provide.
- */
-struct PotentialModel {
-    double central_gm = 0.0002959122082855911;   // GM_sun, AU^3/day^2
-    double j2 = 0.0;
-    double r_eq = 0.004650467261;                  // R_sun in AU
-    std::vector<double> perturber_gm;
-    std::vector<astdyn::Vector3d> perturber_pos;
-};
-
-/// Acceleration a = -grad U (Keplerian + J2 + direct N-body) [AU/day^2].
-astdyn::Vector3d acceleration(const astdyn::Vector3d& r, const PotentialModel& m);
-
-/// Potential Hessian U_ij (3x3), Keplerian + J2 + N-body.
-astdyn::Matrix3d potential_hessian(const astdyn::Vector3d& r, const PotentialModel& m);
-
-/// Potential third derivative U_ijk (3x3x3), Keplerian + J2 + N-body (App. B).
-astdyn::math::Tensor3
-potential_third_derivative(const astdyn::Vector3d& r, const PotentialModel& m);
-
 // --- individual analytic pieces (exposed for testing/reuse) --------------
 astdyn::Matrix3d kepler_hessian(const astdyn::Vector3d& u, double mu);
 astdyn::math::Tensor3 kepler_third(const astdyn::Vector3d& u, double mu);

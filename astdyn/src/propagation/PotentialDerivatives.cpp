@@ -100,43 +100,8 @@ static Vector3d j2_accel(const Vector3d& r, double mu, double j2, double r_eq) {
     return a;
 }
 
-Vector3d acceleration(const Vector3d& r, const PotentialModel& m) {
-    Vector3d a = kepler_accel(r, m.central_gm);
-    if (m.j2 != 0.0) a += j2_accel(r, m.central_gm, m.j2, m.r_eq);
-    for (size_t l = 0; l < m.perturber_gm.size(); ++l) {
-        // DIRETTO: il perturbatore tira il corpo.
-        a += kepler_accel(r - m.perturber_pos[l], m.perturber_gm[l]);
-        // INDIRETTO: il perturbatore tira anche il CORPO CENTRALE, e qui
-        // l'origine e' il corpo centrale. In un sistema eliocentrico l'origine
-        // non e' inerziale: omettere questo termine non attenua la
-        // perturbazione, la falsifica. Per Giove a 5.2 AU e un oggetto a 1.6 AU
-        // i due termini sono dello stesso ordine — l'errore e' del 100%, non
-        // del 10%, e su Phaethon accendere i perturbatori senza di esso
-        // peggiorava di 5 volte rispetto a ignorarli del tutto.
-        a -= kepler_accel(-m.perturber_pos[l], m.perturber_gm[l]);
-    }
-    return a;
-}
 
 // ---- aggregates ---------------------------------------------------------
-Matrix3d potential_hessian(const Vector3d& r, const PotentialModel& m) {
-    Matrix3d H = kepler_hessian(r, m.central_gm);
-    if (m.j2 != 0.0) H += j2_hessian(r, m.central_gm, m.j2, m.r_eq);
-    // Solo il termine diretto: quello indiretto dipende dalla posizione del
-    // perturbatore, non da r, quindi le sue derivate rispetto a r sono nulle.
-    // Compare nell'accelerazione e sparisce qui: e' corretto, non una svista.
-    for (size_t l = 0; l < m.perturber_gm.size(); ++l)
-        H += kepler_hessian(r - m.perturber_pos[l], m.perturber_gm[l]);
-    return H;
-}
 
-Tensor3 potential_third_derivative(const Vector3d& r, const PotentialModel& m) {
-    Tensor3 T = kepler_third(r, m.central_gm);
-    if (m.j2 != 0.0) T += j2_third(r, m.central_gm, m.j2, m.r_eq);
-    // Come per l'hessiana: il termine indiretto non dipende da r.
-    for (size_t l = 0; l < m.perturber_gm.size(); ++l)
-        T += kepler_third(r - m.perturber_pos[l], m.perturber_gm[l]);
-    return T;
-}
 
 }  // namespace astdyn::propagation

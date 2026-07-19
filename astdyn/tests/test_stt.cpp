@@ -53,12 +53,6 @@ Vec6 nominal_state() {
     return y;
 }
 
-PotentialModel kepler_model() {
-    PotentialModel m;
-    m.central_gm = MU_SUN;
-    return m;
-}
-
 std::shared_ptr<propagation::ForceField> kepler_force() {
     propagation::PropagatorSettings s;
     s.central_body_gm         = MU_SUN;
@@ -73,26 +67,39 @@ std::shared_ptr<propagation::ForceField> kepler_force() {
 
 }  // namespace
 
-// ---- 1. Closed-form third derivative vs finite differences of U_ij ---------
+// ---- 1. Closed-form third derivatives vs finite differences of the Hessian --
+// Testa OGNI mattone analitico separatamente (kepler, J2): T_ijk deve essere
+// la derivata numerica di H_ij. Isola quale termine sbaglia, invece di
+// sommarli in un aggregatore.
 TEST(StateTransitionTensor, UijkMatchesFiniteDifference) {
-    PotentialModel m = kepler_model();
-    m.j2 = 2.2e-7; m.r_eq = 4.65e-3;                       // stress J2 too
-    m.perturber_gm = {MU_SUN * 9.54e-4};
-    m.perturber_pos = {Vector3d(3.0, 3.5, 0.1)};
-
     const Vector3d r(0.7, 0.3, 0.5);
     const double d = 1e-7;
-    const Tensor3 T = potential_third_derivative(r, m);
-    double err = 0.0;
-    for (int k = 0; k < 3; ++k) {
-        Vector3d e = Vector3d::Zero(); e[k] = d;
-        const Matrix3d num =
-            (potential_hessian(r + e, m) - potential_hessian(r - e, m)) / (2 * d);
-        for (int i = 0; i < 3; ++i)
-            for (int j = 0; j < 3; ++j)
-                err = std::max(err, std::abs(T(i, j, k) - num(i, j)));
-    }
-    EXPECT_LT(err, 1e-9);
+    const double mu = MU_SUN, j2 = 2.2e-7, r_eq = 4.65e-3;
+
+    auto check = [&](auto third, auto hess) {
+        const Tensor3 T = third();
+        double err = 0.0;
+        for (int k = 0; k < 3; ++k) {
+            Vector3d e = Vector3d::Zero(); e[k] = d;
+            const Matrix3d num = (hess(r + e) - hess(r - e)) / (2 * d);
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j)
+                    err = std::max(err, std::abs(T(i, j, k) - num(i, j)));
+        }
+        return err;
+    };
+
+    // Kepleriano centrale
+    EXPECT_LT(check([&]{ return kepler_third(r, mu); },
+                    [&](const Vector3d& x){ return kepler_hessian(x, mu); }), 1e-9);
+    // J2 solare
+    EXPECT_LT(check([&]{ return j2_third(r, mu, j2, r_eq); },
+                    [&](const Vector3d& x){ return j2_hessian(x, mu, j2, r_eq); }), 1e-9);
+    // N-body diretto (un perturbatore): e' un kepler_third shiftato
+    const Vector3d rp(3.0, 3.5, 0.1);
+    const double gm_p = MU_SUN * 9.54e-4;
+    EXPECT_LT(check([&]{ return kepler_third(r - rp, gm_p); },
+                    [&](const Vector3d& x){ return kepler_hessian(x - rp, gm_p); }), 1e-9);
 }
 
 // ---- 2. STM Phi vs finite differences of the (fixed-step) flow -------------
