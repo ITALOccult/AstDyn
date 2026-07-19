@@ -2,6 +2,8 @@
 #include "astdyn/propagation/PotentialDerivatives.hpp"
 #include "astdyn/math/kahan_sum.hpp"
 #include "astdyn/core/Constants.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
+#include "astdyn/coordinates/ReferenceFrame.hpp"
 #include <cmath>
 #include <vector>
 
@@ -67,8 +69,12 @@ Eigen::Vector3d ForceField::n_body_perturbation(time::EpochTDB t, const Eigen::V
     auto provider = ephemeris_->getProvider();
     if (!provider) return acc_p;
 
-    auto sun_ssb = ephemeris_->getSunBarycentricPosition(t).to_eigen_si() / (constants::AU * 1000.0);
-    
+    const Eigen::Matrix3d R_work = settings_.integrate_in_ecliptic
+        ? coordinates::ReferenceFrame::j2000_to_ecliptic(t)
+        : Eigen::Matrix3d::Identity();
+    Eigen::Vector3d sun_ssb = ephemeris_->getSunBarycentricPosition(t).to_eigen_si() / (constants::AU * 1000.0);
+    sun_ssb = R_work * sun_ssb;   // frame di lavoro (eclittico se richiesto)
+
     using ephemeris::CelestialBody;
     static const CelestialBody bodies[] = {
         CelestialBody::MERCURY, CelestialBody::VENUS, CelestialBody::EARTH, CelestialBody::MARS,
@@ -81,8 +87,8 @@ Eigen::Vector3d ForceField::n_body_perturbation(time::EpochTDB t, const Eigen::V
     Eigen::Vector3d compensation = Eigen::Vector3d::Zero();
     for (int i = 0; i < count; ++i) {
         const double gm    = ephemeris::PlanetaryEphemeris::planet_gm(bodies[i]);
-        const auto   p_ssb = provider->getPosition(bodies[i], t).to_eigen_si()
-                             / (constants::AU * 1000.0);
+        const Eigen::Vector3d p_ssb = R_work * Eigen::Vector3d(
+            provider->getPosition(bodies[i], t).to_eigen_si() / (constants::AU * 1000.0));
 
         Eigen::Vector3d term;
         if (settings_.baricentric_integration) {
@@ -163,7 +169,11 @@ std::vector<Perturber> nbody_perturbers(
     if (!st.include_planets || !eph) return out;
     auto provider = eph->getProvider();
     if (!provider) return out;
-    auto sun_ssb = eph->getSunBarycentricPosition(t).to_eigen_si() / (constants::AU * 1000.0);
+    const Eigen::Matrix3d R_work = st.integrate_in_ecliptic
+        ? coordinates::ReferenceFrame::j2000_to_ecliptic(t)
+        : Eigen::Matrix3d::Identity();
+    Eigen::Vector3d sun_ssb = eph->getSunBarycentricPosition(t).to_eigen_si() / (constants::AU * 1000.0);
+    sun_ssb = R_work * sun_ssb;
     using ephemeris::CelestialBody;
     static const CelestialBody bodies[] = {
         CelestialBody::MERCURY, CelestialBody::VENUS, CelestialBody::EARTH, CelestialBody::MARS,
@@ -172,8 +182,9 @@ std::vector<Perturber> nbody_perturbers(
     const int count = st.include_moon ? 9 : 8;
     for (int i = 0; i < count; ++i) {
         const double gm = ephemeris::PlanetaryEphemeris::planet_gm(bodies[i]);
-        const auto p_ssb = provider->getPosition(bodies[i], t).to_eigen_si() / (constants::AU * 1000.0);
-        out.push_back({gm, p_ssb - sun_ssb});   // eliocentrica
+        const Eigen::Vector3d p_ssb = R_work * Eigen::Vector3d(
+            provider->getPosition(bodies[i], t).to_eigen_si() / (constants::AU * 1000.0));
+        out.push_back({gm, p_ssb - sun_ssb});   // eliocentrica, frame di lavoro
     }
     return out;
 }
