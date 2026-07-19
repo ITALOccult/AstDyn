@@ -58,3 +58,6 @@ graph_info.json
 
 # Output pandoc del config manual (sorgente: docs/config_manual.md)
 config_manual.pdf
+
+# Cache IDE (clangd, ecc.)
+.cache/
