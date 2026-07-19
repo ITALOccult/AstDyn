@@ -326,7 +326,8 @@ int main(int argc, char** argv) {
         ephemeris::PlanetaryEphemeris::setGlobalProvider(provider);
         ephem_ptr = std::make_shared<ephemeris::PlanetaryEphemeris>(provider);
         // M2 fix: catalog config from --conf or hardcoded default
-        std::string catalog_json = adv_cfg.get<std::string>("catalog_config", R"({"catalog_type":"online_esa"})");
+        std::string catalog_json = adv_cfg.get<std::string>("catalog_config",
+            R"({"catalog_type":"sqlite_dr3","sqlite_file_path":"~/.catalog/crossreference/gaia_dr3_occult_pro.db"})");
         catalog::GaiaDR3Catalog::initialize(catalog_json);
     } catch (const std::exception& e) { 
         std::cerr << "Error initializing engine: " << e.what() << "\n";

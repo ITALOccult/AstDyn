@@ -36,6 +36,27 @@ struct GaiaStar {
     double pmdec;                ///< Proper motion in Dec [mas/yr]
     double pmra_error;           ///< PM RA standard error [mas/yr]
     double pmdec_error;          ///< PM Dec standard error [mas/yr]
+
+    // Position errors (ra_error is alpha* = ra*cos(dec), as Gaia publishes)
+    double ra_error = 0.0;       ///< RA (alpha*) standard error [mas]
+    double dec_error = 0.0;      ///< Dec standard error [mas]
+
+    /// Astrometric solution size: 2 = position only, 5 = full, 6 = +pseudocolour.
+    /// Correlations below are meaningful only when this is >= 5.
+    int astrometric_params_solved = 0;
+
+    /// The ten Gaia correlation coefficients, dimensionless in [-1, 1], in the
+    /// parameter order (alpha*, delta, parallax, pmra*, pmdec).
+    double ra_dec_corr         = 0.0;
+    double ra_parallax_corr    = 0.0;
+    double ra_pmra_corr        = 0.0;
+    double ra_pmdec_corr       = 0.0;
+    double dec_parallax_corr   = 0.0;
+    double dec_pmra_corr       = 0.0;
+    double dec_pmdec_corr      = 0.0;
+    double parallax_pmra_corr  = 0.0;
+    double parallax_pmdec_corr = 0.0;
+    double pmra_pmdec_corr     = 0.0;
     
     // Photometry
     double phot_g_mean_mag;      ///< G-band mean magnitude [mag]

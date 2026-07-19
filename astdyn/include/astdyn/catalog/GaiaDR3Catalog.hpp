@@ -60,6 +60,27 @@ struct CatalogStats {
 };
 
 // ============================================================================
+// Astrometric error model (fetched online per event star, cached locally)
+// ============================================================================
+
+/// The full Gaia astrometric uncertainty for one star: 5 formal errors plus
+/// the 10 correlations. Populated from an online per-source_id query when the
+/// local (geometry-only) catalogue lacks them, then cached on disk. ra_error
+/// is alpha* (Gaia convention); correlations are meaningful only when
+/// params_solved >= 5.
+struct StarAstrometricErrors {
+    double ra_error_mas       = 0.0;
+    double dec_error_mas      = 0.0;
+    double parallax_error_mas = 0.0;
+    double pmra_error_mas_yr  = 0.0;
+    double pmdec_error_mas_yr = 0.0;
+    int    astrometric_params_solved = 0;
+    double ra_dec_corr = 0.0, ra_parallax_corr = 0.0, ra_pmra_corr = 0.0, ra_pmdec_corr = 0.0;
+    double dec_parallax_corr = 0.0, dec_pmra_corr = 0.0, dec_pmdec_corr = 0.0;
+    double parallax_pmra_corr = 0.0, parallax_pmdec_corr = 0.0, pmra_pmdec_corr = 0.0;
+};
+
+// ============================================================================
 // GaiaDR3Catalog — main API
 // ============================================================================
 
@@ -143,6 +164,23 @@ public:
     [[nodiscard]] std::optional<Star> by_hd(const std::string& hd_number) const;
     [[nodiscard]] std::optional<Star> by_hipparcos(const std::string& hip_number) const;
     [[nodiscard]] std::optional<Star> by_tycho2(const std::string& tycho2_id) const;
+
+    // -----------------------------------------------------------------------
+    // Astrometric errors (online fetch + local cache)
+    // -----------------------------------------------------------------------
+
+    /**
+     * @brief Full astrometric error model for one star (5 errors + 10 corr).
+     *
+     * The local catalogue carries geometry only. This consults a local SQLite
+     * cache and, on a miss, fetches from the Gaia archive by source_id and
+     * caches the result. One network query per previously-unseen star.
+     *
+     * @param source_id Gaia DR3 source identifier.
+     * @return Errors if available (locally or online), std::nullopt if neither.
+     */
+    [[nodiscard]] std::optional<StarAstrometricErrors>
+    fetch_astrometric_errors(int64_t source_id) const;
 
     // -----------------------------------------------------------------------
     // Diagnostics

@@ -91,12 +91,18 @@ public:
     
     std::string buildSourceIdQuery(const std::vector<int64_t>& source_ids) {
         std::ostringstream adql;
-        
+
+        // Full astrometric error model for C_star: 5 errors + 10 correlations
+        // + params_solved. ra_error is alpha* (Gaia's native convention).
         adql << "SELECT ";
         adql << "source_id, ra, dec, parallax, parallax_error, ";
         adql << "pmra, pmdec, pmra_error, pmdec_error, ";
         adql << "phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, ";
-        adql << "astrometric_excess_noise, astrometric_chi2_al, visibility_periods_used ";
+        adql << "astrometric_excess_noise, astrometric_chi2_al, visibility_periods_used, ";
+        adql << "ra_error, dec_error, astrometric_params_solved, ";
+        adql << "ra_dec_corr, ra_parallax_corr, ra_pmra_corr, ra_pmdec_corr, ";
+        adql << "dec_parallax_corr, dec_pmra_corr, dec_pmdec_corr, ";
+        adql << "parallax_pmra_corr, parallax_pmdec_corr, pmra_pmdec_corr ";
         adql << "FROM " << getTableName() << " ";
         adql << "WHERE source_id IN (";
         
@@ -231,6 +237,19 @@ private:
                     case 12: star.astrometric_excess_noise = std::stod(field); break;
                     case 13: star.astrometric_chi2_al = std::stod(field); break;
                     case 14: star.visibility_periods_used = std::stoi(field); break;
+                    case 15: star.ra_error = std::stod(field); break;
+                    case 16: star.dec_error = std::stod(field); break;
+                    case 17: star.astrometric_params_solved = std::stoi(field); break;
+                    case 18: star.ra_dec_corr = std::stod(field); break;
+                    case 19: star.ra_parallax_corr = std::stod(field); break;
+                    case 20: star.ra_pmra_corr = std::stod(field); break;
+                    case 21: star.ra_pmdec_corr = std::stod(field); break;
+                    case 22: star.dec_parallax_corr = std::stod(field); break;
+                    case 23: star.dec_pmra_corr = std::stod(field); break;
+                    case 24: star.dec_pmdec_corr = std::stod(field); break;
+                    case 25: star.parallax_pmra_corr = std::stod(field); break;
+                    case 26: star.parallax_pmdec_corr = std::stod(field); break;
+                    case 27: star.pmra_pmdec_corr = std::stod(field); break;
                 }
             } catch (...) {
                 // Handle missing/invalid values

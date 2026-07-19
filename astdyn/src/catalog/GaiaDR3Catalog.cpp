@@ -9,9 +9,24 @@
 #include <astdyn/catalog/gaia/unified_gaia_catalog.h>
 #include <astdyn/catalog/gaia/types.h>
 
+// GaiaClient is deprecated in favour of UnifiedGaiaCatalog, but it is the
+// direct route to a per-source_id online query for the error model; the
+// unified layer does not expose one. Use is contained to this file.
+#ifdef __clang__
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#include <astdyn/catalog/gaia/gaia_client.h>
+#ifdef __clang__
+#  pragma clang diagnostic pop
+#endif
+
+#include <sqlite3.h>
 #include <atomic>
+#include <cstdlib>
 #include <memory>
 #include <mutex>
+#include <string>
 
 namespace astdyn::catalog {
 
@@ -38,6 +53,22 @@ Star from_upstream(const ioc::gaia::GaiaStar& s) {
     out.pm_dec               = ProperMotion::from_mas_yr(s.pmdec);
     out.pmra_error_mas_yr    = s.pmra_error;
     out.pmdec_error_mas_yr   = s.pmdec_error;
+
+    // Position errors (ra_error is alpha*, Gaia convention) + full correlation
+    // model for C_star. Meaningful only when astrometric_params_solved >= 5.
+    out.ra_error_mas               = s.ra_error;
+    out.dec_error_mas              = s.dec_error;
+    out.astrometric_params_solved  = s.astrometric_params_solved;
+    out.ra_dec_corr          = s.ra_dec_corr;
+    out.ra_parallax_corr     = s.ra_parallax_corr;
+    out.ra_pmra_corr         = s.ra_pmra_corr;
+    out.ra_pmdec_corr        = s.ra_pmdec_corr;
+    out.dec_parallax_corr    = s.dec_parallax_corr;
+    out.dec_pmra_corr        = s.dec_pmra_corr;
+    out.dec_pmdec_corr       = s.dec_pmdec_corr;
+    out.parallax_pmra_corr   = s.parallax_pmra_corr;
+    out.parallax_pmdec_corr  = s.parallax_pmdec_corr;
+    out.pmra_pmdec_corr      = s.pmra_pmdec_corr;
     
     out.g_mag                = s.phot_g_mean_mag;
     out.bp_mag               = s.phot_bp_mean_mag;
@@ -281,6 +312,147 @@ CatalogStats GaiaDR3Catalog::statistics() const noexcept {
 
 void GaiaDR3Catalog::clear_cache() noexcept {
     ioc::gaia::UnifiedGaiaCatalog::getInstance().clearCache();
+}
+
+
+// ============================================================================
+// Astrometric errors: local SQLite cache + online per-source_id fetch
+// ============================================================================
+
+namespace {
+
+// Cache path: alongside the catalogue config, in ~/.ioccultcalc/.
+std::string error_cache_path() {
+    const char* home = std::getenv("HOME");
+    if (!home) return "star_errors_cache.db";
+    return std::string(home) + "/.ioccultcalc/star_errors_cache.db";
+}
+
+// Open (creating if needed) the cache DB and ensure the schema exists.
+// Returns nullptr on failure; callers then degrade to online-only.
+sqlite3* open_error_cache() {
+    sqlite3* db = nullptr;
+    if (sqlite3_open_v2(error_cache_path().c_str(), &db,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) != SQLITE_OK) {
+        if (db) sqlite3_close(db);
+        return nullptr;
+    }
+    const char* schema =
+        "CREATE TABLE IF NOT EXISTS star_errors ("
+        " sid INTEGER PRIMARY KEY,"
+        " ra_err REAL, dec_err REAL, plx_err REAL, pmra_err REAL, pmdec_err REAL,"
+        " params_solved INTEGER,"
+        " c_ra_dec REAL, c_ra_plx REAL, c_ra_pmra REAL, c_ra_pmdec REAL,"
+        " c_dec_plx REAL, c_dec_pmra REAL, c_dec_pmdec REAL,"
+        " c_plx_pmra REAL, c_plx_pmdec REAL, c_pmra_pmdec REAL);";
+    sqlite3_exec(db, schema, nullptr, nullptr, nullptr);
+    return db;
+}
+
+// Read one row from the cache. Returns nullopt on miss or error.
+std::optional<StarAstrometricErrors> cache_read(sqlite3* db, int64_t sid) {
+    if (!db) return std::nullopt;
+    const char* sql = "SELECT ra_err,dec_err,plx_err,pmra_err,pmdec_err,params_solved,"
+        "c_ra_dec,c_ra_plx,c_ra_pmra,c_ra_pmdec,c_dec_plx,c_dec_pmra,c_dec_pmdec,"
+        "c_plx_pmra,c_plx_pmdec,c_pmra_pmdec FROM star_errors WHERE sid=?;";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) return std::nullopt;
+    sqlite3_bind_int64(st, 1, sid);
+    std::optional<StarAstrometricErrors> out;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        StarAstrometricErrors e;
+        e.ra_error_mas       = sqlite3_column_double(st, 0);
+        e.dec_error_mas      = sqlite3_column_double(st, 1);
+        e.parallax_error_mas = sqlite3_column_double(st, 2);
+        e.pmra_error_mas_yr  = sqlite3_column_double(st, 3);
+        e.pmdec_error_mas_yr = sqlite3_column_double(st, 4);
+        e.astrometric_params_solved = sqlite3_column_int(st, 5);
+        e.ra_dec_corr        = sqlite3_column_double(st, 6);
+        e.ra_parallax_corr   = sqlite3_column_double(st, 7);
+        e.ra_pmra_corr       = sqlite3_column_double(st, 8);
+        e.ra_pmdec_corr      = sqlite3_column_double(st, 9);
+        e.dec_parallax_corr  = sqlite3_column_double(st, 10);
+        e.dec_pmra_corr      = sqlite3_column_double(st, 11);
+        e.dec_pmdec_corr     = sqlite3_column_double(st, 12);
+        e.parallax_pmra_corr = sqlite3_column_double(st, 13);
+        e.parallax_pmdec_corr= sqlite3_column_double(st, 14);
+        e.pmra_pmdec_corr    = sqlite3_column_double(st, 15);
+        out = e;
+    }
+    sqlite3_finalize(st);
+    return out;
+}
+
+void cache_write(sqlite3* db, int64_t sid, const StarAstrometricErrors& e) {
+    if (!db) return;
+    const char* sql = "INSERT OR REPLACE INTO star_errors VALUES"
+        "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) return;
+    sqlite3_bind_int64(st, 1, sid);
+    sqlite3_bind_double(st, 2, e.ra_error_mas);
+    sqlite3_bind_double(st, 3, e.dec_error_mas);
+    sqlite3_bind_double(st, 4, e.parallax_error_mas);
+    sqlite3_bind_double(st, 5, e.pmra_error_mas_yr);
+    sqlite3_bind_double(st, 6, e.pmdec_error_mas_yr);
+    sqlite3_bind_int   (st, 7, e.astrometric_params_solved);
+    sqlite3_bind_double(st, 8,  e.ra_dec_corr);
+    sqlite3_bind_double(st, 9,  e.ra_parallax_corr);
+    sqlite3_bind_double(st, 10, e.ra_pmra_corr);
+    sqlite3_bind_double(st, 11, e.ra_pmdec_corr);
+    sqlite3_bind_double(st, 12, e.dec_parallax_corr);
+    sqlite3_bind_double(st, 13, e.dec_pmra_corr);
+    sqlite3_bind_double(st, 14, e.dec_pmdec_corr);
+    sqlite3_bind_double(st, 15, e.parallax_pmra_corr);
+    sqlite3_bind_double(st, 16, e.parallax_pmdec_corr);
+    sqlite3_bind_double(st, 17, e.pmra_pmdec_corr);
+    sqlite3_step(st);
+    sqlite3_finalize(st);
+}
+
+} // namespace
+
+std::optional<StarAstrometricErrors>
+GaiaDR3Catalog::fetch_astrometric_errors(int64_t source_id) const {
+    // 1. Local cache first (offline path).
+    sqlite3* cache = open_error_cache();
+    if (auto hit = cache_read(cache, source_id)) {
+        if (cache) sqlite3_close(cache);
+        return hit;
+    }
+
+    // 2. Miss: one online query by source_id for the full error model.
+    StarAstrometricErrors e;
+    try {
+        ioc::gaia::GaiaClient client(ioc::gaia::GaiaRelease::DR3);
+        auto rows = client.queryBySourceIds({static_cast<int64_t>(source_id)});
+        if (rows.empty()) { if (cache) sqlite3_close(cache); return std::nullopt; }
+        const auto& s = rows.front();
+        e.ra_error_mas       = s.ra_error;
+        e.dec_error_mas      = s.dec_error;
+        e.parallax_error_mas = s.parallax_error;
+        e.pmra_error_mas_yr  = s.pmra_error;
+        e.pmdec_error_mas_yr = s.pmdec_error;
+        e.astrometric_params_solved = s.astrometric_params_solved;
+        e.ra_dec_corr        = s.ra_dec_corr;
+        e.ra_parallax_corr   = s.ra_parallax_corr;
+        e.ra_pmra_corr       = s.ra_pmra_corr;
+        e.ra_pmdec_corr      = s.ra_pmdec_corr;
+        e.dec_parallax_corr  = s.dec_parallax_corr;
+        e.dec_pmra_corr      = s.dec_pmra_corr;
+        e.dec_pmdec_corr     = s.dec_pmdec_corr;
+        e.parallax_pmra_corr = s.parallax_pmra_corr;
+        e.parallax_pmdec_corr= s.parallax_pmdec_corr;
+        e.pmra_pmdec_corr    = s.pmra_pmdec_corr;
+    } catch (const std::exception&) {
+        if (cache) sqlite3_close(cache);
+        return std::nullopt;  // offline and not cached: honest failure
+    }
+
+    // 3. Cache for next time, then return.
+    cache_write(cache, source_id, e);
+    if (cache) sqlite3_close(cache);
+    return e;
 }
 
 } // namespace astdyn::catalog

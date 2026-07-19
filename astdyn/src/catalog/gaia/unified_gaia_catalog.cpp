@@ -170,9 +170,17 @@ public:
     
     bool initializeSqlite(const std::string& db_path) {
         try {
-            sqlite_catalog_ = std::make_unique<GaiaSqliteCatalog>(db_path);
+            // sqlite3_open non espande '~': lo facciamo qui, cosi' i config
+            // restano portabili (~/.catalog/... invece di path assoluti).
+            std::string path = db_path;
+            if (!path.empty() && path[0] == '~') {
+                if (const char* home = std::getenv("HOME")) {
+                    path = std::string(home) + path.substr(1);
+                }
+            }
+            sqlite_catalog_ = std::make_unique<GaiaSqliteCatalog>(path);
             if (sqlite_catalog_->isOpen()) {
-                std::cout << "Loaded Gaia SQLite DR3 catalog: " << db_path << std::endl;
+                std::cout << "Loaded Gaia SQLite DR3 catalog: " << path << std::endl;
                 return true;
             }
             return false;

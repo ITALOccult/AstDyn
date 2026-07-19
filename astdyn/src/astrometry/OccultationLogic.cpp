@@ -908,23 +908,51 @@ void OccultationLogic::apply_uncertainty(
     // ---- 5. The star's own uncertainty (Eq. 17) ------------------------------
     // Independent of the orbit, so the plane-of-sky covariances simply add.
     Eigen::Matrix2d C_total = m.C_xi;
-    if (star.astrometric_params_solved >= 5) {
+
+    // The local catalogue carries geometry only (no formal errors). If they are
+    // absent, fetch the full error model online by source_id (cached locally).
+    // params_solved comes with it, so the >=5 guard below stays honest: a
+    // 2-parameter source yields no C_star, deliberately.
+    catalog::Star enriched = star;
+    if (enriched.ra_error_mas == 0.0 && enriched.pmra_error_mas_yr == 0.0) {
+        if (auto e = catalog::GaiaDR3Catalog::instance()
+                         .fetch_astrometric_errors(enriched.source_id)) {
+            enriched.ra_error_mas       = e->ra_error_mas;
+            enriched.dec_error_mas      = e->dec_error_mas;
+            enriched.parallax_error_mas = e->parallax_error_mas;
+            enriched.pmra_error_mas_yr  = e->pmra_error_mas_yr;
+            enriched.pmdec_error_mas_yr = e->pmdec_error_mas_yr;
+            enriched.astrometric_params_solved = e->astrometric_params_solved;
+            enriched.ra_dec_corr        = e->ra_dec_corr;
+            enriched.ra_parallax_corr   = e->ra_parallax_corr;
+            enriched.ra_pmra_corr       = e->ra_pmra_corr;
+            enriched.ra_pmdec_corr      = e->ra_pmdec_corr;
+            enriched.dec_parallax_corr  = e->dec_parallax_corr;
+            enriched.dec_pmra_corr      = e->dec_pmra_corr;
+            enriched.dec_pmdec_corr     = e->dec_pmdec_corr;
+            enriched.parallax_pmra_corr = e->parallax_pmra_corr;
+            enriched.parallax_pmdec_corr= e->parallax_pmdec_corr;
+            enriched.pmra_pmdec_corr    = e->pmra_pmdec_corr;
+        }
+    }
+
+    if (enriched.astrometric_params_solved >= 5) {
         Eigen::Matrix<double, 5, 1> serr;
-        serr << star.ra_error_mas, star.dec_error_mas, star.parallax_error_mas,
-                star.pmra_error_mas_yr, star.pmdec_error_mas_yr;
+        serr << enriched.ra_error_mas, enriched.dec_error_mas, enriched.parallax_error_mas,
+                enriched.pmra_error_mas_yr, enriched.pmdec_error_mas_yr;
         // All ten correlations, not a diagonal approximation: Gaia publishes
         // them because the ellipse is wrong without them.
         GaiaCorrelations gc;
-        gc.ra_dec         = star.ra_dec_corr;
-        gc.ra_parallax    = star.ra_parallax_corr;
-        gc.ra_pmra        = star.ra_pmra_corr;
-        gc.ra_pmdec       = star.ra_pmdec_corr;
-        gc.dec_parallax   = star.dec_parallax_corr;
-        gc.dec_pmra       = star.dec_pmra_corr;
-        gc.dec_pmdec      = star.dec_pmdec_corr;
-        gc.parallax_pmra  = star.parallax_pmra_corr;
-        gc.parallax_pmdec = star.parallax_pmdec_corr;
-        gc.pmra_pmdec     = star.pmra_pmdec_corr;
+        gc.ra_dec         = enriched.ra_dec_corr;
+        gc.ra_parallax    = enriched.ra_parallax_corr;
+        gc.ra_pmra        = enriched.ra_pmra_corr;
+        gc.ra_pmdec       = enriched.ra_pmdec_corr;
+        gc.dec_parallax   = enriched.dec_parallax_corr;
+        gc.dec_pmra       = enriched.dec_pmra_corr;
+        gc.dec_pmdec      = enriched.dec_pmdec_corr;
+        gc.parallax_pmra  = enriched.parallax_pmra_corr;
+        gc.parallax_pmdec = enriched.parallax_pmdec_corr;
+        gc.pmra_pmdec     = enriched.pmra_pmdec_corr;
 
         // Julian year of the event, against Gaia's 2016.0 reference epoch. The
         // dt term is not a detail: ten years of proper-motion uncertainty
