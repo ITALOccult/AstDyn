@@ -79,27 +79,6 @@ Tensor3 j2_third(const Vector3d& r, double mu, double j2, double r_eq) {
 }
 
 // ---- acceleration -------------------------------------------------------
-static Vector3d kepler_accel(const Vector3d& u, double mu) {
-    const double r = u.norm();
-    return -mu * u / (r * r * r);
-}
-
-static Vector3d j2_accel(const Vector3d& r, double mu, double j2, double r_eq) {
-    // Forma canonica Vallado (Fundamentals of Astrodynamics, eq. 8-36).
-    // a_r < 0 nel piano equatoriale: J2>0 rafforza la gravita' all'equatore.
-    // La versione precedente restituiva l'accelerazione con segno invertito;
-    // j2_hessian/j2_third erano gia' corrette (verificate vs derivata numerica),
-    // quindi qui si allinea la sola accelerazione alla loro convenzione.
-    const double rn = r.norm();
-    const double z  = r[2];
-    const double k  = -1.5 * j2 * (mu / (rn * rn)) * std::pow(r_eq / rn, 2);
-    Vector3d a;
-    a[0] = k * (1.0 - 5.0 * std::pow(z / rn, 2)) * r[0] / rn;
-    a[1] = k * (1.0 - 5.0 * std::pow(z / rn, 2)) * r[1] / rn;
-    a[2] = k * (3.0 - 5.0 * std::pow(z / rn, 2)) * r[2] / rn;
-    return a;
-}
-
 
 // ---- aggregates ---------------------------------------------------------
 
