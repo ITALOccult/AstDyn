@@ -101,8 +101,10 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
         ev.mag_drop_r = ev.object_mag - comb_r;
     }
     ev.mag_drops_adjusted  = 0;
-    ev.bright_nearby_count = -1;   // no nearby-star check is performed
-    ev.total_nearby_count  = -1;
+    // No nearby-star check is performed; Occult4/OWC expects 0 (not counted),
+    // never -1, for these two fields.
+    ev.bright_nearby_count = 0;
+    ev.total_nearby_count  = 0;
 
     // ---- <Object> ---------------------------------------------------------
     ev.object_number = ast_id;
@@ -171,14 +173,18 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
 
     // "Known errors" means both the star and the object have measured
     // covariances. The star half is only true for a full Gaia solution.
-    ev.error_basis = have_cov
-                   ? (cand.star.astrometric_params_solved >= 5 ? "Known errors" : "Star+PEU")
-                   : "Assumed";
+    // Occult4/OWC canonical error-basis strings (verified against a real
+    // OccultWatcher export): only "Star+PeakEphemUncert" and "Star+Assumed"
+    // are accepted. The true-vs-estimated distinction lives in our logs, not
+    // in the interchange XML, which OWC parses strictly.
+    ev.error_basis = have_cov ? "Star+PeakEphemUncert" : "Star+Assumed";
 
-    ev.reliability = (cand.star.ruwe > 0.0) ? cand.star.ruwe : -1.0;
-    ev.duplicate_source    = -1;
-    ev.non_gaia_pm         = -1;
-    ev.pm_added_from_ucac4 = -1;
+    // Occult4/OWC uses 0 (flag inactive), never -1: a real OWC export shows
+    // these three fields as 0 in 1604/1630 events, 1 in the rest, never -1.
+    ev.reliability = (cand.star.ruwe > 0.0) ? cand.star.ruwe : 0.0;
+    ev.duplicate_source    = 0;
+    ev.non_gaia_pm         = 0;
+    ev.pm_added_from_ucac4 = 0;
 
     // The nonlinearity index has no home in the occelmnt format -- it is a SCOPE
     // quantity, not an Occult4 one -- so it is recorded in the source string,

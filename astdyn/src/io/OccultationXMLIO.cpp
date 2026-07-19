@@ -197,8 +197,7 @@ std::string OccultationXMLIO::format_event_node(const OccultationEvent& ev) {
        << ev.n_rings << "," << ev.n_moons << ","
        << std::setprecision(3) << ev.d_ra_s_hr << "," << ev.d_dec_as_hr << ","
        << ev.taxonomy << "," << ev.diameter_uncertainty_km << ","
-       << ev.moon_in_planet_shadow << ","
-       << std::setprecision(2) << ev.mag_v_asteroid << "," << ev.mag_r_asteroid
+       << ev.moon_in_planet_shadow
        << "</Object>\n";
 
     ss << std::setprecision(4);
