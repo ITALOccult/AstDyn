@@ -178,11 +178,17 @@ bool RKF78Integrator::adaptive_step(const DerivativeFunction& f, double& t, Eige
     for (int i = 0; i < 13; ++i) { y7 += h * b7_[i] * k[i]; y8 += h * b8_[i] * k[i]; }
     double rel_err = estimate_error(y, y7, y8, h);
     double dir = (h >= 0.0) ? 1.0 : -1.0;
-    if (rel_err > tolerance_) {
+    // Se il passo e' gia' al minimo consentito, ACCETTALO anche se l'errore
+    // supera la tolleranza: sotto h_min_ non si puo' scendere, e rifiutare
+    // all'infinito allo stesso passo e' un deadlock (1000 rifiuti -> eccezione).
+    // Il passo minimo E' il compromesso: si accetta l'errore residuo.
+    if (rel_err > tolerance_ && std::abs(h) > h_min_) {
         h = dir * std::max(h_min_, 0.9 * std::abs(h) * std::pow(tolerance_/rel_err, 0.125));
         stats_.num_rejected_steps++; return false;
     }
     y = y8; t += h; stats_.num_steps++;
+    // min/max_step_size sono double locali all'integrazione (non condivisi tra
+    // thread): std::min/max diretti, non serve la versione atomica.
     stats_.min_step_size = std::min(stats_.min_step_size, std::abs(h));
     stats_.max_step_size = std::max(stats_.max_step_size, std::abs(h));
     h = dir * std::clamp(0.9 * std::abs(h) * std::pow(tolerance_/std::max(rel_err, 1e-20), 0.125), h_min_, h_max_);

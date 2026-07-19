@@ -391,6 +391,7 @@ int main(int argc, char** argv) {
     // --- 2a. Load Primary Asteroids ---
     if (!asteroid_ids.empty()) {
         std::cout << "[ioccultcalc] Pre-calcolo polinomi per " << asteroid_ids.size() << " corpi over " << duration << " giorni...\n";
+        size_t skipped_count = 0;
         for (const auto& id : asteroid_ids) {
             auto elements_opt = horizons.query_elements(id, start_epoch);
             if (!elements_opt) {
@@ -398,28 +399,38 @@ int main(int argc, char** argv) {
                           << id << "'. L'asteroide sara' ignorato.\n";
             }
             if (elements_opt) {
-                auto elements = *elements_opt;
-                manager.add_asteroid(id, elements, start_epoch, end_epoch);
-                stored_elements[id] = elements;
-                
-                // Convert Keplerian elements to Cartesian state in GCRF for uncertainty calculation
-                auto state_eclip = propagation::keplerian_to_cartesian(elements);
-                // The state IS heliocentric ecliptic -- the variable is even named for it.
-                // Relabelling it GCRF through cast_frame renamed without converting;
-                // nothing downstream noticed because everything treated it as ecliptic
-                // anyway. Say what it is.
-                stored_states[id] = state_eclip;
-                
-                std::cout << "[ioccultcalc] '" << id << "' caricato da Horizons OK\n";
-                auto props = horizons.query_physical_properties(id);
-                if (props) {
-                    stored_props[id] = *props;
-                    manager.set_diameter(id, props->diameter_km);
-                } else {
-                    stored_props[id] = io::PhysicalProperties{"", 0.0, DEFAULT_ASTEROID_DIAMETER_KM, 0.0};
-                    manager.set_diameter(id, DEFAULT_ASTEROID_DIAMETER_KM);
+                // Un asteroide problematico (integratore che diverge, effemeride
+                // incoerente, ecc.) non deve abortire l'intero batch: lo si
+                // salta e si prosegue. Con range grandi (es. 1-34244) e' certo
+                // che alcuni falliranno.
+                try {
+                    auto elements = *elements_opt;
+                    manager.add_asteroid(id, elements, start_epoch, end_epoch);
+                    stored_elements[id] = elements;
+
+                    // The state IS heliocentric ecliptic -- the variable is named for it.
+                    auto state_eclip = propagation::keplerian_to_cartesian(elements);
+                    stored_states[id] = state_eclip;
+
+                    std::cout << "[ioccultcalc] '" << id << "' caricato da Horizons OK\n";
+                    auto props = horizons.query_physical_properties(id);
+                    if (props) {
+                        stored_props[id] = *props;
+                        manager.set_diameter(id, props->diameter_km);
+                    } else {
+                        stored_props[id] = io::PhysicalProperties{"", 0.0, DEFAULT_ASTEROID_DIAMETER_KM, 0.0};
+                        manager.set_diameter(id, DEFAULT_ASTEROID_DIAMETER_KM);
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "[ioccultcalc] SKIP '" << id << "': " << e.what() << "\n";
+                    ++skipped_count;
+                    continue;
                 }
             }
+        }
+        if (skipped_count > 0) {
+            std::cout << "[ioccultcalc] " << skipped_count
+                      << " asteroidi saltati (vedi SKIP sopra).\n";
         }
     }
 
