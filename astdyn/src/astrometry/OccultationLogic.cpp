@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include "astdyn/coordinates/CelestialToTerrestrial.hpp"
 #include "astdyn/propagation/StateTransitionTensor.hpp"
+#include "astdyn/propagation/ForceField.hpp"
 #include "astdyn/astrometry/StellarCovariance.hpp"
 #include "astdyn/astrometry/OccultationCovariance.hpp"
 #include <cstdlib>
@@ -739,144 +740,32 @@ void OccultationLogic::apply_uncertainty(
     // months separating it from a NEO event it is not, and the resulting error
     // lands squarely on the quantity being validated. The tensor already exposes
     // a per-step hook for exactly this.
-    propagation::PotentialModel model;
-    model.central_gm = constants::GMS;
-    model.j2 = 0.0;                                 // the Sun's J2 is negligible here
+    // Force model unificato: ForceField in ECLITTICA (integrate_in_ecliptic),
+    // stessa fisica del vecchio PotentialModel di questa sezione: J2 solare OFF
+    // (era model.j2=0), relativita' OFF, asteroidi OFF (solo perturbatori
+    // planetari maggiori). Perturbatori e rotazione eq->ecl sono ora interni a
+    // ForceField::n_body_perturbation; EphemerisRefresh e ASTDYN_PERTURBERS via.
+    propagation::PropagatorSettings stt_settings = engine.config().propagator_settings;
+    stt_settings.integrate_in_ecliptic   = true;
+    stt_settings.include_planets         = true;
+    stt_settings.include_moon            = true;
+    stt_settings.include_sun_j2          = false;
+    stt_settings.include_relativity      = false;
+    stt_settings.include_asteroids       = false;
+    stt_settings.baricentric_integration = false;
+    auto stt_force = std::make_shared<propagation::ForceField>(
+        stt_settings, engine.getEphemeris());
 
-    static constexpr std::array<std::pair<ephemeris::CelestialBody, double>, 9> kPerturbers{{
-        {ephemeris::CelestialBody::MERCURY, constants::GM_MERCURY_AU},
-        {ephemeris::CelestialBody::VENUS,   constants::GM_VENUS_AU},
-        // Earth and Moon separately: at a NEO's close approach the Earth-Moon
-        // barycentre is not a good enough stand-in for either.
-        {ephemeris::CelestialBody::EARTH,   constants::GM_EARTH_AU},
-        {ephemeris::CelestialBody::MOON,    constants::GM_MOON_AU},
-        {ephemeris::CelestialBody::MARS,    constants::GM_MARS_AU},
-        {ephemeris::CelestialBody::JUPITER, constants::GM_JUPITER_AU},
-        {ephemeris::CelestialBody::SATURN,  constants::GM_SATURN_AU},
-        {ephemeris::CelestialBody::URANUS,  constants::GM_URANUS_AU},
-        {ephemeris::CelestialBody::NEPTUNE, constants::GM_NEPTUNE_AU},
-    }};
-
+    // Rotazione eq->ecl per la geometria d'ombra a valle (osservatore, stella).
     const Matrix3d eq2ecl_frame = coordinates::ReferenceFrame::j2000_to_ecliptic();
 
-    // Maschera per l'eliminazione a uno a uno: ASTDYN_PERTURBERS e' un elenco
-    // di indici da TENERE, per esempio "0,1,2,5". Vuoto o assente = tutti.
-    //
-    // Serve a togliere un perturbatore alla volta e guardare cosa succede
-    // all'errore. Se togliendone uno crolla, e' quello; se non cambia, quel
-    // perturbatore non stava contribuendo, e il difetto e' nel COME viene
-    // applicato. Nessuna delle due risposte richiede di indovinare.
-    std::vector<int> keep;
-    if (const char* env = std::getenv("ASTDYN_PERTURBERS")) {
-        std::stringstream ss(env);
-        std::string tok;
-        while (std::getline(ss, tok, ',')) if (!tok.empty()) keep.push_back(std::stoi(tok));
-    }
-    std::vector<std::size_t> active;
-    for (std::size_t i = 0; i < kPerturbers.size(); ++i) {
-        if (keep.empty() || std::find(keep.begin(), keep.end(), static_cast<int>(i))
-                            != keep.end()) {
-            active.push_back(i);
-        }
-    }
-    if (occ_debug() && active.size() != kPerturbers.size()) {
-        std::cerr << "[scope] perturbatori attivi: " << active.size() << " su "
-                  << kPerturbers.size() << "\n";
-    }
-
-    model.perturber_gm.reserve(active.size());
-    for (std::size_t i : active) model.perturber_gm.push_back(kPerturbers[i].second);
-    model.perturber_pos.assign(active.size(), Vector3d::Zero());
-
-    // Interruttore per l'A/B: senza perturbatori il problema a due corpi ha
-    // soluzione analitica, e un test chiuso dimostra che l'integratore regge
-    // e=0.89 fino a 0.2 km su 400 giorni. Se accendendo i perturbatori l'errore
-    // sale a decine di migliaia di km, il difetto e' nei perturbatori.
-    auto ephem = engine.getEphemeris();
-    if (std::getenv("ASTDYN_NO_PERTURBERS")) {
-        ephem = nullptr;
-        model.perturber_gm.clear();
-        model.perturber_pos.clear();
-        if (occ_debug()) std::cerr << "[scope] perturbatori DISATTIVATI\n";
-    }
-    propagation::StateTransitionTensor::EphemerisRefresh refresh = nullptr;
-    if (ephem) {
-        bool first_refresh = true;
-        refresh = [ephem, eq2ecl_frame, &first_refresh, active](
-                      time::EpochTDB t, propagation::PotentialModel& m) {
-            for (std::size_t k = 0; k < active.size(); ++k) {
-                const std::size_t i = active[k];
-                const auto st = ephem->getState(kPerturbers[i].first, t);
-                // The ephemeris is EQUATORIAL and the tensor works in the
-                // ecliptic. to_eigen_au_aud() strips the frame tag, so nothing
-                // would complain about feeding it the wrong one -- the same way
-                // an equatorial Earth silently scaled the error ellipse by 1.6.
-                const Vector3d rp = eq2ecl_frame * st.to_eigen_au_aud().head<3>();
-                // Un perturbatore all'origine e' il Sole, non un pianeta: se
-                // l'effemeride non conosce quel corpo e restituisce zero, il
-                // risultato e' una massa spuria sovrapposta al corpo centrale.
-                // Meglio accorgersene che integrarci sopra per 263 giorni.
-                if (rp.norm() < 1e-6) {
-                    throw std::runtime_error(
-                        "apply_uncertainty: il perturbatore " + std::to_string(i) +
-                        " e' all'origine: l'effemeride non lo conosce");
-                }
-                m.perturber_pos[k] = rp;
-                // Le effemeridi DE danno la Luna rispetto alla TERRA, non al
-                // Sole. Se qui arrivasse una posizione geocentrica, la Luna
-                // finirebbe a 0.0026 AU dal Sole e il termine indiretto
-                // -GM*r_p/|r_p|^3 esploderebbe: a quella distanza vale l'1.4%
-                // dell'attrazione solare, costante e sistematica. Il controllo
-                // sull'origine (>1e-6 AU) non lo prenderebbe: 0.0026 lo passa.
-                if (occ_debug() && first_refresh) {
-                    // La norma non discrimina il frame: una rotazione la
-                    // conserva. La latitudine ECLITTICA si': i pianeti stanno
-                    // quasi nell'eclittica, la Terra per DEFINIZIONE a zero.
-                    // Se j2000_to_ecliptic() ruotasse nel verso sbagliato, i
-                    // perturbatori sarebbero fuori di 47 gradi e |r| non
-                    // batterebbe ciglio.
-                    const double lat_deg = std::asin(std::clamp(rp.z()/rp.norm(), -1.0, 1.0))
-                                         * 180.0 / M_PI;
-                    std::cerr << "[scope]   perturbatore " << i << ": |r| = "
-                              << rp.norm() << " AU   lat.eclittica = " << lat_deg
-                              << " deg   GM = " << m.perturber_gm[k] << "\n";
-                }
-            }
-        };
-        refresh(initial_state.epoch, model);        // popola prima del primo passo
-
-        // E ora la stessa cosa all'ALTRO capo. Le posizioni le ho controllate
-        // solo all'epoca iniziale, ma la propagazione le richiede fino a t_ca --
-        // 931 giorni prima, per gli eventi del 2023. Se l'effemeride copre un
-        // intervallo limitato ed estrapola fuori, i perturbatori sarebbero
-        // giusti all'inizio e sbagliati durante: un errore invisibile a
-        // qualunque controllo fatto solo a t0.
-        if (occ_debug()) {
-            std::cerr << "[scope] --- perturbatori a t_ca (MJD " << params.t_ca.mjd()
-                      << "), " << (params.t_ca.mjd() - initial_state.epoch.mjd())
-                      << " giorni dall'epoca ---\n";
-            propagation::PotentialModel check = model;
-            first_refresh = true;
-            refresh(params.t_ca, check);
-        }
-        first_refresh = false;
-    }
-
-    // La precisione dell'integratore, come manopola misurabile.
-    //
-    // Il test chiuso che dava 1 km su 931 giorni girava con KEPLERO PURO. Ma
-    // estimate_step() usa force_gradient(q, m), che con nove perturbatori
-    // restituisce tutt'altro: il passo cambia quando li accendi, e in quel
-    // regime l'integratore non e' mai stato verificato.
-    //
-    // Se il residuo dipende dalla precisione, e' l'integratore. Se non si muove,
-    // e' fisica mancante e va cercata altrove. In entrambi i casi e' una misura,
-    // non un'ipotesi.
+    // Precisione dell'integratore come manopola misurabile (metrica di passo
+    // AAS via ForceField::gradient_spectral_radius).
     double precision = 1e-4;
     if (const char* p = std::getenv("ASTDYN_STT_PRECISION")) precision = std::atof(p);
 
-    propagation::StateTransitionTensor stt(model, precision);
-    const auto tr = stt.propagate(initial_state, params.t_ca, refresh);
+    propagation::StateTransitionTensor stt(stt_force, precision);
+    const auto tr = stt.propagate(initial_state, params.t_ca);
 
     // Il numero grezzo, senza geometria di mezzo. Un test chiuso (STT contro
     // Keplero analitico, senza perturbatori) dava 0.1 km su 263 giorni, mentre

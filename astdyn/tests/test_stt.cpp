@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 #include "astdyn/propagation/StateTransitionTensor.hpp"
+#include "astdyn/propagation/ForceField.hpp"
 #include "astdyn/propagation/PotentialDerivatives.hpp"
 #include "astdyn/core/physics_types.hpp"
 #include "astdyn/time/epoch.hpp"
@@ -58,6 +59,18 @@ PotentialModel kepler_model() {
     return m;
 }
 
+std::shared_ptr<propagation::ForceField> kepler_force() {
+    propagation::PropagatorSettings s;
+    s.central_body_gm         = MU_SUN;
+    s.include_planets         = false;
+    s.include_asteroids       = false;
+    s.include_relativity      = false;
+    s.include_sun_j2          = false;
+    s.include_earth_j2        = false;
+    s.baricentric_integration = false;
+    return std::make_shared<propagation::ForceField>(s);  // kepler puro, no effemeride
+}
+
 }  // namespace
 
 // ---- 1. Closed-form third derivative vs finite differences of U_ij ---------
@@ -84,7 +97,7 @@ TEST(StateTransitionTensor, UijkMatchesFiniteDifference) {
 
 // ---- 2. STM Phi vs finite differences of the (fixed-step) flow -------------
 TEST(StateTransitionTensor, PhiMatchesFiniteDifference) {
-    const StateTransitionTensor stt(kepler_model());
+    const StateTransitionTensor stt(kepler_force());
     const time::EpochTDB t0 = time::EpochTDB::from_mjd(60000.0);
     const time::EpochTDB t1 = t0 + time::TimeDuration::from_days(40.0);
     const int n = 300;
@@ -107,7 +120,7 @@ TEST(StateTransitionTensor, PhiMatchesFiniteDifference) {
 
 // ---- 3. STT Psi vs mixed second differences of the flow --------------------
 TEST(StateTransitionTensor, PsiMatchesFiniteDifference) {
-    const StateTransitionTensor stt(kepler_model());
+    const StateTransitionTensor stt(kepler_force());
     const time::EpochTDB t0 = time::EpochTDB::from_mjd(60000.0);
     const time::EpochTDB t1 = t0 + time::TimeDuration::from_days(40.0);
     const int n = 300;
@@ -142,7 +155,7 @@ TEST(StateTransitionTensor, PsiMatchesFiniteDifference) {
 
 // ---- 4. Psi is symmetric in its last two indices ---------------------------
 TEST(StateTransitionTensor, PsiSymmetry) {
-    const StateTransitionTensor stt(kepler_model());
+    const StateTransitionTensor stt(kepler_force());
     const time::EpochTDB t0 = time::EpochTDB::from_mjd(60000.0);
     const time::EpochTDB t1 = t0 + time::TimeDuration::from_days(40.0);
     const auto psi = stt.propagate_fixed(make_state(nominal_state(), t0), t1, 300).psi;
@@ -156,7 +169,7 @@ TEST(StateTransitionTensor, PsiSymmetry) {
 
 // ---- 5. Adaptive metric agrees with the fixed-step reference ---------------
 TEST(StateTransitionTensor, AdaptiveMatchesFixed) {
-    const StateTransitionTensor stt(kepler_model(), 1e-6);
+    const StateTransitionTensor stt(kepler_force(), 1e-6);
     const time::EpochTDB t0 = time::EpochTDB::from_mjd(60000.0);
     const time::EpochTDB t1 = t0 + time::TimeDuration::from_days(40.0);
     const State x0 = make_state(nominal_state(), t0);

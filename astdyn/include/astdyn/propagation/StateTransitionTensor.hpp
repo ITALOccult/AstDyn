@@ -17,7 +17,7 @@
 #ifndef ASTDYN_PROPAGATION_STATE_TRANSITION_TENSOR_HPP
 #define ASTDYN_PROPAGATION_STATE_TRANSITION_TENSOR_HPP
 
-#include "astdyn/propagation/PotentialDerivatives.hpp"
+#include "astdyn/propagation/ForceField.hpp"
 #include "astdyn/math/Tensor3.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/core/physics_types.hpp"
@@ -25,6 +25,7 @@
 #include "astdyn/time/epoch.hpp"
 #include <Eigen/Dense>
 #include <functional>
+#include <memory>
 
 namespace astdyn::propagation {
 
@@ -37,8 +38,6 @@ public:
     using State = astdyn::physics::CartesianStateTyped<Frame>;
 
     /// Optional hook to refresh perturber positions at a given epoch
-    /// (e.g. from the planetary ephemeris) at the start of each macro-step.
-    using EphemerisRefresh = std::function<void(time::EpochTDB, PotentialModel&)>;
 
     struct Result {
         State final_state;              ///< propagated mean state at t1
@@ -50,14 +49,13 @@ public:
      * @param model     force model (central GM, J2, perturbers) in au/day units
      * @param precision AAS step-metric precision (as in AASIntegrator)
      */
-    explicit StateTransitionTensor(PotentialModel model, double precision = 1e-4);
+    explicit StateTransitionTensor(std::shared_ptr<const ForceField> force, double precision = 1e-4);
 
     /**
      * @brief Propagate (state, Phi, Psi) from x0.epoch to t1 (forward in time).
      * @param refresh optional per-step ephemeris update of the perturbers.
      */
-    [[nodiscard]] Result propagate(const State& x0, time::EpochTDB t1,
-                                   const EphemerisRefresh& refresh = nullptr) const;
+    [[nodiscard]] Result propagate(const State& x0, time::EpochTDB t1) const;
 
     /**
      * @brief Fixed-step variant (uniform n_steps, no adaptive metric).
@@ -75,21 +73,18 @@ private:
     // one adaptive macro-step (7-stage Yoshida DKD) advancing dt days
     void step(astdyn::Vector3d& q, astdyn::Vector3d& p,
               astdyn::Matrix6d& phi, astdyn::math::Tensor6& psi,
-              double dt, const PotentialModel& m) const;
+              double dt, time::EpochTDB t) const;
     void kick(const astdyn::Vector3d& q, astdyn::Vector3d& p,
               astdyn::Matrix6d& phi, astdyn::math::Tensor6& psi,
-              double h, const PotentialModel& m) const;
+              double h, time::EpochTDB t) const;
     void drift(astdyn::Vector3d& q, const astdyn::Vector3d& p,
                astdyn::Matrix6d& phi, astdyn::math::Tensor6& psi, double h) const;
-
-    // AAS adaptive metric
-    [[nodiscard]] double force_gradient(const astdyn::Vector3d& r,
-                                        const PotentialModel& m) const;
+    // AAS adaptive metric (spectral radius via ForceField::gradient_spectral_radius)
     [[nodiscard]] double estimate_step(const astdyn::Vector3d& q,
                                        const astdyn::Vector3d& p,
-                                       double target_dt, const PotentialModel& m) const;
+                                       double target_dt, time::EpochTDB t) const;
 
-    PotentialModel model_;
+    std::shared_ptr<const ForceField> force_;
     double precision_;
     double w1_, w0_, c1_, c2_, d1_, d2_;   ///< Yoshida-4 coefficients
 };
