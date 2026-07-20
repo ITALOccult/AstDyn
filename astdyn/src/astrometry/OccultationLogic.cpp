@@ -652,12 +652,21 @@ std::vector<OccultationCandidate> OccultationLogic::find_multi_asteroid_occultat
             continue;
         }
         if (occ_debug()) std::cerr << "[DBG] '" << id << "' diametro=" << manager.get_diameter(id)
-            << " km (filtro min=" << config.min_asteroid_diameter_km << ")\n";
+            << " km (filtro min=" << config.min_asteroid_diameter_km
+            << " max=" << config.max_asteroid_diameter_km << ")\n";  // debug filtri Fase 2
 
-        // --- NEW: Diameter Filter ---
-        if (config.min_asteroid_diameter_km > 0.1 && manager.get_diameter(id) < config.min_asteroid_diameter_km) {
-            if (occ_debug()) std::cerr << "[DBG]   SCARTATO: diametro sotto soglia\n";
+        // --- Diameter Filter (min e max) ---
+        // Applicato PRIMA della generazione dei path/coni: un corpo fuori
+        // soglia viene scartato senza pagare la ricerca (i corpi grandi
+        // generano path lunghi e centinaia di query cone).
+        const double diam = manager.get_diameter(id);
+        if (config.min_asteroid_diameter_km > 0.1 && diam < config.min_asteroid_diameter_km) {
+            if (occ_debug()) std::cerr << "[DBG]   SCARTATO: diametro sotto soglia min\n";
             continue; 
+        }
+        if (config.max_asteroid_diameter_km > 0.1 && diam > config.max_asteroid_diameter_km) {
+            if (occ_debug()) std::cerr << "[DBG]   SCARTATO: diametro sopra soglia max\n";
+            continue;
         }
         
         const auto& eph = manager.get_ephemeris(id);

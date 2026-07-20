@@ -251,6 +251,8 @@ struct OccultationConfig {
     // Advanced Scientific Filters
     double min_duration_s = 0.0;
     double min_asteroid_diameter_km = 0.0;
+    double max_asteroid_diameter_km = 0.0;  // 0 = disabilitato; esclude i corpi
+                                            // grandi (path lunghi, molti coni)
 
     // Site-Specific Proximity Filters
     double obs_lat = 0.0;

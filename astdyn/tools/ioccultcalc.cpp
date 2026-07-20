@@ -474,12 +474,20 @@ int main(int argc, char** argv) {
 
                     std::cout << "[ioccultcalc] '" << id << "' caricato da Horizons OK\n";
                     auto props = horizons.query_physical_properties(id);
-                    if (props) {
+                    if (props && props->diameter_km > 0.0) {
                         stored_props[id] = *props;
                         manager.set_diameter(id, props->diameter_km);
                     } else {
-                        stored_props[id] = io::PhysicalProperties{"", 0.0, DEFAULT_ASTEROID_DIAMETER_KM, 0.0};
-                        manager.set_diameter(id, DEFAULT_ASTEROID_DIAMETER_KM);
+                        // props assente, oppure presente ma con diametro non
+                        // parsato (0): in entrambi i casi il diametro e' ignoto.
+                        // Usa il default, altrimenti il filtro diametro vedrebbe
+                        // 0 e non potrebbe mai scartare il corpo.
+                        double d = (props && props->diameter_km > 0.0)
+                                 ? props->diameter_km : DEFAULT_ASTEROID_DIAMETER_KM;
+                        io::PhysicalProperties pp = props ? *props : io::PhysicalProperties{"", 0.0, d, 0.0};
+                        pp.diameter_km = d;
+                        stored_props[id] = pp;
+                        manager.set_diameter(id, d);
                     }
                 } catch (const std::exception& e) {
                     std::cerr << "[ioccultcalc] SKIP '" << id << "': " << e.what() << "\n";
@@ -522,6 +530,20 @@ int main(int argc, char** argv) {
     // --- 3c. Global Search ---
     OccultationConfig occ_config = engine.config().occultation_settings;
     occ_config.max_mag_star = mag_limit;
+
+    // --- Fase 2: filtri dal blocco 'filters' della config dinamica ---
+    if (adv_cfg.has("filters.diameter_min_km"))
+        occ_config.min_asteroid_diameter_km = adv_cfg.get<double>("filters.diameter_min_km", 0.0);
+    if (adv_cfg.has("filters.diameter_max_km"))
+        occ_config.max_asteroid_diameter_km = adv_cfg.get<double>("filters.diameter_max_km", 0.0);
+    if (adv_cfg.has("filters.star_mag_max"))
+        occ_config.max_mag_star = adv_cfg.get<double>("filters.star_mag_max", 14.0);
+    if (adv_cfg.has("filters.event_duration_s_min"))
+        occ_config.min_duration_s = adv_cfg.get<double>("filters.event_duration_s_min", 0.0);
+    if (adv_cfg.has("filters.drop_mag_min"))
+        occ_config.min_mag_drop = adv_cfg.get<double>("filters.drop_mag_min", 0.05);
+    if (adv_cfg.has("filters.max_gaia_ruwe"))
+        occ_config.max_gaia_ruwe = adv_cfg.get<double>("filters.max_gaia_ruwe", 99.0);
     
     // Apply scientific filters from CLI (overriding config if present)
     if (vm.count("min-duration")) occ_config.min_duration_s = vm["min-duration"].as<double>();
