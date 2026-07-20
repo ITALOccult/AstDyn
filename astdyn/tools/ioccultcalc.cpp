@@ -254,6 +254,46 @@ std::vector<std::string> parse_asteroid_list(const std::string& input) {
     return ids;
 }
 
+// Converte una specifica temporale flessibile in JD (TDB).
+// Accetta: "YYYY-MM-DD" o "YYYY MM DD.ddd" (calendario), oppure una stringa
+// numerica interpretata come JD se >= 2400000, altrimenti come MJD.
+// Per disambiguare esplicitamente si possono usare i prefissi "jd:" / "mjd:".
+static double parse_epoch_to_jd(const std::string& spec_in) {
+    std::string spec = spec_in;
+    // trim
+    auto a = spec.find_first_not_of(" \t");
+    auto b = spec.find_last_not_of(" \t");
+    if (a == std::string::npos) return 0.0;
+    spec = spec.substr(a, b - a + 1);
+
+    auto starts_with = [&](const std::string& p) {
+        return spec.size() >= p.size() && spec.compare(0, p.size(), p) == 0;
+    };
+
+    if (starts_with("jd:"))  return std::stod(spec.substr(3));
+    if (starts_with("mjd:")) return time::mjd_to_jd(std::stod(spec.substr(4)));
+
+    // Calendario: contiene '-' (YYYY-MM-DD) o spazi (YYYY MM DD)
+    bool looks_calendar = (spec.find('-') != std::string::npos && spec.size() >= 8)
+                       || (spec.find(' ') != std::string::npos);
+    if (looks_calendar) {
+        std::string norm = spec;
+        for (char& c : norm) if (c == '-' || c == '/') c = ' ';
+        std::istringstream iss(norm);
+        int year = 0, month = 0; double day = 1.0;
+        iss >> year >> month >> day;
+        if (year > 0 && month > 0) {
+            int day_int = static_cast<int>(day);
+            double frac = day - day_int;
+            return time::mjd_to_jd(time::calendar_to_mjd(year, month, day_int, frac));
+        }
+    }
+
+    // Numerico puro: JD se grande, altrimenti MJD.
+    double v = std::stod(spec);
+    return (v >= 2400000.0) ? v : time::mjd_to_jd(v);
+}
+
 int main(int argc, char** argv) {
     po::options_description desc("ioccultcalc: AstDyn Occultation Tool CLI\nUsage: ioccultcalc --asteroid <num1,num2,start-end...> --jd-start <jd> --duration <days>");
     desc.add_options()
@@ -341,15 +381,25 @@ int main(int argc, char** argv) {
     }
 
     // --- 3. Preparing Asteroids & Polynomials ---
+    // Selezione oggetti: 'objects.asteroids' (config dinamica) ha priorita',
+    // poi il flag CLI --asteroid, poi la vecchia chiave piatta 'asteroid'.
+    // Tutte le forme (lista, range "100-34244", "@file") passano da
+    // parse_asteroid_list.
     std::vector<std::string> asteroid_ids;
-    if (vm.count("asteroid")) {
+    if (adv_cfg.has("objects.asteroids")) {
+        asteroid_ids = parse_asteroid_list(adv_cfg.get<std::string>("objects.asteroids", ""));
+    } else if (vm.count("asteroid")) {
         asteroid_ids = parse_asteroid_list(vm["asteroid"].as<std::string>());
     } else if (adv_cfg.has("asteroid")) {
         asteroid_ids = parse_asteroid_list(adv_cfg.get<std::string>("asteroid", ""));
     }
 
+    // Finestra temporale: 'time.start' (calendario YYYY-MM-DD, "mjd:" o "jd:")
+    // ha priorita', poi --jd-start CLI, poi la vecchia chiave 'jd-start'.
     double jd_start = 0.0;
-    if (vm.count("jd-start")) {
+    if (adv_cfg.has("time.start")) {
+        jd_start = parse_epoch_to_jd(adv_cfg.get<std::string>("time.start", ""));
+    } else if (vm.count("jd-start")) {
         jd_start = vm["jd-start"].as<double>();
     } else if (adv_cfg.has("jd-start")) {
         jd_start = adv_cfg.get<double>("jd-start", 0.0);
@@ -362,7 +412,17 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    double duration = (!vm["duration"].defaulted()) ? vm["duration"].as<double>() : adv_cfg.get<double>("duration", 1.0);
+    // Durata: 'time.end' (stessa sintassi di start) -> durata = end - start;
+    // oppure 'time.duration_days'; poi --duration CLI; poi 'duration' piatta.
+    double duration;
+    if (adv_cfg.has("time.end")) {
+        double jd_end = parse_epoch_to_jd(adv_cfg.get<std::string>("time.end", ""));
+        duration = jd_end - jd_start;
+    } else if (adv_cfg.has("time.duration_days")) {
+        duration = adv_cfg.get<double>("time.duration_days", 1.0);
+    } else {
+        duration = (!vm["duration"].defaulted()) ? vm["duration"].as<double>() : adv_cfg.get<double>("duration", 1.0);
+    }
     double mag_limit = (!vm["mag"].defaulted()) ? vm["mag"].as<double>() : adv_cfg.get<double>("mag", 15.0);
     
     std::string out_dir = vm.count("out-dir") ? vm["out-dir"].as<std::string>() : adv_cfg.get<std::string>("out-dir", "");
