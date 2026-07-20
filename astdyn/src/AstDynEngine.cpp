@@ -114,7 +114,12 @@ void AstDynEngine::update_propagator() {
 void AstDynEngine::load_integrator_settings(const core::IOCConfig& ioc) {
     config_.integrator_type = string_to_integrator(ioc.get<std::string>("integrator.type", "RK4"));
     config_.initial_step_size = ioc.get<double>("integrator.step_size", 0.1);
-    config_.tolerance = ioc.get<double>("integrator.tolerance", 1e-12);
+    // Default 1e-11, non 1e-12: per RKF78 in AU/day una tolleranza relativa di
+    // 1e-12 e' sotto il rumore aritmetico dei 13 stage, irraggiungibile -> il
+    // passo collassa a h_min e l'integrazione rallenta enormemente (o, prima
+    // del fix del deadlock, falliva). 1e-11 e' accurato e raggiungibile. Chi
+    // vuole precisione estrema puo' ancora impostarlo esplicitamente.
+    config_.tolerance = ioc.get<double>("integrator.tolerance", 1e-11);
     config_.aas_precision = ioc.get<double>("integrator.aas_precision", 1e-4);
 }
 
