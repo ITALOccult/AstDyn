@@ -781,6 +781,20 @@ int main(int argc, char** argv) {
         }
     }
 
+    // output.write_empty: con 0 occultazioni il blocco sopra (if !results.empty)
+    // non scrive nulla. Per un batch OWC puo' servire un file comunque, per
+    // sapere che il run e' andato (vuoto != fallito). Se attivo, scrive un
+    // <Occultations></Occultations> valido.
+    if (results.empty() && adv_cfg.get<bool>("output.write_empty", false)) {
+        std::string xml_file = vm.count("xml-output") ? vm["xml-output"].as<std::string>()
+                                                      : adv_cfg.get<std::string>("xml-output", "");
+        if (!xml_file.empty()) {
+            std::filesystem::path pth = std::filesystem::path(out_dir) / xml_file;
+            OccultationXMLIO::write_file({}, pth.string());
+            std::cout << "[ioccultcalc] Saved 0 events (write_empty) to " << pth.string() << "\n";
+        }
+    }
+
     catalog::GaiaDR3Catalog::shutdown();
     return 0;
 }
