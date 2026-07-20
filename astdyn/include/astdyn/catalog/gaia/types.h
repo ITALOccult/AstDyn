@@ -175,9 +175,11 @@ struct CorridorQueryParams {
     double max_magnitude;               ///< Maximum G magnitude
     double min_parallax;                ///< Minimum parallax [mas], -1 = no limit
     size_t max_results;                 ///< Maximum results (0 = no limit)
+    size_t max_cones = 0;               ///< Max query cones (0 = default 200);
+                                        ///< oltre, allarga il raggio e rigenera
     
     CorridorQueryParams() 
-        : width(0.5), max_magnitude(20.0), min_parallax(-1.0), max_results(0) {}
+        : width(0.5), max_magnitude(20.0), min_parallax(-1.0), max_results(0), max_cones(0) {}
     
     /**
      * Parse corridor query from JSON string
@@ -238,6 +240,7 @@ struct OrbitQueryParams {
     double width;                   ///< Search width (radius) around the orbit [degrees]
     double max_magnitude;           ///< Maximum G magnitude
     double step_size;               ///< Step size for discretizing the orbit [same units as time] (0 = auto)
+    size_t max_cones = 0;           ///< Max query cones (0 = default 200); oltre, allarga il raggio
     
     OrbitQueryParams() 
         : t_start(0), t_end(0), width(0.1), max_magnitude(20.0), step_size(0) {}

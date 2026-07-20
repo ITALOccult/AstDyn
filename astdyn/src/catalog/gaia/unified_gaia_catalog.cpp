@@ -778,61 +778,62 @@ std::vector<GaiaStar> UnifiedGaiaCatalog::queryCorridor(const CorridorQueryParam
     };
     std::vector<SearchCone> search_cones;
     
-    // Heuristic: Use a query radius that is at least a reasonable chunk size (e.g. 0.5 deg)
-    // but scales with width. A larger radius means fewer queries but more filtering.
-    // 0.5 degrees is generally efficient for file-based partial reads.
+    // Heuristic: query radius >= 0.5 deg, scala con la larghezza del corridoio.
+    // Raggio piu' grande = meno coni ma piu' filtraggio.
     double chunk_radius = std::max(params.width * 2.0, 0.5);
-    
-    // Start first cone
-    if (!params.path.empty()) {
-        search_cones.push_back({params.path[0].ra, params.path[0].dec, chunk_radius});
-    }
-    
-    // Iterate through points and add cones when we step out of current coverage
-    // We also check segment midpoints for long segments
-    for (size_t i = 0; i < params.path.size(); ++i) {
-        // Check current point
-        SearchCone& current_cone = search_cones.back();
-        double dist = angularDistance({params.path[i].ra, params.path[i].dec}, 
-                                      {current_cone.ra, current_cone.dec});
-        
-        // If the tube section at this point sticks out of the cone, start a new one
-        // Tube sticks out if: center_dist + width > cone_radius
-        if (dist + params.width > current_cone.radius) {
-            search_cones.push_back({params.path[i].ra, params.path[i].dec, chunk_radius});
+
+    // Cap sul numero di coni: un path lungo/veloce puo' generarne centinaia
+    // (visto fino a 377), rendendo la ricerca lentissima. Se si supera il cap,
+    // si ALLARGA il raggio e si rigenera: il path resta coperto per intero
+    // (coni piu' grandi, piu' sovrapposti), con molte meno query. Nessun evento
+    // perso, a differenza di troncare o saltare.
+    const size_t max_cones = (params.max_cones > 0) ? static_cast<size_t>(params.max_cones) : 200;
+
+    // Lambda che genera i coni per un dato chunk_radius.
+    auto generate_cones = [&](double radius) {
+        search_cones.clear();
+        if (!params.path.empty()) {
+            search_cones.push_back({params.path[0].ra, params.path[0].dec, radius});
         }
-        
-        // Handle long segments between i and i+1
-        if (i + 1 < params.path.size()) {
-            double seg_len = angularDistance(
-                {params.path[i].ra, params.path[i].dec},
-                {params.path[i+1].ra, params.path[i+1].dec}
-            );
-            
-            // If segment is long, walk along it
-            if (seg_len > chunk_radius) {
-                int steps = static_cast<int>(seg_len / (chunk_radius * 0.5)); // 50% overlap approx
-                for (int k = 1; k < steps; ++k) {
-                    double t = static_cast<double>(k) / steps;
-                    double mid_ra = params.path[i].ra + t * (params.path[i+1].ra - params.path[i].ra);
-                    double mid_dec = params.path[i].dec + t * (params.path[i+1].dec - params.path[i].dec);
-                    
-                    SearchCone& active = search_cones.back();
-                    double mid_dist = angularDistance({mid_ra, mid_dec}, {active.ra, active.dec});
-                    
-                    if (mid_dist + params.width > active.radius) {
-                        search_cones.push_back({mid_ra, mid_dec, chunk_radius});
+        for (size_t i = 0; i < params.path.size(); ++i) {
+            SearchCone& current_cone = search_cones.back();
+            double dist = angularDistance({params.path[i].ra, params.path[i].dec},
+                                          {current_cone.ra, current_cone.dec});
+            if (dist + params.width > current_cone.radius) {
+                search_cones.push_back({params.path[i].ra, params.path[i].dec, radius});
+            }
+            if (i + 1 < params.path.size()) {
+                double seg_len = angularDistance(
+                    {params.path[i].ra, params.path[i].dec},
+                    {params.path[i+1].ra, params.path[i+1].dec});
+                if (seg_len > radius) {
+                    int steps = static_cast<int>(seg_len / (radius * 0.5));
+                    for (int k = 1; k < steps; ++k) {
+                        double t = static_cast<double>(k) / steps;
+                        double mid_ra = params.path[i].ra + t * (params.path[i+1].ra - params.path[i].ra);
+                        double mid_dec = params.path[i].dec + t * (params.path[i+1].dec - params.path[i].dec);
+                        SearchCone& active = search_cones.back();
+                        double mid_dist = angularDistance({mid_ra, mid_dec}, {active.ra, active.dec});
+                        if (mid_dist + params.width > active.radius) {
+                            search_cones.push_back({mid_ra, mid_dec, radius});
+                        }
                     }
                 }
             }
         }
+    };
+
+    generate_cones(chunk_radius);
+    // Troppi coni: allarga il raggio (x1.8) e rigenera, fino al cap o a un
+    // tetto di tentativi (evita loop infiniti su path degeneri).
+    for (int attempt = 0; attempt < 8 && search_cones.size() > max_cones; ++attempt) {
+        chunk_radius *= 1.8;
+        generate_cones(chunk_radius);
     }
-    
-    // Execute batched queries
-    // We collect ALL candidates first, then filter.
-    // This allows using the batchQuery API if available, or just loop.
-    std::cout << "Optimized Corridor: " << params.path.size() << " points -> " 
-              << search_cones.size() << " query cones." << std::endl;
+
+    std::cout << "Optimized Corridor: " << params.path.size() << " points -> "
+              << search_cones.size() << " query cones"
+              << " (r=" << chunk_radius << " deg)." << std::endl;
               
     for (const auto& cone : search_cones) {
         QueryParams cone_params;
@@ -915,6 +916,7 @@ std::vector<GaiaStar> UnifiedGaiaCatalog::queryOrbit(const OrbitQueryParams& par
     corridor_params.max_magnitude = params.max_magnitude;
     corridor_params.min_parallax = -1.0; // Default
     corridor_params.max_results = 0; // Default
+    corridor_params.max_cones = params.max_cones; // propaga il cap sui coni
 
     double step = params.step_size;
     if (step <= 0) {
