@@ -61,3 +61,6 @@ config_manual.pdf
 
 # Cache IDE (clangd, ecc.)
 .cache/
+
+# copie duplicate generate da macOS/sync
+* 2.*
