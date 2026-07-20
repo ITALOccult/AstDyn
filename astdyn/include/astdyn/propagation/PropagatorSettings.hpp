@@ -51,6 +51,18 @@ struct PropagatorSettings {
         s.include_moon            = cfg.get<bool>  ("physics.moon",                  s.include_moon);
         s.include_asteroids       = cfg.get<bool>  ("physics.asteroids.enabled",     s.include_asteroids);
         s.use_default_30_set      = cfg.get<bool>  ("physics.asteroids.use_30_set",  s.use_default_30_set);
+        // Lista esplicita di asteroidi perturbatori (NAIF/numero): se presente,
+        // sovrascrive il set di default. Es. physics.asteroids.list: [1, 4, 10].
+        // Attiva anche include_asteroids e disattiva il set di default, cosi'
+        // "la lista che dai e' la lista che usi".
+        if (cfg.has("physics.asteroids.list")) {
+            s.include_asteroids_list = cfg.get<std::vector<int>>("physics.asteroids.list", {});
+            if (!s.include_asteroids_list.empty()) {
+                s.include_asteroids = true;
+                s.use_default_asteroid_set = false;
+                s.use_default_30_set = false;
+            }
+        }
         s.perturb_mercury         = cfg.get<bool>  ("physics.mercury",               s.perturb_mercury);
         s.perturb_venus           = cfg.get<bool>  ("physics.venus",                 s.perturb_venus);
         s.perturb_earth           = cfg.get<bool>  ("physics.earth",                 s.perturb_earth);
