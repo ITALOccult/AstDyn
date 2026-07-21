@@ -1,4 +1,4 @@
-name: Deploy su IONOS via SFTP
+name: Deploy su IONOS via SFTP ok
 
 on:
   push:
