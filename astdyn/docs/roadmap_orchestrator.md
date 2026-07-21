@@ -1,0 +1,134 @@
+# Roadmap — Orchestratore di campagne per ITALOccult
+
+## Visione
+
+Un orchestratore Python sta *davanti* a `ioccultcalc` e prepara tutto: espande
+la lista oggetti, procura gli elementi orbitali (da fonti intercambiabili), li
+depone in una cartella convenzionale, invoca il motore, raccoglie i risultati.
+
+`ioccultcalc` resta piccolo nel ruolo: legge elementi da una cartella e scrive
+risultati. Non sa nulla di `allnum.db`, di NEODyS, di query SQL, di "tutti gli
+asteroidi". La complessità di selezione e provenienza vive in Python, dove è
+ispezionabile e facile da tenere in testa.
+
+## Struttura di lavoro (una campagna = una cartella)
+
+```
+base/
+  config.yaml            # la config della campagna (usata da tool e motore)
+  elements/              # elementi orbitali preparati dal tool (un file per corpo)
+  obs/                   # osservazioni per il fit (solo se richiesto)
+  results/
+    xml/                 # predizioni Occult4/OWC
+    map/                 # mappe
+    log/                 # log per corpo / di campagna
+```
+
+Il tool prepara `elements/` (e `obs/` se serve); il motore legge di lì e scrive
+in `results/`. La cartella è un artefatto riproducibile e ispezionabile.
+
+## Il vincolo tecnico che orienta tutto
+
+`ioccultcalc` oggi prende gli elementi SOLO da JPL Horizons (online, un corpo
+per volta): `horizons.query_elements(id, epoch)`. Il `.eq1` che gia' legge
+(`CovarianceIO::read_eq1`) porta elementi + covarianza, ma il flusso lo usa
+solo per la covarianza, a valle. Quindi:
+
+- Il **lettore di elementi da file esiste gia'** (`read_eq1`).
+- Manca il **canale** che lo usi al posto di Horizons per la propagazione.
+
+Aprire quel canale e' un intervento C++ piccolo e localizzato (non tocca la
+mole del file): "se esiste un file elementi locale per il corpo, usalo; altrimenti
+Horizons". E' la prima pietra: senza, il tool Python non ha come passare gli
+elementi al motore.
+
+---
+
+## Fasi
+
+### Fase 0 — Fondamenta: elementi da file nel motore  [C++, piccolo]
+Obiettivo: `ioccultcalc` sa caricare elementi da una cartella locale.
+- Nuova opzione (config/CLI): `elements_dir` (o `objects.elements_dir`).
+- Nel loop di caricamento: se esiste `elements_dir/<id>.eq1` (o formato scelto),
+  usa `read_eq1` per elementi (e covarianza) invece di `query_elements`.
+- Fallback a Horizons se il file non c'e' (comportamento attuale invariato).
+- Validazione: BK290 con elemento locale da' la stessa ellisse di oggi.
+Dipendenze: nessuna. E' il prerequisito di tutto il resto.
+
+### Fase 1 — Orchestratore minimo (lista esplicita)  [Python]
+Obiettivo: il tool legge la config, prepara `elements/` per una lista di corpi
+data (es. "1,4,704"), invoca il motore, raccoglie i risultati.
+- Legge la config (la stessa che il motore usa).
+- Per ogni corpo: estrae gli elementi dal nostro DB e scrive `elements/<id>.eq1`.
+- Invoca `ioccultcalc` con `elements_dir` e i parametri di config.
+- Struttura le cartelle `results/`.
+Dipendenze: Fase 0.
+
+### Fase 2 — Espansione "*" con filtro diametro  [Python]
+Obiettivo: `objects: "*"` diventa "tutti i numerati nella fascia diametro".
+- Query su `allnum.db`: fascia diametro -> fascia H (formula, albedo config,
+  con margine) -> lista dei numeri. Selezione ispezionabile (scrivibile come
+  lista prima di lanciare).
+- Guardia: `*` senza filtro diametro (o senza tetto) e' rifiutato, per non
+  enumerare 1.5M corpi per errore.
+Dipendenze: Fase 1.
+
+### Fase 3 — Fonti intercambiabili degli elementi  [Python]
+Obiettivo: gli elementi in `elements/` possono venire dal nostro DB, o essere
+scaricati da AstDyS/NEODyS, o forniti dall'utente.
+- Astrazione "source": db locale | astdys online | neodys online | file utente.
+- Config sceglie la fonte; il tool prepara `elements/` di conseguenza.
+- Il motore non cambia: legge sempre da `elements/`.
+Dipendenze: Fase 1 (idealmente dopo Fase 2).
+
+### Fase 4 — Multipassata / second-stage  [Python + forse C++]
+Obiettivo: rielaborare solo gli eventi positivi con parametri diversi.
+- Config: blocco `second_stage` con `only_positive: true` e i propri parametri.
+- Prima passata: predizione su tutti i corpi selezionati.
+- Seconda passata: solo i corpi che hanno prodotto un'occultazione, ri-processati
+  con la config del secondo stage (es. finestra piu' fine, filtri diversi).
+- Il fit orbita (vedi Fase 5) si innesta qui, solo se richiesto.
+Dipendenze: Fase 1.
+
+### Fase 5 — Fit orbita on-demand  [C++ da sistemare + Python]
+Obiettivo: fit orbitale esplicito, attivato solo quando richiesto, tipicamente
+nel second-stage sui pochi eventi positivi.
+- Il fit nella libreria e' attualmente buggato: prima va sistemato (lavoro C++
+  a se', con validazione su un caso noto).
+- Attivazione esplicita in config (`fit: {enabled: true, ...}`), default off.
+- Il tool prepara `obs/` (osservazioni da AstDyS/MPC) per i corpi da fittare.
+- Gira solo sui positivi (poche unita'), non sull'intera selezione.
+Dipendenze: Fase 4 per l'innesto; il debug del fit e' indipendente e puo'
+iniziare quando si vuole.
+
+### Fase 6 — Asteroidi multipli (satelliti/binari)  [C++ + Python]
+Obiettivo: predizione di occultazioni per corpi con satelliti.
+- Il motore ha gia' un percorso "system-ids"/BSP per corpi multipli: va
+  verificato ed esteso.
+- Il tool prepara gli elementi del sistema (primario + satelliti).
+Dipendenze: Fase 1; ortogonale alle altre, si puo' collocare quando serve.
+
+### Fase 7 — Installer e distribuzione  [Python]
+Obiettivo: un tool che porta da zero a sistema funzionante, catalogo incluso.
+- Passi: costruzione/So download del catalogo -> DB iniziale (via
+  update_asteroids.py) -> build dell'eseguibile -> verifica.
+- Distribuisce anche il catalogo (troppo grande per GitHub) da una sorgente
+  definita.
+Dipendenze: le fasi che definiscono la struttura finale (idealmente ultima,
+ma l'ossatura si puo' preparare prima).
+
+---
+
+## Ordine consigliato
+
+0 -> 1 -> 2  danno subito valore (campagne su selezione o su "*" filtrato, con
+elementi dal nostro DB, senza Horizons come collo di bottiglia).
+
+Poi 3 (fonti) e 4 (multipassata) a seconda della priorita'. 5 (fit) quando il
+bug del fit e' risolto. 6 (multipli) e 7 (installer) quando l'ossatura e' stabile.
+
+## Principio guida
+
+Ogni fase e' un pezzo che sta in testa, con un confine netto. Il C++ si tocca
+il meno possibile e solo dove serve un canale (Fase 0, forse 4/5/6). Tutta la
+logica di selezione, provenienza e orchestrazione vive in Python, ispezionabile.
