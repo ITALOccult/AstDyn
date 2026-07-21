@@ -331,9 +331,13 @@ physics::KeplerianStateTyped<core::ECLIPJ2000> AstDysOrbitFitter::equinoctial_to
     while (M < 0) M += 2.0 * constants::PI;
     while (M >= 2.0*constants::PI) M -= 2.0 * constants::PI;
     
+    // from_traditional vuole a in AU (fa lui Distance::from_au). Gli elementi
+    // equinoziali AstDyS hanno gia' a in AU: passarlo diretto, senza *AU
+    // (il *AU era una doppia conversione -> a ~1.5e8x troppo grande -> orbita
+    // assurda -> propagazione fuori range temporale).
     return physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
         epoch,
-        a * constants::AU, e, i_rad * constants::RAD_TO_DEG,
+        a, e, i_rad * constants::RAD_TO_DEG,
         Omega * constants::RAD_TO_DEG,
         omega * constants::RAD_TO_DEG,
         M * constants::RAD_TO_DEG,

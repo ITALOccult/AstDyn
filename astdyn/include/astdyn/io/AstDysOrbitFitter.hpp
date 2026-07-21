@@ -50,6 +50,11 @@ public:
     static AstDysFitResult fit_from_astdys(const std::string& object_name, 
                                           const std::string& download_dir = ".");
 
+    /// Converte elementi equinoziali AstDyS (a, h, k, p, q, lambda + epoca) in
+    /// elementi kepleriani tipizzati nel frame ECLIPJ2000. Utility pura.
+    static physics::KeplerianStateTyped<core::ECLIPJ2000> equinoctial_to_keplerian(
+        double a, double h, double k, double p, double q, double lambda, time::EpochTDB epoch);
+
 private:
     std::vector<observations::OpticalObservation> observations_;
     std::optional<physics::KeplerianStateTyped<core::ECLIPJ2000>> initial_elements_;
@@ -64,9 +69,6 @@ private:
     void load_json_file(const std::string& filename);
     
     std::string detect_format(const std::string& filename);
-    
-    static physics::KeplerianStateTyped<core::ECLIPJ2000> equinoctial_to_keplerian(
-        double a, double h, double k, double p, double q, double lambda, time::EpochTDB epoch);
 };
 
 } // namespace io

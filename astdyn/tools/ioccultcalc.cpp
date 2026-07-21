@@ -9,6 +9,7 @@
 #include "astdyn/astrometry/OccultationEvent.hpp"
 #include "astdyn/astrometry/ChebyshevEphemerisManager.hpp"
 #include "astdyn/io/CovarianceIO.hpp"
+#include "astdyn/io/AstDysOrbitFitter.hpp"
 #include "astdyn/math/MultivariateSampler.hpp"
 #include "astdyn/core/IOCConfig.hpp"
 #include "astdyn/time/TimeScale.hpp"
@@ -385,13 +386,27 @@ int main(int argc, char** argv) {
     // poi il flag CLI --asteroid, poi la vecchia chiave piatta 'asteroid'.
     // Tutte le forme (lista, range "100-34244", "@file") passano da
     // parse_asteroid_list.
+    // "*" significa "da 1 a objects.all_max": lo traduciamo in un range e lo
+    // passiamo a parse_asteroid_list, che i range gia' li gestisce. Il default
+    // di all_max e' volutamente modesto (1000): "*" non deve avviare per
+    // sbaglio una campagna su centinaia di migliaia di corpi (ore di calcolo).
+    // Chi vuole coprire di piu' alza objects.all_max, oppure -- meglio -- usa
+    // un range esplicito (es. "800000-821000") mirato alla zona di interesse.
+    auto expand_star = [&](std::string spec) -> std::string {
+        if (spec == "*") {
+            int all_max = adv_cfg.get<int>("objects.all_max", 1000);
+            return "1-" + std::to_string(all_max);
+        }
+        return spec;
+    };
+
     std::vector<std::string> asteroid_ids;
     if (adv_cfg.has("objects.asteroids")) {
-        asteroid_ids = parse_asteroid_list(adv_cfg.get<std::string>("objects.asteroids", ""));
+        asteroid_ids = parse_asteroid_list(expand_star(adv_cfg.get<std::string>("objects.asteroids", "")));
     } else if (vm.count("asteroid")) {
-        asteroid_ids = parse_asteroid_list(vm["asteroid"].as<std::string>());
+        asteroid_ids = parse_asteroid_list(expand_star(vm["asteroid"].as<std::string>()));
     } else if (adv_cfg.has("asteroid")) {
-        asteroid_ids = parse_asteroid_list(adv_cfg.get<std::string>("asteroid", ""));
+        asteroid_ids = parse_asteroid_list(expand_star(adv_cfg.get<std::string>("asteroid", "")));
     }
 
     // Finestra temporale: 'time.start' (calendario YYYY-MM-DD, "mjd:" o "jd:")
@@ -435,6 +450,14 @@ int main(int argc, char** argv) {
     time::EpochTDB start_epoch = time::EpochTDB::from_jd(jd_start);
     time::EpochTDB end_epoch = time::EpochTDB::from_jd(jd_start + duration);
 
+    // Fase 0 (orchestratore): se objects.elements_dir e' impostato, gli elementi
+    // di ciascun corpo vengono letti da <elements_dir>/<id>.eq1 (formato AstDyS)
+    // invece che da Horizons. Il tool Python prepara gli .eq1 grezzi; qui li
+    // convertiamo con la catena tipizzata (read_eq1 -> to_si ->
+    // equinoctial_to_keplerian), che rispetta frame e unita'. Fallback a
+    // Horizons se il file manca o e' illeggibile.
+    std::string elements_dir = adv_cfg.get<std::string>("objects.elements_dir", "");
+
     ChebyshevEphemerisManager manager(engine.config());
     HorizonsClient horizons;
     std::map<std::string, physics::CartesianStateTyped<core::ECLIPJ2000>> stored_states;
@@ -453,7 +476,42 @@ int main(int argc, char** argv) {
         std::cout << "[ioccultcalc] Pre-calcolo polinomi per " << asteroid_ids.size() << " corpi over " << duration << " giorni...\n";
         size_t skipped_count = 0;
         for (const auto& id : asteroid_ids) {
-            auto elements_opt = horizons.query_elements(id, start_epoch);
+            // Fase 0: prima l'elemento locale <elements_dir>/<id>.eq1, poi Horizons.
+            // Stesso tipo di query_elements (expected), cosi' il resto del loop
+            // (if(!elements_opt), *elements_opt) resta invariato.
+            std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, io::HorizonsError> elements_opt =
+                std::unexpected(io::HorizonsError{});
+            std::string ef = elements_dir.empty() ? std::string()
+                                                  : (elements_dir + "/" + id + ".eq1");
+            if (!ef.empty() && std::filesystem::exists(ef)) {
+                try {
+                    // read_eq1 da' gli elementi equinoziali in unita' AstDyS grezze:
+                    // a in AU, angoli in rad/deg. equinoctial_to_keplerian vuole
+                    // proprio a in AU (converte lei internamente), quindi NON si
+                    // applica to_si. Gli elementi portano la loro epoca (61200);
+                    // add_asteroid/fit_chebyshev propagano da elements.epoch alla
+                    // finestra usando la via gia' collaudata -- non propaghiamo qui.
+                    auto orb = io::CovarianceIO::read_eq1(ef);
+                    auto t0 = time::to_tdb(time::EpochTT::from_mjd(orb.epoch_mjd_tt));
+                    // NB: read_eq1 da' a in AU e lambda in GRADI (unita' AstDyS
+                    // grezze). equinoctial_to_keplerian vuole a in AU (ok) ma
+                    // lambda in RADIANTI (lo usa in M = lambda - varpi con varpi
+                    // in rad). to_si() faceva 'a->km, lambda->rad': serviva solo
+                    // la seconda meta'. Convertiamo qui solo lambda.
+                    elements_opt = io::AstDysOrbitFitter::equinoctial_to_keplerian(
+                        orb.elements(0), orb.elements(1), orb.elements(2),
+                        orb.elements(3), orb.elements(4),
+                        orb.elements(5) * constants::DEG_TO_RAD, t0);
+                    std::cout << "[ioccultcalc] '" << id << "' caricato da " << ef
+                              << " (elementi @MJD " << orb.epoch_mjd_tt << " TT)\n";
+                                } catch (const std::exception& e) {
+                    std::cerr << "[ioccultcalc] '" << id << "': errore leggendo " << ef
+                              << " (" << e.what() << "); fallback a Horizons\n";
+                }
+            }
+            if (!elements_opt) {
+                elements_opt = horizons.query_elements(id, start_epoch);
+            }
             if (!elements_opt) {
                 std::cerr << "[ioccultcalc] ERRORE: JPL Horizons non ha restituito elementi per '"
                           << id << "'. L'asteroide sara' ignorato.\n";
@@ -472,7 +530,8 @@ int main(int argc, char** argv) {
                     auto state_eclip = propagation::keplerian_to_cartesian(elements);
                     stored_states[id] = state_eclip;
 
-                    std::cout << "[ioccultcalc] '" << id << "' caricato da Horizons OK\n";
+                    // Il messaggio di provenienza (Horizons o .eq1) e' gia' stato
+                    // stampato nel ramo di caricamento; qui non ripetiamo "Horizons".
                     auto props = horizons.query_physical_properties(id);
                     if (props && props->diameter_km > 0.0) {
                         stored_props[id] = *props;
