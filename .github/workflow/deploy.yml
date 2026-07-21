@@ -1,4 +1,4 @@
-name: Deploy su IONOS dopo il Push
+name: Deploy su IONOS via SFTP
 
 on:
   push:
@@ -9,15 +9,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Scarica il codice dalla repository
+    - name: Scarica il codice
       uses: actions/checkout@v4
 
-    - name: Carica i file su IONOS tramite SFTP
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+    - name: Carica file tramite SFTP
+      uses: wlixcc/SFTP-Deploy-Action@v1.2.4
       with:
-        server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
+        server: ${{ secrets.FTP_SERVER }}
         password: ${{ secrets.FTP_PASSWORD }}
-        port: 22 # Usa 21 se utilizzi FTP classico invece di SFTP
-        local-dir: ./
-        server-dir: ./Develop/AstDyn/
+        port: 22
+        local_path: './*'
+        remote_path: '/Develop/AstDyn/'
+        sftp_only: true
