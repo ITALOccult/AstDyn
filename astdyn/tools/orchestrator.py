@@ -33,6 +33,7 @@ Config (YAML o JSON):
 """
 
 import argparse
+import copy
 import json
 import math
 import os
@@ -228,19 +229,35 @@ def main():
     if not prep and source != "jpl-horizons":
         sys.exit("ERRORE: nessun elemento preparato. Niente da processare.")
 
-    # --- config per ioccultcalc ---
-    engine_cfg = {
-        "objects": {"asteroids": ",".join(prep) if prep else spec},
-        "time": cfg.get("time", {}),
-    }
+    # --- config per il motore: PARTIAMO DALLA CONFIG DELL'UTENTE e la
+    # arricchiamo. Un solo file di verita': l'utente scrive UN file, qui
+    # aggiungiamo solo le chiavi che il motore ricava dalla campagna
+    # (elements_dir, out-dir, ...). ioccultcalc ignora le chiavi che non
+    # conosce (astdyn_base, source, database), quindi possono restare.
+    engine_cfg = copy.deepcopy(cfg)
+
+    # la lista effettivamente preparata (i corpi trovati), come stringa
+    engine_cfg.setdefault("objects", {})
+    engine_cfg["objects"]["asteroids"] = ",".join(prep) if prep else spec
     if use_elements_dir:
         engine_cfg["objects"]["elements_dir"] = str(elements_dir)
     if cfg.get("ephemeris_file"):
         engine_cfg["ephemeris_file"] = expand_path(cfg["ephemeris_file"])
 
+    # Output: dirigi XML e mappa nelle cartelle results/. Sovrascrivibili da
+    # config (blocco output: {xml, svg, write_empty}).
+    out_cfg = cfg.get("output", {}) or {}
+    engine_cfg["out-dir"] = str(results)
+    engine_cfg["xml-output"] = out_cfg.get("xml", "xml/occultations.xml")
+    if out_cfg.get("svg", True):
+        svg_name = out_cfg["svg"] if isinstance(out_cfg.get("svg"), str) else "map/worldmap.svg"
+        engine_cfg["svg-output"] = svg_name
+    engine_cfg["output"] = {"write_empty": bool(out_cfg.get("write_empty", True))}
+
+    # scriviamo la config arricchita accanto alla base (per ispezione/riproducibilita')
     engine_cfg_path = base / "engine_config.json"
     engine_cfg_path.write_text(json.dumps(engine_cfg, indent=2))
-    print(f"[orchestrator] config motore: {engine_cfg_path}")
+    print(f"[orchestrator] config motore (arricchita): {engine_cfg_path}")
 
     if args.dry_run:
         print("[orchestrator] --dry-run: preparazione completata, motore NON invocato.")
