@@ -89,6 +89,16 @@ public:
         if (!have_elements) {
             throw std::runtime_error("CovarianceIO: no EQU record in " + path);
         }
+        // Covarianza OPZIONALE: gli .eq1 generati dal DB allnum.db (orchestratore)
+        // contengono solo gli elementi, senza record COV. In quel caso la
+        // covarianza resta Zero (gia' inizializzata) e il chiamante usa i soli
+        // elementi (predizione geometrica, niente ellisse). Se i COV ci sono,
+        // devono essere 21 (triangolo superiore della 6x6) e superare
+        // check_covariance. check_covariance NON va chiamato sulla matrice Zero
+        // (non definita positiva -> fallirebbe): per questo il return anticipato.
+        if (cov_values.empty()) {
+            return orb;   // solo elementi, covarianza Zero
+        }
         if (cov_values.size() != 21) {
             throw std::runtime_error("CovarianceIO: expected 21 COV values in " + path +
                                      ", found " + std::to_string(cov_values.size()));
