@@ -253,6 +253,79 @@ def expand_star(db_path, filters, warn_threshold, assume_yes):
 
 
 # ---------------------------------------------------------------------------
+# Fase 3: sorgente AstDyS online (elementi CON covarianza + osservazioni)
+# ---------------------------------------------------------------------------
+# Gli .eq1 individuali di AstDyS contengono i record COV (21 valori): questo
+# porta la covarianza -> ELLISSI di incertezza in campagna (il DB dava solo
+# geometria). Le osservazioni (.rwo) servono per il fit (Fase 5) e si scaricano
+# solo per i corpi che servono (i positivi), non per tutti.
+ASTDYS_BASE = "https://newton.spacedys.com/~astdys2"
+ASTDYS_UA = "ITALOccult-orchestrator/1.0 (occultation campaign tool)"
+
+
+def astdys_group(number):
+    """Raggruppamento AstDyS: cartella = numero // 1000 (820987 -> 820, 1 -> 0)."""
+    return str(int(number) // 1000)
+
+
+def astdys_download(url, dest, throttle=0.5):
+    """Scarica url in dest con User-Agent identificativo e una piccola pausa
+    (cortesia verso il server). Ritorna True se ok. Richiede rete (Mac)."""
+    import urllib.request
+    import time as _time
+    req = urllib.request.Request(url, headers={"User-Agent": ASTDYS_UA})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            if r.status != 200:
+                return False
+            data = r.read()
+        Path(dest).write_bytes(data)
+        _time.sleep(throttle)   # rate limiting di cortesia
+        return True
+    except Exception as e:
+        print(f"[orchestrator]   download fallito {url}: {e}")
+        return False
+
+
+def prepare_from_astdys(ids, elements_dir, throttle=0.5, force=False):
+    """Per ogni id scarica <gruppo>/<id>.eq1 da AstDyS in elements/ (con la
+    covarianza). Cache: se il file esiste gia' e non force, non riscarica.
+    Ritorna (preparati, mancanti)."""
+    preparati, mancanti = [], []
+    for aid in ids:
+        dest = Path(elements_dir) / f"{aid}.eq1"
+        if dest.exists() and not force:
+            preparati.append(aid)   # gia' in cache
+            continue
+        grp = astdys_group(aid)
+        url = f"{ASTDYS_BASE}/epoch/numbered/{grp}/{aid}.eq1"
+        if astdys_download(url, dest, throttle):
+            preparati.append(aid)
+        else:
+            mancanti.append(aid)
+    return preparati, mancanti
+
+
+def download_observations(ids, obs_dir, throttle=0.5, force=False):
+    """Scarica le osservazioni .rwo da AstDyS per i corpi dati (tipicamente i
+    positivi, per il fit). Cache come sopra. Ritorna (scaricati, mancanti)."""
+    Path(obs_dir).mkdir(parents=True, exist_ok=True)
+    got, missing = [], []
+    for aid in ids:
+        dest = Path(obs_dir) / f"{aid}.rwo"
+        if dest.exists() and not force:
+            got.append(aid)
+            continue
+        grp = astdys_group(aid)
+        url = f"{ASTDYS_BASE}/mpcobs/numbered/{grp}/{aid}.rwo"
+        if astdys_download(url, dest, throttle):
+            got.append(aid)
+        else:
+            missing.append(aid)
+    return got, missing
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
@@ -303,9 +376,8 @@ def main():
 
     # --- preparazione elementi secondo la fonte ---
     use_elements_dir = True
-    if source in ("db", "astdys", "astdys-neodys"):
-        # astdys-neodys: per ora dal DB (che gia' contiene il merge). Fase 3 fara'
-        # il download online fresco.
+    if source in ("db", "astdys-neodys"):
+        # dal DB locale (allnum.db). astdys-neodys usa il DB gia' merikato.
         db = cfg.get("database")
         if not db:
             sys.exit("ERRORE: source='{}' richiede 'database' (path allnum.db).".format(source))
@@ -316,6 +388,16 @@ def main():
         print(f"[orchestrator] elementi preparati: {len(prep)}")
         if missing:
             print(f"[orchestrator] NON nel DB ({len(missing)}): {','.join(missing)}")
+    elif source == "astdys":
+        # Fase 3: download online degli .eq1 individuali da AstDyS, CON covarianza
+        # -> ellissi in campagna. Cache locale (non riscarica se gia' presente).
+        throttle = float(cfg.get("astdys_throttle", 0.5))
+        force = bool(cfg.get("astdys_force", False))
+        print(f"[orchestrator] AstDyS online: scarico .eq1 (con covarianza) per {len(ids)} corpi...")
+        prep, missing = prepare_from_astdys(ids, elements_dir, throttle, force)
+        print(f"[orchestrator] elementi scaricati/cache: {len(prep)}")
+        if missing:
+            print(f"[orchestrator] NON su AstDyS ({len(missing)}): {','.join(missing)}")
     elif source == "user":
         # gli .eq1 sono gia' in elements/: verifichiamo che ci siano
         prep = [aid for aid in ids if (elements_dir / f"{aid}.eq1").exists()]
@@ -330,7 +412,7 @@ def main():
         print("[orchestrator] fonte Horizons: elementi presi dal motore (online).")
     else:
         sys.exit(f"ERRORE: sorgente sconosciuta '{source}'. "
-                 f"Usa: db | user | jpl-horizons | astdys-neodys")
+                 f"Usa: db | astdys | user | jpl-horizons | astdys-neodys")
 
     if not prep and source != "jpl-horizons":
         sys.exit("ERRORE: nessun elemento preparato. Niente da processare.")
@@ -430,6 +512,18 @@ def main():
     if not second_stage.get("only_positive", True):
         print("[orchestrator] AVVISO: second_stage.only_positive=false non supportato "
               "in Fase 4 (il secondo stadio gira sempre solo sui positivi).")
+
+    # Osservazioni per i positivi: se richiesto il fit (Fase 5) e la fonte e'
+    # AstDyS, scarica i .rwo SOLO per i positivi (non per tutti i corpi dello
+    # screening). Le osservazioni sono pesanti e servono solo dove si fitta.
+    if second_stage.get("fit") and source == "astdys":
+        obs_dir = base / "obs"
+        throttle = float(cfg.get("astdys_throttle", 0.5))
+        print(f"[orchestrator] scarico osservazioni (.rwo) per {len(positivi)} positivi...")
+        got, miss_obs = download_observations(positivi, obs_dir, throttle)
+        print(f"[orchestrator] osservazioni scaricate/cache: {len(got)}")
+        if miss_obs:
+            print(f"[orchestrator] osservazioni NON trovate: {','.join(miss_obs)}")
 
     # Secondo stadio: solo i positivi, profilo pesante, output in results/
     cfg2 = build_stage_config(engine_cfg, prof2, results, out_cfg)

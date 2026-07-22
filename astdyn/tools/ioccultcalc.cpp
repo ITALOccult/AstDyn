@@ -464,6 +464,9 @@ int main(int argc, char** argv) {
     HorizonsClient horizons;
     std::map<std::string, physics::CartesianStateTyped<core::ECLIPJ2000>> stored_states;
     std::map<std::string, physics::KeplerianStateTyped<core::ECLIPJ2000>> stored_elements;
+    // Covarianza per-asteroide (cartesiana ECLIPJ2000, AU/day), dagli .eq1
+    // che la portano (AstDyS). Assente per .eq1 senza covarianza (DB).
+    std::map<std::string, astdyn::Matrix6d> stored_covariances;
     // M3: named constants for fallback physical properties
     constexpr double DEFAULT_ASTEROID_DIAMETER_KM = 100.0;
     constexpr double DEFAULT_SATELLITE_DIAMETER_KM = 10.0;
@@ -481,7 +484,10 @@ int main(int argc, char** argv) {
             // Fase 0: prima l'elemento locale <elements_dir>/<id>.eq1, poi Horizons.
             // Stesso tipo di query_elements (expected), cosi' il resto del loop
             // (if(!elements_opt), *elements_opt) resta invariato.
-            std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, io::HorizonsError> elements_opt =
+            // Covarianza cartesiana (AU/day) calcolata dall'.eq1 se presente,
+            // trasferita al blocco storage per stored_covariances[id].
+            std::optional<astdyn::Matrix6d> eq1_cov_cart_opt;
+                        std::expected<physics::KeplerianStateTyped<core::ECLIPJ2000>, io::HorizonsError> elements_opt =
                 std::unexpected(io::HorizonsError{});
             std::string ef = elements_dir.empty() ? std::string()
                                                   : (elements_dir + "/" + id + ".eq1");
@@ -495,6 +501,30 @@ int main(int argc, char** argv) {
                     // finestra usando la via gia' collaudata -- non propaghiamo qui.
                     auto orb = io::CovarianceIO::read_eq1(ef);
                     auto t0 = time::to_tdb(time::EpochTT::from_mjd(orb.epoch_mjd_tt));
+                    // Se l'.eq1 porta la covarianza (AstDyS), la trasformo in
+                    // cartesiana AU/day con la STESSA via del flusso --covariance:
+                    // to_si (a->km, lambda->rad) -> EquinoctialElements -> jacobiana.
+                    // Lavoro su una COPIA (orb_cov) per non alterare gli elementi
+                    // grezzi usati subito sotto per equinoctial_to_keplerian.
+                    if (!orb.covariance.isZero(0.0)) {
+                        try {
+                            constexpr double kAuKm_c = 149597870.700;
+                            io::AstDysOrbit orb_cov = orb;
+                            io::CovarianceIO::to_si(orb_cov);   // a->km, lambda->rad
+                            coordinates::EquinoctialElements eqc(
+                                orb_cov.elements(0), orb_cov.elements(1), orb_cov.elements(2),
+                                orb_cov.elements(3), orb_cov.elements(4), orb_cov.elements(5));
+                            const astdyn::Matrix6d Jc = eqc.jacobian_to_cartesian();
+                            const astdyn::Matrix6d C_km_c = Jc * orb_cov.covariance * Jc.transpose();
+                            Eigen::Matrix<double, 6, 1> dc;
+                            dc << 1.0/kAuKm_c, 1.0/kAuKm_c, 1.0/kAuKm_c,
+                                  86400.0/kAuKm_c, 86400.0/kAuKm_c, 86400.0/kAuKm_c;
+                            eq1_cov_cart_opt = dc.asDiagonal() * C_km_c * dc.asDiagonal();
+                        } catch (const std::exception& ce) {
+                            std::cerr << "[ioccultcalc] '" << id << "': covarianza .eq1 non trasformata ("
+                                      << ce.what() << ")\n";
+                        }
+                    }
                     // NB: read_eq1 da' a in AU e lambda in GRADI (unita' AstDyS
                     // grezze). equinoctial_to_keplerian vuole a in AU (ok) ma
                     // lambda in RADIANTI (lo usa in M = lambda - varpi con varpi
@@ -531,6 +561,7 @@ int main(int argc, char** argv) {
                     // The state IS heliocentric ecliptic -- the variable is named for it.
                     auto state_eclip = propagation::keplerian_to_cartesian(elements);
                     stored_states[id] = state_eclip;
+                    if (eq1_cov_cart_opt) stored_covariances[id] = *eq1_cov_cart_opt;
 
                     // Il messaggio di provenienza (Horizons o .eq1) e' gia' stato
                     // stampato nel ramo di caricamento; qui non ripetiamo "Horizons".
@@ -646,13 +677,18 @@ int main(int argc, char** argv) {
     
     // --- 3d. Apply Uncertainty (if requested) ---
     std::string cov_file = vm.count("covariance") ? vm["covariance"].as<std::string>() : adv_cfg.get<std::string>("covariance", "");
-    if (!cov_file.empty() && !results.empty()) {
+    // La covarianza si calcola quando richiesta: via --covariance/config (cov_file),
+    // oppure quando gli .eq1 in elements_dir hanno portato covarianze per-asteroide
+    // (campagna AstDyS) e il calcolo e' abilitato (config physics.covariance:true).
+    bool want_covariance = !cov_file.empty()
+                        || (adv_cfg.get<bool>("physics.covariance", false) && !stored_covariances.empty());
+    if (want_covariance && !results.empty()) {
         try {
             constexpr double kAuKm = 149597870.700;
             astdyn::Matrix6d cov_t0;
             std::optional<physics::CartesianStateTyped<core::ECLIPJ2000>> x0;
 
-            if (cov_file.size() > 4 && cov_file.substr(cov_file.size() - 4) == ".eq1") {
+            if (!cov_file.empty() && cov_file.size() > 4 && cov_file.substr(cov_file.size() - 4) == ".eq1") {
                 // AstDyS publishes the elements AND their covariance at the SAME
                 // epoch, and both must be used: taking the covariance from the .eq1
                 // while leaving the state at the Horizons epoch silently propagates
@@ -684,14 +720,19 @@ int main(int argc, char** argv) {
 
                 std::cout << "[ioccultcalc] AstDyS: epoca MJD " << orb.epoch_mjd_tt
                           << " TT, H=" << orb.h_mag << "\n";
-            } else {
+            } else if (!cov_file.empty()) {
                 // A bare 6x6: assumed already Cartesian, in AU and days, at the epoch
                 // of the stored state.
                 cov_t0 = CovarianceIO::read_file(cov_file);
             }
 
             for (auto& res : results) {
-                if (x0) {
+                if (stored_covariances.count(res.asteroid_id) && stored_states.count(res.asteroid_id)) {
+                    // Covarianza PER-ASTEROIDE (dagli .eq1 AstDyS): ellisse del corpo giusto.
+                    OccultationLogic::apply_uncertainty(res.params, res.star,
+                                                        stored_covariances[res.asteroid_id],
+                                                        stored_states[res.asteroid_id], engine);
+                } else if (x0) {
                     OccultationLogic::apply_uncertainty(res.params, res.star, cov_t0, *x0, engine);
                 } else if (stored_states.count(res.asteroid_id)) {
                     OccultationLogic::apply_uncertainty(res.params, res.star, cov_t0,
