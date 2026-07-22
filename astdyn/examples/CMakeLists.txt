@@ -114,3 +114,12 @@ install(TARGETS example_basic
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/examples
 )
 
+
+add_executable(test_fit_bk290 test_fit_bk290.cpp)
+target_link_libraries(test_fit_bk290 PRIVATE astdyn)
+
+add_executable(test_validate_integrators test_validate_integrators.cpp)
+target_link_libraries(test_validate_integrators PRIVATE astdyn)
+
+add_executable(test_batch_vs_single test_batch_vs_single.cpp)
+target_link_libraries(test_batch_vs_single PRIVATE astdyn)
