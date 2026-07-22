@@ -40,3 +40,8 @@ build/
 *.orig
 *.rej
 .DS_Store
+
+# Scorie macOS "* 2" (duplicati da iCloud/Finder)
+* 2
+* 2.*
+*\ 2
