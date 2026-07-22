@@ -45,6 +45,19 @@ ispezionabile e facile da tenere in testa.
       sistema con rete). Nota scientifica: lo screening leggero rischia falsi
       negativi -> renderlo generoso; la differenza light/full pesa su archi lunghi
       o corpi perturbati, mentre su archi brevi il vantaggio e' soprattutto velocita'.
+
+- [x] **Fase 3 (online) - Sorgente AstDyS + ellissi per-asteroide in campagna**.
+      source: astdys scarica gli .eq1 individuali da newton.spacedys.com
+      (raggruppamento numero//1000), CON covarianza, con cache locale e download
+      di cortesia (User-Agent, throttle). La covarianza e' un PARAMETRO DI CALCOLO
+      (physics.covariance: true): il gancio elements_dir cattura orb.covariance, la
+      trasforma (jacobiana) e la salva per-asteroide (stored_covariances[id]); il
+      loop applica a ciascun evento la covarianza del suo corpo -> ellissi reali in
+      campagna, in una passata. Osservazioni .rwo scaricate on-demand per i positivi
+      (fit, Fase 5). Validato: astdys su BK290 -> ellisse 0.117721 x 0.0644153 @
+      71.39 (identica ad AstDyS), vs source:db che da' 0. Modello: covarianza/fit
+      sono parametri di calcolo, on nel raffinamento, off nello screening.
+
 - [ ] Fase 5 — Fit orbita on-demand (prima riparare il fit in libreria)
 - [ ] Fase 6 — Asteroidi multipli (satelliti/binari)
 - [ ] Fase 7 — Installer e distribuzione (catalogo incluso)
