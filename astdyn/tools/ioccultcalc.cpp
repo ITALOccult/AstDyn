@@ -1,5 +1,6 @@
 #include "astdyn/AstDyn.hpp"
 #include "astdyn/io/OccultationXMLIO.hpp"
+#include "astdyn/io/OccultationJSONIO.hpp"
 #include "astdyn/astrometry/OccultationLogic.hpp"
 #include "astdyn/astrometry/OccultationMapper.hpp"
 #include "astdyn/io/HorizonsClient.hpp"
@@ -305,6 +306,7 @@ int main(int argc, char** argv) {
         ("duration", po::value<double>()->default_value(1.0), "search duration in days")
         ("mag", po::value<double>()->default_value(15.0), "magnitude limit for stars")
         ("xml-output", po::value<std::string>(), "save found occultations to XML")
+        ("json-output", po::value<std::string>(), "save found occultations to native JSON")
         ("svg-output", po::value<std::string>(), "save world map with paths to SVG")
         ("kml", po::value<std::string>(), "save first match to KML")
         ("out-dir", po::value<std::string>(), "base directory for all output files")
@@ -814,6 +816,13 @@ int main(int argc, char** argv) {
             std::filesystem::path p = std::filesystem::path(out_dir) / xml_file;
             OccultationXMLIO::write_file(events, p.string());
             std::cout << "[ioccultcalc] Saved " << events.size() << " events to " << p.string() << "\n";
+            std::string json_file = vm.count("json-output") ? vm["json-output"].as<std::string>() : adv_cfg.get<std::string>("json-output", "");
+            if (!json_file.empty()) {
+                std::filesystem::path pj = std::filesystem::path(out_dir) / json_file;
+                std::filesystem::create_directories(pj.parent_path());
+                OccultationJSONIO::write_file(events, pj.string());
+                std::cout << "[ioccultcalc] Saved " << events.size() << " events (JSON) to " << pj.string() << "\n";
+            }
         }
 
         std::string svg_file = vm.count("svg-output") ? vm["svg-output"].as<std::string>() : adv_cfg.get<std::string>("svg-output", "");
