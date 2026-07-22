@@ -24,7 +24,12 @@ ispezionabile e facile da tenere in testa.
       UNICA (astdyn_base obbligatoria); fonti db|user|jpl-horizons|astdys-neodys;
       KEP->EQU validata contro l'oracolo BK290 (.eq1 dal DB bit-identico ad AstDyS);
       guardia frame (solo ECLIPTIC_J2000); output XML Occult4 + mappe in results/.
-- [ ] Fase 2 — `*` con filtro diametro (query su allnum.db)
+- [x] **Fase 2 — `*` con sistema di filtri SQL** (Python). objects.asteroids='*'
+      seleziona dal DB con un blocco `filters`: range [min,max] su qualsiasi
+      colonna in whitelist (a,e,i,H,G,...) piu' `diameter_km` derivato (H via
+      albedo). Filtri combinabili; guardie ('*' senza filtri rifiutato, avviso+
+      conferma sopra soglia). Nota: l'albedo assunto (0.14) sovrastima il diametro
+      dei corpi scuri (TNO) -> per la fascia principale combinare con a:[2.0,3.5].
 - [ ] Fase 3 — Fonti intercambiabili (download online fresco astdys/neodys)
 - [ ] Fase 4 — Multipassata / second-stage (only-positive)
 - [ ] Fase 5 — Fit orbita on-demand (prima riparare il fit in libreria)
