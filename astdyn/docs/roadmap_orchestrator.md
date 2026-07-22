@@ -30,8 +30,21 @@ ispezionabile e facile da tenere in testa.
       albedo). Filtri combinabili; guardie ('*' senza filtri rifiutato, avviso+
       conferma sopra soglia). Nota: l'albedo assunto (0.14) sovrastima il diametro
       dei corpi scuri (TNO) -> per la fascia principale combinare con a:[2.0,3.5].
-- [ ] Fase 3 — Fonti intercambiabili (download online fresco astdys/neodys)
-- [ ] Fase 4 — Multipassata / second-stage (only-positive)
+- [x] **Fase 3+4 — Ricerca a due stadi** (Python + C++). L'intento reale che
+      unifica le fasi: screening veloce (force field leggero) su tutti i corpi,
+      poi raffinamento completo (force field pesante) SOLO sui corpi che hanno
+      dato occultazione. Profili `physics_profiles` liberi (light/full o altri),
+      applicati via `first_pass`/`second_stage`; default con WARNING rosso se non
+      esplicitati; retrocompatibile (senza i blocchi -> passata singola). Output
+      tracciabile: screening in results/pass1/, raffinamento in results/.
+      Validato: 12 giganti -> screening -> 2 positivi -> raffinamento solo su 2.
+      Supporto C++: nuovo OccultationJSONIO (--json-output) per il formato interno
+      ricco; i positivi si estraggono da object.number nel JSON (robusto).
+      Nota: 'fonte online astdys/neodys' (scope originale Fase 3) resta da fare
+      (il container non raggiunge newton.spacedys.com; da implementare/testare sul
+      sistema con rete). Nota scientifica: lo screening leggero rischia falsi
+      negativi -> renderlo generoso; la differenza light/full pesa su archi lunghi
+      o corpi perturbati, mentre su archi brevi il vantaggio e' soprattutto velocita'.
 - [ ] Fase 5 — Fit orbita on-demand (prima riparare il fit in libreria)
 - [ ] Fase 6 — Asteroidi multipli (satelliti/binari)
 - [ ] Fase 7 — Installer e distribuzione (catalogo incluso)
