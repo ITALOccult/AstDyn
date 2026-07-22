@@ -161,6 +161,98 @@ def parse_id_list(spec):
 
 
 # ---------------------------------------------------------------------------
+# Fase 2: espansione "*" con filtri SQL generali sul DB
+# ---------------------------------------------------------------------------
+# Colonne del DB filtrabili direttamente (whitelist: nessuna concatenazione di
+# input non validato nella query; solo queste colonne, con parametri bound).
+FILTERABLE_COLUMNS = {
+    "a", "e", "i", "node_long", "peri_arg", "M", "H", "G", "epoch_mjd",
+}
+
+
+def H_from_diameter(D_km, albedo=0.14):
+    """Magnitudine assoluta H per un diametro D (km) e albedo dato.
+    D = 1329/sqrt(albedo) * 10^(-H/5)  ->  H = 5*log10(1329/(D*sqrt(albedo)))."""
+    return 5.0 * math.log10(1329.0 / (D_km * math.sqrt(albedo)))
+
+
+def build_filter_query(filters):
+    """Da un dict di filtri costruisce (where_sql, params, descrizione).
+    Ogni filtro colonna e' [min, max] (null = lato aperto). 'diameter_km' e'
+    derivato: [Dmin, Dmax] -> condizione su H (invertita, D grande = H piccolo)
+    con l'albedo dato. Colonne fuori whitelist -> errore."""
+    filters = dict(filters or {})
+    albedo = filters.pop("albedo", 0.14)
+    clauses = ["number IS NOT NULL"]
+    params = []
+    descr = []
+
+    # filtro derivato: diameter_km -> H
+    diam = filters.pop("diameter_km", None)
+    if diam is not None:
+        dmin, dmax = (diam + [None, None])[:2] if isinstance(diam, list) else (diam, diam)
+        # D grande -> H piccolo: Hmin viene da dmax, Hmax da dmin
+        if dmax is not None:
+            clauses.append("H >= ?"); params.append(H_from_diameter(dmax, albedo))
+        if dmin is not None:
+            clauses.append("H <= ?"); params.append(H_from_diameter(dmin, albedo))
+        clauses.append("H IS NOT NULL")
+        descr.append(f"diam {dmin}-{dmax} km (albedo {albedo})")
+
+    # filtri su colonne dirette
+    for col, rng in filters.items():
+        if col not in FILTERABLE_COLUMNS:
+            raise SystemExit(
+                f"ERRORE: filtro '{col}' non ammesso. Colonne filtrabili: "
+                f"{', '.join(sorted(FILTERABLE_COLUMNS))} (piu' 'diameter_km')."
+            )
+        lo, hi = (rng + [None, None])[:2] if isinstance(rng, list) else (rng, rng)
+        if lo is not None:
+            clauses.append(f"{col} >= ?"); params.append(lo)
+        if hi is not None:
+            clauses.append(f"{col} <= ?"); params.append(hi)
+        if lo is not None or hi is not None:
+            descr.append(f"{col} in [{lo}, {hi}]")
+
+    where = " AND ".join(clauses)
+    return where, params, "; ".join(descr)
+
+
+def expand_star(db_path, filters, warn_threshold, assume_yes):
+    """Espande '*' in una lista di numeri applicando i filtri SQL.
+    '*' senza filtri e' rifiutato. Sopra warn_threshold avvisa e chiede
+    conferma (a meno di assume_yes)."""
+    if not filters:
+        raise SystemExit(
+            "ERRORE: objects.asteroids='*' richiede un blocco 'filters' (per non "
+            "enumerare l'intero DB). Es: filters: {diameter_km: [5, 150]}."
+        )
+    where, params, descr = build_filter_query(filters)
+    con = sqlite3.connect(db_path)
+    n = con.execute(f"SELECT COUNT(*) FROM allnum_asteroids WHERE {where}", params).fetchone()[0]
+    print(f"[orchestrator] filtri: {descr}")
+    print(f"[orchestrator] corpi selezionati: {n}")
+    if n == 0:
+        con.close()
+        raise SystemExit("ERRORE: nessun corpo soddisfa i filtri.")
+    if n > warn_threshold and not assume_yes:
+        # stima grezza: ~qualche secondo per corpo (propagazione + ricerca)
+        est_min = n * 3 / 60.0
+        print(f"[orchestrator] ATTENZIONE: {n} corpi (> soglia {warn_threshold}). "
+              f"Stima molto indicativa ~{est_min:.0f} min.")
+        try:
+            risp = input("[orchestrator] procedere? [s/N] ").strip().lower()
+        except EOFError:
+            risp = "n"
+        if risp not in ("s", "si", "y", "yes"):
+            con.close()
+            raise SystemExit("[orchestrator] annullato dall'utente.")
+    rows = con.execute(f"SELECT number FROM allnum_asteroids WHERE {where} ORDER BY number", params).fetchall()
+    con.close()
+    return [str(r[0]) for r in rows]
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
@@ -168,6 +260,8 @@ def main():
     ap.add_argument("config", help="config di campagna (YAML o JSON)")
     ap.add_argument("--dry-run", action="store_true",
                     help="prepara gli .eq1 e la config del motore, ma non invoca ioccultcalc")
+    ap.add_argument("--yes", "-y", action="store_true",
+                    help="salta la conferma quando '*' seleziona molti corpi")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -182,8 +276,20 @@ def main():
     objects = cfg.get("objects", {})
     spec = objects.get("asteroids", "")
     if not spec:
-        sys.exit("ERRORE: 'objects.asteroids' vuoto (Fase 1: lista esplicita).")
-    ids = parse_id_list(spec)
+        sys.exit("ERRORE: 'objects.asteroids' vuoto.")
+
+    # Fase 2: '*' -> espansione con filtri SQL sul DB. Altrimenti lista/range.
+    if str(spec).strip() == "*":
+        db = cfg.get("database")
+        if not db:
+            sys.exit("ERRORE: objects.asteroids='*' richiede 'database' (path allnum.db).")
+        db = expand_path(db)
+        if not os.path.exists(db):
+            sys.exit(f"ERRORE: DB non trovato: {db}")
+        warn_threshold = int(cfg.get("warn_threshold", 2000))
+        ids = expand_star(db, cfg.get("filters"), warn_threshold, args.yes)
+    else:
+        ids = parse_id_list(spec)
 
     # struttura cartelle
     elements_dir = base / "elements"
@@ -253,6 +359,9 @@ def main():
         svg_name = out_cfg["svg"] if isinstance(out_cfg.get("svg"), str) else "map/worldmap.svg"
         engine_cfg["svg-output"] = svg_name
     engine_cfg["output"] = {"write_empty": bool(out_cfg.get("write_empty", True))}
+    # I file mappa per-evento sono scritti come out-dir/<prefix>_<id>_..._.svg.
+    # Con prefix "map/occ" finiscono ordinatamente in results/map/.
+    engine_cfg["prefix"] = out_cfg.get("prefix", "map/occ")
 
     # scriviamo la config arricchita accanto alla base (per ispezione/riproducibilita')
     engine_cfg_path = base / "engine_config.json"
