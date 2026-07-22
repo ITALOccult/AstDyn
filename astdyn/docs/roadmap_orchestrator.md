@@ -11,6 +11,37 @@ risultati. Non sa nulla di `allnum.db`, di NEODyS, di query SQL, di "tutti gli
 asteroidi". La complessità di selezione e provenienza vive in Python, dove è
 ispezionabile e facile da tenere in testa.
 
+
+## Stato (aggiornato 2026-07-22)
+
+- [x] **Fase 0 — Elementi da file nel motore** (C++). Gancio `objects.elements_dir`
+      in ioccultcalc: legge `<id>.eq1` locale via la catena tipizzata
+      (read_eq1 -> equinoctial_to_keplerian), fallback a Horizons. Corretti 3 bug
+      reali lungo il percorso (doppia conversione a*AU; lambda gradi->rad; memoria
+      DE441). read_eq1 reso tollerante agli .eq1 senza covarianza. Validato su
+      BK290 (ellisse esatta 0.117721" x 0.0644153").
+- [x] **Fase 1 — Orchestratore minimo** (Python, tools/orchestrator.py). Config
+      UNICA (astdyn_base obbligatoria); fonti db|user|jpl-horizons|astdys-neodys;
+      KEP->EQU validata contro l'oracolo BK290 (.eq1 dal DB bit-identico ad AstDyS);
+      guardia frame (solo ECLIPTIC_J2000); output XML Occult4 + mappe in results/.
+- [ ] Fase 2 — `*` con filtro diametro (query su allnum.db)
+- [ ] Fase 3 — Fonti intercambiabili (download online fresco astdys/neodys)
+- [ ] Fase 4 — Multipassata / second-stage (only-positive)
+- [ ] Fase 5 — Fit orbita on-demand (prima riparare il fit in libreria)
+- [ ] Fase 6 — Asteroidi multipli (satelliti/binari)
+- [ ] Fase 7 — Installer e distribuzione (catalogo incluso)
+- [ ] **Manuale utente finale** (MD organico dell'intero sistema) — ultimo punto.
+
+## Nota trasversale: tipizzare gli scalari
+
+Ogni bug scovato nelle sessioni Fase 0/1 nasceva da uno scalare non tipizzato a
+un confine (a in AU vs km, lambda in gradi vs rad). La libreria e' tipizzata
+sugli stati e sui frame (KeplerianStateTyped<Frame>), ma scende a `double` /
+`Eigen::Vector3d` nudi nelle conversioni, ed e' li' che i bug di unita' si
+annidano silenziosamente. Direzione futura: tipizzare anche distanze e angoli
+(Distance, Angle) nelle conversioni, cosi' un mismatch di unita' non compili
+invece di produrre numeri sbagliati a runtime.
+
 ## Struttura di lavoro (una campagna = una cartella)
 
 ```
