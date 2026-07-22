@@ -4,6 +4,7 @@
  */
 
 #include "astdyn/propagation/Integrator.hpp"
+#include <iostream>
 #include "astdyn/utils/Atomics.hpp"
 #include <cmath>
 #include <algorithm>
@@ -315,15 +316,36 @@ std::vector<Eigen::VectorXd> RKF78Integrator::integrate_at(const DerivativeFunct
                                                        const std::vector<double>& t_targets) {
     stats_.reset();
     std::vector<Eigen::VectorXd> results; results.reserve(t_targets.size());
-    double t = t0, h = ((t_targets.empty() || t_targets[0] >= t0) ? 1.0 : -1.0) * std::abs(h_initial_);
+    double t = t0;
+    // work_mag: magnitudine (senza segno) del passo di lavoro adattivo, persiste
+    // tra i target. Il segno si ricalcola per ogni target dalla direzione t->tf.
+    double work_mag = std::abs(h_initial_);
     Eigen::VectorXd y = y0; int total_iterations = 0;
     for (double tf : t_targets) {
         int rejections = 0;
+        // center_h: passo di centraggio corrente verso questo target (con segno).
+        // Parte dal passo di lavoro nella direzione giusta; se rifiutato viene
+        // ridotto da adaptive_step e riusato piu' piccolo, senza degradare work_mag.
+        double center_h = 0.0;
+        bool have_center = false;
         while (std::abs(tf - t) > 1e-14) {
-            verify_iteration_limits(++total_iterations, rejections, t, h);
-            double step_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
-            if (adaptive_step(f, t, y, step_h, tf)) { rejections = 0; h = step_h; }
-            else { rejections++; h = step_h; }
+            double dir = (tf > t) ? 1.0 : -1.0;
+            // passo candidato: il centraggio in corso (se attivo) o il lavoro pieno
+            double cand = have_center ? center_h : dir * work_mag;
+            // non superare il target
+            bool clamping = std::abs(tf - t) < std::abs(cand);
+            double step_h = clamping ? (tf - t) : cand;
+            verify_iteration_limits(++total_iterations, rejections, t, step_h);
+            if (adaptive_step(f, t, y, step_h, tf)) {
+                rejections = 0;
+                have_center = false;                 // step accettato: fine centraggio
+                if (!clamping) work_mag = std::abs(step_h);  // aggiorna lavoro solo se non clampavamo
+            } else {
+                rejections++;
+                // adaptive_step ha ridotto step_h: riusalo come centraggio piu' piccolo
+                center_h = step_h;
+                have_center = true;
+            }
         }
         results.push_back(y);
     }
