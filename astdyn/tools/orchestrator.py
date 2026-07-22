@@ -294,7 +294,7 @@ def main():
     # struttura cartelle
     elements_dir = base / "elements"
     results = base / "results"
-    for d in (elements_dir, results / "xml", results / "map", results / "log"):
+    for d in (elements_dir, results / "xml", results / "map", results / "json", results / "log"):
         d.mkdir(parents=True, exist_ok=True)
 
     print(f"[orchestrator] campagna: {base}")
@@ -362,6 +362,8 @@ def main():
     # I file mappa per-evento sono scritti come out-dir/<prefix>_<id>_..._.svg.
     # Con prefix "map/occ" finiscono ordinatamente in results/map/.
     engine_cfg["prefix"] = out_cfg.get("prefix", "map/occ")
+    # JSON nativo (formato interno ricco): sempre prodotto accanto all'XML.
+    engine_cfg["json-output"] = out_cfg.get("json", "json/occultations.json")
 
     # scriviamo la config arricchita accanto alla base (per ispezione/riproducibilita')
     engine_cfg_path = base / "engine_config.json"
@@ -372,32 +374,188 @@ def main():
         print("[orchestrator] --dry-run: preparazione completata, motore NON invocato.")
         return
 
-    # --- invocazione ioccultcalc ---
+    # ==================================================================
+    # ESECUZIONE. Due modalita':
+    #  - singola passata (retrocompatibile): nessun first_pass/second_stage
+    #  - due stadi: screening leggero su tutti -> raffinamento pesante sui
+    #    soli corpi che hanno prodotto un'occultazione.
+    # ==================================================================
     exe = expand_path(cfg.get("ioccultcalc", "ioccultcalc"))
-    cmd = [exe, "--conf", str(engine_cfg_path)]
-    if cfg.get("mag_limit") is not None:
-        cmd += ["--mag", str(cfg["mag_limit"])]
-
     env = dict(os.environ)
     if cfg.get("ephemeris_file"):
         env["ASTDYN_EPHEMERIS_PATH"] = expand_path(cfg["ephemeris_file"])
+    mag = cfg.get("mag_limit")
 
-    log_path = results / "log" / "campaign.log"
-    print(f"[orchestrator] invoco: {' '.join(cmd)}")
-    print(f"[orchestrator] log: {log_path}")
+    profiles = cfg.get("physics_profiles") or {}
+    first_pass = cfg.get("first_pass") or {}
+    second_stage = cfg.get("second_stage") or {}
+    two_stage = bool(first_pass or second_stage)
 
-    with open(log_path, "w") as logf:
-        proc = subprocess.run(cmd, env=env, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, text=True)
-        logf.write(proc.stdout)
+    if not two_stage:
+        # --- SINGOLA PASSATA (Fase 1/2) ---
+        rc = run_engine(exe, engine_cfg, base, results, env, mag, label="single")
+        print(f"[orchestrator] fine (exit {rc}). Risultati in {results}/")
+        return
 
-    # riepilogo: righe salienti dal log
+    # --- DUE STADI ---
+    # Profilo: dict di chiavi motore (physics.*, integrator.*) da fondere nella
+    # config. Se il profilo richiesto non e' definito, usa un default con WARNING.
+    prof1_name = first_pass.get("profile", "light")
+    prof2_name = second_stage.get("profile", "full")
+    prof1 = resolve_profile(profiles, prof1_name, "light")
+    prof2 = resolve_profile(profiles, prof2_name, "full")
+
+    # Prima passata: tutti i corpi, profilo leggero, output in results/pass1/
+    pass1_results = results / "pass1"
+    for d in (pass1_results / "xml", pass1_results / "map", pass1_results / "json", pass1_results / "log"):
+        d.mkdir(parents=True, exist_ok=True)
+    cfg1 = build_stage_config(engine_cfg, prof1, pass1_results, out_cfg)
+    cfg1_path = base / "engine_pass1.json"
+    cfg1_path.write_text(json.dumps(cfg1, indent=2))
+    print(f"[orchestrator] === STADIO 1 (screening, profilo '{prof1_name}') su {len(prep)} corpi ===")
+    rc1 = run_engine(exe, cfg1, base, pass1_results, env, mag, label="pass1",
+                     cfg_path=cfg1_path)
+
+    # estrai i corpi positivi dal JSON della prima passata (object.number esplicito)
+    json1 = pass1_results / "json" / "occultations.json"
+    positivi = extract_positive_ids(json1)
+    print(f"[orchestrator] STADIO 1: {len(positivi)} corpi con occultazione "
+          f"(su {len(prep)} processati).")
+
+    if not positivi:
+        print("[orchestrator] nessun positivo: niente secondo stadio.")
+        print(f"[orchestrator] fine. Risultati screening in {pass1_results}/")
+        return
+
+    if not second_stage.get("only_positive", True):
+        print("[orchestrator] AVVISO: second_stage.only_positive=false non supportato "
+              "in Fase 4 (il secondo stadio gira sempre solo sui positivi).")
+
+    # Secondo stadio: solo i positivi, profilo pesante, output in results/
+    cfg2 = build_stage_config(engine_cfg, prof2, results, out_cfg)
+    cfg2["objects"]["asteroids"] = ",".join(positivi)
+    cfg2_path = base / "engine_pass2.json"
+    cfg2_path.write_text(json.dumps(cfg2, indent=2))
+    print(f"[orchestrator] === STADIO 2 (raffinamento, profilo '{prof2_name}') "
+          f"su {len(positivi)} positivi ===")
+    rc2 = run_engine(exe, cfg2, base, results, env, mag, label="pass2",
+                     cfg_path=cfg2_path)
+
+    # fit opzionale (Fase 5, non ancora implementato)
+    if second_stage.get("fit"):
+        print("[orchestrator] AVVISO: second_stage.fit richiesto ma il fit e' "
+              "rimandato alla Fase 5 (bug in libreria). Ignorato per ora.")
+
+    print(f"[orchestrator] fine. Screening in {pass1_results}/, raffinamento in {results}/")
+
+
+def resolve_profile(profiles, name, builtin_default):
+    """Restituisce il dict del profilo 'name'. Se non definito in config, usa un
+    default incorporato ed EMETTE UN WARNING che dice cosa sta usando."""
+    if name in profiles:
+        return profiles[name] or {}
+    # default incorporati
+    DEFAULTS = {
+        "light": {
+            "physics.planets": False,
+            "physics.asteroids.enabled": False,
+            "physics.relativity": False,
+            "integrator.type": "RKF78",
+            "integrator.tolerance": 1e-9,
+        },
+        "full": {
+            "physics.planets": True,
+            "physics.moon": True,
+            "physics.asteroids.enabled": True,
+            "physics.asteroids.use_30_set": True,
+            "physics.relativity": True,
+            "integrator.type": "RKF78",
+            "integrator.tolerance": 1e-11,
+        },
+    }
+    d = DEFAULTS.get(name) or DEFAULTS[builtin_default]
+    # WARNING visibile (ANSI rosso se il terminale lo supporta)
+    RED = "\033[91m"; RST = "\033[0m"
+    print(f"{RED}[orchestrator] WARNING: profilo '{name}' non definito in "
+          f"physics_profiles. Uso il default incorporato:{RST}")
+    for k, v in d.items():
+        print(f"{RED}    {k} = {v}{RST}")
+    return d
+
+
+def set_dot(cfg, dotkey, value):
+    """Imposta cfg['a']['b']['c'] da 'a.b.c'. Crea i dizionari mancanti."""
+    parts = dotkey.split(".")
+    d = cfg
+    for p in parts[:-1]:
+        d = d.setdefault(p, {})
+        if not isinstance(d, dict):
+            raise SystemExit(f"ERRORE: conflitto nella chiave '{dotkey}'.")
+    d[parts[-1]] = value
+
+
+def build_stage_config(base_cfg, profile, stage_results, out_cfg):
+    """Copia la config base, applica il profilo (chiavi dot-path) e redirige
+    l'output nella cartella dello stadio."""
+    c = copy.deepcopy(base_cfg)
+    for dotkey, value in (profile or {}).items():
+        set_dot(c, dotkey, value)
+    c["out-dir"] = str(stage_results)
+    c["xml-output"] = (out_cfg or {}).get("xml", "xml/occultations.xml")
+    if (out_cfg or {}).get("svg", True):
+        svg_name = out_cfg["svg"] if isinstance(out_cfg.get("svg"), str) else "map/worldmap.svg"
+        c["svg-output"] = svg_name
+    c["output"] = {"write_empty": bool((out_cfg or {}).get("write_empty", True))}
+    c["prefix"] = (out_cfg or {}).get("prefix", "map/occ")
+    # JSON nativo (formato interno ricco): sempre prodotto, usato per estrarre i
+    # positivi (object.number) e come export.
+    c["json-output"] = (out_cfg or {}).get("json", "json/occultations.json")
+    return c
+
+
+def run_engine(exe, engine_cfg, base, results_dir, env, mag, label, cfg_path=None):
+    """Scrive la config (se non gia' fornita) e invoca ioccultcalc, loggando in
+    results_dir/log/. Ritorna il returncode."""
+    if cfg_path is None:
+        cfg_path = base / f"engine_{label}.json"
+        cfg_path.write_text(json.dumps(engine_cfg, indent=2))
+    cmd = [exe, "--conf", str(cfg_path)]
+    if mag is not None:
+        cmd += ["--mag", str(mag)]
+    log_path = results_dir / "log" / "campaign.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[orchestrator] invoco ({label}): {' '.join(cmd)}")
+    proc = subprocess.run(cmd, env=env, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True)
+    log_path.write_text(proc.stdout)
     salienti = [ln for ln in proc.stdout.splitlines()
                 if any(w in ln for w in ("Trovate", "ellisse", "caricato", "SKIP"))]
-    print("[orchestrator] --- risultati ---")
     for ln in salienti[:40]:
         print("  " + ln)
-    print(f"[orchestrator] fine (exit {proc.returncode}). Risultati in {results}/")
+    return proc.returncode
+
+
+def extract_positive_ids(json_path):
+    """Estrae gli ID degli asteroidi con occultazione dal JSON nativo.
+    Ogni evento ha object.number esplicito -> estrazione robusta, niente
+    parsing posizionale. Ritorna una lista ordinata e deduplicata di stringhe."""
+    if not json_path.exists():
+        return []
+    try:
+        data = json.loads(json_path.read_text())
+    except Exception:
+        return []
+    ids = []
+    for ev in data.get("events", []):
+        num = str((ev.get("object") or {}).get("number", "")).strip()
+        if num:
+            ids.append(num)
+    # dedup preservando l'ordine
+    seen = set(); out = []
+    for i in ids:
+        if i and i not in seen:
+            seen.add(i); out.append(i)
+    return out
 
 
 if __name__ == "__main__":
