@@ -24,8 +24,12 @@ int main(int argc, char** argv) {
     cfg.verbose = true;
     cfg.max_iterations = 20;
     cfg.tolerance = (argc > 3) ? std::atof(argv[3]) : 1e-10;
-    cfg.integrator_type = IntegratorType::RADAU;
+    cfg.integrator_type = IntegratorType::RKF78;
     cfg.propagator_settings.include_planets = true;
+    // Perturbatori asteroidali: AstDyS/OrbFit li includono sempre. Senza
+    // asteroid_ephemeris_file, include_asteroids resta inefficace.
+    cfg.asteroid_ephemeris_file = "/Users/michelebigi/.ioccultcalc/ephemerides/sb441-n16.bsp";
+    cfg.propagator_settings.include_asteroids = true;
     const char* eph = std::getenv("ASTDYN_EPHEMERIS_PATH");
     if (eph) cfg.ephemeris_file = eph;
     cfg.ephemeris_type = EphemerisType::DE441;

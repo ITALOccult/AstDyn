@@ -123,3 +123,21 @@ target_link_libraries(test_validate_integrators PRIVATE astdyn)
 
 add_executable(test_batch_vs_single test_batch_vs_single.cpp)
 target_link_libraries(test_batch_vs_single PRIVATE astdyn)
+
+add_executable(test_jacobian test_jacobian.cpp)
+target_link_libraries(test_jacobian PRIVATE astdyn)
+
+add_executable(test_interp_error test_interp_error.cpp)
+target_link_libraries(test_interp_error PRIVATE astdyn)
+
+add_executable(test_residui_vs_astdys test_residui_vs_astdys.cpp)
+target_link_libraries(test_residui_vs_astdys PRIVATE astdyn)
+
+add_executable(test_earth_vel test_earth_vel.cpp)
+target_link_libraries(test_earth_vel PRIVATE astdyn)
+
+add_executable(test_residui_generic test_residui_generic.cpp)
+target_link_libraries(test_residui_generic PRIVATE astdyn)
+
+add_executable(test_greenwich test_greenwich.cpp)
+target_link_libraries(test_greenwich PRIVATE astdyn)
