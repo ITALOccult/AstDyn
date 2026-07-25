@@ -5,9 +5,8 @@ casi conviene usarli. I valori misurati provengono dal banco di prova
 `examples/test_validate_integrators.cpp`, che confronta ogni metodo con l'oracolo
 JPL Horizons su archi crescenti.
 
-> STATO: le sezioni teoriche sono complete; le tabelle di misura vanno riempite
-> eseguendo il banco di prova. I valori gia' presenti sono quelli raccolti il
-> 2026-07-22 su 820987 (2015 BK290).
+> Misure del 2026-07-22 su 820987 (2015 BK290), banco di prova
+> `examples/test_integrators_bench.cpp`. Manca RADAU, ancora da caratterizzare.
 
 ## Come leggere le misure
 
@@ -68,15 +67,37 @@ gli archi, ma **circa 40 volte piu' lento** (1190 ms contro 28 ms su 10 anni).
 qualitativo dell'energia piu' della singola posizione. Non conviene per il fit, dove
 gli archi sono di decenni e la precisione richiesta e' gia' raggiunta da RKF78.
 
-### SABA4 — simplettico di Yoshida
-Metodo simplettico a composizione, pensato per hamiltoniane separabili in una parte
-kepleriana dominante e una perturbativa piccola — esattamente la struttura del
-problema asteroidale.
+### SABA4 — NON SUPPORTATO
+L'implementazione presente e' difettosa: errore di **1.60 AU gia' su un arco di
+0.1 giorni**, dove gli altri metodi danno ~1e-15, e 79 secondi per arco. Dal
+2026-07-22 la costruzione fallisce con un messaggio esplicito invece di
+restituire numeri sbagliati.
 
-*Misurato:* **non funzionante.** Errore di ~5 AU (divergenza completa) e ~80
-secondi per arco. Da considerare rotto finche' non verificato.
+Diagnosi — tre difetti concorrenti:
 
-*Uso consigliato:* nessuno, allo stato attuale.
+1. **Il drift e' rettilineo** (`q += h*p`) invece che kepleriano esatto. I metodi
+   SABA propriamente detti (Laskar & Robutel) separano l'hamiltoniana in
+   kepleriano + perturbazione e risolvono *esattamente* la parte kepleriana a
+   ogni sottopasso: e' da li' che viene la loro efficienza. Con il drift
+   rettilineo lo schema e' un semplice simplettico alla Yoshida, che su un'orbita
+   curva richiede passi minuscoli — e viene costruito con passo iniziale di mezza
+   giornata, in cui BK290 percorre ~780.000 km.
+2. **La stima d'errore divide per il passo**:
+   `err = |y_saba4 - y_saba2| / h`. Accorciando il passo l'errore apparente
+   *cresce*, innescando un meccanismo auto-alimentato. La normalizzazione
+   corretta e' rispetto alla grandezza dello stato.
+3. **Il passo resta bloccato al minimo**: dopo l'accettazione forzata a `h_min_`
+   (1e-6 giorni), `adapt_step_size` con errore enorme satura a scala 0.2 e
+   riporta il passo a `h_min_`. Per coprire 0.1 giorni servirebbero 100.000
+   passi; il ciclo esaurisce il tetto dei 5.000.000 e restituisce uno stato
+   quasi immobile — da cui l'errore di 1.6 AU, che e' semplicemente la distanza
+   non percorsa.
+
+*Per riabilitarlo* servirebbe riscrivere il drift come propagazione kepleriana
+esatta (esiste gia' `kepler_propagator.hpp`), applicare nel kick la sola
+perturbazione e non la forza totale, e rifare la stima d'errore. Il codice resta
+nel repository. In alternativa, chiamarlo con il suo nome — simplettico di
+Yoshida — e correggere solo il controllo del passo, accettandone la lentezza.
 
 ### Gauss-Jackson — multistep
 Predittore-correttore multistep, storicamente il metodo di elezione per orbite
@@ -84,9 +105,10 @@ quasi circolari, ancora molto usato nella meccanica orbitale operativa. Riutiliz
 le valutazioni dei passi precedenti, quindi e' economico per passo, ma richiede
 un avviamento con un metodo a passo singolo e mal sopporta i cambi di passo.
 
-*Misurato:* da caratterizzare.
+*Misurato:* accurato (3.7e-8 AU sul decennio) ma lento: 248.8 ms, oltre dieci
+volte RKF78.
 
-*Uso consigliato:* da definire dopo le misure.
+*Uso consigliato:* nessun vantaggio rispetto a RKF78 nel nostro impiego.
 
 ### Radau-IIA — implicito (Everhart RA15)
 Metodo di collocazione implicito, A-stabile, adatto ai problemi rigidi e agli
@@ -108,21 +130,57 @@ second'ordine con la derivata seconda dipendente dalla sola posizione, evitando 
 propagare la velocita' come variabile indipendente: meno valutazioni a parita' di
 ordine.
 
-*Misurato:* da caratterizzare.
+*Misurato:* il piu' efficiente sugli archi lunghi — 19.1 ms e 1.9e-7 AU sul
+decennio, meglio di RKF78 su entrambi i fronti. Da verificare il trattamento
+della correzione relativistica (dipendente dalla velocita') prima di promuoverlo.
 
-*Uso consigliato:* da definire dopo le misure.
+*Uso consigliato:* candidato a diventare il default per la propagazione, dopo la
+verifica di cui sopra.
 
 ## Tabella riassuntiva
 
-| metodo    | tipo                  | passo     | accuratezza | costo    | stato       |
-|-----------|-----------------------|-----------|-------------|----------|-------------|
-| RK4       | Runge-Kutta 4         | fisso     | da misurare | —        | funzionante |
-| RKF78     | RK-Fehlberg 7(8)      | adattivo  | ~2e-6 AU    | 28 ms/10a| **default** |
-| AAS       | simplettico adattivo  | adattivo  | ~2e-6 AU    | 1190 ms/10a | funzionante |
-| SABA4     | simplettico Yoshida   | fisso     | ~5 AU       | 80 s/arco| **rotto**   |
-| GAUSS     | multistep             | quasi-fisso | da misurare | —      | non provato |
-| RADAU     | implicito IIA         | adattivo  | da misurare | molto alto | da profilare |
-| GRKN64    | Nystrom 6(4)          | adattivo  | da misurare | —        | non provato |
+Errore rispetto a RKF78 @ 1e-13, propagazione all'indietro dall'epoca.
+Tempi su MacBook Air, modello di forze con perturbazioni planetarie.
+
+| metodo | 10 giorni | 100 g   | 1000 g  | 3650 g  | tempo 3650 g | andata-ritorno | energia   |
+|--------|-----------|---------|---------|---------|--------------|----------------|-----------|
+| RKF78  | 5.3e-14   | 2.9e-10 | 2.1e-08 | 7.9e-07 | **21.9 ms**  | 9.0e-11        | 5.1e-10   |
+| GRKN64 | 1.1e-11   | 1.1e-09 | 4.2e-08 | 1.9e-07 | **19.1 ms**  | 2.7e-13        | 2.5e-14   |
+| GAUSS  | 1.1e-13   | 2.8e-11 | 4.0e-10 | 3.7e-08 | 248.8 ms     | 1.4e-13        | 8.6e-15   |
+| RK4    | 1.7e-12   | 4.3e-11 | 2.8e-10 | 3.7e-08 | 308.8 ms     | 3.5e-15 (*)    | 1.5e-15   |
+| AAS    | 2.8e-11   | 1.6e-09 | 1.8e-07 | 4.7e-07 | 1125.4 ms    | 2.2e-09        | 1.1e-08   |
+| SABA4  | —         | —       | —       | —       | 79.5 s       | —              | —         |
+| RADAU  | da misurare | | | | | | |
+
+Errori in AU. Riferimento utile: 1e-6 AU = 150 km ~ 0.1 arcsec a 2 AU.
+
+(*) Il valore di RK4 nell'andata-ritorno e' ingannevole: a passo fisso i passi
+all'indietro ripercorrono esattamente quelli in avanti e l'errore si cancella.
+Non indica accuratezza.
+
+### Cosa dicono queste misure
+
+**GRKN64 e' il piu' efficiente sugli archi lunghi**: sul decennio e' insieme il
+piu' rapido (19.1 ms) e il piu' accurato (1.9e-7 AU). Coerente con la teoria —
+i metodi di Nystrom sfruttano la struttura del second'ordine. Da verificare
+prima di promuoverlo a default: il modello include la correzione relativistica,
+che dipende dalla velocita', mentre i Nystrom puri assumono accelerazione
+funzione della sola posizione. Il "generalized" del nome dovrebbe coprire il
+caso, ma va confermato leggendo l'implementazione.
+
+**I cinque metodi funzionanti concordano fra loro entro ~1e-7 AU**, mentre nella
+prova contro JPL Horizons RKF78 mostrava uno scarto di ~2e-6 AU. Se tutti i
+metodi concordano fra loro dieci volte meglio di quanto concordino con JPL, lo
+scarto residuo non e' dell'integrazione ma del **modello di forze** (perturbatori
+asteroidali assenti, o altro). E' l'indicazione piu' utile emersa dal banco.
+
+**GAUSS e RK4 sono accurati ma lenti**: buona precisione anche sul decennio, a
+un costo dieci volte superiore a RKF78.
+
+**AAS paga la simpletticita'**: precisione paragonabile agli altri ma ~50 volte
+piu' lento di RKF78. La deriva d'energia (1.1e-8) e' superiore a quella degli
+altri metodi su questo arco: il vantaggio dei simplettici si manifesta su
+integrazioni molto piu' lunghe di un decennio.
 
 ## Come scegliere
 
