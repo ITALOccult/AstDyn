@@ -239,8 +239,11 @@ public:
     static Matrix3d j2000_to_itrf_simple(time::EpochUTC t_utc) {
         double era = computeERA(t_utc, 0.0);
         
-        // Rotation about Z-axis (negative for celestial to terrestrial)
-        return rotation_z(-era);
+        // rotation_z e' PASSIVA (+sin sopra la diagonale): applicata a un vettore
+        // lo ruota di -angolo. Perche' itrf_to_j2000_simple (= trasposta di questa)
+        // porti Greenwich (R,0,0) in (R cos ERA, +R sin ERA, 0), qui serve +era.
+        // Con -era la Terra ruotava nel verso sbagliato: errore fino a 2*R_Terra.
+        return rotation_z(era);
     }
     
     /**
