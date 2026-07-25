@@ -211,3 +211,16 @@ indipendenti. Richiedono dati locali e **vengono saltati** se mancano:
 
 Un test saltato non e' un test passato: senza queste variabili la copertura
 sulla catena osservativa e' assente.
+
+## Esecuzione dei test di validazione esterna
+
+I test `ValidazioneEsterna.*` confrontano i risultati con riferimenti
+indipendenti. Richiedono dati locali e **vengono saltati** se mancano:
+
+    export ASTDYN_EPHEMERIS_PATH=~/.ioccultcalc/ephemerides/de440s.bsp
+    export ASTDYN_OBSCODES=~/.ioccultcalc/observatories/ObsCodes.txt
+    export ASTDYN_TEST_DATA=<repo>/astdyn/tests/data
+    ctest --test-dir build -R ValidazioneEsterna --output-on-failure
+
+Un test saltato non e' un test passato: senza queste variabili la copertura
+sulla catena osservativa e' assente.
