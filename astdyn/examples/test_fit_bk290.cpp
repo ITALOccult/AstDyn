@@ -58,7 +58,6 @@ int main(int argc, char** argv) {
         engine.add_observation(o); ++kept;
     }
     std::cout << "osservazioni usate: " << kept << std::endl;
-    std::cout << "PRIMA DI fit_orbit()" << std::endl;
 
     // Fit.
     try {

@@ -371,9 +371,6 @@ std::vector<Eigen::VectorXd> RKF78Integrator::integrate_at(const DerivativeFunct
             // non oltrepassare t_end
             if (dir * ((t + h) - t_end) > 0.0) h = t_end - t;
             verify_iteration_limits(++total_iterations, rejections, t, h);
-            if (total_iterations % 200 == 0)
-                std::cerr << "[TRACE_DENSE]   iter=" << total_iterations << " t=" << t
-                          << " h=" << h << " rej=" << rejections << std::endl;
             double t_a = t;
             Eigen::VectorXd y_a = y;
             Eigen::VectorXd dy_a = f(t_a, y_a);
@@ -391,12 +388,8 @@ std::vector<Eigen::VectorXd> RKF78Integrator::integrate_at(const DerivativeFunct
         }
     };
 
-    std::cerr << "[TRACE_DENSE] t0=" << t0 << " t_min=" << t_min << " t_max=" << t_max
-              << " (" << t_targets.size() << " target)" << std::endl;
     integrate_direction(t_min);
-    std::cerr << "[TRACE_DENSE] tratta indietro fatta, segmenti=" << segs.size() << std::endl;
     integrate_direction(t_max);
-    std::cerr << "[TRACE_DENSE] tratta avanti fatta, segmenti=" << segs.size() << std::endl;
 
     // 3. Valuto ogni target per interpolazione dentro il segmento che lo contiene.
     for (size_t i = 0; i < n; ++i) {

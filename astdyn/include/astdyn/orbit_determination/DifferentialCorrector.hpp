@@ -7,6 +7,8 @@
 #define ASTDYN_ORBIT_DETERMINATION_DIFFERENTIAL_CORRECTOR_HPP
 
 #include "astdyn/core/Types.hpp"
+#include <chrono>
+#include <iostream>
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/core/IOCConfig.hpp"
 #include "astdyn/observations/Observation.hpp"
@@ -101,10 +103,8 @@ public:
             res.iterations = i + 1;
             auto residuals = residual_calc_->compute_residuals(sorted_obs, current_state);
             handle_carpentry_sigma(i, settings, current_sigma, residuals);
-            
             auto dm = build_design_matrix(sorted_obs, current_state, residuals);
             if (dm.valid_indices.empty()) { res.rejection_reason = "No valid observations remaining"; break; }
-            
             Eigen::VectorXd corr = solve_normal_equations(dm);
             double cur_rms = ResidualCalculator<Frame>::compute_statistics(residuals, 6).rms_total.to_arcsec();
             
@@ -196,7 +196,6 @@ private:
             auto p = residual_calc_->get_observer_position(obs[idx]);
             positions.push_back(p ? *p : math::Vector3<core::GCRF, physics::Distance>());
         }
-
         auto batch = stm_computer_->compute_batch(s, times, positions);
         for (int i=0; i<n; ++i) {
             dm.A.template block<2,6>(2*i, 0) = batch[i].partial_radec * batch[i].phi;

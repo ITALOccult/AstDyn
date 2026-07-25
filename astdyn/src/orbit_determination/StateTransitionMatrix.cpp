@@ -28,7 +28,7 @@ StateTransitionMatrix<Frame>::StateTransitionMatrix(
     // to avoid interference with the propagator's integrator and ensure stability
     integrator_ = std::make_shared<RKF78Integrator>(
         0.1,      // initial step [days]
-        1e-13     // high precision for variational equations
+        1e-11     // TEST: tolleranza ragionevole per variazionali (era 1e-13)
     );
 }
 

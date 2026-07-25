@@ -49,15 +49,11 @@ std::vector<ObservationResidual> ResidualCalculator<Frame>::compute_residuals(
         target_times.reserve(observations.size());
         for (const auto& obs : observations) target_times.push_back(time::to_tdb(obs.time));
         
-        std::cerr << "[TRACE_RES] pre propagate_ephemeris, " << target_times.size() << " target" << std::endl;
         auto states = propagator_->propagate_ephemeris(state, target_times);
-        std::cerr << "[TRACE_RES] propagate_ephemeris OK" << std::endl;
         for (size_t i = 0; i < observations.size(); ++i) {
-            std::cerr << "[TRACE_RES] residual obs " << i << std::endl;
             auto residual = compute_residual(observations[i], states[i]);
             if (residual) residuals.push_back(*residual);
         }
-        std::cerr << "[TRACE_RES] loop completato" << std::endl;
     } else {
         // Fallback for Two-body (could also be optimized if needed)
         for (const auto& obs : observations) {
