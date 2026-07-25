@@ -49,12 +49,15 @@ std::vector<ObservationResidual> ResidualCalculator<Frame>::compute_residuals(
         target_times.reserve(observations.size());
         for (const auto& obs : observations) target_times.push_back(time::to_tdb(obs.time));
         
+        std::cerr << "[TRACE_RES] pre propagate_ephemeris, " << target_times.size() << " target" << std::endl;
         auto states = propagator_->propagate_ephemeris(state, target_times);
-        
+        std::cerr << "[TRACE_RES] propagate_ephemeris OK" << std::endl;
         for (size_t i = 0; i < observations.size(); ++i) {
+            std::cerr << "[TRACE_RES] residual obs " << i << std::endl;
             auto residual = compute_residual(observations[i], states[i]);
             if (residual) residuals.push_back(*residual);
         }
+        std::cerr << "[TRACE_RES] loop completato" << std::endl;
     } else {
         // Fallback for Two-body (could also be optimized if needed)
         for (const auto& obs : observations) {
@@ -119,7 +122,11 @@ std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
             
             tau = time::TimeDuration::from_seconds(tau_new_s);
             // Back-propagate from base position: r(t - tau) = r(t) - v * tau
-            auto pos_corr_si = base_pos_gcrf.to_eigen_si() - (object_vel_gcrf.to_eigen_si() * tau.to_seconds());
+            // ESPERIMENTO: velocita' RELATIVA (asteroide - osservatore) invece della
+            // sola velocita' dell'asteroide. Per la nota di Milani (OrbFit aber1)
+            // questo da' la correzione completa "planetaria + stellare".
+            auto vrel_si = object_vel_gcrf.to_eigen_si() + observer_vel_gcrf.to_eigen_si();
+            auto pos_corr_si = base_pos_gcrf.to_eigen_si() - (vrel_si * tau.to_seconds());
             object_pos_gcrf = math::Vector3<core::GCRF, physics::Distance>::from_si(pos_corr_si.x(), pos_corr_si.y(), pos_corr_si.z());
         }
     }
