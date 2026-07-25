@@ -141,3 +141,6 @@ target_link_libraries(test_residui_generic PRIVATE astdyn)
 
 add_executable(test_greenwich test_greenwich.cpp)
 target_link_libraries(test_greenwich PRIVATE astdyn)
+
+add_executable(test_integrators_bench test_integrators_bench.cpp)
+target_link_libraries(test_integrators_bench PRIVATE astdyn)
