@@ -20,6 +20,7 @@ add_executable(astdyn_unit_tests
     test_nbody_frame.cpp
     test_force_field_gradient.cpp
     test_frame_types.cpp
+    test_external_validation.cpp
 )
 
 target_link_libraries(astdyn_unit_tests
