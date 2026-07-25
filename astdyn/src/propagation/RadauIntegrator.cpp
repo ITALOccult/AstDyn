@@ -12,6 +12,10 @@
  */
 
 #include "astdyn/propagation/RadauIntegrator.hpp"
+#include <limits>
+#include <cmath>
+#include <stdexcept>
+#include <string>
 #include <iostream>
 #include <iomanip>
 #include "astdyn/utils/Atomics.hpp"
@@ -38,7 +42,11 @@ const double RadauIntegrator::b_[num_stages_] = {
     1.0 / 9.0
 };
 
-// Error estimator weights (crude)
+// NON PIU' USATO. Era una stima d'errore improvvisata: b_ con l'ultimo peso
+// azzerato, che dava un errore proporzionale ad h invece che ad h^6, quindi mai
+// sotto tolleranza. I Radau IIA non hanno una coppia incorporata come i
+// Runge-Kutta espliciti; la stima ora avviene per estrapolazione di Richardson.
+// Conservato solo per non toccare la dichiarazione nell'header.
 const double RadauIntegrator::b_hat_[num_stages_] = {
     (16.0 - std::sqrt(6.0)) / 36.0,
     (16.0 + std::sqrt(6.0)) / 36.0,
@@ -71,11 +79,39 @@ Eigen::VectorXd RadauIntegrator::integrate(const DerivativeFunction& f, const Ei
     stats_.reset();
     double t = t0, h = ((tf > t0) ? 1.0 : -1.0) * std::abs(h_initial_);
     Eigen::VectorXd y = y0;
+    int total_iterations = 0, rejections = 0;
+    // work_h: passo di lavoro persistente. Il clamping sul target e' una
+    // riduzione TEMPORANEA: se lo step viene rifiutato, adaptive_step ha gia'
+    // ridotto il candidato e lo si riusa piu' piccolo, senza riproporre
+    // all'infinito lo stesso `tf - t`.
+    double work_h = h;
+    double pending_h = 0.0;
+    bool have_pending = false;
     while (std::abs(tf - t) > 1e-14) {
-        double current_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
-        if (!adaptive_step(f, nullptr, t, y, current_h, tf)) stats_.num_rejected_steps++;
-        h = current_h;
+        double cand = have_pending ? pending_h : work_h;
+        bool clamping = std::abs(tf - t) < std::abs(cand);
+        double current_h = clamping ? (tf - t) : cand;
+        if (++total_iterations > 5000000) {
+                throw std::runtime_error("RadauIntegrator: superato il limite di passi (t=" +
+                    std::to_string(t) + ", h=" + std::to_string(current_h) + ")");
+            }
+            if (rejections > 1000) {
+                throw std::runtime_error("RadauIntegrator: troppi rifiuti consecutivi (t=" +
+                    std::to_string(t) + ", h=" + std::to_string(current_h) + ")");
+            }
+        if (adaptive_step(f, nullptr, t, y, current_h, tf)) {
+            rejections = 0;
+            have_pending = false;
+            if (!clamping) work_h = current_h;
+        } else {
+            stats_.num_rejected_steps++;
+            ++rejections;
+            // adaptive_step ha ridotto current_h: riusalo al giro successivo
+            pending_h = current_h;
+            have_pending = true;
+        }
     }
+    h = work_h;
     stats_.final_time = t; return y;
 }
 
@@ -124,9 +160,24 @@ std::vector<Eigen::VectorXd> RadauIntegrator::integrate_at(const DerivativeFunct
     std::vector<Eigen::VectorXd> res; res.reserve(t_targets.size());
     double t = t0, h = ((t_targets.empty() || t_targets[0] >= t0) ? 1.0 : -1.0) * std::abs(h_initial_);
     Eigen::VectorXd y = y0;
+    int total_iterations = 0, rejections = 0;
+    double work_h = h;
+    double pending_h = 0.0;
+    bool have_pending = false;
     for (double tf : t_targets) {
         while (std::abs(tf - t) > 1e-14) {
-            double current_h = (std::abs(tf - t) < std::abs(h)) ? (tf - t) : h;
+            double dir_t = (tf > t) ? 1.0 : -1.0;
+            double cand = have_pending ? pending_h : dir_t * std::abs(work_h);
+            bool clamping = std::abs(tf - t) < std::abs(cand);
+            double current_h = clamping ? (tf - t) : cand;
+            if (++total_iterations > 5000000) {
+                throw std::runtime_error("RadauIntegrator: superato il limite di passi (t=" +
+                    std::to_string(t) + ", h=" + std::to_string(current_h) + ")");
+            }
+            if (rejections > 1000) {
+                throw std::runtime_error("RadauIntegrator: troppi rifiuti consecutivi (t=" +
+                    std::to_string(t) + ", h=" + std::to_string(current_h) + ")");
+            }
             if (!adaptive_step(f, nullptr, t, y, current_h, tf) && std::abs(current_h) < h_min_) 
                 throw std::runtime_error("Radau: Step below h_min");
             h = current_h;
@@ -155,6 +206,13 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
     std::vector<Eigen::VectorXd> k(num_stages_, Eigen::VectorXd::Zero(n));
     if (k_prev_.size() == (size_t)num_stages_) k = k_prev_;
 
+    // La jacobiana e' un membro riusato fra i passi (Newton modificato), ma al
+    // primo passo puo' essere vuota: senza questo controllo i solutori LU
+    // degenererebbero nell'identita' e Newton diventerebbe punto fisso.
+    if (jacobian_.rows() != n || jacobian_.cols() != n) {
+        jacobian_ = jac ? jac(t, y) : numerical_jacobian(f, t, y);
+    }
+
     // Solve implicit system
     bool converged = solve_implicit_system(f, jacobian_, t, y, h, k);
     
@@ -171,13 +229,38 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
         return false;
     }
     
-    // Compute solution and error estimate
+    // Soluzione del passo intero
     Eigen::VectorXd y_new = y;
+    for (int i = 0; i < num_stages_; ++i) y_new += h * b_[i] * k[i];
+
+    // Stima d'errore per ESTRAPOLAZIONE DI RICHARDSON: due mezzi passi.
+    // I Radau IIA non hanno una coppia incorporata; il b_hat_ "crude" presente
+    // in precedenza dava una stima proporzionale ad h, che non si annullava mai.
     Eigen::VectorXd y_err = Eigen::VectorXd::Zero(n);
-    
-    for (int i = 0; i < num_stages_; ++i) {
-        y_new += h * b_[i] * k[i];
-        y_err += h * (b_[i] - b_hat_[i]) * k[i];
+    {
+        const double hh = 0.5 * h;
+        Eigen::VectorXd y_half = y;
+        bool half_ok = true;
+        for (int m = 0; m < 2 && half_ok; ++m) {
+            const double t_m = t + m * hh;
+            std::vector<Eigen::VectorXd> k_h(num_stages_, Eigen::VectorXd::Zero(n));
+            if (k_prev_.size() == (size_t)num_stages_) k_h = k_prev_;
+            auto solvers_h = setup_lu_solvers(jacobian_, n, hh);
+            setup_initial_guess(f, t_m, y_half, hh, k_h);
+            half_ok = solve_newton_iterations(f, solvers_h, t_m, y_half, hh, k_h);
+            if (half_ok) {
+                Eigen::VectorXd y_step = y_half;
+                for (int i = 0; i < num_stages_; ++i) y_step += hh * b_[i] * k_h[i];
+                y_half = y_step;
+            }
+        }
+        if (half_ok && y_half.allFinite()) {
+            // ordine 5: il fattore (2^5 - 1) normalizza la differenza
+            y_err = (y_new - y_half) / 31.0;
+        } else {
+            // se i mezzi passi falliscono il passo e' troppo lungo: forza il rifiuto
+            y_err = Eigen::VectorXd::Constant(n, std::numeric_limits<double>::max());
+        }
     }
     
     // Error control using component-wise relative scaling
@@ -196,7 +279,10 @@ bool RadauIntegrator::adaptive_step(const DerivativeFunction& f,
     double fac = safety * std::pow(tolerance_ / (rel_err + 1e-20), 1.0 / 6.0); // Order 5 (3 stages) -> 1/6
     fac = std::min(fac_max, std::max(fac_min, fac));
     
-    if (rel_err <= tolerance_ && y_new.allFinite()) {
+    // Al passo minimo lo step viene accettato anche con errore sopra tolleranza:
+    // sotto h_min_ non si puo' scendere e rifiutare all'infinito e' un blocco.
+    const bool al_minimo = std::abs(h) <= h_min_ * 1.0000001;
+    if ((rel_err <= tolerance_ || al_minimo) && y_new.allFinite()) {
         // Accept step
         t += h;
         y = y_new;
@@ -271,7 +357,15 @@ void RadauIntegrator::setup_initial_guess(const DerivativeFunction& f, double t,
 }
 
 bool RadauIntegrator::solve_newton_iterations(const DerivativeFunction& f, const std::vector<Eigen::PartialPivLU<Eigen::MatrixXd>>& solvers, double t, const Eigen::VectorXd& y, double h, std::vector<Eigen::VectorXd>& k) {
-    for (int iter = 0; iter < std::min(max_newton_iter_, 4); ++iter) {
+    // La tolleranza di Newton NON coincide con quella di integrazione: deve solo
+    // garantire che l'errore di soluzione del sistema implicito sia trascurabile
+    // rispetto all'errore di troncamento del metodo. Agganciarla a tolerance_
+    // (1e-12 -> soglia 1e-13 su una correzione relativa) la rende irraggiungibile
+    // in doppia precisione. Il pavimento a 1e-11 la mantiene sensata.
+    const double newton_tol = std::max(tolerance_ * 0.1, 1e-11);
+    double prev_corr = std::numeric_limits<double>::max();
+
+    for (int iter = 0; iter < max_newton_iter_; ++iter) {
         double max_corr = 0.0;
         for (int i = 0; i < num_stages_; ++i) {
             Eigen::VectorXd y_s = y;
@@ -281,7 +375,15 @@ bool RadauIntegrator::solve_newton_iterations(const DerivativeFunction& f, const
             k[i] -= delta;
             for (int l = 0; l < delta.size(); ++l) max_corr = std::max(max_corr, std::abs(delta[l]) / std::max(std::abs(k[i][l]), 1e-10));
         }
-        if (max_corr < tolerance_ * 0.1) return true;
+        if (!std::isfinite(max_corr)) return false;
+        if (max_corr < newton_tol) return true;
+        // Stagnazione: se la correzione non migliora sensibilmente, si e'
+        // raggiunto il limite della precisione disponibile e insistere e' inutile.
+        // Accettiamo comunque se siamo vicini alla soglia.
+        if (iter >= 2 && max_corr > 0.9 * prev_corr) {
+            return max_corr < newton_tol * 100.0;
+        }
+        prev_corr = max_corr;
     }
     return false;
 }

@@ -111,18 +111,34 @@ volte RKF78.
 *Uso consigliato:* nessun vantaggio rispetto a RKF78 nel nostro impiego.
 
 ### Radau-IIA — implicito (Everhart RA15)
-Metodo di collocazione implicito, A-stabile, adatto ai problemi rigidi e agli
-incontri ravvicinati. E' il metodo che OrbFit usa come opzione `imet=3`.
+Metodo di collocazione implicito a tre stadi, ordine 5, A-stabile. E' il metodo
+di riferimento della dinamica del sistema solare: Everhart lo introdusse come
+RA15, OrbFit lo adotta come opzione `imet=3`, ed e' quello su cui poggiano molte
+integrazioni a lungo termine della letteratura.
 
-Il carattere implicito richiede la soluzione iterativa di un sistema a ogni passo:
-molto costoso per passo, ma con passi molto piu' lunghi e ottima stabilita'.
+Essendo implicito richiede a ogni passo la soluzione di un sistema non lineare
+(Newton su jacobiana), quindi costa molto per passo — ma usa passi lunghissimi e
+mantiene un'accuratezza molto superiore.
 
-*Misurato:* troppo lento per uso pratico nella nostra implementazione (prova
-interrotta). Da profilare: puo' trattarsi di un problema di implementazione
-piu' che del metodo.
+*Misurato:* **il piu' accurato di tutti sul decennio** — 2.05e-8 AU, dieci volte
+meglio di RKF78, al costo di 177.8 ms (otto volte RKF78). Il passo cresce
+rapidamente: da 0.1 a 5.7 giorni nei primi passi, con errore stimato che resta
+sei ordini di grandezza sotto la tolleranza richiesta.
 
-*Uso consigliato:* da riconsiderare dopo l'ottimizzazione. Naturale candidato per
-gli incontri planetari ravvicinati.
+*Uso consigliato:* quando serve la massima accuratezza su archi lunghi, e per gli
+incontri ravvicinati (e' il caso d'uso per cui OrbFit lo seleziona).
+
+*Nota storica sull'implementazione:* fino al 2026-07-22 il metodo non compiva
+**nemmeno un passo**. I coefficienti (c_, a_, b_) erano corretti — valori canonici
+di Radau IIA — ma la stima d'errore era improvvisata: un `b_hat_` costruito per
+analogia con i Runge-Kutta espliciti, dichiarato "crude" nel codice stesso.
+Dava un errore proporzionale ad h invece che ad h^6, quindi mai sotto tolleranza:
+il passo veniva dimezzato fino a zero e il ciclo girava all'infinito. I Radau IIA
+non ammettono una coppia incorporata; la stima ora avviene per estrapolazione di
+Richardson (passo intero contro due mezzi passi), corretta per costruzione ma con
+un costo di circa 3x per passo. Una stima alla Hairer-Wanner, che riusa la
+fattorizzazione LU gia' disponibile, sarebbe piu' economica: possibile
+ottimizzazione futura.
 
 ### GRKN64 — Runge-Kutta-Nystrom generalizzato 6(4)
 I metodi di Nystrom sfruttano il fatto che l'equazione del moto e' del
@@ -150,7 +166,7 @@ Tempi su MacBook Air, modello di forze con perturbazioni planetarie.
 | RK4    | 1.7e-12   | 4.3e-11 | 2.8e-10 | 3.7e-08 | 308.8 ms     | 3.5e-15 (*)    | 1.5e-15   |
 | AAS    | 2.8e-11   | 1.6e-09 | 1.8e-07 | 4.7e-07 | 1125.4 ms    | 2.2e-09        | 1.1e-08   |
 | SABA4  | —         | —       | —       | —       | 79.5 s       | —              | —         |
-| RADAU  | da misurare | | | | | | |
+| RADAU  | 7.7e-13   | 2.5e-10 | 7.5e-09 | **2.1e-08** | 177.8 ms     | 7.6e-10        | 2.8e-10   | |
 
 Errori in AU. Riferimento utile: 1e-6 AU = 150 km ~ 0.1 arcsec a 2 AU.
 
@@ -159,6 +175,13 @@ all'indietro ripercorrono esattamente quelli in avanti e l'errore si cancella.
 Non indica accuratezza.
 
 ### Cosa dicono queste misure
+
+**RADAU e' il piu' accurato sugli archi lunghi** (2.1e-8 AU sul decennio, dieci
+volte meglio di RKF78) a un costo otto volte superiore. E' il compromesso tipico
+di un implicito ben implementato, e giustifica la reputazione del metodo.
+Da notare il rovescio: RKF78, il piu' veloce, e' il **meno accurato** sul
+decennio. Per l'uso corrente va benissimo; quando serve precisione su archi
+lunghi la scelta e' RADAU.
 
 **GRKN64 e' il piu' efficiente sugli archi lunghi**: sul decennio e' insieme il
 piu' rapido (19.1 ms) e il piu' accurato (1.9e-7 AU). Coerente con la teoria —
@@ -184,10 +207,12 @@ integrazioni molto piu' lunghe di un decennio.
 
 ## Come scegliere
 
-- **Propagazione, fit, STM, uso generale** -> RKF78
+- **Propagazione, fit, STM, uso generale** -> RKF78 (veloce, precisione adeguata)
+- **Massima accuratezza su archi lunghi, incontri ravvicinati** -> RADAU
+- **Efficienza su archi lunghi** -> GRKN64 (da verificare sulla relativita')
 - **Stabilita' su tempi lunghissimi, studi dinamici** -> AAS
 - **Verifiche didattiche, archi brevi** -> RK4
-- Gli altri: non usare finche' non validati.
+- **SABA4** -> non supportato (vedi sopra)
 
 ## Nota metodologica sulla validazione
 
@@ -198,29 +223,3 @@ rotti integratori perfettamente funzionanti. Errore commesso e corretto durante
 le prove del 2026-07-22.
 
 Conversione: JD = MJD + 2400000.5
-
-## Esecuzione dei test di validazione esterna
-
-I test `ValidazioneEsterna.*` confrontano i risultati con riferimenti
-indipendenti. Richiedono dati locali e **vengono saltati** se mancano:
-
-    export ASTDYN_EPHEMERIS_PATH=~/.ioccultcalc/ephemerides/de440s.bsp
-    export ASTDYN_OBSCODES=~/.ioccultcalc/observatories/ObsCodes.txt
-    export ASTDYN_TEST_DATA=<repo>/astdyn/tests/data
-    ctest --test-dir build -R ValidazioneEsterna --output-on-failure
-
-Un test saltato non e' un test passato: senza queste variabili la copertura
-sulla catena osservativa e' assente.
-
-## Esecuzione dei test di validazione esterna
-
-I test `ValidazioneEsterna.*` confrontano i risultati con riferimenti
-indipendenti. Richiedono dati locali e **vengono saltati** se mancano:
-
-    export ASTDYN_EPHEMERIS_PATH=~/.ioccultcalc/ephemerides/de440s.bsp
-    export ASTDYN_OBSCODES=~/.ioccultcalc/observatories/ObsCodes.txt
-    export ASTDYN_TEST_DATA=<repo>/astdyn/tests/data
-    ctest --test-dir build -R ValidazioneEsterna --output-on-failure
-
-Un test saltato non e' un test passato: senza queste variabili la copertura
-sulla catena osservativa e' assente.
