@@ -28,7 +28,7 @@ namespace astdyn::orbit_determination {
  * @brief STM computation settings
  */
 struct STMSettings {
-    bool use_numerical_jacobian = true; ///< Default to OrbFit style
+    bool use_numerical_jacobian = false; ///< Default to OrbFit style
     double differentiation_step = 1e-7;  ///< Default step [AU]
 };
 
@@ -223,7 +223,7 @@ private:
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephemeris_;
     
     double diff_step_ = 1e-7;            ///< Numerical differentiation step (OrbFit default)
-    bool use_numerical_jacobian_ = true; ///< Default to true to match OrbFit logic
+    bool use_numerical_jacobian_ = false;  // analitica: validata vs numerica (rel 1e-9), 66x piu veloce ///< Default to true to match OrbFit logic
 };
 
 } // namespace astdyn::orbit_determination
