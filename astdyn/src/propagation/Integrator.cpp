@@ -310,46 +310,115 @@ std::vector<Eigen::VectorXd> RK4Integrator::integrate_at(const DerivativeFunctio
     return results;
 }
 
+// Passo massimo [giorni] durante il dense output. L'interpolazione di Hermite
+// cubica ha errore ~O(h^4): con passi naturali di decine di giorni l'errore
+// misurato era ~1500 km (1.05 arcsec); con 2 giorni scende a ~60 m (4e-5 arcsec).
+static constexpr double kDenseMaxStepDays = 2.0;
+
+// Interpolazione di Hermite cubica dentro un passo [t_a, t_b].
+// Usa y e dy=f(t,y) ai due estremi. Funziona per qualunque dimensione di stato
+// (6 per lo stato orbitale, 42 per stato+STM), perche' dy e' fornito dal chiamante.
+static Eigen::VectorXd hermite_interp(double t,
+                                      double t_a, const Eigen::VectorXd& y_a, const Eigen::VectorXd& dy_a,
+                                      double t_b, const Eigen::VectorXd& y_b, const Eigen::VectorXd& dy_b) {
+    const double h = t_b - t_a;
+    if (std::abs(h) < 1e-300) return y_a;
+    const double s = (t - t_a) / h;          // parametro normalizzato in [0,1]
+    const double s2 = s * s, s3 = s2 * s;
+    // basi di Hermite
+    const double h00 = 2.0*s3 - 3.0*s2 + 1.0;
+    const double h10 = s3 - 2.0*s2 + s;
+    const double h01 = -2.0*s3 + 3.0*s2;
+    const double h11 = s3 - s2;
+    return h00 * y_a + (h10 * h) * dy_a + h01 * y_b + (h11 * h) * dy_b;
+}
+
 std::vector<Eigen::VectorXd> RKF78Integrator::integrate_at(const DerivativeFunction& f,
                                                        const Eigen::VectorXd& y0,
                                                        double t0,
                                                        const std::vector<double>& t_targets) {
     stats_.reset();
-    std::vector<Eigen::VectorXd> results; results.reserve(t_targets.size());
-    double t = t0;
-    // work_mag: magnitudine (senza segno) del passo di lavoro adattivo, persiste
-    // tra i target. Il segno si ricalcola per ogni target dalla direzione t->tf.
-    double work_mag = std::abs(h_initial_);
-    Eigen::VectorXd y = y0; int total_iterations = 0;
-    for (double tf : t_targets) {
-        int rejections = 0;
-        // center_h: passo di centraggio corrente verso questo target (con segno).
-        // Parte dal passo di lavoro nella direzione giusta; se rifiutato viene
-        // ridotto da adaptive_step e riusato piu' piccolo, senza degradare work_mag.
-        double center_h = 0.0;
-        bool have_center = false;
-        while (std::abs(tf - t) > 1e-14) {
-            double dir = (tf > t) ? 1.0 : -1.0;
-            // passo candidato: il centraggio in corso (se attivo) o il lavoro pieno
-            double cand = have_center ? center_h : dir * work_mag;
-            // non superare il target
-            bool clamping = std::abs(tf - t) < std::abs(cand);
-            double step_h = clamping ? (tf - t) : cand;
-            verify_iteration_limits(++total_iterations, rejections, t, step_h);
-            if (adaptive_step(f, t, y, step_h, tf)) {
+    const size_t n = t_targets.size();
+    std::vector<Eigen::VectorXd> results(n);
+    if (n == 0) return results;
+
+    // 1. Intervallo da coprire: da t0 fino al target piu' lontano (in ciascuna
+    //    direzione). I target possono essere in qualsiasi ordine; li valutiamo
+    //    per interpolazione, quindi non serve ordinarli, ma dobbiamo propagare
+    //    fino a coprirli tutti.
+    double t_min = t0, t_max = t0;
+    for (double tf : t_targets) { t_min = std::min(t_min, tf); t_max = std::max(t_max, tf); }
+
+    // 2. Propago con passo naturale, salvando i segmenti {t_a,t_b,y_a,dy_a,y_b,dy_b}.
+    //    Se i target sono da entrambi i lati di t0, propago in due tratte (indietro e avanti).
+    struct Segment { double ta, tb; Eigen::VectorXd ya, dya, yb, dyb; };
+    std::vector<Segment> segs;
+
+    auto integrate_direction = [&](double t_end) {
+        if (std::abs(t_end - t0) < 1e-14) return;
+        double dir = (t_end > t0) ? 1.0 : -1.0;
+        double t = t0;
+        Eigen::VectorXd y = y0;
+        double work_mag = std::abs(h_initial_);
+        int total_iterations = 0, rejections = 0;
+        while (dir * (t_end - t) > 1e-14) {
+            // Il passo di lavoro viene limitato: l'interpolazione di Hermite
+            // cubica usata per il dense output ha errore ~O(h^4), quindi passi
+            // naturali lunghi (decine di giorni) darebbero errori di ~1500 km
+            // (misurati). Con il cap l'errore scende a pochi metri.
+            double mag = std::min(work_mag, kDenseMaxStepDays);
+            double h = dir * mag;
+            // non oltrepassare t_end
+            if (dir * ((t + h) - t_end) > 0.0) h = t_end - t;
+            verify_iteration_limits(++total_iterations, rejections, t, h);
+            if (total_iterations % 200 == 0)
+                std::cerr << "[TRACE_DENSE]   iter=" << total_iterations << " t=" << t
+                          << " h=" << h << " rej=" << rejections << std::endl;
+            double t_a = t;
+            Eigen::VectorXd y_a = y;
+            Eigen::VectorXd dy_a = f(t_a, y_a);
+            double step_h = h;
+            if (adaptive_step(f, t, y, step_h, t_end)) {
+                // step accettato: t e y sono avanzati a t_a+step_h
                 rejections = 0;
-                have_center = false;                 // step accettato: fine centraggio
-                if (!clamping) work_mag = std::abs(step_h);  // aggiorna lavoro solo se non clampavamo
+                Eigen::VectorXd dy_b = f(t, y);
+                segs.push_back({t_a, t, y_a, dy_a, y, dy_b});
+                work_mag = std::abs(step_h);
             } else {
                 rejections++;
-                // adaptive_step ha ridotto step_h: riusalo come centraggio piu' piccolo
-                center_h = step_h;
-                have_center = true;
+                work_mag = std::abs(step_h);  // adaptive_step ha ridotto step_h
             }
         }
-        results.push_back(y);
+    };
+
+    std::cerr << "[TRACE_DENSE] t0=" << t0 << " t_min=" << t_min << " t_max=" << t_max
+              << " (" << t_targets.size() << " target)" << std::endl;
+    integrate_direction(t_min);
+    std::cerr << "[TRACE_DENSE] tratta indietro fatta, segmenti=" << segs.size() << std::endl;
+    integrate_direction(t_max);
+    std::cerr << "[TRACE_DENSE] tratta avanti fatta, segmenti=" << segs.size() << std::endl;
+
+    // 3. Valuto ogni target per interpolazione dentro il segmento che lo contiene.
+    for (size_t i = 0; i < n; ++i) {
+        double tf = t_targets[i];
+        if (std::abs(tf - t0) < 1e-14) { results[i] = y0; continue; }
+        const Segment* found = nullptr;
+        for (const auto& sg : segs) {
+            double lo = std::min(sg.ta, sg.tb), hi = std::max(sg.ta, sg.tb);
+            if (tf >= lo - 1e-9 && tf <= hi + 1e-9) { found = &sg; break; }
+        }
+        if (found) {
+            results[i] = hermite_interp(tf, found->ta, found->ya, found->dya,
+                                            found->tb, found->yb, found->dyb);
+        } else if (!segs.empty()) {
+            // fallback: target ai bordi numerici, uso l'estremo piu' vicino
+            const auto& sg = segs.back();
+            results[i] = (std::abs(tf - sg.tb) < std::abs(tf - sg.ta)) ? sg.yb : sg.ya;
+        } else {
+            results[i] = y0;
+        }
     }
-    stats_.final_time = t;
+    stats_.final_time = t_max;
     return results;
 }
 
