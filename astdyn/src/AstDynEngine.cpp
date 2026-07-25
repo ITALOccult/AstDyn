@@ -62,7 +62,15 @@ std::unique_ptr<Integrator> AstDynEngine::create_integrator() {
     switch (config_.integrator_type) {
         case IntegratorType::RKF78: return std::make_unique<RKF78Integrator>(config_.initial_step_size, config_.tolerance);
         case IntegratorType::RK4: return std::make_unique<RK4Integrator>(config_.initial_step_size);
-        case IntegratorType::SABA4: return std::make_unique<SABA4Integrator>(std::max(0.5, config_.initial_step_size), config_.tolerance);
+        case IntegratorType::SABA4:
+            // SABA4 non supportato: l'implementazione attuale e' difettosa e
+            // produce risultati privi di senso (errore 1.60 AU su un arco di
+            // 0.1 giorni, contro ~1e-15 degli altri metodi). Vedi
+            // docs/integratori.md per la diagnosi. Fallisce esplicitamente
+            // invece di restituire numeri sbagliati.
+            throw std::runtime_error(
+                "SABA4 non supportato: implementazione difettosa (vedi docs/integratori.md). "
+                "Per un integratore simplettico validato usare AAS; per uso generale RKF78.");
         case IntegratorType::GAUSS: return std::make_unique<GaussIntegrator>(config_.initial_step_size, config_.tolerance);
         case IntegratorType::RADAU: return std::make_unique<RadauIntegrator>(config_.initial_step_size, config_.tolerance);
         case IntegratorType::AAS: return std::make_unique<AASIntegrator>(config_.aas_precision, std::vector<double>{config_.propagator_settings.central_body_gm});
