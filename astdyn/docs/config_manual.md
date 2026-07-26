@@ -49,7 +49,12 @@ fitting.
 
 Controls numerical integration of asteroid orbits.
 
-- `type` (string): `RK4` (default), `RKF78`, `GAUSS`, `RADAU`, `AAS`, `SABA4`, `GRKN64`.
+- `type` (string): `RK4` (default), `RKF78`, `GAUSS`, `RADAU`, `AAS`, `GRKN64`.
+  `SABA4` is **no longer supported**: its step control is defective and produces
+  meaningless results (1.60 AU error over a 0.1-day arc, against ~1e-15 for every
+  other method). Selecting it raises an exception rather than returning wrong
+  numbers silently. See `docs/integratori.md` for the diagnosis and for measured
+  accuracy/cost figures of the working methods.
 - `step_size` (double): initial step in days (default `0.1`).
 - `tolerance` (double): relative error tolerance for adaptive integrators (default `1e-11`).
 - `aas_precision` (double): step-control metric for the `AAS` integrator (default `1e-4`).
@@ -96,14 +101,65 @@ asteroid perturbers can be a default set, a 30-body set, or an explicit list.
 
 Differential-correction (least-squares) orbit fitting.
 
+- `enabled` (bool): run the orbit fit (default `false`). When on, `ioccultcalc`
+  looks for `<observations_dir>/<id>.rwo` for each body and refines its orbit
+  before predicting. **The fitted orbit replaces the starting one only if the
+  fit converges**; a failed fit leaves the original orbit untouched and says so.
+- `obs_years` (double): use only observations from the last N years relative to
+  the element epoch (default `0` = all). Shorter arcs fit faster but constrain
+  the orbit less: accuracy depends on the temporal baseline. Measured on 820987,
+  all 90 observations give RMS 0.26″, while a 3-year cut leaves 19 observations.
+  The fit is refused below six observations — six orbital elements cannot be
+  determined with fewer constraints than unknowns.
+- `tolerance` (double): integrator tolerance during the fit (default `0` = keep
+  the current one). **Measured as ineffective**: four orders of magnitude produce
+  no measurable change in cost, because the expense lies in the state-transition
+  matrix rather than in state propagation. Kept for completeness.
+- `compute_covariance` (bool): compute the formal covariance `(AᵀWA)⁻¹` from the
+  fit (default `true`). When available it **replaces** the `.eq1` covariance for
+  the prediction ellipse, so orbit and uncertainty both come from our own
+  solution. On 820987 this gives 0.107″ × 0.063″ @ PA 71.39 (cross-track
+  120.4 km) against AstDyS 0.118″ × 0.064″ @ PA 71.39 (131.8 km).
 - `max_iter` (int): maximum iterations (default `10`).
 - `convergence` (double): threshold in AU on the state vector (default `1e-6`).
-- `outlier_threshold` (double): sigma-clipping threshold for rejected observations.
+- `outlier_sigma` (double): sigma-clipping threshold (default `3.0`).
+- `outlier_max_sigma`, `outlier_min_sigma` (double): start and end thresholds for
+  progressive outlier rejection (defaults `10.0` and `3.0`).
 - `light_time` (bool): light-time delay correction.
 - `aberration` (bool): annual stellar aberration.
 - `light_deflection` (bool): gravitational light deflection (GR).
 
-### 2.5 `occultation` (engine-level)
+> **Correction.** Earlier revisions of this manual listed `outlier_threshold`.
+> That key is not read by the code; the correct name is `outlier_sigma`.
+
+> **On convergence.** A fit that stops because the line search finds no better
+> step has reached a minimum, and is reported as *converged*. This is the normal
+> outcome when the starting orbit is already good.
+
+### 2.5 `observatories`
+
+The MPC observatory code catalogue, needed to place each observing site on the
+Earth's surface.
+
+- `file` (string): path to MPC `ObsCodes.txt`. If unset, these are tried in
+  order: `~/.ioccultcalc/observatories/ObsCodes.txt`,
+  `~/.ioccultcalc/ObsCodes.txt`, `./ObsCodes.txt`.
+
+> **Why this matters.** Without the catalogue every observation is reduced from
+> the **geocentre**, losing topocentric parallax — about 4″ at 2.2 AU and far
+> more for nearby objects. Measured effect on the 820987 fit: RMS **1.59″
+> without** the catalogue against **0.26″ with** it. When the catalogue is
+> missing the tool now says so explicitly instead of degrading quietly.
+>
+> Get the file from
+> `https://www.minorplanetcenter.net/iau/lists/ObsCodes.html` (an HTML page:
+> strip the tags, the fixed-column content is inside `<pre>`).
+>
+> Mobile observers — code `270` (Unistellar Network) and similar — carry no
+> catalogue coordinates and still fall back to the geocentre. On 433 Eros they
+> account for 47% of recent observations.
+
+### 2.6 `occultation` (engine-level)
 
 Discovery and refinement logic for occultation candidates.
 
@@ -140,6 +196,12 @@ older config files keep working unchanged.
 
 (`"*"` for all numbered asteroids is not yet implemented: it needs a defined
 enumeration source.)
+
+- `objects.elements_dir` (string): directory of `<id>.eq1` element files
+  (AstDyS format). When set, elements are read from disk instead of Horizons.
+- `objects.observations_dir` (string): directory of `<id>.rwo` observation files,
+  used by the orbit fit (`diffcorr.enabled`). The campaign orchestrator downloads
+  them for second-stage positives only.
 
 ### 3.2 Time window — `time`
 
@@ -254,6 +316,19 @@ physics:
   asteroids:
     enabled: true
     use_default_17: true
+
+observatories:
+  file: "~/.ioccultcalc/observatories/ObsCodes.txt"
+
+# Orbit fit (optional): refines each orbit on its own observations and derives
+# the prediction ellipse from the resulting covariance.
+diffcorr:
+  enabled: true
+  obs_years: 0          # 0 = use all observations
+  compute_covariance: true
+
+objects:
+  observations_dir: "~/campaigns/obs"
 
 occultation:
   min_sun_alt: -18.0
