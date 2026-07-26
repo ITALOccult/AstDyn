@@ -72,3 +72,29 @@ introduce ~5e-3 AU di errore spurio - ci ha depistati a lungo).
 - Sezioni: Summary, Statement of need, State of the field, Software design,
   Research impact, References. Evidenziare: two-stage search, covarianza
   per-asteroide -> ellissi, sistema frame tipizzato C++20, validazione vs AstDyS/JPL.
+
+---
+
+## Prossima sessione (annotato il 26 luglio 2026)
+
+### Sezione di uscita — revisione completa
+Controllare a fondo tutte le opzioni di output, che finora non sono mai state
+verificate sui file prodotti ma solo attraverso i numeri a terminale:
+
+- **XML Occult4**: verificare che sia realmente accettato da Occult4, con gli
+  elementi dell'asteroide e le proprieta' della stella al posto giusto;
+- **JSON nativo**: struttura, completezza, coerenza con quanto l'orchestrator
+  si aspetta di leggere per estrarre i positivi;
+- **SVG**: mappa globale e mappe per singolo evento, convenzione dei nomi
+  `{prefix}_{body}_{star_id}_{mjd}.svg`, e le opzioni di inquadratura
+  (`zoom`, `map-lat`, `map-lon`);
+- **KML**: apertura corretta in Google Earth;
+- `out-dir`, `prefix`, `output.write_empty`: comportamento in batch;
+- coerenza fra i formati: lo stesso evento deve comparire con gli stessi valori
+  in XML, JSON e mappe.
+
+### Configurator — collegamento al catalogo
+- `ioccultcalc_setup.py` deve leggere `data/manifest.json` da GitHub invece di
+  avere gli indirizzi nel codice;
+- implementare `--packages` quando i pacchetti del catalogo stellare saranno
+  ospitati (serve `IOCCULTCALC_PACKAGES_URL`).
