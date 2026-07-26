@@ -38,6 +38,11 @@ struct DifferentialCorrectorSettings {
     bool verbose = false;
     bool use_line_search = true;
     double line_search_min_alpha = 1e-4;
+    int outlier_ramp_steps = 3;              ///< Iterazioni per passare da
+                                             ///< outlier_max_sigma a outlier_min_sigma.
+                                             ///< Slegato da max_iterations, che e' un
+                                             ///< limite di sicurezza e non deve
+                                             ///< influenzare quali osservazioni si scartano.
     int max_line_search_steps = 5;           ///< Tetto ai dimezzamenti di alpha: ogni
                                              ///< tentativo costa una propagazione completa,
                                              ///< e da 1 a 1e-4 sarebbero 14 tentativi.
@@ -51,6 +56,7 @@ struct DifferentialCorrectorSettings {
         s.outlier_sigma        = cfg.get<double>("diffcorr.outlier_sigma",        s.outlier_sigma);
         s.outlier_max_sigma    = cfg.get<double>("diffcorr.outlier_max_sigma",    s.outlier_max_sigma);
         s.outlier_min_sigma    = cfg.get<double>("diffcorr.outlier_min_sigma",    s.outlier_min_sigma);
+        s.outlier_ramp_steps   = cfg.get<int>   ("diffcorr.outlier_ramp_steps",   s.outlier_ramp_steps);
         s.rms_tolerance_arcsec = cfg.get<double>("diffcorr.rms_tolerance_arcsec",s.rms_tolerance_arcsec);
         s.reject_outliers      = cfg.get<bool>  ("diffcorr.reject_outliers",      s.reject_outliers);
         s.compute_covariance   = cfg.get<bool>  ("diffcorr.compute_covariance",   s.compute_covariance);
@@ -160,8 +166,15 @@ private:
         if (!settings.reject_outliers) return;
         auto stats = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
         if (iter > 0 && stats.rms_total.to_arcsec() < 1000.0) {
-            double t = (double)iter / (double)settings.max_iterations;
-            current_sigma = settings.outlier_max_sigma + t * (settings.outlier_min_sigma - settings.outlier_max_sigma);
+            // La soglia scende di un passo fisso a ogni iterazione, da
+            // outlier_max_sigma a outlier_min_sigma in outlier_ramp_steps passi.
+            // NON dipende da max_iterations: quello e' un limite di sicurezza, e
+            // un fit ben condizionato che converge in due iterazioni deve
+            // scartare gli outlier come uno che ne impiega venti.
+            const int passi = std::max(1, settings.outlier_ramp_steps);
+            const double t = std::min(1.0, (double)iter / (double)passi);
+            current_sigma = settings.outlier_max_sigma
+                          + t * (settings.outlier_min_sigma - settings.outlier_max_sigma);
             ResidualCalculator<Frame>::identify_outliers(residuals, current_sigma);
         }
     }

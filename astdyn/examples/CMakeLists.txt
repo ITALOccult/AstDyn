@@ -147,3 +147,6 @@ target_link_libraries(test_integrators_bench PRIVATE astdyn)
 
 add_executable(test_covarianza test_covarianza.cpp)
 target_link_libraries(test_covarianza PRIVATE astdyn)
+
+add_executable(test_fit_generic test_fit_generic.cpp)
+target_link_libraries(test_fit_generic PRIVATE astdyn)
