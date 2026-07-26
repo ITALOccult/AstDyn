@@ -144,10 +144,29 @@ TEST(ValidazioneEsterna, ResiduiBK290ControAstDyS) {
     }
     if (!file_esiste(rwo)) GTEST_SKIP() << "fixture mancante: " << rwo;
 
-    // il catalogo osservatori completo e' necessario per la parallasse topocentrica
-    const char* obscodes = std::getenv("ASTDYN_OBSCODES");
-    if (obscodes && file_esiste(obscodes)) {
-        observations::ObservatoryDatabase::getInstance().loadFromMPCFile(obscodes);
+    // Il catalogo osservatori e' NECESSARIO: senza, la riduzione avviene dal
+    // geocentro e i residui salgono da 0.199 a 1.35 arcsec. Il test si salta
+    // invece di fallire, perche' un dato mancante non e' un errore del codice.
+    // Ricerca nei percorsi convenzionali, come fa ioccultcalc.
+    {
+        std::string oc;
+        if (const char* e = std::getenv("ASTDYN_OBSCODES")) {
+            if (file_esiste(e)) oc = e;
+        }
+        if (oc.empty()) {
+            const char* home = std::getenv("HOME");
+            for (const std::string& c : {
+                     std::string(home ? home : "") + "/.ioccultcalc/observatories/ObsCodes.txt",
+                     std::string(home ? home : "") + "/.ioccultcalc/ObsCodes.txt"}) {
+                if (file_esiste(c)) { oc = c; break; }
+            }
+        }
+        if (oc.empty()) {
+            GTEST_SKIP() << "catalogo osservatori non trovato: senza, la riduzione "
+                            "avverrebbe dal geocentro e il confronto non avrebbe senso. "
+                            "Installarlo con tools/ioccultcalc_setup.py --obscodes";
+        }
+        observations::ObservatoryDatabase::getInstance().loadFromMPCFile(oc);
     }
 
     auto e = engine_standard();

@@ -16,9 +16,17 @@ protected:
     void SetUp() override {
         engine = std::make_unique<AstDynEngine>();
         
-        // Disable planetary perturbations for unit tests (requires .bsp file otherwise)
+        // Test unitari del motore, non della fisica: disattiviamo tutto cio' che
+        // richiede un'effemeride su disco, cosi' girano ovunque. Non basta
+        // include_planets=false: anche la correzione relativistica e i termini
+        // J2 interrogano le posizioni dei corpi.
         AstDynConfig config = engine->config();
         config.propagator_settings.include_planets = false;
+        config.propagator_settings.include_asteroids = false;
+        config.propagator_settings.include_relativity = false;
+        config.propagator_settings.include_sun_j2 = false;
+        config.propagator_settings.include_earth_j2 = false;
+        config.ephemeris_type = EphemerisType::Analytical;
         engine->set_config(config);
     }
     

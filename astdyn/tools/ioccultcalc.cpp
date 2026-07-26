@@ -712,9 +712,39 @@ int main(int argc, char** argv) {
             }
             manager.add_system_body(id_str, naif_id, *system_reader, start_epoch, end_epoch);
             asteroid_ids.push_back(id_str);
-            stored_props[id_str] = io::PhysicalProperties{"", DEFAULT_SATELLITE_H_MAG,
-                                                          DEFAULT_SATELLITE_DIAMETER_KM, 0.0};
-            manager.set_diameter(id_str, DEFAULT_SATELLITE_DIAMETER_KM);
+
+            // Proprieta' fisiche dal blocco `system_bodies` della configurazione.
+            // Il diametro determina la larghezza dell'ombra e la durata
+            // dell'evento; la magnitudine determina il calo di luce. I valori
+            // predefiniti (10 km, H=15) sono segnaposto: per Hi'iaka, che misura
+            // ~320 km, sbaglierebbero di un fattore 32.
+            const std::string chiave = "system_bodies." + id_str;
+            double diam = adv_cfg.get<double>(chiave + ".diameter_km", 0.0);
+            double hmag = adv_cfg.get<double>(chiave + ".H", 999.0);
+            std::string nome = adv_cfg.get<std::string>(chiave + ".name", "");
+
+            if (diam <= 0.0) {
+                diam = DEFAULT_SATELLITE_DIAMETER_KM;
+                std::cout << "[sistema] " << id_str << ": diametro non specificato, uso "
+                          << DEFAULT_SATELLITE_DIAMETER_KM << " km (SEGNAPOSTO). "
+                          << "La larghezza dell'ombra e la durata dell'evento saranno "
+                          << "inattendibili: indicare il valore reale in system_bodies."
+                          << id_str << ".diameter_km\n";
+            }
+            if (hmag > 900.0) {
+                hmag = DEFAULT_SATELLITE_H_MAG;
+                std::cout << "[sistema] " << id_str << ": magnitudine assoluta non "
+                          << "specificata, uso H=" << DEFAULT_SATELLITE_H_MAG
+                          << " (segnaposto): il calo di luce sara' indicativo\n";
+            }
+            if (!nome.empty() || diam != DEFAULT_SATELLITE_DIAMETER_KM) {
+                std::cout << "[sistema] " << id_str
+                          << (nome.empty() ? "" : " (" + nome + ")")
+                          << ": diametro " << diam << " km, H=" << hmag << "\n";
+            }
+
+            stored_props[id_str] = io::PhysicalProperties{nome, hmag, diam, 0.0};
+            manager.set_diameter(id_str, diam);
         }
     }
 
