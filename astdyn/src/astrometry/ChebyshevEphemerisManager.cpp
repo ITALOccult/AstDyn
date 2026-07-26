@@ -33,6 +33,19 @@ void ChebyshevEphemerisManager::add_system_body(
     );
 }
 
+void ChebyshevEphemerisManager::add_orbiting_body(
+    const std::string& id,
+    const physics::KeplerianStateTyped<core::ECLIPJ2000>& primary_elements,
+    const OrbitingChebyshevEphemeris::OrbitaMutua& orbita,
+    time::EpochTDB start,
+    time::EpochTDB end,
+    int degree)
+{
+    ephemerides_[id] = std::make_unique<OrbitingChebyshevEphemeris>(
+        primary_elements, orbita, start, end, config_, degree
+    );
+}
+
 std::pair<std::tuple<double, double, double>, std::tuple<double, double, double>>
 ChebyshevEphemerisManager::evaluate_full(const std::string& id, time::EpochTDB t) const
 {

@@ -1,0 +1,53 @@
+# Prova della Fase 6: occultazioni del sistema (22) Kalliope + Linus.
+#
+# Linus non ha un kernel SPK pubblicato: la sua posizione viene derivata
+# propagando l'orbita mutua, i cui parametri sono da letteratura.
+#
+# Verifica attesa: due tracce distinte, quella di Linus separata da quella di
+# Kalliope di una quantita' dell'ordine del semiasse dell'orbita mutua proiettato
+# sul cielo — a 1099 km e a una distanza tipica di 2 AU, sono circa 0.75 arcsec.
+
+astdyn_base: ~/campagne/prova_kalliope
+ioccultcalc: ~/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/build/tools/bin/ioccultcalc
+ephemeris_file: ~/.ioccultcalc/ephemerides/de440s.bsp
+
+source: astdys
+objects:
+  asteroids: "22"
+
+time:
+  start: "2026-08-01"
+  duration_days: 30
+
+filters:
+  star_mag_max: 14.0
+
+# Corpi del sistema: il primario e il satellite.
+system_bodies:
+  "22":
+    name: "Kalliope"
+    diameter_km: 150.0
+    H: 6.45
+  "22-S1":
+    name: "Linus"
+    primary: "22"
+    diameter_km: 28.0
+    H: 10.4
+    orbit:
+      a_km: 1099.0
+      e: 0.005
+      i_deg: 103.7
+      node_deg: 100.6
+      peri_deg: 0.0
+      M_deg: 0.0
+      period_days: 3.5951
+      epoch_mjd: 61200.0
+      plane: equatorial
+
+output:
+  json: json/occultations.json
+  xml: xml/occultations.xml
+  svg: false
+  write_empty: true
+
+verbose: true

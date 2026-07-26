@@ -630,7 +630,7 @@ def run_engine(exe, engine_cfg, base, results_dir, env, mag, label, cfg_path=Non
                           stderr=subprocess.STDOUT, text=True)
     log_path.write_text(proc.stdout)
     salienti = [ln for ln in proc.stdout.splitlines()
-                if any(w in ln for w in ("Trovate", "ellisse", "caricato", "SKIP", "[fit]", "[osservatori]"))]
+                if any(w in ln for w in ("Trovate", "ellisse", "caricato", "SKIP", "[fit]", "[osservatori]", "[sistema]"))]
     for ln in salienti[:40]:
         print("  " + ln)
     return proc.returncode

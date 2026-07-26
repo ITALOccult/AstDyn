@@ -70,6 +70,16 @@ public:
     bool has(const std::string& path) const;
 
     /**
+     * @brief Nomi delle chiavi contenute in un blocco.
+     *
+     * Serve per i blocchi a chiavi variabili, dove i nomi non sono noti in
+     * anticipo: per esempio `system_bodies`, che elenca i corpi di un sistema
+     * multiplo. Restituisce un elenco vuoto se il percorso non esiste o non
+     * corrisponde a un oggetto.
+     */
+    std::vector<std::string> get_keys(const std::string& path) const;
+
+    /**
      * @brief Set value for a specific path
      */
     template <typename T>

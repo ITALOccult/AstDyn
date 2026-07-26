@@ -1,4 +1,5 @@
 #include "astdyn/AstDyn.hpp"
+#include "astdyn/astrometry/OrbitingChebyshevEphemeris.hpp"
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/observations/RWOReader.hpp"
 #include <fstream>
@@ -745,6 +746,80 @@ int main(int argc, char** argv) {
 
             stored_props[id_str] = io::PhysicalProperties{nome, hmag, diam, 0.0};
             manager.set_diameter(id_str, diam);
+        }
+    }
+
+    // --- Fase 6: satelliti descritti dalla loro orbita mutua -----------------
+    // Per la gran parte dei binari noti non esiste un kernel SPK: la letteratura
+    // pubblica i parametri dell'orbita del satellite attorno al primario.
+    {
+        const auto elenco = adv_cfg.get_keys("system_bodies");
+        for (const auto& sat_id : elenco) {
+            const std::string base = "system_bodies." + sat_id;
+            if (!adv_cfg.has(base + ".orbit.a_km")) continue;   // non e' un satellite
+
+            const std::string primario = adv_cfg.get<std::string>(base + ".primary", "");
+            if (primario.empty()) {
+                std::cout << "[sistema] " << sat_id << ": manca 'primary', "
+                          << "impossibile collocare l'orbita mutua. Corpo ignorato.\n";
+                continue;
+            }
+            auto it = stored_elements.find(primario);
+            if (it == stored_elements.end()) {
+                std::cout << "[sistema] " << sat_id << ": il primario '" << primario
+                          << "' non e' fra i corpi caricati. Corpo ignorato.\n";
+                continue;
+            }
+
+            astrometry::OrbitingChebyshevEphemeris::OrbitaMutua orb;
+            orb.a_km        = adv_cfg.get<double>(base + ".orbit.a_km", 0.0);
+            orb.e           = adv_cfg.get<double>(base + ".orbit.e", 0.0);
+            orb.i_deg       = adv_cfg.get<double>(base + ".orbit.i_deg", 0.0);
+            orb.node_deg    = adv_cfg.get<double>(base + ".orbit.node_deg", 0.0);
+            orb.peri_deg    = adv_cfg.get<double>(base + ".orbit.peri_deg", 0.0);
+            orb.M_deg       = adv_cfg.get<double>(base + ".orbit.M_deg", 0.0);
+            orb.period_days = adv_cfg.get<double>(base + ".orbit.period_days", 0.0);
+            orb.epoch = time::EpochTDB::from_mjd(
+                adv_cfg.get<double>(base + ".orbit.epoch_mjd", it->second.epoch.mjd()));
+
+            const std::string piano = adv_cfg.get<std::string>(base + ".orbit.plane", "equatorial");
+            orb.piano = (piano == "ecliptic")
+                      ? astrometry::OrbitingChebyshevEphemeris::PianoRiferimento::Eclittico
+                      : astrometry::OrbitingChebyshevEphemeris::PianoRiferimento::Equatoriale;
+
+            if (orb.period_days <= 0.0) {
+                std::cout << "[sistema] " << sat_id << ": manca 'orbit.period_days', "
+                          << "necessario per il parametro gravitazionale. Corpo ignorato.\n";
+                continue;
+            }
+
+            // proprieta' fisiche, con gli stessi avvisi degli altri corpi di sistema
+            double diam = adv_cfg.get<double>(base + ".diameter_km", 0.0);
+            double hmag = adv_cfg.get<double>(base + ".H", 999.0);
+            const std::string nome = adv_cfg.get<std::string>(base + ".name", "");
+            if (diam <= 0.0) {
+                diam = DEFAULT_SATELLITE_DIAMETER_KM;
+                std::cout << "[sistema] " << sat_id << ": diametro non specificato, uso "
+                          << diam << " km (SEGNAPOSTO): larghezza dell'ombra e durata "
+                          << "saranno inattendibili\n";
+            }
+            if (hmag > 900.0) hmag = DEFAULT_SATELLITE_H_MAG;
+
+            try {
+                manager.add_orbiting_body(sat_id, it->second, orb, start_epoch, end_epoch);
+                asteroid_ids.push_back(sat_id);
+                stored_props[sat_id] = io::PhysicalProperties{nome, hmag, diam, 0.0};
+                manager.set_diameter(sat_id, diam);
+
+                std::cout << "[sistema] " << sat_id
+                          << (nome.empty() ? "" : " (" + nome + ")")
+                          << ": satellite di " << primario
+                          << ", a=" << orb.a_km << " km, P=" << orb.period_days << " d, "
+                          << "diametro " << diam << " km, piano " << piano << "\n";
+            } catch (const std::exception& e) {
+                std::cout << "[sistema] " << sat_id << ": " << e.what()
+                          << ". Corpo ignorato.\n";
+            }
         }
     }
 

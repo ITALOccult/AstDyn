@@ -148,6 +148,16 @@ bool IOCConfig::has(const std::string& path) const {
     return find_node(path) != nullptr;
 }
 
+std::vector<std::string> IOCConfig::get_keys(const std::string& path) const {
+    std::vector<std::string> chiavi;
+    const nlohmann::json* node = find_node(path);
+    if (!node || !node->is_object()) return chiavi;
+    for (auto it = node->begin(); it != node->end(); ++it) {
+        chiavi.push_back(it.key());
+    }
+    return chiavi;
+}
+
 std::string IOCConfig::to_json_string(int indent) const {
     return data_.dump(indent);
 }

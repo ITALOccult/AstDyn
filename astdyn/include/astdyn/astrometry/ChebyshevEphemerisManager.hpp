@@ -4,6 +4,7 @@
 #include "astdyn/astrometry/IChebyshevEphemeris.hpp"
 #include "astdyn/astrometry/AsteroidChebyshevEphemeris.hpp"
 #include "astdyn/astrometry/SPKChebyshevEphemeris.hpp"
+#include "astdyn/astrometry/OrbitingChebyshevEphemeris.hpp"
 #include <map>
 #include <string>
 #include <memory>
@@ -47,6 +48,26 @@ public:
         const std::string& id,
         int naif_id,
         io::SPKReader& reader,
+        time::EpochTDB start,
+        time::EpochTDB end,
+        int degree = 12
+    );
+
+    /**
+     * @brief Aggiunge un satellite descritto dalla sua orbita attorno al primario.
+     *
+     * Da usare quando non esiste un kernel SPK per il satellite — il caso della
+     * gran parte dei binari noti, per i quali la letteratura pubblica soltanto i
+     * parametri dell'orbita mutua.
+     *
+     * @param id               identificativo del satellite
+     * @param primary_elements elementi eliocentrici del primario
+     * @param orbita           parametri dell'orbita mutua
+     */
+    void add_orbiting_body(
+        const std::string& id,
+        const physics::KeplerianStateTyped<core::ECLIPJ2000>& primary_elements,
+        const OrbitingChebyshevEphemeris::OrbitaMutua& orbita,
         time::EpochTDB start,
         time::EpochTDB end,
         int degree = 12
