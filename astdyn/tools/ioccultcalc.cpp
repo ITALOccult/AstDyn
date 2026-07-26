@@ -604,6 +604,7 @@ int main(int argc, char** argv) {
                     // osservazioni, si raffina l'orbita. L'orbita fittata
                     // sostituisce quella di partenza solo se il fit converge:
                     // un fit fallito non deve peggiorare un'orbita buona.
+                    std::optional<astdyn::Matrix6d> cov_dal_fit;
                     if (fit_attivo && !observations_dir.empty()) {
                         const std::string rwo = observations_dir + "/" + id + ".rwo";
                         std::ifstream prova(rwo);
@@ -623,10 +624,22 @@ int main(int argc, char** argv) {
                                 auto esito = motore_fit.fit_orbit();
                                 if (esito.converged) {
                                     elements = esito.orbit;
+                                    // Covarianza dal fit: sostituisce quella dell'.eq1 perche'
+                                    // descrive l'orbita che stiamo effettivamente usando.
+                                    // Orbita e covarianza restano accoppiate.
+                                    if (esito.covariance.rows() == 6 && esito.covariance.cols() == 6) {
+                                        astdyn::Matrix6d cov_fit;
+                                        for (int r = 0; r < 6; ++r)
+                                            for (int c = 0; c < 6; ++c)
+                                                cov_fit(r, c) = esito.covariance(r, c);
+                                        cov_dal_fit = cov_fit;
+                                    }
                                     std::cout << "[fit] " << id << ": orbita raffinata su "
                                               << esito.num_observations << " osservazioni, RMS "
                                               << esito.rms_total_arcsec << " arcsec ("
-                                              << esito.num_rejected << " scartate)\n";
+                                              << esito.num_rejected << " scartate)"
+                                              << (cov_dal_fit ? ", covarianza dal fit" : "")
+                                              << "\n";
                                 } else {
                                     std::cout << "[fit] " << id << ": NON convergente ("
                                               << esito.exit_reason << "), orbita AstDyS mantenuta\n";
@@ -645,7 +658,9 @@ int main(int argc, char** argv) {
                     // The state IS heliocentric ecliptic -- the variable is named for it.
                     auto state_eclip = propagation::keplerian_to_cartesian(elements);
                     stored_states[id] = state_eclip;
-                    if (eq1_cov_cart_opt) stored_covariances[id] = *eq1_cov_cart_opt;
+                    // La covarianza del fit ha la precedenza: descrive l'orbita in uso.
+                    if (cov_dal_fit)              stored_covariances[id] = *cov_dal_fit;
+                    else if (eq1_cov_cart_opt)    stored_covariances[id] = *eq1_cov_cart_opt;
 
                     // Il messaggio di provenienza (Horizons o .eq1) e' gia' stato
                     // stampato nel ramo di caricamento; qui non ripetiamo "Horizons".
