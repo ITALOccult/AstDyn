@@ -1,4 +1,5 @@
 #include "astdyn/AstDyn.hpp"
+#include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/observations/RWOReader.hpp"
 #include <fstream>
 #include "astdyn/io/OccultationXMLIO.hpp"
@@ -463,6 +464,38 @@ int main(int argc, char** argv) {
     std::string elements_dir = adv_cfg.get<std::string>("objects.elements_dir", "");
     // Fase 5: directory dei .rwo per il fit orbitale. L'orchestrator li scarica
     // per i soli positivi del secondo stadio.
+    // Catalogo osservatori MPC: senza, le osservazioni vengono ridotte dal
+    // geocentro e si perde la parallasse topocentrica (~4" a 2.2 AU).
+    {
+        std::string obs_file = adv_cfg.get<std::string>("observatories.file", "");
+        if (obs_file.empty()) {
+            const char* home = std::getenv("HOME");
+            const std::vector<std::string> candidati = {
+                std::string(home ? home : "") + "/.ioccultcalc/observatories/ObsCodes.txt",
+                std::string(home ? home : "") + "/.ioccultcalc/ObsCodes.txt",
+                "ObsCodes.txt"
+            };
+            for (const auto& c : candidati) {
+                std::ifstream prova(c);
+                if (prova.good()) { obs_file = c; break; }
+            }
+        }
+        if (obs_file.empty()) {
+            std::cout << "[osservatori] ATTENZIONE: catalogo MPC non trovato. Le osservazioni "
+                         "saranno ridotte dal GEOCENTRO, perdendo la parallasse topocentrica. "
+                         "Impostare 'observatories.file' oppure collocare ObsCodes.txt in "
+                         "~/.ioccultcalc/observatories/\n";
+        } else {
+            try {
+                size_t n = observations::ObservatoryDatabase::getInstance().loadFromMPCFile(obs_file);
+                std::cout << "[osservatori] " << n << " codici da " << obs_file << "\n";
+            } catch (const std::exception& e) {
+                std::cout << "[osservatori] ATTENZIONE: lettura fallita (" << e.what()
+                          << "): riduzione dal geocentro\n";
+            }
+        }
+    }
+
     std::string observations_dir = adv_cfg.get<std::string>("objects.observations_dir", "");
     const bool fit_attivo = adv_cfg.get<bool>("diffcorr.enabled", false);
     if (fit_attivo && observations_dir.empty()) {

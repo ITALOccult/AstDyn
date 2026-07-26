@@ -8,6 +8,7 @@
  * Atteso: converged=YES, RMS ~0.46 arcsec (RMSast dell'header .rwo).
  */
 #include <astdyn/AstDynEngine.hpp>
+#include <astdyn/observations/ObservatoryDatabase.hpp>
 #include <chrono>
 #include <astdyn/observations/RWOReader.hpp>
 #include <cstdlib>
@@ -53,6 +54,15 @@ int main(int argc, char** argv) {
               << " i=" << engine.orbit().i.to_deg() << " deg\n";
 
     // Osservazioni dal .rwo (parser dedicato), con filtro opzionale.
+    // Catalogo osservatori: senza, get_observer_position ricade sul geocentro
+    // e si perde la parallasse topocentrica (~4" a 2.2 AU, molto di piu' sui
+    // singoli casi).
+    if (const char* oc = std::getenv("ASTDYN_OBSCODES")) {
+        size_t n = observations::ObservatoryDatabase::getInstance().loadFromMPCFile(oc);
+        std::cout << "osservatori caricati: " << n << "\n";
+    } else {
+        std::cout << "ATTENZIONE: ASTDYN_OBSCODES non impostata, osservatori dal geocentro\n";
+    }
     auto obs = observations::RWOReader::readFile(rwo_path);
     std::cout << "osservazioni lette: " << obs.size() << "\n";
     int kept = 0;
