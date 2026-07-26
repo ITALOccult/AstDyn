@@ -153,3 +153,6 @@ target_link_libraries(test_fit_generic PRIVATE astdyn)
 
 add_executable(test_orbita_mutua test_orbita_mutua.cpp)
 target_link_libraries(test_orbita_mutua PRIVATE astdyn)
+
+add_executable(test_satellite test_satellite.cpp)
+target_link_libraries(test_satellite PRIVATE astdyn)
