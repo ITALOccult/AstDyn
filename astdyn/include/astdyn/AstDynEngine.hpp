@@ -221,7 +221,26 @@ OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
         auto vel_f = coordinates::ReferenceFrame::transform_vel<core::ECLIPJ2000, Frame>(cart_legacy.position, cart_legacy.velocity, cart_legacy.epoch);
         initial_state = physics::CartesianStateTyped<Frame>(cart_legacy.epoch, pos_f, vel_f, cart_legacy.gm);
     }
-    auto result_dc = fitter.fit(obs_context_.observations(), initial_state, dc_settings);
+    // Filtro temporale: con fit_obs_years > 0 si usano solo le osservazioni degli
+    // ultimi N anni rispetto all'epoca dell'orbita. Arco corto significa fit piu'
+    // rapido ma orbita meno vincolata: l'accuratezza dipende dalla baseline.
+    std::vector<observations::OpticalObservation> obs_usate;
+    if (config_.fit_obs_years > 0.0) {
+        const double mjd_min = current_orbit_.epoch.mjd() - config_.fit_obs_years * 365.25;
+        for (const auto& o : obs_context_.observations())
+            if (o.time.mjd() >= mjd_min) obs_usate.push_back(o);
+        if (config_.verbose)
+            std::cout << "Filtro " << config_.fit_obs_years << " anni: " << obs_usate.size()
+                      << " osservazioni su " << obs_context_.observations().size() << "\n";
+    } else {
+        obs_usate = obs_context_.observations();
+    }
+    if (obs_usate.size() < 6) {
+        throw std::runtime_error("Fit: osservazioni insufficienti dopo il filtro (" +
+            std::to_string(obs_usate.size()) + "); ne servono almeno 6 per determinare "
+            "i sei elementi orbitali");
+    }
+    auto result_dc = fitter.fit(obs_usate, initial_state, dc_settings);
     physics::CartesianStateTyped<core::ECLIPJ2000> final_ecl;
     if constexpr (std::is_same_v<Frame, core::ECLIPJ2000>) {
         final_ecl = result_dc.final_state;

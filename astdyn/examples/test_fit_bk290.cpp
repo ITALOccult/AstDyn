@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
     AstDynConfig cfg = engine.config();
     cfg.verbose = true;
     cfg.max_iterations = 20;
+    cfg.fit_obs_years = last_years;  // usa il filtro della libreria, non quello locale
     cfg.tolerance = (argc > 3) ? std::atof(argv[3]) : 1e-10;
     cfg.integrator_type = IntegratorType::RKF78;
     cfg.propagator_settings.include_planets = true;
@@ -54,7 +55,7 @@ int main(int argc, char** argv) {
     std::cout << "osservazioni lette: " << obs.size() << "\n";
     int kept = 0;
     for (const auto& o : obs) {
-        if (last_years > 0.0 && o.time.mjd() < 61200.0 - last_years * 365.25) continue;
+        // filtro ora gestito dalla libreria via cfg.fit_obs_years
         engine.add_observation(o); ++kept;
     }
     std::cout << "osservazioni usate: " << kept << std::endl;
