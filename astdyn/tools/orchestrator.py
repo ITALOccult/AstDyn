@@ -528,6 +528,17 @@ def main():
     # Secondo stadio: solo i positivi, profilo pesante, output in results/
     cfg2 = build_stage_config(engine_cfg, prof2, results, out_cfg)
     cfg2["objects"]["asteroids"] = ",".join(positivi)
+    # Fase 5: se richiesto, il secondo stadio raffina l'orbita con il fit sulle
+    # osservazioni scaricate. Il motore le cerca in objects.observations_dir.
+    if second_stage.get("fit") and source in ("astdys", "user"):
+        set_dot(cfg2, "objects.observations_dir", str(base / "obs"))
+        set_dot(cfg2, "diffcorr.enabled", True)
+        if second_stage.get("fit_obs_years"):
+            set_dot(cfg2, "diffcorr.obs_years", float(second_stage["fit_obs_years"]))
+        print("[orchestrator] fit orbitale ATTIVO sui positivi")
+    elif second_stage.get("fit"):
+        print("[orchestrator] AVVISO: second_stage.fit richiede source=astdys o user "
+              "(servono le osservazioni .rwo). Fit non attivato.")
     cfg2_path = base / "engine_pass2.json"
     cfg2_path.write_text(json.dumps(cfg2, indent=2))
     print(f"[orchestrator] === STADIO 2 (raffinamento, profilo '{prof2_name}') "
@@ -535,10 +546,6 @@ def main():
     rc2 = run_engine(exe, cfg2, base, results, env, mag, label="pass2",
                      cfg_path=cfg2_path)
 
-    # fit opzionale (Fase 5, non ancora implementato)
-    if second_stage.get("fit"):
-        print("[orchestrator] AVVISO: second_stage.fit richiesto ma il fit e' "
-              "rimandato alla Fase 5 (bug in libreria). Ignorato per ora.")
 
     print(f"[orchestrator] fine. Screening in {pass1_results}/, raffinamento in {results}/")
 
@@ -623,7 +630,7 @@ def run_engine(exe, engine_cfg, base, results_dir, env, mag, label, cfg_path=Non
                           stderr=subprocess.STDOUT, text=True)
     log_path.write_text(proc.stdout)
     salienti = [ln for ln in proc.stdout.splitlines()
-                if any(w in ln for w in ("Trovate", "ellisse", "caricato", "SKIP"))]
+                if any(w in ln for w in ("Trovate", "ellisse", "caricato", "SKIP", "[fit]"))]
     for ln in salienti[:40]:
         print("  " + ln)
     return proc.returncode

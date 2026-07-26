@@ -1,4 +1,6 @@
 #include "astdyn/AstDyn.hpp"
+#include "astdyn/observations/RWOReader.hpp"
+#include <fstream>
 #include "astdyn/io/OccultationXMLIO.hpp"
 #include "astdyn/io/OccultationJSONIO.hpp"
 #include "astdyn/astrometry/OccultationLogic.hpp"
@@ -459,6 +461,14 @@ int main(int argc, char** argv) {
     // equinoctial_to_keplerian), che rispetta frame e unita'. Fallback a
     // Horizons se il file manca o e' illeggibile.
     std::string elements_dir = adv_cfg.get<std::string>("objects.elements_dir", "");
+    // Fase 5: directory dei .rwo per il fit orbitale. L'orchestrator li scarica
+    // per i soli positivi del secondo stadio.
+    std::string observations_dir = adv_cfg.get<std::string>("objects.observations_dir", "");
+    const bool fit_attivo = adv_cfg.get<bool>("diffcorr.enabled", false);
+    if (fit_attivo && observations_dir.empty()) {
+        std::cout << "[fit] ATTENZIONE: diffcorr.enabled=true ma objects.observations_dir "
+                     "non e' impostata: nessun fit verra' eseguito.\n";
+    }
 
     ChebyshevEphemerisManager manager(engine.config());
     HorizonsClient horizons;
@@ -555,6 +565,47 @@ int main(int argc, char** argv) {
                 // che alcuni falliranno.
                 try {
                     auto elements = *elements_opt;
+
+                    // --- Fase 5: fit orbitale on-demand ---------------------
+                    // Se il fit e' richiesto e per questo corpo esistono le
+                    // osservazioni, si raffina l'orbita. L'orbita fittata
+                    // sostituisce quella di partenza solo se il fit converge:
+                    // un fit fallito non deve peggiorare un'orbita buona.
+                    if (fit_attivo && !observations_dir.empty()) {
+                        const std::string rwo = observations_dir + "/" + id + ".rwo";
+                        std::ifstream prova(rwo);
+                        if (!prova.good()) {
+                            std::cout << "[fit] " << id << ": osservazioni assenti ("
+                                      << rwo << "), orbita AstDyS mantenuta\n";
+                        } else {
+                            prova.close();
+                            try {
+                                auto osservazioni = observations::RWOReader::readFile(rwo);
+                                AstDynEngine motore_fit;
+                                auto cfg_fit = engine.config();
+                                cfg_fit.verbose = false;
+                                motore_fit.set_config(cfg_fit);
+                                motore_fit.set_initial_orbit(elements);
+                                for (const auto& o : osservazioni) motore_fit.add_observation(o);
+                                auto esito = motore_fit.fit_orbit();
+                                if (esito.converged) {
+                                    elements = esito.orbit;
+                                    std::cout << "[fit] " << id << ": orbita raffinata su "
+                                              << esito.num_observations << " osservazioni, RMS "
+                                              << esito.rms_total_arcsec << " arcsec ("
+                                              << esito.num_rejected << " scartate)\n";
+                                } else {
+                                    std::cout << "[fit] " << id << ": NON convergente ("
+                                              << esito.exit_reason << "), orbita AstDyS mantenuta\n";
+                                }
+                            } catch (const std::exception& e) {
+                                std::cout << "[fit] " << id << ": errore (" << e.what()
+                                          << "), orbita AstDyS mantenuta\n";
+                            }
+                        }
+                    }
+                    // --------------------------------------------------------
+
                     manager.add_asteroid(id, elements, start_epoch, end_epoch);
                     stored_elements[id] = elements;
 
