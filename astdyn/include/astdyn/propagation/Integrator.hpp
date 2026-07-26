@@ -64,6 +64,22 @@ struct IntegrationStatistics {
 class Integrator {
 public:
     virtual ~Integrator() = default;
+
+    /**
+     * @brief L'integratore ha una tolleranza d'errore regolabile?
+     *
+     * I metodi a passo fisso (RK4, SABA4) non ne hanno: restituiscono false, e
+     * set_tolerance() su di essi non ha effetto. Meglio dichiararlo che
+     * accettare in silenzio un valore destinato a essere ignorato.
+     */
+    virtual bool supports_tolerance() const { return false; }
+
+    /// Tolleranza corrente; 0 se l'integratore non ne ha una.
+    virtual double tolerance() const { return 0.0; }
+
+    /// Imposta la tolleranza. Senza effetto se supports_tolerance() e' false.
+    virtual void set_tolerance(double) {}
+
     
     /**
      * @brief Integrate from t0 to tf
@@ -245,8 +261,9 @@ public:
                       double& h,
                       double t_target);
     
-    void set_tolerance(double tol) { tolerance_ = tol; }
-    double tolerance() const { return tolerance_; }
+    bool supports_tolerance() const override { return true; }
+    void set_tolerance(double tol) override { tolerance_ = tol; }
+    double tolerance() const override { return tolerance_; }
     
     void set_min_step(double h_min) { h_min_ = h_min; }
     void set_max_step(double h_max) { h_max_ = h_max; }

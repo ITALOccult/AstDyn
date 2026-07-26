@@ -92,8 +92,9 @@ public:
                       double& h,
                       double t_target);
     
-    void set_tolerance(double tol) { tolerance_ = tol; }
-    double tolerance() const { return tolerance_; }
+    bool supports_tolerance() const override { return true; }
+    void set_tolerance(double tol) override { tolerance_ = tol; }
+    double tolerance() const override { return tolerance_; }
     
     void set_max_newton_iter(int max_iter) { max_newton_iter_ = max_iter; }
     int max_newton_iter() const { return max_newton_iter_; }

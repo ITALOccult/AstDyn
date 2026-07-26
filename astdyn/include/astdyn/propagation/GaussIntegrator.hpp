@@ -66,8 +66,9 @@ public:
                                              double t0,
                                              const std::vector<double>& t_targets) override;
     
-    void set_tolerance(double tol) { tolerance_ = tol; }
-    double tolerance() const { return tolerance_; }
+    bool supports_tolerance() const override { return true; }
+    void set_tolerance(double tol) override { tolerance_ = tol; }
+    double tolerance() const override { return tolerance_; }
     
 private:
     double h_initial_;
