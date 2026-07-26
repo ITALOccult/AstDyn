@@ -100,24 +100,38 @@ Validato confrontando Phi propagata nei due modi (`examples/test_jacobian.cpp`):
 differenza relativa **1.7e-9**, tempo **66.5 ms -> 1.0 ms (66x)**.
 Ora e' il default.
 
-## Punto aperto: il segno del termine di velocita'
+## Il termine di aberrazione — RISOLTO
 
 La correzione di tempo-luce originale usava la sola velocita' dell'asteroide,
-come OrbFit con `iaber=1` ("only time delay"). Questo recupera esattamente
-v_ast/c = 12.4", verificato disattivando la correzione.
+come OrbFit con `iaber=1`. Questo recupera esattamente v_ast/c = 12.4 arcsec,
+verificato disattivando la correzione (i residui passano da 16.5 a 28.7).
 
-Restava pero' un sistematico di ~16.5" con l'ampiezza di v_Terra/c = 20.5".
-Empiricamente si annulla usando **v_ast + v_obs**, mentre la nota di Milani in
-`aber1` prescrive **v_ast - v_obs** per la correzione completa.
+Restava pero' un sistematico di ~16.5 arcsec, con l'ampiezza di v_Terra/c = 20.5.
+Aggiungendo la velocita' dell'osservatore i residui scendono a 0.199 arcsec.
 
-Il termine e' stato reso selezionabile con `ASTDYN_ABER_MODE` (ast|minus|plus),
-default "ast" (comportamento originale). **Il confronto va rifatto ora che la
-rotazione terrestre e' corretta**: e' possibile che il "+" stesse compensando
-l'errore ERA, nel qual caso "ast" tornerebbe a essere il modo giusto e non
-resterebbe alcuna anomalia da spiegare.
+**Verifica conclusiva** (dopo il fix della rotazione terrestre, per escludere che
+il termine stesse compensando quel bug): rimuovendo v_obs i residui risalgono a
+**16.88 arcsec**. Il termine serve davvero.
+
+**Interpretazione fisica.** E' aberrazione stellare. Le posizioni astrometriche
+riportate dall'MPC NON sono depurate dall'aberrazione: i cataloghi di riferimento
+moderni (Gaia) danno posizioni baricentriche, quindi l'aberrazione resta nella
+misura e il modello di osservazione deve riprodurla. L'argomento secondo cui la
+riduzione rispetto alle stelle di campo la assorbirebbe — che avevamo considerato
+durante la diagnosi — non si applica.
+
+**Sul segno.** La nota di Milani in `aber1` prescrive VREL = V(corpo) -
+V(osservatore) per la correzione completa, mentre a noi serve la somma. Non e'
+una contraddizione: le due espressioni sono impostate diversamente. Nella nostra
+formulazione, `r_corretta = r - vrel*tau`, entrambi i contributi entrano con lo
+stesso segno — l'asteroide si sposta durante il tragitto, e l'osservatore in moto
+vede la sorgente spostata verso la propria direzione di marcia.
+
+La variabile `ASTDYN_ABER_MODE`, introdotta per il confronto, e' stata rimossa:
+il codice usa stabilmente la correzione completa.
 
 ## Da fare
-- [ ] rifare il confronto ASTDYN_ABER_MODE dopo il fix ERA (vedi sopra)
+- [x] termine di aberrazione verificato dopo il fix ERA: serve, ed e' aberrazione stellare
 - [ ] caricare ObsCodes.txt automaticamente; rendere **rumoroso** il fallback
       al geocentro (warning), mai silenzioso
 - [ ] coordinate per-osservazione per gli osservatori mobili (codice 270)
