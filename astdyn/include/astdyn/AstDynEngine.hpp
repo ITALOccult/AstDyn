@@ -63,6 +63,10 @@ struct AstDynConfig {
     double outlier_sigma = 3.0;              ///< Outlier rejection threshold (legacy/default)
     double outlier_max_sigma = 10.0;         ///< Carpentry start sigma
     double outlier_min_sigma = 3.0;          ///< Carpentry end sigma
+
+    // Fit orbitale on-demand (Fase 5)
+    bool fit_enabled = false;                ///< Attiva il fit come parametro di calcolo
+    double fit_obs_years = 0.0;              ///< Usa solo le osservazioni degli ultimi N anni (0 = tutte)
     
     // Close approach settings
     close_approach::CloseApproachSettings ca_settings;

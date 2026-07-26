@@ -152,6 +152,10 @@ void AstDynEngine::load_fitting_settings(const core::IOCConfig& ioc) {
     config_.light_time_correction      = ioc.get<bool>("diffcorr.light_time",       config_.light_time_correction);
     config_.aberrazione_differenziale  = ioc.get<bool>("diffcorr.aberration",       config_.aberrazione_differenziale);
     config_.deflessione_relativistica  = ioc.get<bool>("diffcorr.light_deflection", config_.deflessione_relativistica);
+
+    // Fit orbitale on-demand (Fase 5)
+    config_.fit_enabled   = ioc.get<bool>  ("diffcorr.enabled",   config_.fit_enabled);
+    config_.fit_obs_years = ioc.get<double>("diffcorr.obs_years", config_.fit_obs_years);
 }
 
 void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {
