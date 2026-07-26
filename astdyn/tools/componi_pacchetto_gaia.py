@@ -106,18 +106,54 @@ def main():
     """)
 
     dst.execute("ATTACH DATABASE ? AS src", (args.sorgente,))
-    print("  copio le stelle...")
-    dst.execute("INSERT INTO stars SELECT * FROM src.stars WHERE mag <= ?", (args.mag,))
-    dst.commit()
-    print(f"  {dst.execute('SELECT COUNT(*) FROM stars').fetchone()[0]:,} righe in {time.time()-t0:.0f} s")
+
+    # Copia a blocchi, per poter mostrare l'avanzamento: una INSERT..SELECT unica
+    # non da' alcun segnale di vita per decine di minuti.
+    print(f"  copio {sel_righe:,} stelle...")
+    BLOCCO = 500_000
+    copiate = 0
+    ultimo_sid = -1
+    while True:
+        righe = src.execute(
+            "SELECT * FROM stars WHERE mag <= ? AND sid > ? ORDER BY sid LIMIT ?",
+            (args.mag, ultimo_sid, BLOCCO)).fetchall()
+        if not righe:
+            break
+        dst.executemany(
+            "INSERT INTO stars VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", righe)
+        dst.commit()
+        ultimo_sid = righe[-1][0]
+        copiate += len(righe)
+
+        pct = 100.0 * copiate / sel_righe if sel_righe else 100.0
+        trascorso = time.time() - t0
+        stima = trascorso / copiate * (sel_righe - copiate) if copiate else 0
+        print(f"\r  {copiate:,} / {sel_righe:,}  ({pct:5.1f}%)"
+              f"  trascorso {trascorso/60:.1f} min"
+              f"  mancano ~{stima/60:.1f} min   ", end="", flush=True)
+    print()
+    print(f"  copiate {copiate:,} righe in {(time.time()-t0)/60:.1f} min")
 
     print("  ricostruisco l'indice spaziale...")
+    t_rt = time.time()
     dst.execute("CREATE VIRTUAL TABLE stars_spatial USING rtree(id, min_ra, max_ra, min_dec, max_dec)")
-    dst.execute("""INSERT INTO stars_spatial
-                   SELECT r.id, r.min_ra, r.max_ra, r.min_dec, r.max_dec
-                   FROM src.stars_spatial r
-                   JOIN stars s ON s.sid = r.id""")
-    dst.commit()
+    # Anche qui a blocchi: l'indice R-tree su decine di milioni di voci e' lento.
+    inserite = 0
+    ultimo = -1
+    while True:
+        righe = dst.execute(
+            "SELECT sid, ra, ra, dec, dec FROM stars WHERE sid > ? ORDER BY sid LIMIT ?",
+            (ultimo, BLOCCO)).fetchall()
+        if not righe:
+            break
+        dst.executemany("INSERT INTO stars_spatial VALUES (?,?,?,?,?)", righe)
+        dst.commit()
+        ultimo = righe[-1][0]
+        inserite += len(righe)
+        pct = 100.0 * inserite / copiate if copiate else 100.0
+        print(f"\r  indice: {inserite:,} / {copiate:,}  ({pct:5.1f}%)"
+              f"  {(time.time()-t_rt)/60:.1f} min   ", end="", flush=True)
+    print()
 
     print("  indici secondari...")
     dst.execute("CREATE INDEX idx_mag ON stars(mag)")
