@@ -15,6 +15,7 @@
 #define ASTDYN_CATALOG_INTEGRATION_HPP
 
 #include "astdyn/catalog/CatalogTypes.hpp"
+#include <functional>
 #include "astdyn/catalog/GaiaDR3Catalog.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include "astdyn/astrometry/sky_types.hpp"
@@ -158,6 +159,33 @@ namespace astdyn::catalog {
 [[nodiscard]] ChebyshevSegment fit_chebyshev_spk(
     astdyn::io::SPKReader& reader,
     int            target_id,
+    time::EpochTDB center_epoch,
+    double         duration_days,
+    int            degree = 12,
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem = nullptr
+);
+
+/**
+ * @brief Fornisce la posizione eliocentrica di un corpo a un dato istante.
+ *
+ * @param et_tdb  istante in secondi da J2000 (TDB)
+ * @return posizione eliocentrica in km, frame eclittico J2000
+ *
+ * Consente di adattare i polinomi per corpi la cui posizione non viene da un
+ * kernel SPK: satelliti di asteroidi propagati sulla loro orbita mutua, orbite
+ * fittate, o qualunque altra sorgente.
+ */
+using FornitorePosizione = std::function<Eigen::Vector3d(double et_tdb)>;
+
+/**
+ * @brief Adatta un segmento di Chebyshev per un corpo di cui si sa fornire la
+ *        posizione, con la stessa riduzione astrometrica del caso SPK.
+ *
+ * Il fornitore viene interrogato all'istante di EMISSIONE della luce, quindi
+ * gia' corretto per il tempo di percorrenza: l'iterazione e' interna.
+ */
+[[nodiscard]] ChebyshevSegment fit_chebyshev_da_posizione(
+    const FornitorePosizione& posizione,
     time::EpochTDB center_epoch,
     double         duration_days,
     int            degree = 12,

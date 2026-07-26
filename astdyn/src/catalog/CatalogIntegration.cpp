@@ -1,4 +1,5 @@
 #include "astdyn/catalog/CatalogIntegration.hpp"
+#include <functional>
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/astrometry/Astrometry.hpp"
 
@@ -232,9 +233,8 @@ ChebyshevSegment fit_chebyshev(
     return seg;
 }
 
-ChebyshevSegment fit_chebyshev_spk(
-    astdyn::io::SPKReader& reader,
-    int            target_id,
+ChebyshevSegment fit_chebyshev_da_posizione(
+    const FornitorePosizione& posizione,
     time::EpochTDB center_epoch,
     double         duration_days,
     int            degree,
@@ -269,8 +269,7 @@ ChebyshevSegment fit_chebyshev_spk(
         Eigen::Vector3d rho_vec;
         for (int iter = 0; iter < 5; ++iter) {
             double et_emit = et_obs - lt;
-            auto s_emit = reader.getState(target_id, et_emit);
-            rho_vec = Eigen::Vector3d(s_emit[0], s_emit[1], s_emit[2]) - r_earth;
+            rho_vec = posizione(et_emit) - r_earth;
             lt = rho_vec.norm() / (c::C_LIGHT / 1000.0);
         }
 
@@ -310,6 +309,23 @@ ChebyshevSegment fit_chebyshev_spk(
     seg.dist_coeffs = cheby_fit(tau_samples, dist_samples, degree);
     return seg;
 }
+ChebyshevSegment fit_chebyshev_spk(
+    astdyn::io::SPKReader& reader,
+    int            target_id,
+    time::EpochTDB center_epoch,
+    double         duration_days,
+    int            degree,
+    std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem)
+{
+    // La logica astrometrica sta in fit_chebyshev_da_posizione: qui si fornisce
+    // soltanto la sorgente delle posizioni.
+    auto da_kernel = [&reader, target_id](double et) -> Eigen::Vector3d {
+        auto st = reader.getState(target_id, et);
+        return Eigen::Vector3d(st[0], st[1], st[2]);
+    };
+    return fit_chebyshev_da_posizione(da_kernel, center_epoch, duration_days, degree, ephem);
+}
+
 
 std::vector<Star> find_stars_near_segment(
     const GaiaDR3Catalog& catalog,
