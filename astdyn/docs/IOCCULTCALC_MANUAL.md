@@ -19,6 +19,7 @@ This manual supersedes the earlier separate documents `ioccultcalc_guide.md`,
 6. [The physical model](#6-the-physical-model)
 7. [Numerical integrators](#7-numerical-integrators)
 8. [Observations and orbit fitting](#8-observations-and-orbit-fitting)
+8bis. [Binary asteroids and their satellites](#8bis-binary-asteroids-and-their-satellites)
 9. [How events are discovered](#9-how-events-are-discovered)
 10. [Output and visualisation](#10-output-and-visualisation)
 11. [Two-stage campaigns](#11-two-stage-campaigns)
@@ -499,6 +500,108 @@ the geocentre. On 433 Eros they account for 832 of 16 324 observations.
 
 ---
 
+## 8bis. Binary asteroids and their satellites
+
+`ioccultcalc` can predict occultations by the satellites of binary asteroids,
+producing a separate shadow track for each body of the system.
+
+Two ways of describing a satellite are supported, and they differ in what data
+they need.
+
+### From an SPK kernel
+
+If a kernel with the satellite's ephemeris exists, it is the better source: it
+carries positions that already include the measured perturbations.
+
+```yaml
+bsp: "~/.ioccultcalc/ephemerides/haumea_system.bsp"
+system-ids: "136108,20136108,30136108"
+```
+
+NAIF numbers satellites of asteroids as `20000000 + number` for the first and
+`30000000 + number` for the second, so Hi'iaka is `20136108` and Namaka
+`30136108`. Kernels can be generated through the JPL Horizons SPK service.
+
+Such kernels exist only for a handful of well-studied systems.
+
+### From the mutual orbit
+
+For most known binaries no kernel exists, but the literature publishes the
+orbit of the satellite **around the primary**: semi-major axis, eccentricity,
+inclination and period. The satellite's position is then derived by propagating
+that orbit and adding the result to the primary's heliocentric position.
+
+```yaml
+objects:
+  asteroids: "22"
+
+system_bodies:
+  "22":
+    name: "Kalliope"
+    diameter_km: 150.0
+    H: 6.45
+  "22-S1":
+    name: "Linus"
+    primary: "22"              # explicit: which body it orbits
+    diameter_km: 28.0
+    H: 10.4
+    orbit:
+      a_km: 1099.0             # semi-major axis of the mutual orbit
+      e: 0.005
+      i_deg: 103.7
+      node_deg: 100.6
+      peri_deg: 0.0
+      M_deg: 0.0
+      period_days: 3.5951      # required: the system's GM comes from this
+      epoch_mjd: 61200.0
+      plane: equatorial        # equatorial | ecliptic
+```
+
+The primary must be among the campaign's asteroids: its elements are reused.
+
+### Two settings that decide whether the result is meaningful
+
+**`plane`** — published orbital angles are usually referred to the **J2000
+equator**, while the library works in the ecliptic. Getting this wrong rotates
+the mutual orbit by 23.4°, which places the satellite's track elsewhere in a way
+that still looks plausible. The default is `equatorial`, matching the common
+convention, but check your source.
+
+**`diameter_km`** — the diameter sets the shadow width and the event duration.
+Without it a placeholder of 10 km is used, with a warning: for a body like
+Hi'iaka (~320 km) that would make the track thirty-two times too narrow.
+
+### Where the system's GM comes from
+
+The gravitational parameter is derived from the **period**, through Kepler's
+third law μ = 4π²a³/P², rather than from published masses. Periods are measured
+well from lightcurves; binary masses are often uncertain by 20–30%.
+
+This gives a useful consistency check: the implied mass, divided by the volume
+of a sphere of the primary's diameter, should give a plausible asteroid density.
+For the three systems used in testing:
+
+| system | implied mass | implied density |
+|--------|--------------|-----------------|
+| (22) Kalliope | 8.14e18 kg | 4605 kg/m³ (M-type, metallic — expected high) |
+| (45) Eugenia | 5.89e18 kg | 1365 kg/m³ (C-type) |
+| (87) Sylvia | 1.48e19 kg | 1423 kg/m³ (C-type) |
+
+A density outside roughly 500–6000 kg/m³ means the semi-major axis, the period
+or the diameter do not agree with each other.
+
+### Limits worth knowing
+
+**The mutual orbit is treated as Keplerian.** Real satellite orbits are
+perturbed by the primary's non-sphericity — the J2 of an irregular body is
+large — by tides and by the Sun. Over long spans the node and pericentre precess
+appreciably. The prediction is reliable near the element epoch and degrades away
+from it. Where an SPK kernel exists, prefer it.
+
+**The satellite's position is usually less certain than the system's
+heliocentric orbit.** The prediction ellipse does not currently account for this,
+so the uncertainty on a satellite track is understated.
+
 ## 9. How events are discovered
 
 1. **Preparation** — orbital states are obtained from the local catalogue, from
@@ -749,6 +852,27 @@ and a courtesy delay between requests.
 > state-transition matrix rather than in state propagation. It is kept for
 > completeness.
 
+### system_bodies
+
+Physical properties and, optionally, mutual orbit of the bodies of a multiple
+system. Keys are the body identifiers.
+
+| key | type | meaning |
+|-----|------|---------|
+| `<id>.name` | string | display name |
+| `<id>.diameter_km` | double | diameter; sets shadow width and duration |
+| `<id>.H` | double | absolute magnitude; sets the light drop |
+| `<id>.primary` | string | for a satellite: which body it orbits |
+| `<id>.orbit.a_km` | double | semi-major axis of the mutual orbit |
+| `<id>.orbit.e` | double | eccentricity |
+| `<id>.orbit.i_deg` | double | inclination |
+| `<id>.orbit.node_deg` | double | longitude of the ascending node |
+| `<id>.orbit.peri_deg` | double | argument of pericentre |
+| `<id>.orbit.M_deg` | double | mean anomaly at epoch |
+| `<id>.orbit.period_days` | double | orbital period — **required**, the GM derives from it |
+| `<id>.orbit.epoch_mjd` | double | epoch of the elements |
+| `<id>.orbit.plane` | string | `equatorial` (default) or `ecliptic` |
+
 ### objects, time, filters, occultation, output
 
 See §5, §9 and §10; the keys are listed there with their defaults.
@@ -779,6 +903,11 @@ Check `filters.diameter_max_km`: a body whose diameter is unknown is treated as
 If `diffcorr.compute_covariance` is false, the ellipse keeps coming from the
 imported covariance and the fit affects only the geometry — which typically
 moves it by a negligible amount.
+
+**A satellite's track is far from the primary's, or missing.**
+Check `system_bodies.<id>.primary`: without it the body cannot be placed and is
+skipped with a message. Check `orbit.plane` as well — published angles are
+usually equatorial, and reading them as ecliptic rotates the orbit by 23.4°.
 
 **A `.oop` configuration file is rejected.**
 That format was removed. Convert to YAML or JSON; the settings map one to one.

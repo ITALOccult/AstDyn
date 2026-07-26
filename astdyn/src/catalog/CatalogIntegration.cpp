@@ -243,72 +243,68 @@ ChebyshevSegment fit_chebyshev_da_posizione(
     const double t_start = center_epoch.jd() - duration_days / 2.0;
     const double t_end   = center_epoch.jd() + duration_days / 2.0;
 
-    // Sample the orbit
     const int N = degree + 5;
-    std::vector<double> jd_samples(N), ra_samples(N), dec_samples(N), dist_samples(N), tau_samples(N);
+    std::vector<double> jd_samples(N), ra_samples(N), dec_samples(N),
+                        dist_samples(N), tau_samples(N);
 
-    // Settings for the reduction
+    // Stessa riduzione astrometrica di fit_chebyshev: una sola catena, cosi' le
+    // posizioni di corpi ottenuti per vie diverse restano confrontabili.
     astrometry::AstrometricSettings a_settings;
     a_settings.light_time_correction = true;
-    a_settings.aberrazione_differenziale = false; 
+    a_settings.aberrazione_differenziale = false;
     a_settings.frame_conversion_to_equatorial = true;
 
+    astdyn::AstDynConfig cfg_locale;
+    if (ephem) cfg_locale.ephemeris_type = EphemerisType::DE441;
+
     for (int i = 0; i < N; ++i) {
-        double tau = -1.0 + 2.0 * i / (N - 1);
-        double jd  = t_start + (tau + 1.0) * (t_end - t_start) / 2.0;
-        time::EpochTDB t_obs = time::EpochTDB::from_jd(jd);
-        double et_obs = (jd - c::JD2000) * c::SECONDS_PER_DAY;
+        const double tau = -1.0 + 2.0 * i / (N - 1);
+        const double jd  = t_start + (tau + 1.0) * (t_end - t_start) / 2.0;
+        const time::EpochTDB t_obs = time::EpochTDB::from_jd(jd);
+        const double et_obs = (jd - c::JD2000) * c::SECONDS_PER_DAY;
 
-        // 1. Get Earth position at observation time
-        auto actual_ephem = ephem ? ephem : std::make_shared<ephemeris::PlanetaryEphemeris>();
-        auto earth_state = actual_ephem->getState(ephemeris::CelestialBody::EARTH, t_obs);
-        Eigen::Vector3d r_earth = earth_state.position.to_eigen_si() / 1000.0; // km
+        // Il fornitore da' la posizione eliocentrica in km, frame eclittico.
+        // Il riduttore vuole uno stato cartesiano: la velocita' non serve alla
+        // riduzione posizionale, e si stima per differenze finite dove utile.
+        const Eigen::Vector3d r_km = posizione(et_obs);
+        const double dt = 60.0;   // s
+        const Eigen::Vector3d r_dopo = posizione(et_obs + dt);
+        const Eigen::Vector3d v_kms = (r_dopo - r_km) / dt;
 
-        // 2. Iterative light-time correction
-        double lt = 0.0;
-        Eigen::Vector3d rho_vec;
-        for (int iter = 0; iter < 5; ++iter) {
-            double et_emit = et_obs - lt;
-            rho_vec = posizione(et_emit) - r_earth;
-            lt = rho_vec.norm() / (c::C_LIGHT / 1000.0);
+        auto stato = physics::CartesianStateTyped<core::ECLIPJ2000>(
+            t_obs,
+            math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(
+                r_km.x() * 1000.0, r_km.y() * 1000.0, r_km.z() * 1000.0),
+            math::Vector3<core::ECLIPJ2000, physics::Velocity>::from_si(
+                v_kms.x() * 1000.0, v_kms.y() * 1000.0, v_kms.z() * 1000.0),
+            physics::GravitationalParameter::sun());
+
+        // t_elements == t_obs: la posizione e' gia' all'istante voluto, non c'e'
+        // nulla da propagare — solo da ridurre.
+        auto obs = astrometry::AstrometryReducer::compute_observation_from_cartesian(
+            stato.cast_frame<core::GCRF>(), t_obs, t_obs, cfg_locale, a_settings);
+
+        if (!obs) {
+            throw std::runtime_error(
+                "fit_chebyshev_da_posizione: riduzione fallita a JD " + std::to_string(jd));
         }
 
-        // 3. Convert to Equatorial J2000 if needed (AstrometryReducer helper)
-        // Note: SPK data is already in J2000 Ecliptic (native for AstDyn) or ICRF?
-        // SPKReader.hpp says Ecliptic J2000 frame.
-        // We need to rotate to Equatorial for catalog matching.
-        
-        // Use the rotation from AstrometryReducer if private access is problematic, 
-        // we can do it manually here.
-        double obliquity = c::OBLIQUITY_J2000;
-        Eigen::Matrix3d rot;
-        rot << 1, 0, 0,
-               0, std::cos(-obliquity), -std::sin(-obliquity),
-               0, std::sin(-obliquity),  std::cos(-obliquity);
-        
-        Eigen::Vector3d rho_eq = rot * rho_vec;
-        
-        // 4. Final conversion to RA/Dec
-        double r = rho_eq.norm();
-        double ra = std::atan2(rho_eq.y(), rho_eq.x()) * c::RAD_TO_DEG;
-        double dec = std::asin(rho_eq.z() / r) * c::RAD_TO_DEG;
-        if (ra < 0) ra += 2.0 * c::PI * c::RAD_TO_DEG;
-
-        jd_samples[i]  = jd;
-        tau_samples[i] = tau;
-        ra_samples[i]  = ra;
-        dec_samples[i] = dec;
-        dist_samples[i] = r / c::AU;
+        jd_samples[i]   = jd;
+        tau_samples[i]  = tau;
+        ra_samples[i]   = obs->ra.to_deg();
+        dec_samples[i]  = obs->dec.to_deg();
+        dist_samples[i] = obs->distance.to_au();
     }
 
     ChebyshevSegment seg;
     seg.t_start = t_start;
     seg.t_end   = t_end;
-    seg.ra_coeffs  = cheby_fit(tau_samples, ra_samples, degree);
-    seg.dec_coeffs = cheby_fit(tau_samples, dec_samples, degree);
+    seg.ra_coeffs   = cheby_fit(tau_samples, ra_samples, degree);
+    seg.dec_coeffs  = cheby_fit(tau_samples, dec_samples, degree);
     seg.dist_coeffs = cheby_fit(tau_samples, dist_samples, degree);
     return seg;
 }
+
 ChebyshevSegment fit_chebyshev_spk(
     astdyn::io::SPKReader& reader,
     int            target_id,

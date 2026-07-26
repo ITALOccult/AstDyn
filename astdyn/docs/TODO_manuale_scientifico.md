@@ -67,6 +67,34 @@ Da trattare anche il caso degli **osservatori mobili** (codice 270, Unistellar
 Network): non hanno coordinate in catalogo e le portano nei record della singola
 osservazione. Su 433 Eros sono 832 osservazioni su 16324.
 
+### Cap. 12 / 15 — riduzione astrometrica  [AGGIUNTA del 26 luglio]
+
+Nel percorso che costruisce le effemeridi dei corpi caricati da kernel SPK sono
+stati trovati **due difetti**, entrambi silenziosi e invisibili ai 177 test:
+
+1. **Tempo-luce sbagliato di un fattore mille.** Il codice calcolava
+   `lt = rho / (C_LIGHT / 1000)` con `C_LIGHT` gia' espressa in km/s: la
+   divisione superflua rendeva il ritardo mille volte troppo grande, e i corpi
+   venivano valutati **21 giorni** prima dell'istante voluto.
+2. **Frame mescolati.** La posizione della Terra, ottenuta da `getState(EARTH)`
+   in GCRF (equatoriale), veniva sottratta da una posizione eclittica, e al
+   risultato si applicava poi la rotazione all'equatore — sommando l'errore.
+   Il sorgente portava scritto il dubbio irrisolto: *"SPK data is already in
+   J2000 Ecliptic (native for AstDyn) or ICRF?"*.
+
+Effetto misurato: un satellite che doveva stare a 0.42 arcsec dal primario
+finiva a 12 gradi.
+
+Entrambi i difetti nascevano da una **seconda implementazione** della riduzione
+astrometrica, scritta a mano accanto a quella basata su `AstrometryReducer`.
+La correzione non e' stata rattopparli ma eliminare la variante: ora esiste una
+sola catena astrometrica.
+
+E' il terzo caso in due giorni in cui una duplicazione si rivela un difetto,
+dopo la rotazione terrestre (due implementazioni, una sbagliata) e la tolleranza
+degli integratori (duplicata in tre classi). Vale la pena che il manuale lo dica
+come principio di progetto, non solo come cronaca.
+
 ---
 
 ## B. Misure NUOVE da inserire
@@ -141,12 +169,45 @@ Da scrivere. Materiale disponibile oggi:
 - covarianza per-asteroide dagli .eq1 AstDyS;
 - il fit come parametro di calcolo, non come passo obbligato.
 
+### Sistemi multipli — capitolo o sezione nuova
+
+La libreria predice ora le occultazioni dei satelliti di asteroidi binari
+partendo dai parametri della loro **orbita mutua**, non solo da kernel SPK.
+Materiale disponibile:
+
+- il parametro gravitazionale del sistema si ricava dal **periodo** con la terza
+  legge di Keplero, non dalle masse: i periodi si misurano bene dalle curve di
+  luce, le masse dei binari sono incerte al 20-30%. La densita' implicita
+  fornisce un controllo di plausibilita' indipendente (misurate: Kalliope
+  4605 kg/m3 da tipo M metallico, Eugenia 1365 e Sylvia 1423 da tipo C);
+- il **piano di riferimento** degli angoli pubblicati e' quasi sempre l'equatore
+  J2000, non l'eclittica: leggerli male ruota l'orbita di 23.4 gradi e colloca la
+  traccia altrove in modo credibile;
+- l'orbita mutua e' trattata come **kepleriana**: le orbite reali sono perturbate
+  dal J2 del primario — grande per un corpo irregolare — dalle maree e dal Sole,
+  con precessione sensibile di nodo e pericentro su tempi lunghi;
+- verifica geometrica su Kalliope-Linus: separazione 0.42 arcsec contro 0.4235
+  attesi dal semiasse proiettato, e rotazione dell'angolo di posizione di
+  360.2 gradi in un periodo di 3.5951 giorni.
+
 ### Cap. 26 — Future Developments
 Aggiornare con lo stato reale: Fase 5 completata (fit operativo in campagna con
 covarianza propria), Fase 6 in attesa delle effemeridi di satelliti, Fase 7
 (installer) avviata.
 
 ---
+
+## C-bis. Da rifare: la validazione su Haumea
+
+Il report `haumea_final_validation_report.md` (maggio 2026) dichiara le tracce
+del sistema Haumea allineate con una predizione esterna. Ma quel calcolo passava
+dal percorso SPK, che fino al 26 luglio aveva il tempo-luce sbagliato di un
+fattore mille e i frame mescolati.
+
+La validazione va **rifatta**. Va inoltre corretta una attribuzione: i numeri
+della sezione 3 di quel report — 4100 osservazioni, RMS 0.292 arcsec, modello
+errori `fcct14` — sono di **AstDyS**, letti dall'intestazione del file .rwo, non
+un risultato del nostro fit.
 
 ## D. Nota metodologica che meriterebbe un posto nel manuale
 

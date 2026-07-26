@@ -4,6 +4,7 @@
  */
 
 #include "astdyn/astrometry/OrbitingChebyshevEphemeris.hpp"
+#include <iostream>
 #include "astdyn/catalog/CatalogIntegration.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/AstDynEngine.hpp"
@@ -129,7 +130,8 @@ OrbitingChebyshevEphemeris::OrbitingChebyshevEphemeris(
         auto cart = propagation::keplerian_to_cartesian<core::ECLIPJ2000>(kep);
         const Eigen::Vector3d r_primario = cart.position.to_eigen_si() / 1000.0;  // km
 
-        return r_primario + vettore_relativo(orbita, t);
+        const auto rel = vettore_relativo(orbita, t);
+        return r_primario + rel;
     };
 
     // Segmenti giornalieri, come per gli altri corpi. Un satellite con periodo
