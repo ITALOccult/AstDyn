@@ -1,0 +1,46 @@
+# Prova end-to-end del fit orbitale (Fase 5, passo 2) su 820987 (2015 BK290).
+#
+# L'evento noto e' il 2026-07-27; la finestra lo comprende con margine.
+# Con source: astdys l'orchestrator scarica .eq1 e .rwo; il secondo stadio
+# attiva il fit sui positivi.
+#
+# Atteso nell'output del secondo stadio:
+#   [fit] 820987: orbita raffinata su ~90 osservazioni, RMS ~1.6 arcsec
+#
+# Riferimenti dalla Fase 3 (senza fit): ellisse 0.117721" x 0.0644153" @ PA 71.39
+
+astdyn_base: ~/campagne/prova_fit_bk290
+ioccultcalc: ~/Documents/Develop/ASTDYN/IOccultLibrary/astdyn/build/tools/bin/ioccultcalc
+ephemeris_file: ~/.ioccultcalc/ephemerides/de440s.bsp
+
+source: astdys
+astdys_throttle: 0.5
+
+objects:
+  asteroids: "820987"
+
+time:
+  start: "2026-07-25"
+  end: "2026-07-29"
+
+filters:
+  star_mag_max: 15.0
+
+physics:
+  covariance: true
+
+first_pass:
+  profile: light
+
+second_stage:
+  profile: full
+  fit: true
+  # fit_obs_years: 5     # opzionale: limita l'arco delle osservazioni
+
+output:
+  json: json/occultations.json
+  xml: xml/occultations.xml
+  svg: false
+  write_empty: true
+
+verbose: true
