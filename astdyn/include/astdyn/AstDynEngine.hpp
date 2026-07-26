@@ -104,6 +104,7 @@ struct OrbitDeterminationResult {
     int num_rejected;                        ///< Number of rejected outliers
     int num_iterations;                      ///< Number of DC iterations
     bool converged;                          ///< Convergence flag
+    std::string exit_reason;                 ///< Motivo dell'uscita dal ciclo di correzione
 };
 
 /**
@@ -229,6 +230,7 @@ OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
     OrbitDeterminationResult result;
     result.orbit = current_orbit_;
     result.converged = result_dc.converged;
+    result.exit_reason = result_dc.rejection_reason;
     result.rms_ra = result_dc.statistics.rms_ra.to_arcsec();
     result.rms_dec = result_dc.statistics.rms_dec.to_arcsec();
     result.rms_total_arcsec = result_dc.statistics.rms_total.to_arcsec();

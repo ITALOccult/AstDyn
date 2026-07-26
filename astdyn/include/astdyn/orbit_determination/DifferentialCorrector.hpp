@@ -110,7 +110,12 @@ public:
             
             if (settings.use_line_search) {
                 if (!perform_line_search(sorted_obs, corr, settings, current_state, residuals, cur_rms)) {
-                    res.rejection_reason = "Line search failed to find better solution"; break;
+                    // Nessun passo migliora l'RMS: e' un MINIMO RAGGIUNTO, quindi
+                    // convergenza. Accade tipicamente quando l'orbita di partenza
+                    // e' gia' ottima e non c'e' margine di correzione.
+                    res.rejection_reason = "minimo raggiunto: nessuna correzione migliora la soluzione";
+                    res.converged = true;
+                    break;
                 }
             } else {
                 current_state = apply_correction(current_state, corr, 1.0);
