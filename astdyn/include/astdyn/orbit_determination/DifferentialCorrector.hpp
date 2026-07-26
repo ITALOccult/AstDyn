@@ -38,6 +38,9 @@ struct DifferentialCorrectorSettings {
     bool verbose = false;
     bool use_line_search = true;
     double line_search_min_alpha = 1e-4;
+    int max_line_search_steps = 5;           ///< Tetto ai dimezzamenti di alpha: ogni
+                                             ///< tentativo costa una propagazione completa,
+                                             ///< e da 1 a 1e-4 sarebbero 14 tentativi.
     double rms_tolerance_arcsec = 0.001;
     bool check_energy_barrier = true;
     double energy_barrier_fraction = 0.5;
@@ -107,7 +110,6 @@ public:
             if (dm.valid_indices.empty()) { res.rejection_reason = "No valid observations remaining"; break; }
             Eigen::VectorXd corr = solve_normal_equations(dm);
             double cur_rms = ResidualCalculator<Frame>::compute_statistics(residuals, 6).rms_total.to_arcsec();
-            
             if (settings.use_line_search) {
                 if (!perform_line_search(sorted_obs, corr, settings, current_state, residuals, cur_rms)) {
                     // Nessun passo migliora l'RMS: e' un MINIMO RAGGIUNTO, quindi
@@ -120,7 +122,6 @@ public:
             } else {
                 current_state = apply_correction(current_state, corr, 1.0);
             }
-            
             res.statistics = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
             res.residuals = residuals;
             res.rms_history.push_back(res.statistics.rms_total.to_arcsec());
@@ -172,7 +173,9 @@ private:
 
     bool perform_line_search(const std::vector<observations::OpticalObservation>& obs, const Eigen::VectorXd& correction, const DifferentialCorrectorSettings& settings, physics::CartesianStateTyped<Frame>& current_state, std::vector<ObservationResidual>& residuals, double& cur_rms) {
         double alpha = 1.0;
-        while (alpha >= settings.line_search_min_alpha) {
+        int tentativi = 0;
+        while (alpha >= settings.line_search_min_alpha && tentativi < settings.max_line_search_steps) {
+            ++tentativi;
             auto trial = apply_correction(current_state, correction, alpha);
             auto trial_res = residual_calc_->compute_residuals(obs, trial);
             for (size_t i=0; i<residuals.size(); ++i) trial_res[i].outlier = residuals[i].outlier;

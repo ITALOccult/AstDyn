@@ -8,6 +8,7 @@
  * Atteso: converged=YES, RMS ~0.46 arcsec (RMSast dell'header .rwo).
  */
 #include <astdyn/AstDynEngine.hpp>
+#include <chrono>
 #include <astdyn/observations/RWOReader.hpp>
 #include <cstdlib>
 #include <iostream>

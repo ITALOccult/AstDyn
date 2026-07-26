@@ -9,6 +9,7 @@
 #define ASTDYN_ORBFITENGINE_HPP
 
 #include "astdyn/core/physics_state.hpp"
+#include <chrono>
 #include "astdyn/propagation/Propagator.hpp"
 #include "astdyn/observations/ObservationManager.hpp"
 #include "astdyn/orbit_determination/OrbitFitter.hpp"
