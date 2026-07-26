@@ -67,6 +67,7 @@ struct AstDynConfig {
     // Fit orbitale on-demand (Fase 5)
     bool fit_enabled = false;                ///< Attiva il fit come parametro di calcolo
     double fit_obs_years = 0.0;              ///< Usa solo le osservazioni degli ultimi N anni (0 = tutte)
+    double fit_tolerance = 0.0;              ///< Tolleranza dell'integratore durante il fit (0 = usa quella corrente)
     
     // Close approach settings
     close_approach::CloseApproachSettings ca_settings;
@@ -199,9 +200,35 @@ private:
     void set_initial_orbit_ecl(const physics::KeplerianStateTyped<core::ECLIPJ2000>& elements);
 };
 
+/// Applica una tolleranza all'integratore per la durata di uno scope e la
+/// ripristina all'uscita, anche in caso di eccezione: un fit interrotto non deve
+/// lasciare l'integratore alterato per i calcoli successivi.
+class TolleranzaTemporanea {
+public:
+    TolleranzaTemporanea(std::shared_ptr<propagation::Integrator> integ, double nuova)
+        : integ_(integ) {
+        if (integ_ && nuova > 0.0 && integ_->supports_tolerance()) {
+            precedente_ = integ_->tolerance();
+            attiva_ = true;
+            integ_->set_tolerance(nuova);
+        }
+    }
+    ~TolleranzaTemporanea() { if (attiva_) integ_->set_tolerance(precedente_); }
+    TolleranzaTemporanea(const TolleranzaTemporanea&) = delete;
+    TolleranzaTemporanea& operator=(const TolleranzaTemporanea&) = delete;
+private:
+    std::shared_ptr<propagation::Integrator> integ_;
+    double precedente_ = 0.0;
+    bool attiva_ = false;
+};
+
 template <typename Frame>
 OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
     using namespace orbit_determination;
+    // Tolleranza dedicata al fit: le derivate parziali non richiedono la
+    // precisione della propagazione finale. Con fit_tolerance = 0 resta quella corrente.
+    TolleranzaTemporanea guardia(propagator_ ? propagator_->get_integrator() : nullptr,
+                                 config_.fit_tolerance);
     OrbitFitter<Frame> fitter(ephemeris_, propagator_);
     fitter.set_corrections(config_.aberrazione_differenziale, config_.light_time_correction);
     DifferentialCorrectorSettings dc_settings;

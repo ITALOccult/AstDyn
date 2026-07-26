@@ -156,6 +156,7 @@ void AstDynEngine::load_fitting_settings(const core::IOCConfig& ioc) {
     // Fit orbitale on-demand (Fase 5)
     config_.fit_enabled   = ioc.get<bool>  ("diffcorr.enabled",   config_.fit_enabled);
     config_.fit_obs_years = ioc.get<double>("diffcorr.obs_years", config_.fit_obs_years);
+    config_.fit_tolerance = ioc.get<double>("diffcorr.tolerance", config_.fit_tolerance);
 }
 
 void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {
