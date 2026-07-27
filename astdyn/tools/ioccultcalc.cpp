@@ -280,7 +280,11 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     {
         char buf[32];
         std::snprintf(buf, sizeof(buf), "%04d%02d%02d", ey, em, ed);
-        const std::string sid = std::to_string(cand.star.source_id);
+        // La coda va presa dall'identificativo che SCRIVIAMO, non dal source_id
+        // di Gaia: e' cosi' che OccultWatcher riconosce due predizioni come
+        // riferite allo stesso evento. Con J175336.90-214720.9 la coda e'
+        // 4720.9, che coincide con quella delle predizioni di riferimento.
+        const std::string& sid = ev.star_id;
         ev.event_id = std::string(buf) + "_" +
                       (sid.size() > 6 ? sid.substr(sid.size() - 6) : sid);
     }
