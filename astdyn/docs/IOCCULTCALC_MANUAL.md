@@ -25,7 +25,8 @@ This manual supersedes the earlier separate documents `ioccultcalc_guide.md`,
 11. [Two-stage campaigns](#11-two-stage-campaigns)
 12. [Data formats](#12-data-formats)
 13. [Appendix A — complete key reference](#appendix-a--complete-key-reference)
-14. [Appendix B — troubleshooting](#appendix-b--troubleshooting)
+14. [Appendix B — the JSON result format](#appendix-b--the-json-result-format)
+15. [Appendix C — troubleshooting](#appendix-c--troubleshooting)
 
 ---
 
@@ -917,7 +918,162 @@ See §5, §9 and §10; the keys are listed there with their defaults.
 
 ---
 
-## Appendix B — troubleshooting
+## Appendix B — the JSON result format
+
+The JSON file is the **native** output: everything the engine computes about an
+event is there, including quantities the Occult4 interchange format has no place
+for. The XML is a projection of it, written for compatibility with Occult4 and
+OccultWatcher.
+
+Set it with `json-output`; the campaign orchestrator reads it to find which
+bodies showed an event.
+
+### Top level
+
+```json
+{
+  "count": 12,
+  "events": [ … ]
+}
+```
+
+### Each event
+
+Nine groups. Angles are in degrees unless the field name says otherwise,
+distances in AU or km as marked, times in UT.
+
+#### `event` — when
+
+| field | meaning |
+|-------|---------|
+| `year`, `month`, `day` | date of closest approach |
+| `ut_closest_h` | UT of closest approach, decimal hours |
+| `duration_s` | maximum duration on the centre line, seconds |
+
+#### `elements` — Besselian elements
+
+| field | meaning |
+|-------|---------|
+| `source` | provenance of the orbital elements |
+| `x`, `y` | shadow axis position at closest approach, Earth radii |
+| `dx`, `dy` | first derivatives, Earth radii per hour |
+| `d2x`, `d2y` | second-order terms |
+| `d3x`, `d3y` | third-order terms |
+| `nonlinearity_index` | *(ours only)* how far the covariance mapping departs from linearity |
+
+The shadow axis follows
+`x(t) = x + dx·t + d2x·t² + d3x·t³` with `t` in hours from closest approach.
+The higher-order terms matter: dropping them displaces the track by about
+100 km two hours from the centre.
+
+`nonlinearity_index` has no counterpart in the Occult4 format. It measures how
+much the projection of the covariance onto the sky plane departs from the linear
+approximation; small values mean the error ellipse is trustworthy.
+
+#### `earth` — Earth orientation
+
+| field | meaning |
+|-------|---------|
+| `substellar_lon_deg`, `substellar_lat_deg` | where the star is at the zenith |
+| `subsolar_lon_deg`, `subsolar_lat_deg` | where the Sun is at the zenith |
+| `jwst` | prediction for the James Webb Space Telescope |
+
+The substellar latitude is **geocentric**, and equals the star's apparent
+declination — the convention Occult4 uses.
+
+#### `star` — the occulted star
+
+| field | meaning |
+|-------|---------|
+| `id` | positional designation `Jhhmmss.ss±ddmmss.s` |
+| `ra_h`, `dec_deg` | BCRS position at the epoch of the event, no parallax |
+| `app_ra_h`, `app_dec_deg` | apparent position of date |
+| `mag_b`, `mag_v`, `mag_r` | B, V, R magnitudes; **99.0 means not available** |
+| `mag_drop_v`, `mag_drop_r` | light drop during the event; 0 when not computable |
+| `diameter_mas` | stellar diameter — not modelled, always 0 |
+| `double_star_code` | 0 none, 1 WDS, 2 other source, 4 variable; cumulative |
+| `k2_flag` | `K` for a K2 star |
+| `mag_drops_adjusted` | drops adjusted for nearby stars |
+| `bright_nearby_count`, `total_nearby_count` | **−1: no check performed** |
+
+The identifier is positional rather than a catalogue number because Occult4's
+Gaia record carries no `source_id`: it identifies stars by position. Right
+ascension is rounded, declination truncated — the convention its own
+predictions follow.
+
+Only the G band is available from the distributed stellar catalogue, so `mag_b`
+and `mag_r` come out as 99.0 and the R-band drop cannot be computed. See
+`docs/TODO_catalogo_multifile.md`.
+
+#### `object` — the occulting body
+
+| field | meaning |
+|-------|---------|
+| `number`, `name` | designation; the name comes from the local AstDyS catalogue |
+| `mag` | apparent magnitude from the HG model |
+| `diameter_km` | diameter, augmented by the stellar diameter |
+| `diameter_uncertainty_km` | uncertainty on it |
+| `distance_au` | geocentric distance |
+| `d_ra_s_hr` | hourly change in RA, **seconds of time** per hour |
+| `d_dec_as_hr` | hourly change in Dec, arcseconds per hour |
+| `n_rings`, `n_moons` | rings and moons |
+| `taxonomy` | taxonomic class |
+| `moon_in_planet_shadow` | for planetary satellites |
+| `mag_v`, `mag_r` | V and R magnitudes of the asteroid — **not computed, always 0** |
+
+#### `orbit` — low-precision elements
+
+Enough to plot the body's motion on a star chart, not to reproduce the
+prediction: `equinox`, `mean_anomaly_deg`, `epoch_year`/`month`/`day`,
+`peri_deg`, `node_deg`, `inclination_deg`, `eccentricity`,
+`semi_major_axis_au`, `perihelion_au`, `h0`, `coeff_log_r`, `g_param`.
+
+#### `errors` — prediction uncertainty
+
+| field | meaning |
+|-------|---------|
+| `major_as`, `minor_as`, `pa_deg` | 1-sigma error ellipse on the sky plane |
+| `sigma1_as` | quadrature sum of the two semi-axes |
+| `path_widths` | cross-track uncertainty divided by the shadow width |
+| `basis` | `Star+PEU`, `Star+Assumed`, `Known errors` or `Assumed` |
+| `reliability` | the star's RUWE; **−1 not set** |
+| `duplicate_source`, `non_gaia_pm`, `pm_added_from_ucac4` | **−1: not checked** |
+
+`path_widths` says how uncertain the track position is *relative to how wide the
+track is*. A value of 1.75 means the shadow could fall almost two path widths
+away from where it is drawn — for a small body with a poorly determined orbit it
+can reach the tens.
+
+When `diffcorr.compute_covariance` is on, the ellipse comes from our own fit
+rather than from the imported AstDyS covariance (§8.4).
+
+#### `id`
+
+| field | meaning |
+|-------|---------|
+| `event_id` | `yyyymmdd_xxxxxx`: date plus the tail of the star identifier |
+| `prediction_mjd` | when the prediction was computed |
+
+`event_id` is what OccultWatcher uses to recognise two predictions as referring
+to the same event, so its tail must come from the identifier actually written,
+not from an internal catalogue number.
+
+### A note on missing values
+
+Three different conventions appear, each meaning something specific:
+
+- **99.0** — a magnitude that the catalogue does not carry;
+- **−1** — a check that was not performed, as distinct from a check that found
+  nothing;
+- **0.0** — a quantity that is genuinely zero, or one we do not model
+  (`diameter_mas`, `object.mag_v`).
+
+The distinction matters: writing 0 where a check did not happen claims a result
+that was never obtained.
+
+---
+
+## Appendix C — troubleshooting
 
 **Residuals of the fit are several arcseconds, not sub-arcsecond.**
 The most likely cause is a missing observatory catalogue: check with
