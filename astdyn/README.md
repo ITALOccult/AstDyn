@@ -1,340 +1,240 @@
-[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B23)
-[![CMake](https://img.shields.io/badge/CMake-3.15+-blue.svg)](https://cmake.org/)
-[![License](https://img.shields.io/badge/License-GPL--3.0-green.svg)](LICENSE)
-[![OpenMP](https://img.shields.io/badge/OpenMP-Parallel-red.svg)](https://www.openmp.org/)
-
-Modern C++ port of **AstDyn** - A comprehensive software package for orbit determination and propagation of asteroids and celestial objects.
-
-## 📖 Overview
-
-AstDyn C++ is a complete rewrite of the original Fortran 90 AstDyn software, bringing modern C++ design patterns, improved performance, and enhanced maintainability to orbital mechanics computations.
-
-### Features
-
-- ✅ **Core Infrastructure & Performance**
-  - Modern CMake build system with **OpenMP** parallelization
-  - **High-Precision Integrator Suite**: AAS, RKF78, Gauss-Legendre (GL8), SABA4, and Radau15 (IAS15).
-  - **Stability & Precision**: Optimized step-control (Picard/Sundman) for non-conservative systems and Jacobian caching for implicit methods.
-  - Native C++ SPK (SPICE) reader: **stateless and thread-safe** (no CSPICE needed)
-  - JPL DE441 integration via native reader
-
-- ✅ **Astrometry & Occultations**
-  - High-precision Occultation Engine (Bessel Fundamental Plane)
-  - Validated against Occult4 (precision < 1 mas)
-  - **Relativistic Aberration & Light Deflection** (IAU 2000 compliant)
-  - Advanced stellar correctors for Gaia DR3 (Proper Motion, Parallax)
-
-- ✅ **Dynamics & Perturbations**
-  - **Optimized Close Approach Engine**: Sub-millimeter TCA refinement via golden-section search
-  - **High-Precision MOID**: Optimized 2-stage grid search for Minimum Orbit Intersection Distance
-  - Native Force Model: 17 massive asteroids, relativity, and J2 (Sun/Earth)
-  - **IAU 2015 Standards**: Standardized GM and physical radii repository
-
-## 🛠️ Requirements
-
-### Minimum Requirements
-
-- **C++ Compiler**: GCC 11+, Clang 14+, or MSVC 2022+ (C++23 support)
-- **CMake**: 3.15 or higher
-- **Eigen3**: 3.4 or higher
-- **Boost**: 1.70 or higher
-- **OpenMP**: For multi-core acceleration
-
-### Optional Dependencies
-
-- **Doxygen**: For generating API documentation
-- **Google Test**: For unit testing
-
-## 🚀 Quick Start
-
-### Building from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/manvalan/ITALOccultLibrary.git
-cd ITALOccultLibrary/astdyn
-
-# Create build directory
-mkdir build && cd build
-
-# Configure with CMake
-cmake ..
-
-# Build
-cmake --build . -j$(nproc)
-
-# Run tests
-ctest --output-on-failure
-
-# Install (optional)
-sudo cmake --install .
-```
-
-### CMake Options
-
-Configure the build with these options:
-
-```bash
-cmake -DASTDYN_BUILD_TESTS=ON \          # Build unit tests (default: ON)
-      -DASTDYN_BUILD_EXAMPLES=ON \       # Build examples (default: ON)
-      -DASTDYN_BUILD_DOCS=OFF \          # Build documentation (default: OFF)
-      -DASTDYN_USE_OPENMP=ON \           # Enable OpenMP (default: ON)
-      -DCMAKE_BUILD_TYPE=Release \       # Build type (Debug/Release)
-      ..
-```
-
-### Example Build Configurations
-
-**Debug build with all features:**
-```bash
-cmake -DCMAKE_BUILD_TYPE=Debug \
-      -DASTDYN_BUILD_TESTS=ON \
-      -DASTDYN_BUILD_EXAMPLES=ON \
-      ..
-```
-
-**Optimized release build:**
-```bash
-cmake -DCMAKE_BUILD_TYPE=Release \
-      -DASTDYN_BUILD_TESTS=OFF \
-      -DASTDYN_BUILD_EXAMPLES=OFF \
-      ..
-cmake --build . -j$(nproc)
-```
-
-**Multi-core accelerated build:**
-```bash
-cmake -DASTDYN_USE_OPENMP=ON -DCMAKE_BUILD_TYPE=Release ..
-cmake --build . -j$(sysctl -n hw.ncpu)
-```
-
-## 📦 Installing Dependencies
-
-### Ubuntu/Debian
-
-```bash
-sudo apt-get update
-sudo apt-get install -y \
-    build-essential \
-    cmake \
-    libeigen3-dev \
-    libboost-all-dev \
-    libgtest-dev \
-    doxygen
-```
-
-### macOS (via Homebrew)
-
-```bash
-brew install cmake eigen boost googletest doxygen
-```
-
-### Windows (via vcpkg)
-
-```powershell
-vcpkg install eigen3:x64-windows boost:x64-windows gtest:x64-windows
-cmake -DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake ..
-```
-
-## 📚 Usage Example
-
-```cpp
-#include <astdyn/AstDyn.hpp>
-#include <iostream>
-
-int main() {
-    // Initialize library
-    if (!astdyn::initialize()) {
-        std::cerr << "Failed to initialize AstDyn\n";
-        return 1;
-    }
-    
-    // Print version
-    std::cout << "AstDyn C++ v" << astdyn::Version::string << "\n";
-    
-    // Access constants
-    using namespace astdyn::constants;
-    std::cout << "AU = " << AU << " km\n";
-    std::cout << "Speed of light = " << C_LIGHT << " km/s\n";
-    
-    // Create a 3D vector
-    astdyn::Vector3d position(1.0, 0.0, 0.0);  // 1 AU on x-axis
-    std::cout << "Position: " << position.transpose() << "\n";
-    
-    // Cleanup
-    astdyn::shutdown();
-    return 0;
-}
-```
-
-Compile and link:
-```bash
-g++ -std=c++23 example.cpp -lastdyn -I/usr/local/include -L/usr/local/lib
-```
-
-### High-Precision Propagation
-
-```cpp
-#include <astdyn/AstDyn.hpp>
-#include <iostream>
-
-int main() {
-    astdyn::initialize();
-
-    // 1. Configure for High Precision
-    astdyn::propagation::PropagatorSettings settings;
-    settings.include_planets = true;
-    settings.include_asteroids = true;
-    settings.use_default_asteroid_set = true;  // Load 17 massive asteroids
-    
-    // 2. Initial elements (Epoch 2458315.5)
-    astdyn::propagation::KeplerianElements elements;
-    // ... set elements ...
-
-    // 3. Propagate and calculate Geocentric RA/Dec
-    double target_jd = 2461050.580949; // 2026-Jan-10
-    auto result = propagator.calculateGeocentricObservation(elements, target_jd);
-
-    std::cout << "RA J2000: " << result.ra_deg << " deg\n";
-    std::cout << "Dec J2000: " << result.dec_deg << " deg\n";
-
-    astdyn::shutdown();
-    return 0;
-}
-```
-
-## 🧪 Testing
-
-Run all unit tests:
-```bash
-cd build
-ctest --output-on-failure
-```
-
-Run specific test:
-```bash
-./tests/astdyn_tests --gtest_filter=ConstantsTest.*
-```
-
-## 📁 Project Structure
-
-```
-astdyn/
-├── CMakeLists.txt              # Root CMake configuration
-├── README.md                   # This file
-├── LICENSE                     # GPL-3.0 license
-├── cmake/                      # CMake modules and scripts
-│   ├── FindCSPICE.cmake
-│   ├── Version.hpp.in
-│   └── Config.hpp.in
-├── include/astdyn/             # Public headers
-│   ├── AstDyn.hpp             # Main include file
-│   ├── core/
-│   │   ├── Constants.hpp      # Physical constants
-│   │   └── Types.hpp          # Type definitions
-│   ├── math/                  # Mathematical utilities
-│   ├── time/                  # Time scale conversions
-│   ├── orbit/                 # Orbital elements
-│   ├── ephemeris/             # Ephemeris handling
-│   ├── observations/          # Observation data
-│   └── propagation/           # Orbit propagation
-├── src/                       # Implementation files
-│   ├── CMakeLists.txt
-│   ├── core/
-│   ├── math/
-│   ├── time/
-│   └── ...
-├── tests/                     # Unit tests
-│   ├── CMakeLists.txt
-│   ├── test_constants.cpp
-│   └── test_types.cpp
-├── examples/                  # Example programs
-├── docs/                      # Documentation
-└── data/                      # Data files (ephemerides, etc.)
-```
-
-## 🔧 Development
-
-### Code Style
-
-- **C++ Standard**: C++23
-- **Formatting**: Follow project .clang-format
-- **Naming**:
-  - Classes: `PascalCase`
-  - Functions/methods: `snake_case`
-  - Constants: `UPPER_SNAKE_CASE`
-  - Namespaces: `lowercase`
-
-### Adding New Features
-
-1. Create header in `include/astdyn/module/`
-2. Implement in `src/module/`
-3. Add unit tests in `tests/`
-4. Update CMakeLists.txt
-5. Document with Doxygen comments
-
-### Running Static Analysis
-
-```bash
-# Using clang-tidy
-clang-tidy src/**/*.cpp -- -std=c++17 -Iinclude
-
-# Using cppcheck
-cppcheck --enable=all --std=c++17 src/
-```
-
-## 📊 Performance
-
-Preliminary benchmarks show:
-- **10-30% faster** than Fortran version on modern CPUs
-- **Reduced memory footprint** with smart pointer management
-- **Better cache utilization** with Eigen's optimized linear algebra
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-Original Fortran AstDyn © 1997-2020 AstDyn Consortium
-
-## 🙏 Acknowledgments
-
-- **Original AstDyn Team**: Andrea Milani, Steven Chesley, Mario Carpino, and contributors
-- **Eigen3 Library**: Linear algebra foundation
-- **NASA JPL**: SPICE Toolkit and ephemerides
-- **IAU**: Standard astronomical constants
-
-## 📞 Contact
-
-- **Project Repository**: https://github.com/manvalan/ITALOccultLibrary
-- **Issue Tracker**: https://github.com/manvalan/ITALOccultLibrary/issues
-- **Documentation**: Part of ITALOccultLibrary project
-
-## 🗺️ Roadmap
-
-- [x] **Phase 1**: Setup & Infrastructure *(Complete)*
-- [x] **Phase 2**: Base Utilities & Math *(Complete)*
-- [x] **Phase 3**: Ephemerides & Reference Systems *(Complete)*
-- [x] **Phase 4**: Observations *(Complete)*
-- [x] **Phase 5**: Orbital Elements *(Complete)*
-- [x] **Phase 6**: Propagation Core *(Complete)*
-- [x] **Phase 7**: Orbit Determination & Uncertainty *(Complete)*
-- [x] **Phase 8**: Close Approaches & Occultations *(Validated)*
-  - Stabilized Gauss and SABA step-control for solar system propagation
-  - Optimized Radau15 (IAS15) with Jacobian caching
-- [ ] **Phase 9**: Advanced Fitter (Global Batch)
-- [ ] **Phase 10**: Cloud/Parallel Cluster Support
-- [ ] **Phase 11**: Final Documentation & Release
+# AstDyn — asteroid dynamics and stellar occultation prediction
+
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![Standard: C++23](https://img.shields.io/badge/standard-C%2B%2B23-blue.svg)
+![Status: Beta](https://img.shields.io/badge/Status-Beta-yellow.svg)
+
+This repository contains two things:
+
+- **AstDyn**, a C++23 library for high-precision asteroid orbit propagation and
+  determination;
+- **ioccultcalc**, a command-line engine built on it that predicts stellar
+  occultations by asteroids — when they happen, where the shadow falls, and how
+  uncertain the prediction is.
 
 ---
 
-**Made with ❤️ for the asteroid science community**
+## Using ioccultcalc
+
+### 1. Install the external data
+
+The engine needs data that is not in the repository: observatory codes,
+planetary ephemerides, an asteroid catalogue. It runs without them but produces
+worse results, and not always visibly — without the MPC observatory catalogue
+every observation is reduced from the geocentre, which on a test fit changed the
+residual RMS from 0.26″ to 1.59″.
+
+```bash
+python3 astdyn/tools/ioccultcalc_setup.py            # what is present, what is missing
+python3 astdyn/tools/ioccultcalc_setup.py --essential # install the minimum
+```
+
+### 2. Run a search
+
+```bash
+ioccultcalc --asteroid 1,4 --jd-start 2461131.5 --duration 30.0 \
+            --out-dir campaign --prefix test
+```
+
+Or through a configuration file, which is preferable for anything beyond a quick
+test:
+
+```yaml
+objects:
+  asteroids: "4"
+time:
+  start: "2026-07-01"
+  duration_days: 30
+filters:
+  star_mag_max: 14.5
+out-dir: "campaign"
+```
+
+```bash
+ioccultcalc --conf campaign.yaml
+```
+
+### 3. Read the manual
+
+**[ioccultcalc User Manual](astdyn/docs/IOCCULTCALC_MANUAL.md)** — installation,
+configuration, physical model, integrators, orbit fitting, campaigns, data
+formats, complete key reference and troubleshooting.
+
+---
+
+## What it does
+
+**Occultation discovery.** Orbits are propagated through the search window,
+their sky path is swept against the Gaia DR3 catalogue for stars inside a
+discovery corridor, candidate events are refined to sub-millisecond closest
+approach, and the shadow track is projected onto the Earth's surface through the
+full IAU transformation chain.
+
+**Orbit fitting.** Orbits can be refined on their own astrometric observations
+before prediction, so that both the orbit and its uncertainty are computed
+locally rather than imported. On asteroid 820987 the fit reaches an RMS of
+0.26″ over 90 observations spanning 16 years, and the resulting prediction
+ellipse agrees with the AstDyS one to 9% on the major axis with coincident
+orientation.
+
+**Binary asteroids.** Satellites can be described either by an SPK kernel, where
+one exists, or by the parameters of their **mutual orbit** — which is what the
+literature publishes for most known binaries. Each body of the system gets its
+own shadow track.
+
+**Two-stage campaigns.** `tools/orchestrator.py` screens many bodies with a
+light force model, then re-runs the few that showed an event with full physics
+and, optionally, orbit fitting.
+
+---
+
+## Using the library
+
+AstDyn is designed so that frame and unit errors are impossible at compile time.
+A position in GCRF and one in ECLIPJ2000 are different types; so are a time in
+TT and one in UTC. This is the choice that most shapes the codebase.
+
+```cpp
+#include <astdyn/AstDynEngine.hpp>
+
+AstDynEngine engine;
+auto cfg = engine.config();
+cfg.integrator_type = IntegratorType::RKF78;
+engine.set_config(cfg);
+
+auto orbit = physics::KeplerianStateTyped<core::ECLIPJ2000>::from_traditional(
+    time::EpochTDB::from_mjd(61200.0),
+    2.688, 0.103, 11.85, 253.16, 98.14, 333.02);   // angles in degrees
+engine.set_initial_orbit(orbit);
+
+auto propagated = engine.propagate_to(time::EpochTDB::from_mjd(60300.0));
+```
+
+Further documentation is in `astdyn/docs/`: the
+[API reference](astdyn/docs/API_REFERENCE.md), the
+[integrator comparison](astdyn/docs/integratori.md), and the
+[Scientific Reference Manual](astdyn/docs/manual/) (LaTeX, in progress).
+
+---
+
+## Numerical integrators
+
+Measured on asteroid 820987 propagated backwards from MJD 61200, against RKF78
+at tolerance 1e-13, with planetary perturbations. Errors in AU; 1e-6 AU is
+150 km, about 0.1″ at 2 AU.
+
+| method | 10 d | 100 d | 1000 d | 3650 d | time (3650 d) |
+|--------|------|-------|--------|--------|---------------|
+| RKF78  | 5.3e-14 | 2.9e-10 | 2.1e-08 | 7.9e-07 | 21.9 ms |
+| GRKN64 | 1.1e-11 | 1.1e-09 | 4.2e-08 | 1.9e-07 | 19.1 ms |
+| RADAU  | 7.7e-13 | 2.5e-10 | 7.5e-09 | **2.1e-08** | 177.8 ms |
+| GAUSS  | 1.1e-13 | 2.8e-11 | 4.0e-10 | 3.7e-08 | 248.8 ms |
+| RK4    | 1.7e-12 | 4.3e-11 | 2.8e-10 | 3.7e-08 | 308.8 ms |
+| AAS    | 2.8e-11 | 1.6e-09 | 1.8e-07 | 4.7e-07 | 1125.4 ms |
+
+**RKF78** is the default choice; **RADAU** when accuracy over long arcs matters
+more than speed; **AAS**, an adaptive symplectic method developed for this
+library, for long-term stability studies. **SABA4 is not supported** — its
+implementation is defective and raises an exception rather than returning
+meaningless numbers.
+
+A note worth drawing from the table: the five working methods agree with each
+other to about 1e-7 AU, while RKF78 differs from JPL Horizons by about 2e-6.
+When independent methods agree among themselves ten times better than they agree
+with an external oracle, the residual discrepancy is in the force model, not in
+the integration.
+
+---
+
+## Validation
+
+The library is checked against external references rather than only against
+itself. `ctest` runs 177 tests, of which the `ValidazioneEsterna` group compares
+results with AstDyS, with JPL Horizons, and with first principles; those tests
+skip with an explanatory message when the required data is absent.
+
+**Residuals against AstDyS** — asteroid 820987, 78 observations, comparing our
+residuals with those AstDyS records in the same `.rwo` file:
+
+| | mean \|residual\| | RA bias | Dec bias |
+|---|---|---|---|
+| ours | 0.199″ | −0.052″ | +0.076″ |
+| AstDyS | 0.169″ | — | — |
+
+**Positions against JPL Horizons** — better than 1e-5 AU over arcs up to ten
+years.
+
+**Earth rotation** — verified from first principles: a point at Greenwich must
+land where the Earth Rotation Angle says it does.
+
+Older validation reports are in `astdyn/docs/`. Note that
+`haumea_final_validation_report.md` predates corrections made in July 2026 to
+the SPK ephemeris path and should be redone.
+
+---
+
+## Building
+
+**Requirements**: a C++23 compiler (GCC 13+, Clang 16+, MSVC 2022), CMake 3.20+,
+Eigen3, CURL, nlohmann_json.
+
+```bash
+git clone https://github.com/ITALOccult/AstDyn.git
+cd AstDyn
+cmake -S astdyn -B build
+cmake --build build
+ctest --test-dir build
+```
+
+Planetary ephemerides are installed by `ioccultcalc_setup.py`. It fetches
+`de440s.bsp` (31 MB, covering 1849–2150), which is ample for occultation work.
+`de441.bsp` spans far longer but is 3 GB and will stall machines with limited
+memory.
+
+---
+
+## Configuration
+
+Configuration files are **YAML** or **JSON**; both parse into the same internal
+representation, and settings are addressed by dot-path.
+
+```yaml
+integrator:
+  type: RKF78
+  tolerance: 1.0e-11
+physics:
+  relativity: true
+  asteroids:
+    enabled: true
+```
+
+> The earlier OrbFit-style braced format (`integrator { type = RKF78 }`) is no
+> longer supported: such files are rejected rather than silently ignored.
+
+The full key reference is in the
+[user manual](astdyn/docs/IOCCULTCALC_MANUAL.md#appendix-a--complete-key-reference).
+
+---
+
+## Status
+
+| area | state |
+|------|-------|
+| N-body dynamics, planetary perturbations | working |
+| asteroid perturbations (AST17 / BC405) | working |
+| stellar corrections (proper motion, parallax, aberration, deflection) | working |
+| occultation discovery and refinement | working |
+| orbit fitting with own covariance | working |
+| binary systems from SPK or mutual orbit | working |
+| output: Occult4 XML, JSON, SVG, KML | working, under review |
+| data installer | working; downloadable packages in preparation |
+
+The stellar catalogue is a processed extract of Gaia DR3 and is not available
+from a public source; distributable packages limited by magnitude are being
+prepared.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
