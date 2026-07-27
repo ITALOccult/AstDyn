@@ -1,10 +1,8 @@
 {
   "manifest_version": 1,
-  "updated": "2026-07-26",
+  "updated": "2026-07-27",
   "description": "Dati esterni di ioccultcalc. Il tool ioccultcalc_setup.py legge questo file invece di avere gli indirizzi nel codice: cosi' una sorgente puo' cambiare senza richiedere un aggiornamento del programma.",
-
   "datasets": {
-
     "obscodes": {
       "title": "Codici osservatorio MPC",
       "essential": true,
@@ -16,12 +14,16 @@
       "verify": {
         "min_lines": 2000,
         "expected_lines": 2713,
-        "must_contain_prefixes": ["500", "691", "F51", "G96"]
+        "must_contain_prefixes": [
+          "500",
+          "691",
+          "F51",
+          "G96"
+        ]
       },
       "why": "Senza, le osservazioni vengono ridotte dal geocentro e si perde la parallasse topocentrica (~4 arcsec a 2.2 AU). Misurato sul fit di 820987: RMS 1.59 arcsec senza, 0.26 con.",
       "refresh_days": 90
     },
-
     "ephemerides_planets": {
       "title": "Effemeridi planetarie DE440s",
       "essential": true,
@@ -30,12 +32,13 @@
       "format": "spk",
       "size_approx": 32726016,
       "min_size": 20000000,
-      "verify": { "magic": "DAF/" },
+      "verify": {
+        "magic": "DAF/"
+      },
       "why": "Posizioni di Sole, pianeti e Luna. Copre 1849-2150, sufficiente per le occultazioni.",
       "note": "de441.bsp copre un intervallo molto piu' ampio ma pesa 3 GB e blocca le macchine con poca memoria: non e' fra i dati essenziali.",
       "refresh_days": 3650
     },
-
     "perturbers": {
       "title": "Perturbatori asteroidali (sb441-n16)",
       "essential": false,
@@ -44,11 +47,12 @@
       "format": "spk",
       "size_approx": 645727232,
       "min_size": 500000000,
-      "verify": { "magic": "DAF/" },
+      "verify": {
+        "magic": "DAF/"
+      },
       "why": "I 16 asteroidi piu' massivi come perturbatori. AstDyS li include sempre; su archi lunghi l'effetto e' dell'ordine dell'arcsec.",
       "refresh_days": 3650
     },
-
     "catalog_asteroids": {
       "title": "Catalogo asteroidi (allnum.db)",
       "essential": true,
@@ -61,40 +65,44 @@
       "why": "Elementi orbitali di tutti gli asteroidi numerati. NEODyS per i NEO (orbite curate), AstDyS per gli altri.",
       "refresh_days": 30
     },
-
     "catalog_stars": {
       "title": "Catalogo stellare Gaia DR3 per occultazioni",
       "essential": true,
       "dest_external": "~/.catalog/crossreference/gaia_dr3_occult_pro.db",
       "url": null,
       "why": "Senza catalogo stellare non si trovano occultazioni.",
-      "note": "Non scaricabile da sorgenti pubbliche: e' un'elaborazione di Gaia DR3 con indice spaziale, moti propri, RUWE e corrispondenze HD/HIP/SAO. I pacchetti sono in preparazione; l'indirizzo verra' inserito qui quando disponibili.",
-      "packages_planned": [
+      "note": "Elaborazione di Gaia DR3 con indice spaziale R-tree, moti propri, RUWE e corrispondenze HD/HIP/SAO. Non disponibile da sorgenti pubbliche: distribuito come pacchetto compresso.",
+      "packages": [
         {
           "id": "gaia_mag14",
           "title": "fino a magnitudine G 14",
           "stars": 16844164,
-          "size_approx": 3200000000,
-          "url": null,
-          "note": "Copre le occultazioni osservabili con strumentazione amatoriale."
+          "url": "http://italoccult.it/downloads/italoccult-tools/gaia_mag14.db.xz",
+          "compressed_size": 1220359056,
+          "sha256": "3ed9b28c1351230171e725a3e608546475a7582c70e47a33267c5ee8501c2921",
+          "uncompressed_size_approx": 3200000000,
+          "format": "xz",
+          "default": true,
+          "note": "Copre le occultazioni osservabili con strumentazione amatoriale: oltre la magnitudine 14 il calo di luce diventa difficile da registrare con rapporto segnale-rumore utile."
         },
         {
           "id": "gaia_mag15",
           "title": "fino a magnitudine G 15",
           "stars": 36909365,
-          "size_approx": 6500000000,
-          "url": null
+          "url": null,
+          "uncompressed_size_approx": 6500000000,
+          "note": "In preparazione. Per aperture maggiori."
         },
         {
           "id": "gaia_mag16",
           "title": "completo, fino a magnitudine G 16",
           "stars": 77952398,
-          "size_approx": 14700000000,
-          "url": null
+          "url": null,
+          "uncompressed_size_approx": 14700000000,
+          "note": "In preparazione."
         }
       ]
     },
-
     "satellite_ephemerides": {
       "title": "Effemeridi di satelliti per sistemi binari",
       "essential": false,

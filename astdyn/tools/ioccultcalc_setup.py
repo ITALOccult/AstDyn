@@ -26,6 +26,7 @@ Uso:
 
 import argparse
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
@@ -40,10 +41,78 @@ URL_OBSCODES = "https://www.minorplanetcenter.net/iau/lists/ObsCodes.html"
 URL_DE440S = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp"
 URL_SB441 = "https://ssd.jpl.nasa.gov/ftp/eph/small_bodies/asteroids_de441/sb441-n16.bsp"
 
-# Manifesto dei pacchetti distribuiti da noi (catalogo stellare, effemeridi di
-# satelliti). GitHub non ospita file di queste dimensioni, quindi l'indirizzo e'
-# configurabile: si cambia il manifesto senza toccare il codice.
-URL_MANIFESTO = os.environ.get("IOCCULTCALC_PACKAGES_URL", "")
+# Manifesto dei dati esterni. Gli indirizzi stanno li', non nel codice: una
+# sorgente puo' cambiare senza richiedere un aggiornamento del programma.
+URL_MANIFESTO = os.environ.get(
+    "IOCCULTCALC_MANIFEST",
+    "https://raw.githubusercontent.com/ITALOccult/AstDyn/main/astdyn/data/manifest.json")
+
+_manifesto_cache = None
+
+
+def carica_manifesto(percorso_locale=None):
+    """Legge il manifesto, da file locale se indicato, altrimenti dalla rete.
+    Se non e' raggiungibile si prosegue con gli indirizzi incorporati."""
+    global _manifesto_cache
+    if _manifesto_cache is not None:
+        return _manifesto_cache
+
+    import json
+    if percorso_locale:
+        try:
+            _manifesto_cache = json.loads(pathlib.Path(percorso_locale).read_text())
+            dice(f"manifesto: {percorso_locale}")
+            return _manifesto_cache
+        except FileNotFoundError:
+            dice(f"manifesto locale non trovato: {percorso_locale}")
+            _manifesto_cache = {}
+            return _manifesto_cache
+        except Exception as e:
+            # Un errore qui non e' un dato mancante ma un difetto del programma:
+            # mascherarlo con la ricaduta farebbe credere che il manifesto sia
+            # incompleto, quando invece non e' stato letto affatto.
+            raise RuntimeError(
+                f"errore leggendo il manifesto {percorso_locale}: {e}") from e
+
+    try:
+        req = urllib.request.Request(URL_MANIFESTO, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            _manifesto_cache = json.loads(r.read().decode())
+    except Exception as e:
+        dice(f"manifesto non raggiungibile ({e}), uso gli indirizzi incorporati")
+        _manifesto_cache = {}
+    return _manifesto_cache
+
+
+def dal_manifesto(dataset, chiave, default):
+    """Valore dal manifesto, con ricaduta sull'indirizzo incorporato."""
+    m = carica_manifesto()
+    try:
+        return m["datasets"][dataset][chiave]
+    except (KeyError, TypeError):
+        return default
+
+
+def sha256_di(path, mostra_avanzamento=True):
+    """Checksum del file, con avanzamento: su oltre un gigabyte serve."""
+    import hashlib
+    h = hashlib.sha256()
+    dim = os.path.getsize(path)
+    fatto = 0
+    ultimo = 0.0
+    with open(path, "rb") as f:
+        while True:
+            blocco = f.read(1 << 20)
+            if not blocco:
+                break
+            h.update(blocco)
+            fatto += len(blocco)
+            if mostra_avanzamento and time.time() - ultimo > 1.0:
+                print(f"\r    verifica {100*fatto/dim:.0f}%", end="", flush=True)
+                ultimo = time.time()
+    if mostra_avanzamento:
+        print("\r                    \r", end="")
+    return h.hexdigest()
 
 
 def dice(msg):
@@ -131,8 +200,9 @@ def fai_obscodes(force):
         dice(f"  codici osservatorio: gia' presenti ({info}) — usare --force per riscaricare")
         return True
     dice("  codici osservatorio (MPC)")
+    url = dal_manifesto("obscodes", "url", URL_OBSCODES)
     tmp_html = DEST_OBSCODES + ".html.tmp"
-    if not scarica(URL_OBSCODES, tmp_html, atteso_min=50_000):
+    if not scarica(url, tmp_html, atteso_min=50_000):
         return False
 
     # La pagina e' HTML con il contenuto a colonne fisse dentro <pre>.
@@ -184,7 +254,8 @@ def fai_ephemerides(force):
         return True
     dice("  effemeridi planetarie (JPL NAIF, ~31 MB)")
     tmp = DEST_DE440S + ".tmp"
-    if not scarica(URL_DE440S, tmp, atteso_min=20_000_000):
+    url = dal_manifesto("ephemerides_planets", "url", URL_DE440S)
+    if not scarica(url, tmp, atteso_min=20_000_000):
         return False
     if open(tmp, "rb").read(8)[:4] not in (b"DAF/", b"NAIF"):
         dice("    ERRORE: non sembra un kernel SPK")
@@ -201,7 +272,8 @@ def fai_perturbers(force):
         return True
     dice("  perturbatori asteroidali (JPL, 645 MB — richiede tempo)")
     tmp = DEST_SB441 + ".tmp"
-    if not scarica(URL_SB441, tmp, atteso_min=500_000_000):
+    url = dal_manifesto("perturbers", "url", URL_SB441)
+    if not scarica(url, tmp, atteso_min=500_000_000):
         return False
     installa(tmp, DEST_SB441)
     return True
@@ -241,16 +313,103 @@ def stato_stelle():
     return True, umano(os.path.getsize(CATALOGO_STELLE))
 
 
-def fai_packages(force):
-    if not URL_MANIFESTO:
-        dice("  pacchetti: nessun manifesto configurato.")
-        dice("    Impostare IOCCULTCALC_PACKAGES_URL con l'indirizzo del manifesto.")
-        dice("    Serve per i dati che non hanno sorgente pubblica: catalogo stellare,")
-        dice("    effemeridi di satelliti per i sistemi binari.")
+def fai_packages(force, quale=None):
+    """Scarica il catalogo stellare: non ha una sorgente pubblica, viene
+    distribuito come pacchetto compresso."""
+    m = carica_manifesto()
+    try:
+        pacchetti = m["datasets"]["catalog_stars"]["packages"]
+    except (KeyError, TypeError):
+        dice("  pacchetti: il manifesto non elenca alcun catalogo stellare.")
         return False
-    dice(f"  pacchetti: manifesto da {URL_MANIFESTO}")
-    dice("    (scarico dei pacchetti non ancora implementato)")
-    return False
+
+    disponibili = [p for p in pacchetti if p.get("url")]
+    if not disponibili:
+        dice("  pacchetti: nessun catalogo disponibile al momento.")
+        for p in pacchetti:
+            dice(f"    {p['id']}: {p.get('note', 'in preparazione')}")
+        return False
+
+    scelto = None
+    if quale:
+        scelto = next((p for p in disponibili if p["id"] == quale), None)
+        if not scelto:
+            dice(f"  pacchetto '{quale}' non disponibile. Disponibili: "
+                 + ", ".join(p["id"] for p in disponibili))
+            return False
+    else:
+        scelto = next((p for p in disponibili if p.get("default")), disponibili[0])
+        if len(disponibili) > 1:
+            dice("  pacchetti disponibili: " + ", ".join(p["id"] for p in disponibili))
+            dice(f"  scelgo '{scelto['id']}' (predefinito); usare --package ID per un altro")
+
+    dest = os.path.expanduser(m["datasets"]["catalog_stars"]["dest_external"])
+    if os.path.exists(dest) and not force:
+        dice(f"  catalogo stellare: gia' presente ({umano(os.path.getsize(dest))})"
+             " — usare --force per riscaricare")
+        return True
+
+    dice(f"  catalogo stellare: {scelto['title']} — {scelto['stars']:,} stelle")
+    dice(f"    compresso {umano(scelto['compressed_size'])}, "
+         f"espanso ~{umano(scelto['uncompressed_size_approx'])}")
+
+    # lo spazio serve per l'archivio E per il file espanso
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    st = os.statvfs(os.path.dirname(dest))
+    libero = st.f_bavail * st.f_frsize
+    servono = scelto["compressed_size"] + scelto["uncompressed_size_approx"]
+    dice(f"    spazio: {umano(libero)} disponibili, ~{umano(servono)} necessari")
+    if libero < servono:
+        dice("    ERRORE: spazio insufficiente")
+        return False
+
+    tmp_xz = dest + ".xz.tmp"
+    if not scarica(scelto["url"], tmp_xz, atteso_min=scelto["compressed_size"] // 2):
+        return False
+
+    atteso = scelto.get("sha256")
+    if atteso:
+        dice("    verifico il checksum...")
+        ottenuto = sha256_di(tmp_xz)
+        if ottenuto != atteso:
+            dice(f"    ERRORE: checksum non corrispondente.")
+            dice(f"      atteso  {atteso}")
+            dice(f"      trovato {ottenuto}")
+            dice("    Il file e' incompleto o corrotto: non viene installato.")
+            os.remove(tmp_xz)
+            return False
+        dice("    checksum corretto")
+
+    dice("    decomprimo (richiede alcuni minuti)...")
+    import lzma
+    tmp_db = dest + ".tmp"
+    try:
+        with lzma.open(tmp_xz, "rb") as sorgente, open(tmp_db, "wb") as destinazione:
+            fatto = 0
+            ultimo = 0.0
+            attesi = scelto["uncompressed_size_approx"]
+            while True:
+                blocco = sorgente.read(1 << 22)
+                if not blocco:
+                    break
+                destinazione.write(blocco)
+                fatto += len(blocco)
+                if time.time() - ultimo > 1.0:
+                    print(f"\r    {umano(fatto)} / ~{umano(attesi)}"
+                          f"  ({100*fatto/attesi:.0f}%)", end="", flush=True)
+                    ultimo = time.time()
+        print()
+    except Exception as e:
+        dice(f"    ERRORE nella decompressione: {e}")
+        for f in (tmp_xz, tmp_db):
+            if os.path.exists(f):
+                os.remove(f)
+        return False
+
+    os.remove(tmp_xz)
+    installa(tmp_db, dest)
+    dice(f"    Impostare in configurazione: catalog_config: \"{dest}\"")
+    return True
 
 
 # --------------------------------------------------------------------- check
@@ -291,8 +450,13 @@ def main():
     ap.add_argument("--catalog", action="store_true", help="catalogo asteroidi")
     ap.add_argument("--packages", action="store_true", help="pacchetti distribuiti (catalogo stellare)")
     ap.add_argument("--essential", action="store_true", help="il minimo per un sistema funzionante")
+    ap.add_argument("--package", default=None, help="quale pacchetto del catalogo stellare")
+    ap.add_argument("--manifest", default=None, help="manifesto da file locale invece che dalla rete")
     ap.add_argument("--force", action="store_true", help="riscarica anche se presente")
     args = ap.parse_args()
+
+    if args.manifest:
+        carica_manifesto(args.manifest)
 
     azioni = any([args.obscodes, args.ephemerides, args.perturbers,
                   args.catalog, args.packages, args.essential])
@@ -311,7 +475,7 @@ def main():
         if args.ephemerides: esiti.append(fai_ephemerides(args.force))
         if args.perturbers:  esiti.append(fai_perturbers(args.force))
         if args.catalog:     esiti.append(fai_catalogo(args.force))
-        if args.packages:    esiti.append(fai_packages(args.force))
+        if args.packages:    esiti.append(fai_packages(args.force, args.package))
 
     dice("")
     if all(esiti):
