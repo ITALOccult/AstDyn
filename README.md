@@ -27,6 +27,7 @@ residual RMS from 0.26″ to 1.59″.
 ```bash
 python3 astdyn/tools/ioccultcalc_setup.py            # what is present, what is missing
 python3 astdyn/tools/ioccultcalc_setup.py --essential # install the minimum
+python3 astdyn/tools/ioccultcalc_setup.py --packages  # stellar catalogue (1.2 GB)
 ```
 
 ### 2. Run a search
@@ -227,10 +228,12 @@ The full key reference is in the
 | orbit fitting with own covariance | working |
 | binary systems from SPK or mutual orbit | working |
 | output: Occult4 XML, JSON, SVG, KML | working, under review |
-| data installer | working; downloadable packages in preparation |
+| data installer | working, with verified downloads |
 
-The stellar catalogue is a processed extract of Gaia DR3 and is not available
-from a public source; distributable packages limited by magnitude are being
+The stellar catalogue is a processed extract of Gaia DR3 and has no public
+source. It is distributed as a compressed package — 1.2 GB for the magnitude-14
+extract, 16.8 million stars — installed and checksum-verified by
+`ioccultcalc_setup.py --packages`. Extracts to fainter limits are being
 prepared.
 
 ---
