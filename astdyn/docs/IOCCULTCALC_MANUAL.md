@@ -78,9 +78,18 @@ to install it.
     python3 tools/ioccultcalc_setup.py --essential
 
 This fetches the observatory codes, the planetary ephemeris and the asteroid
-catalogue. Individual datasets can be requested with `--obscodes`,
-`--ephemerides`, `--perturbers` or `--catalog`; `--force` re-downloads something
-already present.
+catalogue. The stellar catalogue is a separate, larger download:
+
+```bash
+python3 tools/ioccultcalc_setup.py --packages
+```
+
+Individual datasets can be requested with `--obscodes`, `--ephemerides`,
+`--perturbers` or `--catalog`; `--force` re-downloads something already present.
+
+Source addresses live in `data/manifest.json`, which the tool reads from the
+repository rather than having them compiled in, so a source can move without
+requiring a new release. `--manifest FILE` uses a local copy instead.
 
 Downloads go to a temporary file, are verified, and only then installed — a
 previous copy is kept as `.bak`. An interrupted download never damages data in
@@ -94,12 +103,41 @@ use.
 | planetary ephemeris | `~/.ioccultcalc/ephemerides/de440s.bsp` | 31 MB | JPL NAIF |
 | asteroid perturbers | `~/.ioccultcalc/ephemerides/sb441-n16.bsp` | 645 MB | JPL |
 | asteroid catalogue | `~/.ioccultcalc/database/allnum.db` | 295 MB | AstDyS + NEODyS |
-| stellar catalogue | `~/.catalog/crossreference/gaia_dr3_occult_pro.db` | 14.7 GB | prepared package |
+| stellar catalogue | `~/.catalog/crossreference/gaia_dr3_occult_pro.db` | 1.2 GB compressed | prepared package |
 
-The stellar catalogue is not available from a public source: it is a processed
-extract of Gaia DR3 carrying a spatial index, proper motions, RUWE and
-cross-identifications with the classical catalogues. Packages limited by
-magnitude are in preparation.
+### The stellar catalogue
+
+This one has no public source: it is a processed extract of Gaia DR3 carrying a
+spatial index, proper motions, RUWE and cross-identifications with the classical
+catalogues. It is distributed as a compressed package:
+
+```bash
+python3 tools/ioccultcalc_setup.py --packages
+```
+
+The download is verified against a SHA-256 checksum before installation, so a
+truncated transfer or an error page saved under the right name is rejected
+rather than installed.
+
+| package | stars | limit | compressed | expanded |
+|---------|-------|-------|-----------|----------|
+| `gaia_mag14` (default) | 16.8 M | G ≤ 14 | 1.2 GB | ~3.2 GB |
+| `gaia_mag15` | 36.9 M | G ≤ 15 | — | ~6.5 GB |
+| `gaia_mag16` | 78.0 M | G ≤ 16 | — | ~14.7 GB |
+
+Only the first is published so far. Magnitude 14 covers the occultations that
+are realistically observable with amateur equipment: beyond it the light drop
+becomes hard to record with a useful signal-to-noise ratio. Choose another with
+`--package gaia_mag15`.
+
+The engine looks for the catalogue at
+`~/.catalog/crossreference/gaia_dr3_occult_pro.db`, which is where the setup
+tool installs it, so no configuration is needed. To use a different file, the
+`catalog_config` key takes an inline JSON string:
+
+```yaml
+catalog_config: '{"catalog_type":"sqlite_dr3","sqlite_file_path":"~/path/to/catalogue.db"}'
+```
 
 `data/manifest.json` in the repository lists all sources with their expected
 sizes and verification criteria; the setup tool reads it, so a source can move
@@ -903,6 +941,11 @@ Check `filters.diameter_max_km`: a body whose diameter is unknown is treated as
 If `diffcorr.compute_covariance` is false, the ellipse keeps coming from the
 imported covariance and the fit affects only the geometry — which typically
 moves it by a negligible amount.
+
+**No stars are found at all.**
+The stellar catalogue is probably missing. Check with `ioccultcalc_setup.py`;
+install it with `--packages`. It is not among the datasets that `--essential`
+fetches, because it is a 1.2 GB download.
 
 **A satellite's track is far from the primary's, or missing.**
 Check `system_bodies.<id>.primary`: without it the body cannot be placed and is
