@@ -408,7 +408,10 @@ def fai_packages(force, quale=None):
 
     os.remove(tmp_xz)
     installa(tmp_db, dest)
-    dice(f"    Impostare in configurazione: catalog_config: \"{dest}\"")
+    dice("    Il percorso predefinito di ioccultcalc e' proprio questo: nessuna")
+    dice("    configurazione necessaria. Per usarne un altro, la chiave e'")
+    dice("    catalog_config, che vuole un JSON in linea:")
+    dice('      catalog_config: \'{"catalog_type":"sqlite_dr3","sqlite_file_path":"..."}\'')
     return True
 
 
