@@ -3,6 +3,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Standard: C++23](https://img.shields.io/badge/standard-C%2B%2B23-blue.svg)
 ![Status: Beta](https://img.shields.io/badge/Status-Beta-yellow.svg)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21630566.svg)](https://doi.org/10.5281/zenodo.21630566)
 
 This repository contains two things:
 
@@ -237,6 +238,26 @@ extract, 16.8 million stars — installed and checksum-verified by
 prepared.
 
 ---
+
+## Citing
+
+If this software contributes to work you publish, please cite the archived
+release:
+
+> Bigi, M. (2026). *ioccultcalc / AstDyn* (v1.1.0). Zenodo.
+> https://doi.org/10.5281/zenodo.21630566
+
+```bibtex
+@software{Bigi2026_ioccultcalc,
+  author    = {Bigi, Michele},
+  title     = {ioccultcalc / AstDyn},
+  version   = {1.1.0},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.21630566},
+  url       = {https://github.com/ITALOccult/AstDyn}
+}
+```
 
 ## License
 
