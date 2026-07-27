@@ -75,9 +75,12 @@ struct ObservationResidual {
  * @brief Statistics for residual set
  */
 struct ResidualStatistics {
-    int num_observations;
-    int num_outliers;
-    int degrees_of_freedom;              ///< N_obs - N_params
+    // Inizializzati: quando il ciclo di correzione esce prima di calcolare le
+    // statistiche, questi campi venivano letti comunque e portavano valori
+    // indeterminati fino all'export (num_observations = -156740344 su Askania).
+    int num_observations = 0;
+    int num_outliers = 0;
+    int degrees_of_freedom = 0;          ///< N_obs - N_params
     
     // RMS residuals
     astrometry::Angle rms_ra;
@@ -85,11 +88,11 @@ struct ResidualStatistics {
     astrometry::Angle rms_total;
     
     // Weighted RMS (normalized)
-    double weighted_rms;
+    double weighted_rms = 0.0;
     
     // Chi-squared test
-    double chi_squared;
-    double reduced_chi_squared;          ///< χ²/dof
+    double chi_squared = 0.0;
+    double reduced_chi_squared = 0.0;    ///< χ²/dof
     
     // Max residuals
     astrometry::Angle max_abs_ra;

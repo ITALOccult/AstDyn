@@ -102,14 +102,17 @@ struct OrbitDeterminationResult {
     Eigen::MatrixXd covariance;              ///< Covariance matrix (6×6)
     std::vector<double> residuals_ra;        ///< RA residuals [arcsec]
     std::vector<double> residuals_dec;       ///< Dec residuals [arcsec]
-    double rms_ra;                           ///< RMS of RA residuals [arcsec]
-    double rms_dec;                          ///< RMS of Dec residuals [arcsec]
-    double rms_total_arcsec;                 ///< Total RMS [arcsec]
-    double chi_squared;                      ///< Chi-squared statistic
-    int num_observations;                    ///< Number of observations used
-    int num_rejected;                        ///< Number of rejected outliers
-    int num_iterations;                      ///< Number of DC iterations
-    bool converged;                          ///< Convergence flag
+    // Tutti inizializzati: un fit che esce prima di popolarli lasciava valori
+    // indeterminati, e `converged` non inizializzato risultava vero abbastanza
+    // spesso da far sostituire l'orbita con il risultato di un fit mai avvenuto.
+    double rms_ra = 0.0;                     ///< RMS of RA residuals [arcsec]
+    double rms_dec = 0.0;                    ///< RMS of Dec residuals [arcsec]
+    double rms_total_arcsec = 0.0;           ///< Total RMS [arcsec]
+    double chi_squared = 0.0;                ///< Chi-squared statistic
+    int num_observations = 0;                ///< Number of observations used
+    int num_rejected = 0;                    ///< Number of rejected outliers
+    int num_iterations = 0;                  ///< Number of DC iterations
+    bool converged = false;                  ///< Convergence flag
     std::string exit_reason;                 ///< Motivo dell'uscita dal ciclo di correzione
 };
 

@@ -771,7 +771,9 @@ int main(int argc, char** argv) {
                                     std::cout << "[fit] " << id << ": orbita raffinata su "
                                               << esito.num_observations << " osservazioni, RMS "
                                               << esito.rms_total_arcsec << " arcsec ("
-                                              << esito.num_rejected << " scartate)"
+                                              << esito.num_rejected << " scartate, "
+                                              << esito.num_iterations << " iterazioni, "
+                                              << esito.exit_reason << ")"
                                               << (cov_dal_fit ? ", covarianza dal fit" : "")
                                               << "\n";
                                 } else {

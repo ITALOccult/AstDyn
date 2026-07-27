@@ -115,21 +115,46 @@ public:
             auto dm = build_design_matrix(sorted_obs, current_state, residuals);
             if (dm.valid_indices.empty()) { res.rejection_reason = "No valid observations remaining"; break; }
             Eigen::VectorXd corr = solve_normal_equations(dm);
-            double cur_rms = ResidualCalculator<Frame>::compute_statistics(residuals, 6).rms_total.to_arcsec();
+            // Le statistiche si calcolano QUI, prima del line search: i residui
+            // sono gia' disponibili, e un'uscita anticipata lasciava altrimenti
+            // la struttura vuota. Il chiamante leggeva zero osservazioni e RMS
+            // zero da un fit che si dichiarava riuscito, e sostituiva comunque
+            // l'orbita.
+            res.statistics = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
+            res.residuals = residuals;
+            // Il line search deve valutare la stessa quantita' che le equazioni
+            // normali minimizzano: il chi quadro, non l'RMS in arcsec.
+            //
+            // Su (1216) Askania, con osservazioni dal 1936, i due criteri
+            // divergono: una lastra con residuo 30" e sigma 20" contribuisce 900
+            // alla somma dei quadrati e 2.25 al chi quadro. La correzione ottima
+            // nel senso pesato faceva crescere l'RMS aritmetico e veniva
+            // rifiutata a ogni alpha, cosi' che il fit non partiva affatto.
+            double cur_rms = res.statistics.weighted_rms > 0.0
+                           ? res.statistics.weighted_rms
+                           : res.statistics.rms_total.to_arcsec();
+
             if (settings.use_line_search) {
                 if (!perform_line_search(sorted_obs, corr, settings, current_state, residuals, cur_rms)) {
-                    // Nessun passo migliora l'RMS: e' un MINIMO RAGGIUNTO, quindi
-                    // convergenza. Accade tipicamente quando l'orbita di partenza
-                    // e' gia' ottima e non c'e' margine di correzione.
-                    res.rejection_reason = "minimo raggiunto: nessuna correzione migliora la soluzione";
-                    res.converged = true;
+                    if (i == 0) {
+                        // Alla PRIMA iterazione nessun passo e' ancora stato
+                        // compiuto: se gia' la correzione iniziale non migliora
+                        // nulla, il fit non e' partito. Non e' un minimo
+                        // raggiunto, e l'orbita di partenza va conservata.
+                        res.rejection_reason = "il line search non trova alcun passo utile alla "
+                                               "prima iterazione: il fit non e' partito";
+                        res.converged = false;
+                    } else {
+                        // Dopo almeno un passo, "nessun miglioramento possibile"
+                        // e' la definizione di minimo raggiunto.
+                        res.rejection_reason = "minimo raggiunto: nessuna correzione migliora la soluzione";
+                        res.converged = true;
+                    }
                     break;
                 }
             } else {
                 current_state = apply_correction(current_state, corr, 1.0);
             }
-            res.statistics = ResidualCalculator<Frame>::compute_statistics(residuals, 6);
-            res.residuals = residuals;
             res.rms_history.push_back(res.statistics.rms_total.to_arcsec());
             res.correction_norm.push_back(corr.norm());
 
@@ -193,7 +218,11 @@ private:
             auto trial_res = residual_calc_->compute_residuals(obs, trial);
             for (size_t i=0; i<residuals.size(); ++i) trial_res[i].outlier = residuals[i].outlier;
             auto t_stats = ResidualCalculator<Frame>::compute_statistics(trial_res, 6);
-            if (t_stats.rms_total.to_arcsec() < cur_rms) { current_state = trial; residuals = trial_res; cur_rms = t_stats.rms_total.to_arcsec(); return true; }
+            // Stessa metrica del chiamante: chi quadro dove disponibile.
+            const double t_val = t_stats.weighted_rms > 0.0
+                               ? t_stats.weighted_rms
+                               : t_stats.rms_total.to_arcsec();
+            if (t_val < cur_rms) { current_state = trial; residuals = trial_res; cur_rms = t_val; return true; }
             alpha *= 0.5;
         }
         return false;
