@@ -55,6 +55,46 @@ static bool magnitudine_disponibile(double m) {
     return m > -2.0 && m < 30.0;
 }
 
+/// Denominazione posizionale Jhhmmss.ss+ddmmss.s a partire dalle coordinate.
+///
+/// Occult4 non memorizza il source_id di Gaia — il suo record e' di 42 byte e
+/// contiene solo posizione, moti propri, magnitudini e incertezze — quindi
+/// identifica le stelle per posizione. Un identificativo "Gaia DR3 <numero>"
+/// non viene riconosciuto, e i suoi spazi rompono gli indirizzi che
+/// OccultWatcher costruisce concatenandolo.
+static std::string denominazione_posizionale(double ra_ore, double dec_gradi) {
+    // RA in ore, minuti, secondi con due decimali
+    double r = ra_ore;
+    if (r < 0.0) r += 24.0;
+    int rh = static_cast<int>(r);
+    double rm_f = (r - rh) * 60.0;
+    int rm = static_cast<int>(rm_f);
+    double rs = (rm_f - rm) * 60.0;
+    // il centesimo di secondo puo' arrotondare a 60: si riporta
+    if (rs >= 59.995) { rs = 0.0; if (++rm == 60) { rm = 0; if (++rh == 24) rh = 0; } }
+
+    // Dec in gradi, primi, secondi con un decimale
+    const char segno = (dec_gradi < 0.0) ? '-' : '+';
+    double d = std::abs(dec_gradi);
+    int dd = static_cast<int>(d);
+    double dm_f = (d - dd) * 60.0;
+    int dm = static_cast<int>(dm_f);
+    double ds = (dm_f - dm) * 60.0;
+    if (ds >= 59.95) { ds = 0.0; if (++dm == 60) { dm = 0; ++dd; } }
+
+    // Convenzione verificata sul riferimento J175336.90-214720.9, ottenuto da
+    // RA 17.89358196 h (36.895056 s) e Dec -21.78915475 deg (20.957100 arcsec):
+    // l'ascensione retta ARROTONDA, la declinazione TRONCA verso lo zero.
+    // Troncare la declinazione evita che un raffinamento di un centesimo di
+    // arcsec faccia slittare il primo e cambi il nome della stella.
+    ds = std::floor(ds * 10.0) / 10.0;
+
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "J%02d%02d%05.2f%c%02d%02d%04.1f",
+                  rh, rm, rs, segno, dd, dm, ds);
+    return buf;
+}
+
 /// Valore che Occult4 usa per una magnitudine non nota.
 constexpr double kMagAssente = 99.0;
 
@@ -97,15 +137,15 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.jwst = false;
 
     // ---- <Star> -----------------------------------------------------------
-    ev.star_id = cand.star.source_id != 0
-               ? "Gaia DR3 " + std::to_string(cand.star.source_id)
-               : pr.star_id;
     // The spec asks for the BCRS position at the epoch of the event with NO
     // parallax applied, which is exactly what predict_at() returns when it is
     // called without an observer position.
     const auto s_ep = cand.star.predict_at(pr.t_ca);
     ev.star_ra_h    = s_ep.ra().to_deg() / 15.0;
     ev.star_dec_deg = s_ep.dec().to_deg();
+    // Identificativo posizionale: Occult4 non conosce i source_id di Gaia.
+    // Il source_id resta nel JSON nativo, dove non crea problemi.
+    ev.star_id = denominazione_posizionale(ev.star_ra_h, ev.star_dec_deg);
     // Gaia BP/G/RP sono i surrogati piu' vicini a B/V/R. Il catalogo puo'
     // fornirne solo alcune: quelle assenti si dichiarano, non si azzerano.
     ev.mag_b = magnitudine_disponibile(cand.star.bp_mag) ? cand.star.bp_mag : kMagAssente;
@@ -121,10 +161,11 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
         ev.star_app_dec_deg = dec_app.to_deg();
     }
     ev.mag_drops_adjusted  = 0;
-    // No nearby-star check is performed; Occult4/OWC expects 0 (not counted),
-    // never -1, for these two fields.
-    ev.bright_nearby_count = 0;
-    ev.total_nearby_count  = 0;
+    // Nessun controllo sulle stelle vicine viene eseguito. La specifica
+    // occelmnt: "Set to -1 if a check for nearby stars has not occurred".
+    // Zero direbbe che abbiamo cercato entro 15 arcsec senza trovare nulla.
+    ev.bright_nearby_count = -1;
+    ev.total_nearby_count  = -1;
 
     // ---- <Object> ---------------------------------------------------------
     ev.object_number = ast_id;
@@ -210,20 +251,21 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
                        ? pr.cross_track_uncertainty.to_km() / diameter_km
                        : 0.0;
 
-    // "Known errors" means both the star and the object have measured
-    // covariances. The star half is only true for a full Gaia solution.
-    // Occult4/OWC canonical error-basis strings (verified against a real
-    // OccultWatcher export): only "Star+PeakEphemUncert" and "Star+Assumed"
-    // are accepted. The true-vs-estimated distinction lives in our logs, not
-    // in the interchange XML, which OWC parses strictly.
-    ev.error_basis = have_cov ? "Star+PeakEphemUncert" : "Star+Assumed";
+    // Stringhe canoniche della specifica occelmnt: Star+Assumed, Star+PEU,
+    // Known errors, Assumed. "Known errors" richiede covarianze misurate per
+    // ENTRAMBI, stella e asteroide; noi abbiamo quella dell'asteroide e
+    // l'incertezza di picco dell'effemeride, quindi Star+PEU.
+    ev.error_basis = have_cov ? "Star+PEU" : "Star+Assumed";
 
-    // Occult4/OWC uses 0 (flag inactive), never -1: a real OWC export shows
-    // these three fields as 0 in 1604/1630 events, 1 in the rest, never -1.
-    ev.reliability = (cand.star.ruwe > 0.0) ? cand.star.ruwe : 0.0;
-    ev.duplicate_source    = 0;
-    ev.non_gaia_pm         = 0;
-    ev.pm_added_from_ucac4 = 0;
+    // La specifica prescrive -1 per "non impostato". Scrivere 0 significa
+    // affermare di aver eseguito un controllo che non facciamo: per i conteggi
+    // di stelle vicine 0 vuol dire "cercate, nessuna trovata", e per il RUWE
+    // vuol dire un valore nullo, impossibile (una stella singola ben misurata
+    // ha RUWE ~1).
+    ev.reliability = (cand.star.ruwe > 0.0) ? cand.star.ruwe : -1.0;
+    ev.duplicate_source    = -1;
+    ev.non_gaia_pm         = -1;
+    ev.pm_added_from_ucac4 = -1;
 
     // L'indice di nonlinearita' e' una quantita' SCOPE, non del formato occelmnt:
     // viene riportato nel JSON nativo, in un campo proprio. Metterlo nella stringa
