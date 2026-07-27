@@ -64,3 +64,6 @@ config_manual.pdf
 
 # copie duplicate generate da macOS/sync
 * 2.*
+
+# cache di Python degli strumenti
+tools/__pycache__/

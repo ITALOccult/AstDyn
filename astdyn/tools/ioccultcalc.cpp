@@ -1,4 +1,7 @@
 #include "astdyn/AstDyn.hpp"
+#include <mutex>
+#include <map>
+#include <sqlite3.h>
 #include "astdyn/astrometry/OrbitingChebyshevEphemeris.hpp"
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/observations/RWOReader.hpp"
@@ -53,6 +56,58 @@ static bool magnitudine_disponibile(double m) {
     // 0.03 — ma quel caso non si distingue comunque da un campo vuoto.
     if (m == 0.0) return false;
     return m > -2.0 && m < 30.0;
+}
+
+/// Nome proprio dell'asteroide dal catalogo locale AstDyS.
+///
+/// I file .eq1 portano solo il numero, e Horizons non viene interrogato quando
+/// gli elementi arrivano da AstDyS. Il catalogo `allnum.db` ha la colonna
+/// `name` nella forma "(1216) Askania": si estrae la parte dopo la parentesi.
+/// Vuoto per gli asteroidi senza nome proprio, dove l'export ricade sul numero.
+static std::string nome_da_catalogo(const std::string& numero) {
+    static std::map<std::string, std::string> cache;
+    static bool caricato = false;
+    static std::mutex mtx;
+
+    std::lock_guard<std::mutex> lock(mtx);
+    if (!caricato) {
+        caricato = true;   // un solo tentativo, anche se fallisce
+        const char* home = std::getenv("HOME");
+        if (!home) return "";
+        const std::string db = std::string(home) + "/.ioccultcalc/database/allnum.db";
+
+        sqlite3* conn = nullptr;
+        if (sqlite3_open_v2(db.c_str(), &conn, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
+            if (conn) sqlite3_close(conn);
+            std::cout << "[nomi] catalogo non disponibile (" << db << "): "
+                      << "gli asteroidi compariranno con il solo numero\n";
+            return "";
+        }
+        sqlite3_stmt* st = nullptr;
+        const char* sql = "SELECT number, name FROM allnum_asteroids WHERE name IS NOT NULL";
+        if (sqlite3_prepare_v2(conn, sql, -1, &st, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(st) == SQLITE_ROW) {
+                const std::string num = std::to_string(sqlite3_column_int64(st, 0));
+                const unsigned char* txt = sqlite3_column_text(st, 1);
+                if (!txt) continue;
+                std::string nome(reinterpret_cast<const char*>(txt));
+                // "(1216) Askania" -> "Askania"; "(820987)" -> vuoto
+                const auto chiusa = nome.find(')');
+                if (chiusa != std::string::npos) {
+                    nome = nome.substr(chiusa + 1);
+                    const auto inizio = nome.find_first_not_of(" \t");
+                    nome = (inizio == std::string::npos) ? "" : nome.substr(inizio);
+                }
+                if (!nome.empty()) cache[num] = nome;
+            }
+            sqlite3_finalize(st);
+        }
+        sqlite3_close(conn);
+        std::cout << "[nomi] " << cache.size() << " nomi di asteroidi dal catalogo\n";
+    }
+
+    auto it = cache.find(numero);
+    return (it != cache.end()) ? it->second : "";
 }
 
 /// Denominazione posizionale Jhhmmss.ss+ddmmss.s a partire dalle coordinate.
@@ -1133,6 +1188,9 @@ int main(int argc, char** argv) {
                     ev_diam  = props_it->second.diameter_km;
                     ev_name  = props_it->second.name;
                 }
+                // Horizons non viene interrogato quando gli elementi vengono da
+                // AstDyS: in quel caso il nome si prende dal catalogo locale.
+                if (ev_name.empty()) ev_name = nome_da_catalogo(m.result.asteroid_id);
                 events.push_back(candidate_to_event(m.result, m.result.asteroid_id, el,
                                                     ev_diam, ev_h_mag, ev_name));
             }
