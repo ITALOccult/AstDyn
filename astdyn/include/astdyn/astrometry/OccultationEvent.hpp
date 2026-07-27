@@ -45,6 +45,11 @@ struct OccultationEvent {
     double d2x = 0.0, d2y = 0.0;      ///< 2nd-order rate.
     double d3x = 0.0, d3y = 0.0;      ///< 3rd-order rate.
 
+    /// Indice di nonlinearita' SCOPE: quanto la mappa dalla covarianza cartesiana
+    /// al piano del cielo si discosta dall'approssimazione lineare. Non fa parte
+    /// del formato occelmnt, compare solo nel JSON nativo.
+    double nonlinearity_index = 0.0;
+
     // ---- <Earth> ----------------------------------------------------------
     /// Sub-star point [deg]. The latitude is "of date", i.e. geocentric, and so
     /// equals the star's apparent declination.

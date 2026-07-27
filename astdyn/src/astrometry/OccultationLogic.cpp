@@ -200,6 +200,65 @@ OccultationParameters OccultationLogic::compute_fundamental_plane_geometry(
     return params;
 }
 
+void OccultationLogic::compute_higher_order_motion(
+    OccultationParameters& params,
+    const catalog::ChebyshevSegment& segment,
+    const RightAscension& star_ra,
+    const Declination& star_dec)
+{
+    // Sette campioni su +/-2 ore: quattro coefficienti da determinare, tre punti
+    // di margine per attenuare il rumore dei polinomi di Chebyshev.
+    constexpr int N = 7;
+    constexpr double MEZZA_FINESTRA_H = 2.0;
+
+    const double jd_ca = params.t_ca.jd();
+    // Se il TCA e' vicino a un bordo del segmento la finestra si restringe:
+    // meglio un adattamento su un intervallo piu' corto che un'estrapolazione.
+    double mezza_h = MEZZA_FINESTRA_H;
+    const double margine_h = std::min(jd_ca - segment.t_start, segment.t_end - jd_ca) * 24.0;
+    if (margine_h < mezza_h) mezza_h = std::max(0.25, margine_h * 0.9);
+
+    std::vector<double> t_h(N), xi_m(N), eta_m(N);
+    for (int i = 0; i < N; ++i) {
+        const double ore = -mezza_h + 2.0 * mezza_h * i / (N - 1);
+        const auto t = time::EpochTDB::from_jd(jd_ca + ore / 24.0);
+        const auto [pos, vel] = segment.evaluate_full(t.jd());
+
+        const auto g = compute_fundamental_plane_geometry(
+            star_ra, star_dec,
+            RightAscension::from_deg(std::get<0>(pos)),
+            Declination::from_deg(std::get<1>(pos)),
+            physics::Distance::from_au(std::get<2>(pos)));
+
+        t_h[i]   = ore * 3600.0;              // secondi dal TCA
+        xi_m[i]  = g.xi_ca.to_m();
+        eta_m[i] = g.eta_ca.to_m();
+    }
+
+    // Adattamento ai minimi quadrati di  f(t) = c0 + c1 t + c2 t^2 + c3 t^3.
+    auto adatta = [&](const std::vector<double>& y) -> std::array<double, 4> {
+        Eigen::MatrixXd A(N, 4);
+        Eigen::VectorXd b(N);
+        for (int i = 0; i < N; ++i) {
+            const double t = t_h[i];
+            A(i, 0) = 1.0; A(i, 1) = t; A(i, 2) = t * t; A(i, 3) = t * t * t;
+            b(i) = y[i];
+        }
+        const Eigen::VectorXd c = A.colPivHouseholderQr().solve(b);
+        return {c(0), c(1), c(2), c(3)};
+    };
+
+    const auto cx = adatta(xi_m);
+    const auto cy = adatta(eta_m);
+
+    // I coefficienti del polinomio sono le derivate divise per il fattoriale:
+    // c2 = f''/2, c3 = f'''/6. Qui si conservano le derivate.
+    params.d2xi_dt2  = 2.0 * cx[2];
+    params.d3xi_dt3  = 6.0 * cx[3];
+    params.d2eta_dt2 = 2.0 * cy[2];
+    params.d3eta_dt3 = 6.0 * cy[3];
+}
+
 void OccultationLogic::compute_shadow_velocity(
     OccultationParameters& params,
     const Declination& star_dec,
@@ -368,6 +427,10 @@ void OccultationLogic::evaluate_candidate(
             physics::Velocity::from_au_d(std::get<2>(vel)),
             ca.t_ca, engine.getEphemeris());
 
+        // Il moto dell'asse dell'ombra e' curvo: senza i termini di ordine
+        // superiore la traccia sbaglia di ~100 km a due ore dal TCA.
+        compute_higher_order_motion(params, segment, star_at_tca.ra(), star_at_tca.dec());
+
         // Maximum duration: the full shadow width traversed at the shadow speed.
         // Without this max_duration stays at zero, and the moment min_duration_s
         // is configured above 0.1 the filter below rejects every event -- the
@@ -457,6 +520,10 @@ void OccultationLogic::evaluate_candidate(
             Angle::from_arcsec(dra_hr), Angle::from_arcsec(ddec_hr),
             physics::Velocity::from_au_d(std::get<2>(vel)),
             ca.t_ca, engine.getEphemeris());
+
+        // Il moto dell'asse dell'ombra e' curvo: senza i termini di ordine
+        // superiore la traccia sbaglia di ~100 km a due ore dal TCA.
+        compute_higher_order_motion(params, segment, star_at_tca.ra(), star_at_tca.dec());
 
         if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) {
             continue;

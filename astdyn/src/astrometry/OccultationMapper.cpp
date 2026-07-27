@@ -95,10 +95,19 @@ std::optional<GeoPoint> OccultationMapper::calculate_geopoint_at_epoch(
 {
     const double vxi  = params.dxi_dt.to_ms();
     const double veta = params.deta_dt.to_ms();
+    const double dts  = dt_from_ca.to_seconds();
 
-    // Shadow axis position on the fundamental plane
-    double xi_m  = params.xi_ca.to_m()  + vxi  * dt_from_ca.to_seconds();
-    double eta_m = params.eta_ca.to_m() + veta * dt_from_ca.to_seconds();
+    // Posizione dell'asse dell'ombra sul piano fondamentale.
+    // Il moto NON e' rettilineo: fermarsi al termine lineare costa 6 km a mezz'ora
+    // dal massimo avvicinamento, 25 a un'ora, 101 a due — misurato sull'evento
+    // 820987 del 2026-07-27, la cui ombra e' larga 1.25 km. Un osservatore
+    // posizionato sugli estremi di una traccia rettilinea manca l'evento.
+    double xi_m  = params.xi_ca.to_m()  + vxi  * dts
+                 + 0.5 * params.d2xi_dt2  * dts * dts
+                 + params.d3xi_dt3  * dts * dts * dts / 6.0;
+    double eta_m = params.eta_ca.to_m() + veta * dts
+                 + 0.5 * params.d2eta_dt2 * dts * dts
+                 + params.d3eta_dt3 * dts * dts * dts / 6.0;
 
     // Offset perpendicular to track
     if (offset_perp.to_m() != 0.0) {

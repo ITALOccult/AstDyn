@@ -41,6 +41,23 @@ namespace po = boost::program_options;
 /**
  * @brief Helper to convert an internal candidate to an XML-formatted event structure.
  */
+/// Una magnitudine e' utilizzabile? Il catalogo puo' non avere tutte le bande:
+/// il nostro estratto SQLite di Gaia DR3 porta solo la G, e i campi BP/RP
+/// restano a zero. Zero non e' una magnitudine plausibile — la stella piu'
+/// luminosa del cielo ha G = -1.5 — quindi va trattato come "assente".
+static bool magnitudine_disponibile(double m) {
+    // Lo ZERO va escluso esplicitamente: e' il valore che restano i campi mai
+    // popolati (GaiaStar non li inizializza e il lettore SQLite non li scrive,
+    // perche' il catalogo ha la sola banda G). Escluderlo costa la possibilita'
+    // di rappresentare una stella di magnitudine esattamente 0.00 — Vega ne ha
+    // 0.03 — ma quel caso non si distingue comunque da un campo vuoto.
+    if (m == 0.0) return false;
+    return m > -2.0 && m < 30.0;
+}
+
+/// Valore che Occult4 usa per una magnitudine non nota.
+constexpr double kMagAssente = 99.0;
+
 OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std::string& ast_id,
                                     const physics::KeplerianStateTyped<core::ECLIPJ2000>& el,
                                     double diameter_km, double h_mag,
@@ -54,7 +71,7 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     auto [ey, em, ed, efrac] = time::mjd_to_calendar(t_utc.mjd());
 
     // ---- <Elements> : the payload Occult4 uses to draw the path -----------
-    ev.elements_source = "AstDyn-AAS-GaiaDR3";
+    ev.elements_source = "AstDyn";
     ev.duration_s   = pr.max_duration.to_seconds();
     ev.year = ey; ev.month = em; ev.day = ed;
     ev.ut_closest_h = efrac * 24.0;
@@ -62,9 +79,15 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.y  = pr.eta_ca.to_m() / kEarthRadiusM;
     ev.dx = pr.dxi_dt.to_ms()  * 3600.0 / kEarthRadiusM;
     ev.dy = pr.deta_dt.to_ms() * 3600.0 / kEarthRadiusM;
-    // The higher-order terms would need the Chebyshev segment differentiated a
-    // second time; over a ~40 min event they are worth a few km at the path ends.
-    ev.d2x = ev.d2y = ev.d3x = ev.d3y = 0.0;
+    // Termini di ordine superiore, nelle unita' del formato: raggi terrestri per
+    // ora elevata alla potenza corrispondente. Il polinomio di Occult4 e'
+    //     x(t) = x + dx t + d2x t^2 + d3x t^3
+    // quindi i coefficienti includono gia' il fattoriale.
+    constexpr double ORA = 3600.0;
+    ev.d2x = 0.5 * pr.d2xi_dt2  * ORA * ORA / kEarthRadiusM;
+    ev.d2y = 0.5 * pr.d2eta_dt2 * ORA * ORA / kEarthRadiusM;
+    ev.d3x = pr.d3xi_dt3  * ORA * ORA * ORA / (6.0 * kEarthRadiusM);
+    ev.d3y = pr.d3eta_dt3 * ORA * ORA * ORA / (6.0 * kEarthRadiusM);
 
     // ---- <Earth> ----------------------------------------------------------
     ev.substellar_lon_deg = pr.substar_lon.to_deg();
@@ -83,10 +106,11 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     const auto s_ep = cand.star.predict_at(pr.t_ca);
     ev.star_ra_h    = s_ep.ra().to_deg() / 15.0;
     ev.star_dec_deg = s_ep.dec().to_deg();
-    // Gaia BP/G/RP are the closest available proxies for B/V/R.
-    ev.mag_b = cand.star.bp_mag;
-    ev.mag_v = cand.star.g_mag;
-    ev.mag_r = cand.star.rp_mag;
+    // Gaia BP/G/RP sono i surrogati piu' vicini a B/V/R. Il catalogo puo'
+    // fornirne solo alcune: quelle assenti si dichiarano, non si azzerano.
+    ev.mag_b = magnitudine_disponibile(cand.star.bp_mag) ? cand.star.bp_mag : kMagAssente;
+    ev.mag_v = magnitudine_disponibile(cand.star.g_mag)  ? cand.star.g_mag  : kMagAssente;
+    ev.mag_r = magnitudine_disponibile(cand.star.rp_mag) ? cand.star.rp_mag : kMagAssente;
     ev.star_diameter_mas = 0.0;   // not modelled
     ev.double_star_code  = 0;
     ev.k2_flag           = "";
@@ -95,16 +119,6 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
         coordinates::apparent_place(t_tt, s_ep.ra(), s_ep.dec(), ra_app, dec_app);
         ev.star_app_ra_h    = ra_app.to_deg() / 15.0;
         ev.star_app_dec_deg = dec_app.to_deg();
-    }
-    // Magnitude drop: during the event only the asteroid is seen, before it the
-    // combined light. Occult4's 10.69 is simply 21.11 - 10.42.
-    if (ev.object_mag > -5.0) {
-        const double comb_v = -2.5 * std::log10(std::pow(10.0, -0.4 * ev.mag_v) +
-                                                std::pow(10.0, -0.4 * ev.object_mag));
-        const double comb_r = -2.5 * std::log10(std::pow(10.0, -0.4 * ev.mag_r) +
-                                                std::pow(10.0, -0.4 * ev.object_mag));
-        ev.mag_drop_v = ev.object_mag - comb_v;
-        ev.mag_drop_r = ev.object_mag - comb_r;
     }
     ev.mag_drops_adjusted  = 0;
     // No nearby-star check is performed; Occult4/OWC expects 0 (not counted),
@@ -122,6 +136,25 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
                                  pr.heliocentric_distance.to_au(),
                                  pr.geocentric_distance.to_au(),
                                  pr.phase_angle);
+
+    // Calo di magnitudine: durante l'evento si vede il solo asteroide, prima la
+    // luce combinata. DEVE stare dopo l'assegnazione di object_mag: calcolarlo
+    // prima significava usare magnitudine zero — un corpo piu' luminoso di Vega —
+    // e produceva 0.00 invece di 10.69 sul caso 820987.
+    // Ogni banda si calcola solo se la magnitudine stellare corrispondente c'e':
+    // con mag_r assente il calcolo dava 21.11, cioe' un calo di ventun magnitudini.
+    if (ev.object_mag > -5.0) {
+        if (magnitudine_disponibile(ev.mag_v)) {
+            const double comb_v = -2.5 * std::log10(std::pow(10.0, -0.4 * ev.mag_v) +
+                                                    std::pow(10.0, -0.4 * ev.object_mag));
+            ev.mag_drop_v = ev.object_mag - comb_v;
+        }
+        if (magnitudine_disponibile(ev.mag_r)) {
+            const double comb_r = -2.5 * std::log10(std::pow(10.0, -0.4 * ev.mag_r) +
+                                                    std::pow(10.0, -0.4 * ev.object_mag));
+            ev.mag_drop_r = ev.object_mag - comb_r;
+        }
+    }
     ev.diameter_km   = diameter_km;
     ev.distance_au   = pr.geocentric_distance.to_au();
     ev.n_rings = 0;
@@ -192,13 +225,12 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.non_gaia_pm         = 0;
     ev.pm_added_from_ucac4 = 0;
 
-    // The nonlinearity index has no home in the occelmnt format -- it is a SCOPE
-    // quantity, not an Occult4 one -- so it is recorded in the source string,
-    // where it travels with the prediction and stays visible.
+    // L'indice di nonlinearita' e' una quantita' SCOPE, non del formato occelmnt:
+    // viene riportato nel JSON nativo, in un campo proprio. Metterlo nella stringa
+    // della sorgente la rendeva diversa a ogni evento, impedendo a chi legge il
+    // file di riconoscere le predizioni come provenienti dalla stessa origine.
     if (have_cov && pr.nonlinearity_index > 0.0) {
-        char nbuf[64];
-        std::snprintf(nbuf, sizeof(nbuf), "AstDyn-SCOPE-N%.2e", pr.nonlinearity_index);
-        ev.elements_source = nbuf;
+        ev.nonlinearity_index = pr.nonlinearity_index;
     }
 
     // ---- <ID> -------------------------------------------------------------

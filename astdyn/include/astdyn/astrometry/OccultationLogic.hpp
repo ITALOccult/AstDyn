@@ -43,6 +43,12 @@ struct OccultationParameters {
     physics::Velocity shadow_velocity;    
     physics::Velocity dxi_dt;             
     physics::Velocity deta_dt;            
+    /// Termini di ordine superiore del moto dell'asse dell'ombra sul piano
+    /// fondamentale, in m/s^2 e m/s^3. Il moto NON e' rettilineo: su due ore
+    /// l'approssimazione lineare sbaglia di un centinaio di chilometri.
+    /// Espansione usata: xi(t) = xi_ca + dxi_dt t + d2xi_dt2 t^2/2 + d3xi_dt3 t^3/6
+    double d2xi_dt2 = 0.0, d2eta_dt2 = 0.0;
+    double d3xi_dt3 = 0.0, d3eta_dt3 = 0.0;
     Angle position_angle;                 
     physics::Velocity relative_velocity_mag;
     time::EpochTDB t_ca;                  
@@ -183,6 +189,16 @@ private:
         const RightAscension& star_ra, const Declination& star_dec,
         const RightAscension& ast_ra, const Declination& ast_dec,
         const physics::Distance& ast_dist);
+
+    /// Campiona xi ed eta attorno al TCA e ne adatta un polinomio cubico,
+    /// riempiendo i termini di ordine superiore di `params`. Serve il segmento
+    /// di Chebyshev perche' la geometria va rivalutata a piu' istanti: le
+    /// derivate analitiche da sole descrivono solo la tangente.
+    static void compute_higher_order_motion(
+        OccultationParameters& params,
+        const catalog::ChebyshevSegment& segment,
+        const RightAscension& star_ra,
+        const Declination& star_dec);
 
     static void compute_shadow_velocity(
         OccultationParameters& params,

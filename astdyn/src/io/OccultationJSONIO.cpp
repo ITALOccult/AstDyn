@@ -70,6 +70,7 @@ static json event_to_json(const OccultationEvent& ev) {
         {"dx", ev.dx}, {"dy", ev.dy},
         {"d2x", ev.d2x}, {"d2y", ev.d2y},
         {"d3x", ev.d3x}, {"d3y", ev.d3y},
+        {"nonlinearity_index", ev.nonlinearity_index},
     };
 
     // ---- <Earth> : punti substellare/subsolare ---------------------------
