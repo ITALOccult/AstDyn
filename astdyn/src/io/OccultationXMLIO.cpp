@@ -5,6 +5,7 @@
  * Field order follows Occult4's published specification; see OccultationEvent.hpp.
  */
 #include "astdyn/io/OccultationXMLIO.hpp"
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
@@ -163,6 +164,35 @@ OccultationEvent OccultationXMLIO::parse_event_node(const std::string& xml) {
     return ev;
 }
 
+namespace {
+
+/// Un valore non disponibile si scrive VUOTO, non con un numero sentinella.
+///
+/// E' la convenzione di Occult4: nel blocco <Moon> ogni campo a zero produce
+/// virgole consecutive, e Parse_Star traduce un campo non numerico in
+/// magnitudine 25 -- "troppo debole per essere nota". Scrivere 99.00
+/// significherebbe dichiarare una stella di magnitudine 99.
+std::string campo_opzionale(double v, int decimali, bool disponibile) {
+    if (!disponibile) return std::string();
+    std::ostringstream o;
+    o << std::fixed << std::setprecision(decimali) << v;
+    return o.str();
+}
+
+/// Una magnitudine e' utilizzabile se sta in un intervallo plausibile. Il
+/// catalogo stellare distribuito porta la sola banda G: B e R restano assenti
+/// finche' non se ne avra' uno con tutte e tre.
+bool mag_disponibile(double m) { return m > -2.0 && m < 30.0 && m != 0.0; }
+
+/// Angolo riportato in [0, 360). Occult4 scrive l'anomalia media convertendo da
+/// radianti gia' normalizzati; noi potremmo averla negativa dopo un fit.
+double in_giro(double deg) {
+    double a = std::fmod(deg, 360.0);
+    return (a < 0.0) ? a + 360.0 : a;
+}
+
+} // namespace
+
 std::string OccultationXMLIO::format_event_node(const OccultationEvent& ev) {
     std::stringstream ss;
     ss << std::fixed;
@@ -175,18 +205,22 @@ std::string OccultationXMLIO::format_event_node(const OccultationEvent& ev) {
        << ev.dx << "," << ev.dy << "," << ev.d2x << "," << ev.d2y << ","
        << ev.d3x << "," << ev.d3y << "</Elements>\n";
 
+    // Occult4 scrive le sub-stellari con 4 decimali e le sub-solari con 2.
     ss << std::setprecision(4);
     ss << "    <Earth>" << ev.substellar_lon_deg << "," << ev.substellar_lat_deg << ","
-       << ev.subsolar_lon_deg << "," << ev.subsolar_lat_deg << ","
+       << std::setprecision(2) << ev.subsolar_lon_deg << "," << ev.subsolar_lat_deg << ","
        << (ev.jwst ? "True" : "False") << "</Earth>\n";
 
     ss << "    <Star>" << ev.star_id << ","
        << std::setprecision(8) << ev.star_ra_h << "," << ev.star_dec_deg << ","
-       << std::setprecision(2) << ev.mag_b << "," << ev.mag_v << "," << ev.mag_r << ","
+       << campo_opzionale(ev.mag_b, 2, mag_disponibile(ev.mag_b)) << ","
+       << campo_opzionale(ev.mag_v, 2, mag_disponibile(ev.mag_v)) << ","
+       << campo_opzionale(ev.mag_r, 2, mag_disponibile(ev.mag_r)) << ","
        << std::setprecision(3) << ev.star_diameter_mas << ","
        << ev.double_star_code << "," << ev.k2_flag << ","
        << std::setprecision(8) << ev.star_app_ra_h << "," << ev.star_app_dec_deg << ","
-       << std::setprecision(2) << ev.mag_drop_v << "," << ev.mag_drop_r << ","
+       << campo_opzionale(ev.mag_drop_v, 2, ev.mag_drop_v != 0.0) << ","
+       << campo_opzionale(ev.mag_drop_r, 2, ev.mag_drop_r != 0.0) << ","
        << ev.mag_drops_adjusted << "," << ev.bright_nearby_count << ","
        << ev.total_nearby_count << "</Star>\n";
 
@@ -196,12 +230,17 @@ std::string OccultationXMLIO::format_event_node(const OccultationEvent& ev) {
        << std::setprecision(4) << ev.distance_au << ","
        << ev.n_rings << "," << ev.n_moons << ","
        << std::setprecision(3) << ev.d_ra_s_hr << "," << ev.d_dec_as_hr << ","
-       << ev.taxonomy << "," << ev.diameter_uncertainty_km << ","
-       << ev.moon_in_planet_shadow
+       << ev.taxonomy << "," << std::setprecision(1) << ev.diameter_uncertainty_km << ","
+       << ev.moon_in_planet_shadow << ","
+       // Magnitudini V ed R dell'asteroide, aggiunte alla specifica in agosto
+       // 2024. Non le calcoliamo: vuote, non a zero.
+       << campo_opzionale(ev.mag_v_asteroid, 2, ev.mag_v_asteroid != 0.0) << ","
+       << campo_opzionale(ev.mag_r_asteroid, 2, ev.mag_r_asteroid != 0.0)
        << "</Object>\n";
 
     ss << std::setprecision(4);
-    ss << "    <Orbit>" << ev.equinox << "," << ev.mean_anomaly_deg << ","
+    ss << "    <Orbit>" << static_cast<int>(ev.equinox) << ","
+       << in_giro(ev.mean_anomaly_deg) << ","
        << ev.epoch_year << "," << ev.epoch_month << "," << ev.epoch_day << ","
        << ev.peri_deg << "," << ev.node_deg << "," << ev.inclination_deg << ","
        << std::setprecision(5) << ev.eccentricity << "," << ev.semi_major_axis_au << ","
