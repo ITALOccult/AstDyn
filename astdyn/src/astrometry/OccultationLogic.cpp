@@ -259,6 +259,70 @@ void OccultationLogic::compute_higher_order_motion(
     params.d3eta_dt3 = 6.0 * cy[3];
 }
 
+/// Il Sole e' sotto la soglia in almeno un punto della traccia?
+///
+/// Valuta i tre punti che hanno significato geometrico: dove l'asse dell'ombra
+/// entra sul lembo terrestre, il massimo avvicinamento, e dove esce. Gli estremi
+/// risolvono |(xi, eta)| = R_terra, di secondo grado nel moto lineare.
+///
+/// Una traccia d'ombra e' lunga migliaia di chilometri e attraversa spesso il
+/// terminatore: su (4769) Castalia un'occultazione centrale veniva scartata
+/// perche' al centro era giorno, mentre la coda era osservabile dall'Australia.
+static bool sole_sotto_soglia_da_qualche_parte(const OccultationParameters& params,
+                                               double soglia_deg)
+{
+    constexpr double R_TERRA_M = 6378137.0;
+    const double d2r = 3.14159265358979323846 / 180.0;
+
+    const double xi0 = params.xi_ca.to_m(), eta0 = params.eta_ca.to_m();
+    const double vxi = params.dxi_dt.to_ms(), veta = params.deta_dt.to_ms();
+    const double v2 = vxi * vxi + veta * veta;
+    if (v2 <= 0.0) return params.sun_altitude.to_deg() < soglia_deg;
+
+    // |(xi0 + vxi t, eta0 + veta t)| = R  ->  v2 t^2 + 2 b t + c = 0
+    const double b = xi0 * vxi + eta0 * veta;
+    const double c = xi0 * xi0 + eta0 * eta0 - R_TERRA_M * R_TERRA_M;
+    const double disc = b * b - v2 * c;
+    if (disc < 0.0) return false;              // l'ombra non tocca la Terra
+
+    const double rad = std::sqrt(disc);
+    const double t_in = (-b - rad) / v2;       // secondi dal massimo avvicinamento
+    const double t_out = (-b + rad) / v2;
+
+    // altezza del Sole nel punto sotto l'asse a un dato istante
+    auto altezza_sole = [&](double t_sec) -> double {
+        const double xi = xi0 + vxi * t_sec;
+        const double eta = eta0 + veta * t_sec;
+        const double r2 = (xi * xi + eta * eta) / (R_TERRA_M * R_TERRA_M);
+        if (r2 >= 1.0) return 90.0;            // fuori dalla Terra: non conta
+        const double ore = t_sec / 3600.0;
+
+        const double zeta = std::sqrt(1.0 - r2) * R_TERRA_M;
+        const double ds = params.substar_lat.to_rad();
+        const double z  = eta * std::cos(ds) + zeta * std::sin(ds);
+        const double yq = -eta * std::sin(ds) + zeta * std::cos(ds);
+        const double lat = std::atan2(z, std::hypot(xi, yq)) / d2r;
+        const double lon = params.substar_lon.to_deg()
+                         + std::atan2(xi, yq) / d2r - 15.0 * ore;
+
+        // il punto sub-solare ruota con la Terra
+        const double slat = params.subsolar_lat.to_deg();
+        const double slon = params.subsolar_lon.to_deg() - 15.0 * ore;
+        const double cos_z = std::sin(lat * d2r) * std::sin(slat * d2r)
+                           + std::cos(lat * d2r) * std::cos(slat * d2r)
+                             * std::cos((lon - slon) * d2r);
+        return std::asin(std::clamp(cos_z, -1.0, 1.0)) / d2r;
+    };
+
+    // margine interno agli estremi: sul lembo esatto il punto e' degenere
+    // Margine interno agli estremi: sul lembo esatto il punto e' degenere.
+    const double margine = 0.02 * (t_out - t_in);
+    for (double t : {t_in + margine, 0.0, t_out - margine}) {
+        if (altezza_sole(t) < soglia_deg) return true;
+    }
+    return false;
+}
+
 void OccultationLogic::compute_shadow_velocity(
     OccultationParameters& params,
     const Declination& star_dec,
@@ -440,7 +504,11 @@ void OccultationLogic::evaluate_candidate(
                 diameter_km * 1000.0 / params.shadow_velocity.to_ms());
         }
 
-        if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) {
+        // Un evento si scarta solo se e' giorno lungo TUTTA la traccia utile:
+        // al centro puo' essere pieno giorno mentre la coda e' osservabile.
+        if (config.filter_daylight && params.is_daylight
+            && params.sun_altitude.to_deg() > config.min_sun_altitude
+            && !sole_sotto_soglia_da_qualche_parte(params, config.min_sun_altitude)) {
             if (occ_debug()) std::cerr << "[DBG]       SCARTATO: giorno (sole alt="
                 << params.sun_altitude.to_deg() << " > " << config.min_sun_altitude << ")\n";
             continue;
@@ -525,7 +593,11 @@ void OccultationLogic::evaluate_candidate(
         // superiore la traccia sbaglia di ~100 km a due ore dal TCA.
         compute_higher_order_motion(params, segment, star_at_tca.ra(), star_at_tca.dec());
 
-        if (config.filter_daylight && params.is_daylight && params.sun_altitude.to_deg() > config.min_sun_altitude) {
+        // Un evento si scarta solo se e' giorno lungo TUTTA la traccia utile:
+        // al centro puo' essere pieno giorno mentre la coda e' osservabile.
+        if (config.filter_daylight && params.is_daylight
+            && params.sun_altitude.to_deg() > config.min_sun_altitude
+            && !sole_sotto_soglia_da_qualche_parte(params, config.min_sun_altitude)) {
             continue;
         }
 

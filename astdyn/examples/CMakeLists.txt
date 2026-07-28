@@ -162,3 +162,9 @@ target_link_libraries(test_separazione PRIVATE astdyn)
 
 add_executable(test_curvatura_ombra test_curvatura_ombra.cpp)
 target_link_libraries(test_curvatura_ombra PRIVATE astdyn)
+
+add_executable(test_posizione test_posizione.cpp)
+target_link_libraries(test_posizione PRIVATE astdyn)
+
+add_executable(test_occultazione test_occultazione.cpp)
+target_link_libraries(test_occultazione PRIVATE astdyn)
