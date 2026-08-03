@@ -67,3 +67,8 @@ config_manual.pdf
 
 # cache di Python degli strumenti
 tools/__pycache__/
+
+# configurazione locale dell'ambiente di sviluppo
+.claude/
+# scarico temporaneo dei diametri da JPL SBDB (8 MB, rigenerabile)
+diametri.json
