@@ -162,6 +162,19 @@ public:
     // J2000 ↔ Ecliptic Transformation
     // ========================================================================
     
+    /// Obliquita' che DEFINISCE il frame ECLIPJ2000, in arcsec.
+    ///
+    /// Valore IAU 1976, non quello IAU 2006 (84381.406) che la serie
+    /// `mean_obliquity` da' a J2000. La differenza e' di 42 mas, e non e' una
+    /// questione di accuratezza: gli elementi orbitali di AstDyS, NEODyS e JPL
+    /// sono riferiti a un piano eclittico costruito con QUESTO angolo, e
+    /// ruotarli con un altro introduce una rotazione spuria — 55 km sulla
+    /// traccia d'ombra di (316) Goberta a 2.73 AU.
+    ///
+    /// Occult4 fa lo stesso: tiene due costanti distinte e usa questa nel
+    /// modulo delle occultazioni.
+    static constexpr double OBLIQUITY_ECLIPJ2000_ARCSEC = 84381.448;
+
     static double mean_obliquity(time::EpochTDB t) {
         // T is Julian centuries from J2000.0
         double T = (t.mjd() - constants::MJD2000) / constants::DAYS_PER_CENTURY;
@@ -186,7 +199,8 @@ public:
      * @return 3x3 rotation matrix
      */
     static Matrix3d j2000_to_ecliptic(time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000)) {
-        return rotation_x(mean_obliquity(t));
+        // Il frame ECLIPJ2000 e' definito dall'obliquita' IAU 1976.
+        return rotation_x(constants::OBLIQUITY_ECLIPJ2000);
     }
     
     /**
@@ -195,7 +209,8 @@ public:
      * @return 3x3 rotation matrix
      */
     static Matrix3d ecliptic_to_j2000(time::EpochTDB t = time::EpochTDB::from_mjd(constants::MJD2000)) {
-        return rotation_x(-mean_obliquity(t));
+        // Il frame ECLIPJ2000 e' definito dall'obliquita' IAU 1976.
+        return rotation_x(-constants::OBLIQUITY_ECLIPJ2000);
     }
     
     // ========================================================================

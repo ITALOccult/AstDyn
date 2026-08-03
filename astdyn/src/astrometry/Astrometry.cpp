@@ -185,6 +185,17 @@ Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
         auto cart_emit = propagator->propagate_cartesian(cart0, t_emit);
         p_ast = cart_emit.position.to_eigen_si();
         tau = (p_ast - earth_pos_helio_ecl).norm() / (constants::C_LIGHT * 86400.0 * 1000.0);
+        if (std::getenv("ASTDYN_LT_DEBUG")) {
+            const Eigen::Vector3d g = p_ast - earth_pos_helio_ecl;
+            std::cerr << std::fixed << std::setprecision(12)
+                      << "[LT] iter " << i << " tau=" << tau*86400.0 << " s\n"
+                      << "     ast elio ecl AU  " << p_ast.x()/1.495978707e11 << " "
+                      << p_ast.y()/1.495978707e11 << " " << p_ast.z()/1.495978707e11 << "\n"
+                      << "     terra elio ecl   " << earth_pos_helio_ecl.x()/1.495978707e11 << " "
+                      << earth_pos_helio_ecl.y()/1.495978707e11 << " "
+                      << earth_pos_helio_ecl.z()/1.495978707e11 << "\n"
+                      << "     rho              " << g.norm()/1.495978707e11 << " AU\n";
+        }
     }
     return p_ast;
 }

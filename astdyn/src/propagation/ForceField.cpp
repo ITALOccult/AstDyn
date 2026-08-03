@@ -1,4 +1,5 @@
 #include "astdyn/propagation/ForceField.hpp"
+#include <iostream>
 #include "astdyn/propagation/PotentialDerivatives.hpp"
 #include "astdyn/math/kahan_sum.hpp"
 #include "astdyn/core/Constants.hpp"
@@ -19,6 +20,22 @@ ForceField::ForceField(const PropagatorSettings& settings,
         else if (settings_.use_default_30_set) asteroids_->loadDefault30Asteroids();
         if (!settings_.asteroid_ephemeris_file.empty()) {
             asteroids_->loadSPK(settings_.asteroid_ephemeris_file);
+        }
+        // Un modello di forze che dichiara i perturbatori e poi non ne carica
+        // nessuno e' peggio di uno che non li dichiara: silenziosamente
+        // produce orbite meno accurate. Su (316) Goberta, 35 giorni senza
+        // perturbatori valgono 0.05 arcsec, cioe' 90 km sulla traccia d'ombra.
+        const size_t n = asteroids_->getAsteroids().size();
+        if (n == 0) {
+            std::cerr << "[forze] perturbatori asteroidali richiesti ma NESSUNO caricato";
+            if (settings_.asteroid_ephemeris_file.empty())
+                std::cerr << " (nessun file indicato)";
+            else
+                std::cerr << " (file: " << settings_.asteroid_ephemeris_file << ")";
+            std::cerr << std::endl;
+        } else if (std::getenv("ASTDYN_FORCE_DEBUG")) {
+            std::cerr << "[forze] " << n << " perturbatori asteroidali attivi"
+                      << std::endl;
         }
     }
 }

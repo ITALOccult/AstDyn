@@ -120,6 +120,19 @@ constexpr double SUN_J2 = 2.2e-7;
 /// coordinates::ReferenceFrame::mean_obliquity(epoch).
 constexpr double OBLIQUITY_J2000 = 84381.406 * ARCSEC_TO_RAD;
 
+/// Obliquita' che DEFINISCE il frame ECLIPJ2000 (IAU 1976), in radianti.
+///
+/// Distinta da OBLIQUITY_J2000, che e' la migliore stima moderna (IAU 2006).
+/// La differenza e' di 42 mas e non riguarda l'accuratezza: gli elementi
+/// orbitali di AstDyS, NEODyS e JPL sono riferiti a un piano eclittico
+/// costruito con QUESTO angolo, e ruotarli con l'altro introduce una rotazione
+/// spuria — 55 km sulla traccia d'ombra di (316) Goberta a 2.73 AU, misurati
+/// contro due corde osservate.
+///
+/// Occult4 mantiene la stessa distinzione: due costanti separate, e questa nel
+/// modulo delle occultazioni.
+constexpr double OBLIQUITY_ECLIPJ2000 = 84381.448 * ARCSEC_TO_RAD;
+
 // ============================================================================
 // Sky Geometry Constants
 // ============================================================================

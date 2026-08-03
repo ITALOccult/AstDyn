@@ -200,6 +200,10 @@ ChebyshevSegment fit_chebyshev(
 
     astrometry::AstrometricSettings a_settings;
     a_settings.light_time_correction = true;
+    // L'aberrazione DIFFERENZIALE: la parte comune ad asteroide e stella si
+    // cancella nella loro differenza, ma il termine legato al moto dell'asteroide
+    // no. Vale v_ast/c, circa 0.07 arcsec, che a 2.5 AU sono un centinaio di km
+    // sul piano fondamentale.
     a_settings.aberrazione_differenziale = false;
     a_settings.frame_conversion_to_equatorial = true;
 
@@ -251,6 +255,10 @@ ChebyshevSegment fit_chebyshev_da_posizione(
     // posizioni di corpi ottenuti per vie diverse restano confrontabili.
     astrometry::AstrometricSettings a_settings;
     a_settings.light_time_correction = true;
+    // L'aberrazione DIFFERENZIALE: la parte comune ad asteroide e stella si
+    // cancella nella loro differenza, ma il termine legato al moto dell'asteroide
+    // no. Vale v_ast/c, circa 0.07 arcsec, che a 2.5 AU sono un centinaio di km
+    // sul piano fondamentale.
     a_settings.aberrazione_differenziale = false;
     a_settings.frame_conversion_to_equatorial = true;
 

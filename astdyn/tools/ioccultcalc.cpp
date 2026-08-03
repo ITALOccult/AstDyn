@@ -80,7 +80,7 @@ static std::string nome_da_catalogo(const std::string& numero) {
         if (sqlite3_open_v2(db.c_str(), &conn, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
             if (conn) sqlite3_close(conn);
             std::cout << "[nomi] catalogo non disponibile (" << db << "): "
-                      << "gli asteroidi compariranno con il solo numero\n";
+                      << "gli asteroidi compariranno con il solo numero\#include <utility>\nn";
             return "";
         }
         sqlite3_stmt* st = nullptr;
@@ -108,6 +108,58 @@ static std::string nome_da_catalogo(const std::string& numero) {
 
     auto it = cache.find(numero);
     return (it != cache.end()) ? it->second : "";
+}
+
+/// Diametro misurato e sua incertezza, dal catalogo locale.
+///
+/// Restituisce {diametro_km, sigma_km}; diametro 0 se l'oggetto non e' nel
+/// catalogo o non ha una misura. La fonte e' JPL SBDB, importata da
+/// `tools/importa_diametri.py`: 135 475 asteroidi numerati con diametro
+/// misurato da IRAS, WISE, Akari, radar od occultazioni.
+///
+/// Conta piu' di quanto sembri: su (316) Goberta la stima da H dava 31.9 km
+/// contro i 56.1 misurati, e con quel valore una corda osservata di 3.4 s
+/// sarebbe stata piu' lunga dell'intera ombra.
+static std::pair<double, double> diametro_da_catalogo(const std::string& numero) {
+    static std::map<std::string, std::pair<double, double>> cache;
+    static bool caricato = false;
+    static std::mutex mtx;
+
+    std::lock_guard<std::mutex> lock(mtx);
+    if (!caricato) {
+        caricato = true;
+        const char* home = std::getenv("HOME");
+        if (!home) return {0.0, 0.0};
+        const std::string db = std::string(home) + "/.ioccultcalc/database/allnum.db";
+
+        sqlite3* conn = nullptr;
+        if (sqlite3_open_v2(db.c_str(), &conn, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
+            if (conn) sqlite3_close(conn);
+            return {0.0, 0.0};
+        }
+        sqlite3_stmt* st = nullptr;
+        const char* sql =
+            "SELECT number, diameter_km, diameter_sigma_km FROM allnum_asteroids "
+            "WHERE diameter_km IS NOT NULL AND diameter_source != 'H+albedo 0.10'";
+        if (sqlite3_prepare_v2(conn, sql, -1, &st, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(st) == SQLITE_ROW) {
+                cache[std::to_string(sqlite3_column_int64(st, 0))] =
+                    {sqlite3_column_double(st, 1), sqlite3_column_double(st, 2)};
+            }
+            sqlite3_finalize(st);
+        } else {
+            // colonne assenti: il catalogo non e' stato ancora arricchito
+            std::cout << "[diametri] il catalogo non contiene i diametri misurati; "
+                      << "eseguire tools/importa_diametri.py\n";
+        }
+        sqlite3_close(conn);
+        if (!cache.empty())
+            std::cout << "[diametri] " << cache.size()
+                      << " diametri misurati dal catalogo\n";
+    }
+
+    auto it = cache.find(numero);
+    return (it != cache.end()) ? it->second : std::make_pair(0.0, 0.0);
 }
 
 /// Denominazione posizionale Jhhmmss.ss+ddmmss.s a partire dalle coordinate.
@@ -651,6 +703,7 @@ int main(int argc, char** argv) {
     // Full properties, not just {H, D}: the designation is needed for the
     // occelmnt <Object> record, which wants "2015 BK290" and not "820987".
     std::map<std::string, io::PhysicalProperties> stored_props;
+    std::map<std::string, double> stored_diameter_sigma;
     std::unique_ptr<io::SPKReader> system_reader;
 
     // --- 2a. Load Primary Asteroids ---
@@ -801,21 +854,30 @@ int main(int argc, char** argv) {
                     // Il messaggio di provenienza (Horizons o .eq1) e' gia' stato
                     // stampato nel ramo di caricamento; qui non ripetiamo "Horizons".
                     auto props = horizons.query_physical_properties(id);
-                    if (props && props->diameter_km > 0.0) {
-                        stored_props[id] = *props;
-                        manager.set_diameter(id, props->diameter_km);
+
+                    // Il diametro MISURATO del catalogo locale ha la precedenza:
+                    // e' lo stesso dato che Horizons restituirebbe, ma disponibile
+                    // senza rete e con la sua incertezza. Horizons resta per gli
+                    // oggetti non numerati o non coperti.
+                    const auto [d_cat, sigma_cat] = diametro_da_catalogo(id);
+
+                    double d = 0.0, sigma = 0.0;
+                    if (d_cat > 0.0) {
+                        d = d_cat; sigma = sigma_cat;
+                    } else if (props && props->diameter_km > 0.0) {
+                        d = props->diameter_km;
                     } else {
-                        // props assente, oppure presente ma con diametro non
-                        // parsato (0): in entrambi i casi il diametro e' ignoto.
-                        // Usa il default, altrimenti il filtro diametro vedrebbe
-                        // 0 e non potrebbe mai scartare il corpo.
-                        double d = (props && props->diameter_km > 0.0)
-                                 ? props->diameter_km : DEFAULT_ASTEROID_DIAMETER_KM;
-                        io::PhysicalProperties pp = props ? *props : io::PhysicalProperties{"", 0.0, d, 0.0};
-                        pp.diameter_km = d;
-                        stored_props[id] = pp;
-                        manager.set_diameter(id, d);
+                        // Diametro ignoto: il predefinito serve perche' con 0 il
+                        // filtro sul diametro non potrebbe mai scartare il corpo.
+                        d = DEFAULT_ASTEROID_DIAMETER_KM;
                     }
+
+                    io::PhysicalProperties pp = props ? *props
+                                              : io::PhysicalProperties{"", 0.0, d, 0.0};
+                    pp.diameter_km = d;
+                    stored_props[id] = pp;
+                    stored_diameter_sigma[id] = sigma;
+                    manager.set_diameter(id, d);
                 } catch (const std::exception& e) {
                     std::cerr << "[ioccultcalc] SKIP '" << id << "': " << e.what() << "\n";
                     ++skipped_count;

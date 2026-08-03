@@ -103,11 +103,22 @@ TEST(ReferenceFrameTest, J2000ICRSRoundTrip) {
 
 TEST(ReferenceFrameTest, J2000ToEcliptic) {
     Matrix3d R = ReferenceFrame::j2000_to_ecliptic();
-    
-    // Should be rotation about X-axis by obliquity
-    Matrix3d expected = ReferenceFrame::rotation_x(constants::OBLIQUITY_J2000);
-    
-    EXPECT_TRUE(R.isApprox(expected, 1e-10));
+
+    // Il frame ECLIPJ2000 e' definito dall'obliquita' IAU 1976, 84381.448
+    // arcsec, NON dalla migliore stima moderna (IAU 2006, 84381.406). Non e'
+    // una questione di accuratezza: gli elementi orbitali di AstDyS, NEODyS e
+    // JPL sono riferiti a un piano eclittico costruito con quell'angolo.
+    //
+    // Il valore e' scritto qui esplicitamente, non ricavato dalla funzione in
+    // prova: un test che chiede al codice quale numero usi non verifica nulla.
+    constexpr double EPS_FRAME_RAD = 84381.448 / 3600.0 * constants::DEG_TO_RAD;
+    Matrix3d expected = ReferenceFrame::rotation_x(EPS_FRAME_RAD);
+
+    EXPECT_TRUE(R.isApprox(expected, 1e-12));
+
+    // E resta distinta dalla serie IAU 2006, che descrive l'obliquita' MEDIA
+    // ALLA DATA ed e' un'altra grandezza.
+    EXPECT_NE(constants::OBLIQUITY_ECLIPJ2000, constants::OBLIQUITY_J2000);
 }
 
 TEST(ReferenceFrameTest, EclipticToJ2000Inverse) {

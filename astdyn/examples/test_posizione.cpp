@@ -31,9 +31,17 @@ int main(int argc, char** argv) {
     AstDynConfig cfg;
     cfg.verbose = false;
     cfg.integrator_type = IntegratorType::RKF78;
-    cfg.tolerance = 1e-12;
+    cfg.tolerance = 1e-14;
     cfg.propagator_settings.include_planets = true;
     cfg.propagator_settings.include_relativity = true;
+    // I perturbatori asteroidali contano: su un corpo di fascia principale
+    // valgono qualche centesimo di arcsec al mese, cioe' decine di km sulla
+    // traccia d'ombra.
+    cfg.propagator_settings.include_asteroids = true;
+    if (const char* af = std::getenv("ASTDYN_ASTEROID_FILE")) {
+        cfg.asteroid_ephemeris_file = af;
+        cfg.propagator_settings.asteroid_ephemeris_file = af;
+    }
     if (const char* eph = std::getenv("ASTDYN_EPHEMERIS_PATH")) cfg.ephemeris_file = eph;
     cfg.ephemeris_type = EphemerisType::DE441;
 
