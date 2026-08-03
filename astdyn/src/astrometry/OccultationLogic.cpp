@@ -1,3 +1,4 @@
+#include "astdyn/astrometry/AstrometricCorrections.hpp"
 #include "astdyn/astrometry/OccultationLogic.hpp"
 #include "astdyn/ephemeris/CelestialBody.hpp"
 #include <utility>
@@ -90,6 +91,49 @@ namespace {
         }
         return best_t;
     }
+
+} // namespace
+
+namespace {
+
+/// Rotazione del frame Gaia DR3 per le stelle brillanti, in arcsec.
+///
+/// Le stelle piu' brillanti di magnitudine 13 sono misurate da Gaia in un
+/// regime strumentale diverso dalle deboli, e il loro sistema di riferimento
+/// ruota lentamente rispetto a quello del catalogo. I coefficienti sono in
+/// microarcsec all'anno e dipendono dalla magnitudine; la correzione cresce
+/// col tempo trascorso dall'epoca 2016.0.
+void correzione_frame_gaia(double ra_rad, double dec_rad, double mag,
+                           double anni_da_2016,
+                           double& d_ra_as, double& d_dec_as)
+{
+    d_ra_as = d_dec_as = 0.0;
+    if (mag >= 13.0 || mag < 0.0) return;   // fuori intervallo: nessuna correzione
+
+    // omega_x, omega_y, omega_z in microarcsec/anno, per intervallo di magnitudine
+    double wx, wy, wz;
+    if      (mag <  9.00) { wx = 18.4; wy = 33.8; wz = -11.3; }
+    else if (mag <  9.50) { wx = 14.0; wy = 30.7; wz = -19.4; }
+    else if (mag < 10.00) { wx = 12.8; wy = 31.4; wz = -11.8; }
+    else if (mag < 10.50) { wx = 13.6; wy = 35.7; wz = -10.5; }
+    else if (mag < 11.00) { wx = 16.2; wy = 50.0; wz =   2.1; }
+    else if (mag < 11.50) { wx = 19.4; wy = 59.9; wz =   0.2; }
+    else if (mag < 11.75) { wx = 21.8; wy = 64.2; wz =   1.0; }
+    else if (mag < 12.00) { wx = 17.7; wy = 65.6; wz =  -1.9; }
+    else if (mag < 12.25) { wx = 21.3; wy = 74.8; wz =   2.1; }
+    else if (mag < 12.50) { wx = 25.7; wy = 73.6; wz =   1.0; }
+    else if (mag < 12.75) { wx = 27.3; wy = 76.6; wz =   0.5; }
+    else                  { wx = 34.9; wy = 68.9; wz =  -2.9; }
+
+    const double sd = std::sin(dec_rad), cd = std::cos(dec_rad);
+    const double sa = std::sin(ra_rad),  ca = std::cos(ra_rad);
+
+    const double a = (-sd * ca * wx - sd * sa * wy + cd * wz) / 1000.0;
+    const double b = ( sa * wx - ca * wy) / 1000.0;
+
+    d_ra_as  = -anni_da_2016 * a / 1000.0;
+    d_dec_as = -anni_da_2016 * b / 1000.0;
+}
 
 } // namespace
 
@@ -478,7 +522,44 @@ void OccultationLogic::evaluate_candidate(
             continue;
         }
 
-        auto star_at_tca = star.predict_at(ca.t_ca);
+        // La stella si vede dalla TERRA, non dal baricentro: senza la posizione
+        // dell'osservatore `predict_at` omette la parallasse annua. Per una
+        // stella con parallasse di 2 mas l'effetto e' piccolo, ma entra nella
+        // ricerca del massimo avvicinamento e ne sposta l'istante.
+        auto star_at_tca = [&] {
+            auto e = engine.getEphemeris();
+            auto sky = e ? star.predict_at(ca.t_ca,
+                             e->getState(ephemeris::CelestialBody::EARTH, ca.t_ca)
+                               .position.to_eigen_si())
+                         : star.predict_at(ca.t_ca);
+            if (!e) return sky;
+
+            // Rotazione del frame Gaia per le stelle brillanti.
+            double d_ra_as = 0.0, d_dec_as = 0.0;
+            const double anni = (ca.t_ca.mjd() - 57388.0) / 365.25;   // da 2016.0
+            correzione_frame_gaia(sky.ra().to_rad(), sky.dec().to_rad(),
+                                  star.g_mag, anni, d_ra_as, d_dec_as);
+
+            // Deflessione gravitazionale della luce stellare nel campo del Sole.
+            const auto sole = e->getState(ephemeris::CelestialBody::SUN, ca.t_ca);
+            const auto terra = e->getState(ephemeris::CelestialBody::EARTH, ca.t_ca);
+            const Eigen::Vector3d oss_sole = sole.position.to_eigen_si()
+                                           - terra.position.to_eigen_si();
+            const double a = sky.ra().to_rad(), d = sky.dec().to_rad();
+            const Eigen::Vector3d u(std::cos(d)*std::cos(a), std::cos(d)*std::sin(a), std::sin(d));
+            const Eigen::Vector3d defl =
+                ::astdyn::astrometry::deflessione_relativistica(u * 1.0e15, oss_sole).normalized();
+
+            double ra_f = std::atan2(defl.y(), defl.x());
+            if (ra_f < 0.0) ra_f += 2.0 * M_PI;
+            double dec_f = std::asin(std::clamp(defl.z(), -1.0, 1.0));
+
+            // e la rotazione del frame, in arcsec
+            ra_f  += d_ra_as / 3600.0 * M_PI / 180.0 / std::cos(dec_f);
+            dec_f += d_dec_as / 3600.0 * M_PI / 180.0;
+
+            return astrometry::SkyCoord<core::GCRF>::from_rad(ra_f, dec_f);
+        }();
         
         double dra_hr = (std::get<0>(vel) / 24.0) * 3600.0;
         double ddec_hr = (std::get<1>(vel) / 24.0) * 3600.0;
@@ -568,7 +649,44 @@ void OccultationLogic::evaluate_candidate(
     AstDynEngine& engine)
 {
     for (const auto& ca : candidates) {
-        auto star_at_tca = star.predict_at(ca.t_ca);
+        // La stella si vede dalla TERRA, non dal baricentro: senza la posizione
+        // dell'osservatore `predict_at` omette la parallasse annua. Per una
+        // stella con parallasse di 2 mas l'effetto e' piccolo, ma entra nella
+        // ricerca del massimo avvicinamento e ne sposta l'istante.
+        auto star_at_tca = [&] {
+            auto e = engine.getEphemeris();
+            auto sky = e ? star.predict_at(ca.t_ca,
+                             e->getState(ephemeris::CelestialBody::EARTH, ca.t_ca)
+                               .position.to_eigen_si())
+                         : star.predict_at(ca.t_ca);
+            if (!e) return sky;
+
+            // Rotazione del frame Gaia per le stelle brillanti.
+            double d_ra_as = 0.0, d_dec_as = 0.0;
+            const double anni = (ca.t_ca.mjd() - 57388.0) / 365.25;   // da 2016.0
+            correzione_frame_gaia(sky.ra().to_rad(), sky.dec().to_rad(),
+                                  star.g_mag, anni, d_ra_as, d_dec_as);
+
+            // Deflessione gravitazionale della luce stellare nel campo del Sole.
+            const auto sole = e->getState(ephemeris::CelestialBody::SUN, ca.t_ca);
+            const auto terra = e->getState(ephemeris::CelestialBody::EARTH, ca.t_ca);
+            const Eigen::Vector3d oss_sole = sole.position.to_eigen_si()
+                                           - terra.position.to_eigen_si();
+            const double a = sky.ra().to_rad(), d = sky.dec().to_rad();
+            const Eigen::Vector3d u(std::cos(d)*std::cos(a), std::cos(d)*std::sin(a), std::sin(d));
+            const Eigen::Vector3d defl =
+                ::astdyn::astrometry::deflessione_relativistica(u * 1.0e15, oss_sole).normalized();
+
+            double ra_f = std::atan2(defl.y(), defl.x());
+            if (ra_f < 0.0) ra_f += 2.0 * M_PI;
+            double dec_f = std::asin(std::clamp(defl.z(), -1.0, 1.0));
+
+            // e la rotazione del frame, in arcsec
+            ra_f  += d_ra_as / 3600.0 * M_PI / 180.0 / std::cos(dec_f);
+            dec_f += d_dec_as / 3600.0 * M_PI / 180.0;
+
+            return astrometry::SkyCoord<core::GCRF>::from_rad(ra_f, dec_f);
+        }();
         
         auto [pos, vel] = segment.evaluate_full(ca.t_ca.jd());
         double dist_au_at_ca = std::get<2>(pos);
