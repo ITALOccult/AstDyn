@@ -77,6 +77,14 @@ struct SurfacePoint {
     time::EpochTT tt, time::EpochUT1 ut1,
     const Ellipsoid& ellipsoid = Ellipsoid::wgs84());
 
+/**
+ * @brief Rotation of fundamental-plane coordinates (xi, eta) from axes on the
+ *        J2000 equator to axes on the true equator of date, at the star.
+ *
+ * The occelmnt Besselian elements, like their sub-star point, are of date.
+ */
+[[nodiscard]] Eigen::Matrix2d fundamental_plane_j2000_to_date(time::EpochTT tt, double ra_rad, double dec_rad);
+
 } // namespace astdyn::coordinates
 
 #endif

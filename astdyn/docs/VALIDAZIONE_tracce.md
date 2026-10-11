@@ -23,6 +23,9 @@ stato misurato contro un riferimento esterno prima di essere corretto.
 | perturbatori asteroidali dallo SPK non ruotati in eclittica | vettori Horizons 1949-2024 di (3930) | 145 km nel 2015, 2718 km nel 1949 | 2.9 km, 213 km |
 | TAI-UTC fisso a 37 s per ogni data | storia IERS/USNO, Delta T | 1-2 s su Gaia 2014-16, 30-40 s sulle lastre | per data |
 | astrometria Gaia FPR non usata | soluzione JPL#64 di (3930) | fit a 37 km da JPL | <= 9 km con le 472 osservazioni FPR |
+| aberrazione annua assente dal punto sub-stellare e dalla proiezione | elementi Occult4 di (316) Goberta | 20" sulla stella apparente, 1.3 s di rotazione | 0.005" |
+| elementi besseliani esportati su assi J2000 invece che della data | elementi Occult4, corde di Goberta | 0.14 gradi, 14 km lungo la traccia, -1.0 s | -0.2/+0.1 s come JPL |
+| riga satellite .rwo letta per token (nota in colonna 15) | residui TESS 2023 di Goberta | 836 osservazioni a 50" | lette per colonna |
 | date prima di mezzogiorno UT (32 ottobre) | calendario | 6 date impossibili su 205 | test di andata e ritorno |
 | filtro diurno valutato fuori dalla Terra | campionamento della traccia | 54 eventi a 2-5 gradi dal Sole | 95 eventi osservabili su 205 |
 | occelmnt: campi vuoti letti con double.Parse | lettore di Occult4 (sorgente) | file rifiutato da Occult4 | test sulle regole del lettore |
@@ -31,6 +34,25 @@ Lo scarto diagnostico fra la covarianza propagata (STT) e la traccia, che era
 di 32-52 km su tutti gli eventi, e' sceso a 1-10 km: i primi due difetti ne
 spiegavano quasi tutto, il resto veniva dal modello di forze ridotto della STT,
 ora allineato a quello della traccia.
+
+### (316) Goberta contro le corde, catena corretta (12 ottobre 2026)
+
+Corde di M. Harman (Vartovka, SK, 48 43 04.4 N, 19 09 13.7 E, 570 m) e
+F. Garcia (La Vara, Valdes, ES, 43 28 21.6 N, 6 23 26.7 W, 219 m), da SODIS.
+
+| predizione | Harman | Garcia | trasversale |
+|------------|--------|--------|-------------|
+| Occult4, JPL#90+INTG (riferimento) | -0.2 s | +0.1 s | 10.7 / 5.5 km |
+| nostra catena, orbita JPL | -0.2 s | +0.1 s | 10.6 / 5.4 km |
+| nostra catena, nostro fit (rwo + Gaia FPR) | -2.2 s | -1.9 s | 7.8 / 8.3 km |
+
+Con la stessa orbita la catena riproduce Occult4 e le corde. Il nostro fit di
+Goberta resta 16 mas avanti lungo la traccia (2 s): sui dati da terra 2020-2026
+le due orbite differiscono di ~10 mas in RA, dentro quanto quei dati
+vincolano (~7 mas), e la scelta la fanno pesi e debiasing (JPL: Eggl 2020 e
+Veres 2017; noi: FCCT14 di AstDyS). Le corde danno ragione a JPL. L'astrometria
+TESS di Goberta ha un sistematico di -0.20" in RA e +0.17" in Dec rispetto
+all'orbita JPL, ma col peso per notte non sposta il fit.
 
 ### Accordo con JPL, a catena corretta
 

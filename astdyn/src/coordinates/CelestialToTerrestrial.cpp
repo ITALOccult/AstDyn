@@ -204,4 +204,30 @@ std::optional<SurfacePoint> shadow_point(
                          astrometry::Angle::from_rad(std::atan2(P.y_m(), P.x_m())) };
 }
 
+/// Rotation of the fundamental-plane axes from the J2000 (GCRS) equator to the
+/// true equator of date, at the star's direction.
+///
+/// We compute (xi, eta) with north along the J2000 pole; the occelmnt format,
+/// like its sub-star point "of date", wants them on the equator of date. The two
+/// differ by the precession since J2000 seen at the star -- 0.14 deg in 2026 for
+/// (316) Goberta -- and a point 0.9 Earth radii off the centre then lands 14 km
+/// along the track: the chords came 1 s early with Occult4's own orbit.
+Eigen::Matrix2d fundamental_plane_j2000_to_date(time::EpochTT tt, double ra_rad, double dec_rad) {
+    const Eigen::Vector3d s(std::cos(dec_rad) * std::cos(ra_rad), std::cos(dec_rad) * std::sin(ra_rad), std::sin(dec_rad));
+    astrometry::Angle cip_x, cip_y;
+    cip_xy(tt, cip_x, cip_y);
+    const double x = cip_x.to_rad(), y = cip_y.to_rad();
+    const Eigen::Vector3d pole_date(x, y, std::sqrt(1.0 - x * x - y * y));
+    auto basis = [&s](const Eigen::Vector3d& pole) {
+        const Eigen::Vector3d north = (pole - pole.dot(s) * s).normalized();
+        return std::pair<Eigen::Vector3d, Eigen::Vector3d>{north.cross(s), north};   // east, north
+    };
+    const auto [east_j2000, north_j2000] = basis(Eigen::Vector3d::UnitZ());
+    const auto [east_date, north_date] = basis(pole_date);
+    Eigen::Matrix2d m;
+    m << east_j2000.dot(east_date),  north_j2000.dot(east_date),
+         east_j2000.dot(north_date), north_j2000.dot(north_date);
+    return m;
+}
+
 } // namespace astdyn::coordinates

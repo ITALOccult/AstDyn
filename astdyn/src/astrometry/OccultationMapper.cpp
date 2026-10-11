@@ -120,9 +120,11 @@ std::optional<GeoPoint> OccultationMapper::calculate_geopoint_at_epoch(
 
     // The ellipsoid intersection (and the miss test) is done in project_to_earth.
     const time::EpochUTC t = time::to_utc(params.t_ca) + dt_from_ca;
+    // The shadow falls along the APPARENT star direction (see OccultationParameters).
     return project_to_earth(physics::Distance::from_m(xi_m),
                             physics::Distance::from_m(eta_m),
-                            star_ra, star_dec, t);
+                            params.has_apparent_star ? params.star_ra_apparent : star_ra,
+                            params.has_apparent_star ? params.star_dec_apparent : star_dec, t);
 }
 
 void OccultationMapper::add_time_marker(

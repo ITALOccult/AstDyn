@@ -28,6 +28,7 @@ constexpr size_t RWO_DEC_FIELDS = 103;        // sdd mm ss acc rms F bias resid
 constexpr size_t RWO_FIELDS_WIDTH = 53;
 constexpr size_t RWO_BIAS_TOKEN = 6;
 constexpr size_t RWO_OBSERVATORY_COLUMN = 180;
+constexpr size_t RWO_SPACE_UNIT_COLUMN = 34;     // 1 = km, 2 = AU
 
 bool is_satellite_line(const std::string& line) {
     return line.size() > 13 && line[11] == 'S' && line[13] == 'S';
@@ -62,19 +63,19 @@ void subtract_catalog_bias(const std::string& line, OpticalObservation& obs) {
 }
 
 /// Second line of a satellite observation: geocentric equatorial position of
-/// the observer, flag 1 = km, 2 = AU (MPC convention).
+/// the observer, flag 1 = km, 2 = AU (MPC convention), read by COLUMN.
+///
+/// Splitting on blanks broke on the optional note in column 15: the TESS lines
+/// of 2023 carry it ("S s 0 2023 ..."), those of 2021 do not, and every field
+/// slid by one -- the date read as the unit flag, "1" as the x coordinate.
+/// (316) Goberta's 836 observations of late 2023 came out 50" off.
 std::optional<math::Vector3<core::GCRF, physics::Distance>> parse_space_observer(const std::string& line) {
-    std::istringstream in(line);
-    std::vector<std::string> tokens;
-    for (std::string t; in >> t;) tokens.push_back(t);
-    if (tokens.size() < 10) return std::nullopt;
-    try {
-        const double unit_m = (tokens[6] == "2") ? constants::AU * 1000.0 : 1000.0;
-        return math::Vector3<core::GCRF, physics::Distance>::from_si(
-            std::stod(tokens[7]) * unit_m, std::stod(tokens[8]) * unit_m, std::stod(tokens[9]) * unit_m);
-    } catch (...) {
-        return std::nullopt;
-    }
+    if (line.size() <= RWO_SPACE_UNIT_COLUMN) return std::nullopt;
+    std::istringstream in(line.substr(RWO_SPACE_UNIT_COLUMN + 1));
+    double x = 0.0, y = 0.0, z = 0.0;
+    if (!(in >> x >> y >> z)) return std::nullopt;
+    const double unit_m = (line[RWO_SPACE_UNIT_COLUMN] == '2') ? constants::AU * 1000.0 : 1000.0;
+    return math::Vector3<core::GCRF, physics::Distance>::from_si(x * unit_m, y * unit_m, z * unit_m);
 }
 
 } // namespace

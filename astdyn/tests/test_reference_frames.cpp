@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 #include "astdyn/coordinates/ReferenceFrame.hpp"
 #include "astdyn/coordinates/CartesianState.hpp"
+#include "astdyn/coordinates/CelestialToTerrestrial.hpp"
+#include "astdyn/time/TimeScale.hpp"
 
 using namespace astdyn;
 using namespace astdyn::coordinates;
@@ -351,4 +353,18 @@ TEST(ReferenceFrameTest, GcrfToEclipJ2000MatchesJplWithoutFrameBias) {
     const Eigen::Vector3d ours_au =
         ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(icrf).to_eigen_si() / au_m;
     EXPECT_LT((ours_au - jpl_ecliptic_au).norm() * au_m, 1.0);   // metres
+}
+
+// (316) Goberta, 2026-07-13: the same JPL orbit gave x,y on J2000 axes
+// (-0.2195179, 0.8946834) Earth radii; Occult4, on the equator of date,
+// (-0.2216140, 0.8941676). The chords came 1 s early with the former.
+// The rotation varies by microradians across the star's 20" of aberration,
+// so the catalogue direction serves.
+TEST(ReferenceFrameTest, BesselianElementsRotatedToEquatorOfDateLikeOccult4) {
+    const auto tt = time::to_tt(time::EpochUTC::from_mjd(61234.0 + 22.8413480 / 24.0));
+    const Eigen::Matrix2d m = coordinates::fundamental_plane_j2000_to_date(
+        tt, 19.98415721 * 15.0 * DEG_TO_RAD, -20.1632248 * DEG_TO_RAD);
+    const Eigen::Vector2d of_date = m * Eigen::Vector2d(-0.2195179, 0.8946834);
+    EXPECT_NEAR(of_date.x(), -0.2216140, 1.0e-4);   // 0.6 km
+    EXPECT_NEAR(of_date.y(), 0.8941676, 1.0e-4);
 }
