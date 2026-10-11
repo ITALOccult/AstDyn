@@ -128,3 +128,17 @@ TEST(RiduzioneOsservazioni, GaiaFprCovarianzaCorrelataEInflataPerTransito) {
     EXPECT_NEAR(obs[0].space_observer_gcrf->x_si(), 0.0092 * constants::AU * 1000.0, 1.0);
     std::remove(path.c_str());
 }
+
+TEST(RiduzioneOsservazioni, SatelliteConNotaInColonna15) {
+    // TESS 2023: the note "0" in column 15 must not shift the fields.
+    std::istringstream in(
+        " 316       S S 0 2023 12 05.005868      1.000E-06 11 32 16.824  1.500E-02    0.600 F    0.000    0.155 "
+        "+04 14 40.88  1.000E-02    0.600 F    0.000    0.386 15.6 G  0.70  -0.09   V C57      0.69 1 1\n"
+        " 316       S s 0 2023 12 05.00586 1     -22382.197000000004     220051.081000000006      97190.272999999986 C57\n");
+    const auto obs = observations::RWOReader::readStream(in);
+    ASSERT_EQ(obs.size(), 1u);
+    ASSERT_TRUE(obs[0].space_observer_gcrf.has_value());
+    EXPECT_NEAR(obs[0].space_observer_gcrf->x_si(), -22382197.0, 1.0);
+    EXPECT_NEAR(obs[0].space_observer_gcrf->y_si(), 220051081.0, 1.0);
+    EXPECT_NEAR(obs[0].space_observer_gcrf->z_si(), 97190273.0, 1.0);
+}
