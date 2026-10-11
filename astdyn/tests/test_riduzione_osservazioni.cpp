@@ -15,6 +15,7 @@
 #include "astdyn/observations/RWOReader.hpp"
 #include "astdyn/observations/NightlyDeweighting.hpp"
 #include "astdyn/observations/GaiaSSOReader.hpp"
+#include "astdyn/orbit_determination/StationWeights.hpp"
 #include "astdyn/core/Constants.hpp"
 #include <cmath>
 #include <cstdio>
@@ -141,4 +142,29 @@ TEST(RiduzioneOsservazioni, SatelliteConNotaInColonna15) {
     EXPECT_NEAR(obs[0].space_observer_gcrf->x_si(), -22382197.0, 1.0);
     EXPECT_NEAR(obs[0].space_observer_gcrf->y_si(), 220051081.0, 1.0);
     EXPECT_NEAR(obs[0].space_observer_gcrf->z_si(), 97190273.0, 1.0);
+}
+
+TEST(RiduzioneOsservazioni, PesiPerStazioneDallaDispersioneDeiResidui) {
+    std::vector<orbit_determination::ObservationResidual> res;
+    auto add = [&res](const std::string& code, double z) {
+        orbit_determination::ObservationResidual r;
+        r.observatory_code = code; r.outlier = false;
+        r.normalized_ra = z; r.normalized_dec = -z;
+        res.push_back(r);
+    };
+    // "A": residuals twice their sigma -> factor 2; "B": too few -> untouched
+    for (int k = 0; k < 200; ++k) add("A", 2.0 * (k % 2 ? 0.6745 : -0.6745));
+    for (int k = 0; k < 5; ++k) add("B", 9.0);
+    const auto factors = orbit_determination::station_sigma_factors(res);
+    ASSERT_EQ(factors.count("A"), 1u);
+    EXPECT_EQ(factors.count("B"), 0u);
+    EXPECT_NEAR(factors.at("A"), 2.0, 0.01);
+
+    std::vector<observations::OpticalObservation> obs(2);
+    obs[0].observatory_code = "A"; obs[0].sigma_ra = astrometry::Angle::from_arcsec(0.5);
+    obs[1].observatory_code = "A"; obs[1].radec_covariance_arcsec2 = Eigen::Matrix2d::Identity();
+    obs[1].sigma_ra = astrometry::Angle::from_arcsec(0.5);
+    EXPECT_EQ(orbit_determination::apply_station_factors(obs, factors), 1);   // Gaia-like untouched
+    EXPECT_NEAR(obs[0].sigma_ra.to_arcsec(), 1.0, 0.01);
+    EXPECT_NEAR(obs[1].sigma_ra.to_arcsec(), 0.5, 1e-12);
 }

@@ -158,6 +158,7 @@ void AstDynEngine::load_fitting_settings(const core::IOCConfig& ioc) {
     config_.fit_obs_years = ioc.get<double>("diffcorr.obs_years", config_.fit_obs_years);
     config_.fit_tolerance = ioc.get<double>("diffcorr.tolerance", config_.fit_tolerance);
     config_.fit_batch_deweighting = ioc.get<bool>("diffcorr.batch_deweighting", config_.fit_batch_deweighting);
+    config_.fit_station_weights   = ioc.get<bool>("diffcorr.station_weights", config_.fit_station_weights);
 }
 
 void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {
