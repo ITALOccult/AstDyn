@@ -176,12 +176,32 @@ OccultationParameters OccultationLogic::compute_parameters(
     }
     
     if (ephem) {
+        set_apparent_star(params, star_ra, star_dec, t_ca, *ephem);
         // Order matters: the shadow centre defines the point at which the Sun's
         // altitude is evaluated, so it must be computed first.
-        compute_shadow_centre(params, t_ca, star_ra, star_dec);
+        compute_shadow_centre(params, t_ca, params.star_ra_apparent, params.star_dec_apparent);
         compute_sky_conditions(params, t_ca, ast_ra, ast_dec, ast_dist, star_ra, star_dec, ephem);
     }
     return params;
+}
+
+void OccultationLogic::set_apparent_star(
+    OccultationParameters& params,
+    const RightAscension& star_ra, const Declination& star_dec,
+    const time::EpochTDB& t_ca, const ephemeris::PlanetaryEphemeris& ephem)
+{
+    const double a = star_ra.to_rad(), d = star_dec.to_rad();
+    const Eigen::Vector3d astrometric(std::cos(d) * std::cos(a), std::cos(d) * std::sin(a), std::sin(d));
+    // Barycentric velocity of the Earth: the annual aberration it produces is
+    // up to 20.5".
+    const Eigen::Vector3d earth_vel_m_s =
+        ephem.getProvider()->getVelocity(ephemeris::CelestialBody::EARTH, t_ca).to_eigen_si();
+    const Eigen::Vector3d apparent = aberrazione_differenziale(astrometric, earth_vel_m_s).normalized();
+    double ra = std::atan2(apparent.y(), apparent.x());
+    if (ra < 0.0) ra += constants::TWO_PI;
+    params.star_ra_apparent = RightAscension::from_rad(ra);
+    params.star_dec_apparent = Declination::from_rad(std::asin(std::clamp(apparent.z(), -1.0, 1.0)));
+    params.has_apparent_star = true;
 }
 
 void OccultationLogic::compute_shadow_centre(

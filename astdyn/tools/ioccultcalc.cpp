@@ -237,6 +237,18 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.d3x = pr.d3xi_dt3  * ORA * ORA * ORA / (6.0 * kEarthRadiusM);
     ev.d3y = pr.d3eta_dt3 * ORA * ORA * ORA / (6.0 * kEarthRadiusM);
 
+    // Gli elementi del formato sono sull'equatore della data (vedi fundamental_plane_j2000_to_date).
+    {
+        const double ra = (pr.has_apparent_star ? pr.star_ra_apparent : cand.star.ra).to_rad();
+        const double dec = (pr.has_apparent_star ? pr.star_dec_apparent : cand.star.dec).to_rad();
+        const Eigen::Matrix2d alla_data = coordinates::fundamental_plane_j2000_to_date(t_tt, ra, dec);
+        auto ruota = [&alla_data](double& u, double& v) {
+            const Eigen::Vector2d r = alla_data * Eigen::Vector2d(u, v);
+            u = r.x(); v = r.y();
+        };
+        ruota(ev.x, ev.y); ruota(ev.dx, ev.dy); ruota(ev.d2x, ev.d2y); ruota(ev.d3x, ev.d3y);
+    }
+
     // ---- <Earth> ----------------------------------------------------------
     ev.substellar_lon_deg = pr.substar_lon.to_deg();
     ev.substellar_lat_deg = pr.substar_lat.to_deg();   // geocentric == apparent Dec
@@ -264,7 +276,11 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.k2_flag           = "";
     {
         Angle ra_app, dec_app;
-        coordinates::apparent_place(t_tt, s_ep.ra(), s_ep.dec(), ra_app, dec_app);
+        // Occult4's "apparent of date" includes the annual aberration.
+        if (pr.has_apparent_star)
+            coordinates::apparent_place(t_tt, pr.star_ra_apparent, pr.star_dec_apparent, ra_app, dec_app);
+        else
+            coordinates::apparent_place(t_tt, s_ep.ra(), s_ep.dec(), ra_app, dec_app);
         ev.star_app_ra_h    = ra_app.to_deg() / 15.0;
         ev.star_app_dec_deg = dec_app.to_deg();
     }

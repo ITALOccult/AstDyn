@@ -64,6 +64,14 @@ struct OccultationParameters {
     /// which is the convention Occult4 uses in <Earth>.
     Angle substar_lat;                 
     Angle substar_lon;                 
+    /// The star as seen from the moving Earth (GCRS, annual aberration
+    /// applied). The shadow falls along this direction: (xi, eta) are free of
+    /// aberration, which shifts star and asteroid alike, but orienting the
+    /// Earth under them is not. Without it the sub-star point sat ~20" off,
+    /// 1.3 s of Earth rotation -- (316) Goberta's chords came 1 s early.
+    RightAscension star_ra_apparent;
+    Declination star_dec_apparent;
+    bool has_apparent_star = false;
     /// Sub-solar point (geocentric). Occult4 carries it in <Earth> fields 3-4
     /// so that the day/night terminator can be drawn.
     Angle subsolar_lat;                
@@ -209,6 +217,11 @@ private:
 
     /// Geodetic lat/lon of the shadow centre at t_ca (uses the impact
     /// parameter xi/eta; NOT the sub-asteroid point).
+    static void set_apparent_star(
+        OccultationParameters& params,
+        const RightAscension& star_ra, const Declination& star_dec,
+        const time::EpochTDB& t_ca, const ephemeris::PlanetaryEphemeris& ephem);
+
     static void compute_shadow_centre(
         OccultationParameters& params,
         const time::EpochTDB& t_ca,
