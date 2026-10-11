@@ -7,6 +7,8 @@
 
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/coordinates/ReferenceFrame.hpp"
+#include "astdyn/coordinates/CelestialToTerrestrial.hpp"
+#include "astdyn/time/TimeScale.hpp"
 #include <fstream>
 #include <sstream>
 #include <cmath>
@@ -19,6 +21,22 @@ namespace observations {
 static constexpr double WGS84_A = 6378137.0;      // Semi-major axis [m]
 static constexpr double WGS84_F = 1.0 / 298.257223563; // Flattening
 
+/// Geocentric site position straight from the MPC parallax constants.
+///
+/// rho*cos(phi') and rho*sin(phi') are already geocentric, in equatorial
+/// radii. Turning them into a latitude and feeding it to the geodetic
+/// conversion applied the flattening a second time: ~0.16 deg of latitude at
+/// +-30 deg, ~18 km of site, ~15 mas on a main-belt asteroid with the sign of
+/// the hemisphere -- measured on the AstDyS residuals of (3830).
+static math::Vector3<core::ITRF, physics::Distance> position_from_parallax_constants(
+    double longitude_rad, double rho_cos_phi, double rho_sin_phi)
+{
+    return math::Vector3<core::ITRF, physics::Distance>::from_si(
+        WGS84_A * rho_cos_phi * std::cos(longitude_rad),
+        WGS84_A * rho_cos_phi * std::sin(longitude_rad),
+        WGS84_A * rho_sin_phi);
+}
+
 // ============================================================================
 // Observatory Methods
 // ============================================================================
@@ -29,11 +47,14 @@ void Observatory::computeGeocentricPosition() {
 }
 
 math::Vector3<core::GCRF, physics::Distance> Observatory::getPositionGCRF(time::EpochUTC t) const {
-    // Convert ITRF position to GCRF using Earth rotation
-    // Uses rotation matrix directly (non-deprecated path)
-    Eigen::Vector3d pos_itrf(position.x_si(), position.y_si(), position.z_si());
-    Eigen::Matrix3d R = coordinates::ReferenceFrame::itrf_to_j2000_simple(t);
-    Eigen::Vector3d pos_gcrf = R * pos_itrf;
+    // Full IAU chain, not the Earth Rotation Angle alone: without precession-
+    // nutation the site is rotated about the CIP of J2000 instead of today's,
+    // ~0.0025 rad apart in 2026 -- 15 km of site position, ~10 mas on a
+    // main-belt asteroid, with opposite sign in the two hemispheres. That is
+    // how it showed up against the AstDyS residuals of (3830).
+    const Eigen::Vector3d pos_itrf(position.x_si(), position.y_si(), position.z_si());
+    const auto itrf_from_gcrf = coordinates::gcrf_to_itrf(time::to_tt(t), time::to_ut1(t));
+    const Eigen::Vector3d pos_gcrf = itrf_from_gcrf.matrix().transpose() * pos_itrf;
     return math::Vector3<core::GCRF, physics::Distance>::from_si(pos_gcrf.x(), pos_gcrf.y(), pos_gcrf.z());
 }
 
@@ -101,9 +122,9 @@ size_t ObservatoryDatabase::loadFromMPCFile(const std::string& filepath) {
                                   obs.rho_sin_phi * obs.rho_sin_phi);
             obs.latitude = std::atan2(obs.rho_sin_phi, obs.rho_cos_phi);
             obs.altitude = (rho - 1.0) * WGS84_A; // meters
-            
-            // Compute geocentric position
-            obs.computeGeocentricPosition();
+
+            obs.position = position_from_parallax_constants(
+                obs.longitude, obs.rho_cos_phi, obs.rho_sin_phi);
             
             addObservatory(obs);
             count++;
@@ -168,7 +189,8 @@ void ObservatoryDatabase::loadDefaultObservatories() {
             obs.altitude = 0.0;
         }
         
-        obs.computeGeocentricPosition();
+        obs.position = position_from_parallax_constants(
+            obs.longitude, obs.rho_cos_phi, obs.rho_sin_phi);
         addObservatory(obs);
     }
 }

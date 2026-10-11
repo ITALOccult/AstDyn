@@ -11,6 +11,7 @@
 #ifndef ASTDYN_ORBIT_DETERMINATION_RESIDUALS_HPP
 #define ASTDYN_ORBIT_DETERMINATION_RESIDUALS_HPP
 
+#include <Eigen/Cholesky>
 #include "astdyn/core/Types.hpp"
 #include "astdyn/observations/Observation.hpp"
 #include "astdyn/core/physics_state.hpp"
@@ -70,6 +71,22 @@ struct ObservationResidual {
                 std::abs(normalized_dec) > sigma_threshold);
     }
 };
+
+/**
+ * @brief Whitening of a correlated (alpha*, delta) pair: L^-1, with C = L L^T [rad].
+ *
+ * Applied to the residual pair and to the two rows of the design matrix, it
+ * turns r^T C^-1 r into a plain sum of squares, so a correlated observation
+ * enters the least squares exactly and the rest of the solver is unchanged.
+ */
+inline std::optional<Eigen::Matrix2d> whitening_matrix(const observations::OpticalObservation& obs) {
+    if (!obs.radec_covariance_arcsec2) return std::nullopt;
+    const double arcsec_rad = constants::ARCSEC_TO_RAD;
+    const Eigen::Matrix2d cov_rad2 = *obs.radec_covariance_arcsec2 * (arcsec_rad * arcsec_rad);
+    Eigen::LLT<Eigen::Matrix2d> llt(cov_rad2);
+    if (llt.info() != Eigen::Success) return std::nullopt;
+    return Eigen::Matrix2d(llt.matrixL().solve(Eigen::Matrix2d::Identity()));
+}
 
 /**
  * @brief Statistics for residual set
@@ -185,6 +202,13 @@ public:
     void set_aberration_correction(bool enable) { 
         aberration_correction_ = enable; 
     }
+
+    /**
+     * @brief Enable/disable the solar light deflection of the computed position
+     */
+    void set_light_deflection(bool enable) {
+        light_deflection_ = enable;
+    }
     
     /**
      * @brief Get observer position at observation time
@@ -247,8 +271,14 @@ private:
     std::shared_ptr<astdyn::propagation::Propagator> propagator_;
     
     // Correction flags
+    // Observations are reduced against catalogue stars, which suffer the same
+    // aberration and (nearly) the same deflection: the computed position must
+    // be ASTROMETRIC. Both flags give the apparent place, for other uses.
+    // Against JPL Horizons on (3830): 0.1 mas astrometric, 12 mas with the
+    // full deflection applied to the asteroid.
     bool light_time_correction_ = true;
-    bool aberration_correction_ = true;
+    bool aberration_correction_ = false;
+    bool light_deflection_ = false;
 };
 
 } // namespace astdyn::orbit_determination

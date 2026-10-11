@@ -147,6 +147,28 @@ std::expected<AstrometricObservation, AstrometryError> AstrometryReducer::comput
     return finalize_observation(rho_eq);
 }
 
+namespace {
+/// How far the Sun moves, relative to the barycentre, while the light travels.
+///
+/// The asteroid is propagated heliocentric and the observer is heliocentric,
+/// but at two different instants: subtracting them as they are measures the
+/// asteroid from where the Sun is NOW instead of from where it was when the
+/// light left. The Sun moves at ~11 m/s around the barycentre, so over the
+/// ~1900 s of a main-belt light time the path shifted by ~20 km.
+Eigen::Vector3d sun_motion_during_light_time_ecl_m(
+    const std::shared_ptr<::astdyn::ephemeris::DE441Provider>& de441,
+    const time::EpochTDB& t_emit, const time::EpochTDB& t_obs)
+{
+    const auto sun_emit = de441->getPosition(::astdyn::ephemeris::CelestialBody::SUN, t_emit);
+    const auto sun_obs  = de441->getPosition(::astdyn::ephemeris::CelestialBody::SUN, t_obs);
+    const auto shift_gcrf = math::Vector3<core::GCRF, physics::Distance>::from_si(
+        sun_emit.x_si() - sun_obs.x_si(),
+        sun_emit.y_si() - sun_obs.y_si(),
+        sun_emit.z_si() - sun_obs.z_si());
+    return coordinates::ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(shift_gcrf).to_eigen_si();
+}
+} // namespace
+
 Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     const physics::KeplerianStateTyped<core::ECLIPJ2000>& initial,
     const time::EpochTDB& t_elements, const time::EpochTDB& t_obs,
@@ -183,7 +205,8 @@ Eigen::Vector3d AstrometryReducer::compute_light_time_corrected_pos(
     for (int i = 0; i < 5; ++i) {
         time::EpochTDB t_emit = time::EpochTDB::from_mjd(t_obs.mjd() - tau);
         auto cart_emit = propagator->propagate_cartesian(cart0, t_emit);
-        p_ast = cart_emit.position.to_eigen_si();
+        p_ast = cart_emit.position.to_eigen_si()
+              + sun_motion_during_light_time_ecl_m(de441, t_emit, t_obs);
         tau = (p_ast - earth_pos_helio_ecl).norm() / (constants::C_LIGHT * 86400.0 * 1000.0);
         if (std::getenv("ASTDYN_LT_DEBUG")) {
             const Eigen::Vector3d g = p_ast - earth_pos_helio_ecl;

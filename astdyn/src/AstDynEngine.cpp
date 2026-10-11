@@ -122,12 +122,12 @@ void AstDynEngine::update_propagator() {
 void AstDynEngine::load_integrator_settings(const core::IOCConfig& ioc) {
     config_.integrator_type = string_to_integrator(ioc.get<std::string>("integrator.type", "RK4"));
     config_.initial_step_size = ioc.get<double>("integrator.step_size", 0.1);
-    // Default 1e-11, non 1e-12: per RKF78 in AU/day una tolleranza relativa di
-    // 1e-12 e' sotto il rumore aritmetico dei 13 stage, irraggiungibile -> il
-    // passo collassa a h_min e l'integrazione rallenta enormemente (o, prima
-    // del fix del deadlock, falliva). 1e-11 e' accurato e raggiungibile. Chi
-    // vuole precisione estrema puo' ancora impostarlo esplicitamente.
-    config_.tolerance = ioc.get<double>("integrator.tolerance", 1e-11);
+    // Default 1e-13. Misurato su (3830), 565 giorni, contro RADAU a 1e-13:
+    // RKF78 sbaglia di 55 km a 1e-11, 1.5 km a 1e-12, 0.07 km a 1e-13 -- e i
+    // 55 km finivano dritti sulla traccia d'ombra. La campagna completa costa
+    // il 27% in piu' (386 s contro 305 s). Il vecchio timore che 1e-12 facesse
+    // collassare il passo valeva prima del fix del deadlock: oggi non succede.
+    config_.tolerance = ioc.get<double>("integrator.tolerance", 1e-13);
     config_.aas_precision = ioc.get<double>("integrator.aas_precision", 1e-4);
 }
 
@@ -157,6 +157,7 @@ void AstDynEngine::load_fitting_settings(const core::IOCConfig& ioc) {
     config_.fit_enabled   = ioc.get<bool>  ("diffcorr.enabled",   config_.fit_enabled);
     config_.fit_obs_years = ioc.get<double>("diffcorr.obs_years", config_.fit_obs_years);
     config_.fit_tolerance = ioc.get<double>("diffcorr.tolerance", config_.fit_tolerance);
+    config_.fit_batch_deweighting = ioc.get<bool>("diffcorr.batch_deweighting", config_.fit_batch_deweighting);
 }
 
 void AstDynEngine::load_occultation_settings(const core::IOCConfig& ioc) {

@@ -5,6 +5,7 @@
 #include "astdyn/astrometry/OrbitingChebyshevEphemeris.hpp"
 #include "astdyn/observations/ObservatoryDatabase.hpp"
 #include "astdyn/observations/RWOReader.hpp"
+#include "astdyn/observations/GaiaSSOReader.hpp"
 #include <fstream>
 #include "astdyn/io/OccultationXMLIO.hpp"
 #include "astdyn/io/OccultationJSONIO.hpp"
@@ -285,23 +286,31 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
                                  pr.geocentric_distance.to_au(),
                                  pr.phase_angle);
 
+    // Magnitudini dell'asteroide in V e R come le scrive Occult4 quando non ha
+    // dati di colore: V e' la magnitudine dell'asteroide, R = V - 0.45
+    // (MinorPlanetOccultationElements.cs). Il suo lettore fa double.Parse di
+    // questi campi: vuoti, come li scrivevamo, fanno fallire il file intero.
+    constexpr double kAsteroidVMinusR = 0.45;
+    ev.mag_v_asteroid = ev.object_mag;
+    ev.mag_r_asteroid = ev.object_mag - kAsteroidVMinusR;
+
     // Calo di magnitudine: durante l'evento si vede il solo asteroide, prima la
-    // luce combinata. DEVE stare dopo l'assegnazione di object_mag: calcolarlo
-    // prima significava usare magnitudine zero — un corpo piu' luminoso di Vega —
-    // e produceva 0.00 invece di 10.69 sul caso 820987.
-    // Ogni banda si calcola solo se la magnitudine stellare corrispondente c'e':
-    // con mag_r assente il calcolo dava 21.11, cioe' un calo di ventun magnitudini.
+    // luce combinata. Ogni banda si calcola solo se la magnitudine stellare
+    // corrispondente c'e' (anche ricavata, con la relazione di Occult4
+    // R = 1.54 V - 0.54 B): con mag_r assente il calcolo dava 21.11.
+    const auto calo = [](double stella, double asteroide) {
+        const double combinata = -2.5 * std::log10(std::pow(10.0, -0.4 * stella) +
+                                                   std::pow(10.0, -0.4 * asteroide));
+        return asteroide - combinata;
+    };
+    double mag_r_stella = ev.mag_r;
+    if (!magnitudine_disponibile(mag_r_stella) && magnitudine_disponibile(ev.mag_b)
+        && magnitudine_disponibile(ev.mag_v)) {
+        mag_r_stella = 1.54 * ev.mag_v - 0.54 * ev.mag_b;
+    }
     if (ev.object_mag > -5.0) {
-        if (magnitudine_disponibile(ev.mag_v)) {
-            const double comb_v = -2.5 * std::log10(std::pow(10.0, -0.4 * ev.mag_v) +
-                                                    std::pow(10.0, -0.4 * ev.object_mag));
-            ev.mag_drop_v = ev.object_mag - comb_v;
-        }
-        if (magnitudine_disponibile(ev.mag_r)) {
-            const double comb_r = -2.5 * std::log10(std::pow(10.0, -0.4 * ev.mag_r) +
-                                                    std::pow(10.0, -0.4 * ev.object_mag));
-            ev.mag_drop_r = ev.object_mag - comb_r;
-        }
+        if (magnitudine_disponibile(ev.mag_v)) ev.mag_drop_v = calo(ev.mag_v, ev.mag_v_asteroid);
+        if (magnitudine_disponibile(mag_r_stella)) ev.mag_drop_r = calo(mag_r_stella, ev.mag_r_asteroid);
     }
     ev.diameter_km   = diameter_km;
     ev.distance_au   = pr.geocentric_distance.to_au();
@@ -314,8 +323,6 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     ev.taxonomy = "";
     ev.diameter_uncertainty_km = 0.0;
     ev.moon_in_planet_shadow   = 0;
-    ev.mag_v_asteroid = 0.0;
-    ev.mag_r_asteroid = 0.0;
 
     // ---- <Orbit> : low-precision, for plotting only -----------------------
     auto [oy, om, od, ofrac] = time::mjd_to_calendar(el.epoch.mjd());
@@ -802,6 +809,16 @@ int main(int argc, char** argv) {
                             prova.close();
                             try {
                                 auto osservazioni = observations::RWOReader::readFile(rwo);
+                                // L'astrometria Gaia non passa da MPC ne' da AstDyS: senza,
+                                // l'orbita di (3830) restava a 70-85 km da quella JPL, che
+                                // la usa. Si scarica con tools/scarica_gaia_sso.py.
+                                const std::string gaia_csv = observations_dir + "/" + id + "_gaia_fpr.csv";
+                                if (std::filesystem::exists(gaia_csv)) {
+                                    auto gaia = observations::read_gaia_sso_csv(gaia_csv);
+                                    std::cout << "[fit] " << id << ": " << gaia.size()
+                                              << " osservazioni Gaia FPR da " << gaia_csv << "\n";
+                                    osservazioni.insert(osservazioni.end(), gaia.begin(), gaia.end());
+                                }
                                 AstDynEngine motore_fit;
                                 auto cfg_fit = engine.config();
                                 cfg_fit.verbose = false;
@@ -1259,8 +1276,12 @@ int main(int argc, char** argv) {
                                                     ev_diam, ev_h_mag, ev_name));
             }
             std::filesystem::path p = std::filesystem::path(out_dir) / xml_file;
-            OccultationXMLIO::write_file(events, p.string());
-            std::cout << "[ioccultcalc] Saved " << events.size() << " events to " << p.string() << "\n";
+            std::filesystem::create_directories(p.parent_path());
+            if (OccultationXMLIO::write_file(events, p.string())) {
+                std::cout << "[ioccultcalc] Saved " << events.size() << " events to " << p.string() << "\n";
+            } else {
+                std::cerr << "[ioccultcalc] ERRORE: impossibile scrivere " << p.string() << "\n";
+            }
             std::string json_file = vm.count("json-output") ? vm["json-output"].as<std::string>() : adv_cfg.get<std::string>("json-output", "");
             if (!json_file.empty()) {
                 std::filesystem::path pj = std::filesystem::path(out_dir) / json_file;
@@ -1273,6 +1294,7 @@ int main(int argc, char** argv) {
         std::string svg_file = vm.count("svg-output") ? vm["svg-output"].as<std::string>() : adv_cfg.get<std::string>("svg-output", "");
         if (!svg_file.empty()) {
             std::filesystem::path p = std::filesystem::path(out_dir) / svg_file;
+            std::filesystem::create_directories(p.parent_path());
             double zoom    = vm["zoom"].as<double>();
             double map_lat = vm.count("map-lat") ? vm["map-lat"].as<double>() : obs_lat;
             double map_lon = vm.count("map-lon") ? vm["map-lon"].as<double>() : obs_lon;

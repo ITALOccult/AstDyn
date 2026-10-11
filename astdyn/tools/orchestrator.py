@@ -571,7 +571,7 @@ def resolve_profile(profiles, name, builtin_default):
             "physics.asteroids.use_30_set": True,
             "physics.relativity": True,
             "integrator.type": "RKF78",
-            "integrator.tolerance": 1e-11,
+            "integrator.tolerance": 1e-13,
         },
     }
     d = DEFAULTS.get(name) or DEFAULTS[builtin_default]

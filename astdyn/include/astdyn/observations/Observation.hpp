@@ -18,6 +18,10 @@
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/epoch.hpp"
 #include "astdyn/astrometry/sky_types.hpp"
+#include "astdyn/math/frame_algebra.hpp"
+#include "astdyn/core/physics_types.hpp"
+#include "astdyn/core/frame_tags.hpp"
+#include <optional>
 
 namespace astdyn {
 namespace observations {
@@ -93,6 +97,18 @@ struct OpticalObservation {
     // Quality flags
     bool is_discovery;               ///< Discovery observation flag
     bool is_offset;                  ///< Offset observation (from nearby reference)
+
+    /// Geocentric position of a space-based observer (TESS, WISE, ...), GCRF.
+    /// Absent for ground sites, whose position comes from the MPC catalogue.
+    /// TESS orbits out to ~375 000 km: reducing it from the geocentre would
+    /// cost up to 0.5" on a main-belt asteroid.
+    std::optional<math::Vector3<core::GCRF, physics::Distance>> space_observer_gcrf;
+
+    /// Full covariance of (alpha*cos(delta), delta) [arcsec^2], when the two
+    /// errors are correlated. Gaia's are: a transit measures along the scan to
+    /// ~2 mas and across it to ~500 mas, a correlation of -0.99999 in (RA, Dec).
+    /// Absent, the independent sigma_ra and sigma_dec apply.
+    std::optional<Eigen::Matrix2d> radec_covariance_arcsec2;
     
     /**
      * @brief Default constructor

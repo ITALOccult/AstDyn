@@ -166,23 +166,34 @@ OccultationEvent OccultationXMLIO::parse_event_node(const std::string& xml) {
 
 namespace {
 
-/// Un valore non disponibile si scrive VUOTO, non con un numero sentinella.
-///
-/// E' la convenzione di Occult4: nel blocco <Moon> ogni campo a zero produce
-/// virgole consecutive, e Parse_Star traduce un campo non numerico in
-/// magnitudine 25 -- "troppo debole per essere nota". Scrivere 99.00
-/// significherebbe dichiarare una stella di magnitudine 99.
-std::string campo_opzionale(double v, int decimali, bool disponibile) {
-    if (!disponibile) return std::string();
+/// Occult4 ends every line with CRLF (StreamWriter.WriteLine on Windows), and
+/// its reader -- the one OccultWatcher shares -- scans the file line by line.
+constexpr const char* EOL = "\r\n";
+
+/// A magnitude is usable if it lies in a plausible range.
+bool mag_disponibile(double m) { return m > -2.0 && m < 30.0 && m != 0.0; }
+
+/// Star magnitudes as Occult4 writes them: always a number. A missing B or R
+/// is derived from the other with Occult4's own relation (V = (R + 0.54 B) /
+/// 1.54); with neither, 0.00 -- the value its reader treats as "unknown".
+/// An empty field would be read as 25 by Occult4 but is not guaranteed to be
+/// accepted by every reader of the format.
+struct MagnitudiBVR { double b, v, r; };
+
+MagnitudiBVR magnitudini_occult4(const OccultationEvent& ev) {
+    const bool has_b = mag_disponibile(ev.mag_b), has_v = mag_disponibile(ev.mag_v),
+               has_r = mag_disponibile(ev.mag_r);
+    MagnitudiBVR m{has_b ? ev.mag_b : 0.0, has_v ? ev.mag_v : 0.0, has_r ? ev.mag_r : 0.0};
+    if (has_v && !has_b && has_r) m.b = (1.54 * m.v - m.r) / 0.54;
+    if (has_v && has_b && !has_r) m.r = 1.54 * m.v - 0.54 * m.b;
+    return m;
+}
+
+std::string f(double v, int decimali) {
     std::ostringstream o;
     o << std::fixed << std::setprecision(decimali) << v;
     return o.str();
 }
-
-/// Una magnitudine e' utilizzabile se sta in un intervallo plausibile. Il
-/// catalogo stellare distribuito porta la sola banda G: B e R restano assenti
-/// finche' non se ne avra' uno con tutte e tre.
-bool mag_disponibile(double m) { return m > -2.0 && m < 30.0 && m != 0.0; }
 
 /// Angolo riportato in [0, 360). Occult4 scrive l'anomalia media convertendo da
 /// radianti gia' normalizzati; noi potremmo averla negativa dopo un fit.
@@ -194,74 +205,66 @@ double in_giro(double deg) {
 } // namespace
 
 std::string OccultationXMLIO::format_event_node(const OccultationEvent& ev) {
-    std::stringstream ss;
-    ss << std::fixed;
-    ss << "  <Event>\n";
+    // Field by field the layout and the decimals of Occult4's
+    // OccultationElements.XML_Elements(): its reader parses most fields with
+    // double.Parse, so an empty field is not "missing" but an exception.
+    return "  <Event>" + std::string(EOL) + elements_line(ev) + earth_line(ev) + star_line(ev)
+         + object_line(ev) + orbit_line(ev) + errors_line(ev) + id_line(ev)
+         + "  </Event>" + EOL;
+}
 
-    ss << std::setprecision(7);
-    ss << "    <Elements>" << ev.elements_source << ","
-       << ev.duration_s << "," << ev.year << "," << ev.month << "," << ev.day << ","
-       << ev.ut_closest_h << "," << ev.x << "," << ev.y << ","
-       << ev.dx << "," << ev.dy << "," << ev.d2x << "," << ev.d2y << ","
-       << ev.d3x << "," << ev.d3y << "</Elements>\n";
+std::string OccultationXMLIO::elements_line(const OccultationEvent& ev) {
+    return "    <Elements>" + ev.elements_source + "," + f(ev.duration_s, 2) + ","
+         + std::to_string(ev.year) + "," + std::to_string(ev.month) + "," + std::to_string(ev.day) + ","
+         + f(ev.ut_closest_h, 7) + "," + f(ev.x, 7) + "," + f(ev.y, 7) + ","
+         + f(ev.dx, 7) + "," + f(ev.dy, 7) + "," + f(ev.d2x, 7) + "," + f(ev.d2y, 7) + ","
+         + f(ev.d3x, 7) + "," + f(ev.d3y, 7) + "</Elements>" + EOL;
+}
 
-    // Occult4 scrive le sub-stellari con 4 decimali e le sub-solari con 2.
-    ss << std::setprecision(4);
-    ss << "    <Earth>" << ev.substellar_lon_deg << "," << ev.substellar_lat_deg << ","
-       << std::setprecision(2) << ev.subsolar_lon_deg << "," << ev.subsolar_lat_deg << ","
-       << (ev.jwst ? "True" : "False") << "</Earth>\n";
+std::string OccultationXMLIO::earth_line(const OccultationEvent& ev) {
+    return "    <Earth>" + f(ev.substellar_lon_deg, 4) + "," + f(ev.substellar_lat_deg, 4) + ","
+         + f(ev.subsolar_lon_deg, 2) + "," + f(ev.subsolar_lat_deg, 2) + ","
+         + (ev.jwst ? "True" : "False") + "</Earth>" + EOL;
+}
 
-    ss << "    <Star>" << ev.star_id << ","
-       << std::setprecision(8) << ev.star_ra_h << "," << ev.star_dec_deg << ","
-       << campo_opzionale(ev.mag_b, 2, mag_disponibile(ev.mag_b)) << ","
-       << campo_opzionale(ev.mag_v, 2, mag_disponibile(ev.mag_v)) << ","
-       << campo_opzionale(ev.mag_r, 2, mag_disponibile(ev.mag_r)) << ","
-       << std::setprecision(3) << ev.star_diameter_mas << ","
-       << ev.double_star_code << "," << ev.k2_flag << ","
-       << std::setprecision(8) << ev.star_app_ra_h << "," << ev.star_app_dec_deg << ","
-       << campo_opzionale(ev.mag_drop_v, 2, ev.mag_drop_v != 0.0) << ","
-       << campo_opzionale(ev.mag_drop_r, 2, ev.mag_drop_r != 0.0) << ","
-       << ev.mag_drops_adjusted << "," << ev.bright_nearby_count << ","
-       << ev.total_nearby_count << "</Star>\n";
+std::string OccultationXMLIO::star_line(const OccultationEvent& ev) {
+    const auto m = magnitudini_occult4(ev);
+    return "    <Star>" + ev.star_id + "," + f(ev.star_ra_h, 8) + "," + f(ev.star_dec_deg, 7) + ","
+         + f(m.b, 2) + "," + f(m.v, 2) + "," + f(m.r, 2) + "," + f(ev.star_diameter_mas, 1) + ","
+         + std::to_string(ev.double_star_code) + "," + ev.k2_flag + ","
+         + f(ev.star_app_ra_h, 8) + "," + f(ev.star_app_dec_deg, 7) + ","
+         + f(ev.mag_drop_v, 2) + "," + f(ev.mag_drop_r, 2) + ","
+         + std::to_string(ev.mag_drops_adjusted) + "," + std::to_string(ev.bright_nearby_count) + ","
+         + std::to_string(ev.total_nearby_count) + "</Star>" + EOL;
+}
 
-    ss << "    <Object>" << ev.object_number << "," << ev.object_name << ","
-       << std::setprecision(2) << ev.object_mag << ","
-       << std::setprecision(3) << ev.diameter_km << ","
-       << std::setprecision(4) << ev.distance_au << ","
-       << ev.n_rings << "," << ev.n_moons << ","
-       << std::setprecision(3) << ev.d_ra_s_hr << "," << ev.d_dec_as_hr << ","
-       << ev.taxonomy << "," << std::setprecision(1) << ev.diameter_uncertainty_km << ","
-       << ev.moon_in_planet_shadow << ","
-       // Magnitudini V ed R dell'asteroide, aggiunte alla specifica in agosto
-       // 2024. Non le calcoliamo: vuote, non a zero.
-       << campo_opzionale(ev.mag_v_asteroid, 2, ev.mag_v_asteroid != 0.0) << ","
-       << campo_opzionale(ev.mag_r_asteroid, 2, ev.mag_r_asteroid != 0.0)
-       << "</Object>\n";
+std::string OccultationXMLIO::object_line(const OccultationEvent& ev) {
+    // The trailing comma after MagR is Occult4's: it writes "{0:f2}," for both.
+    return "    <Object>" + ev.object_number + "," + ev.object_name + "," + f(ev.object_mag, 2) + ","
+         + f(ev.diameter_km, 3) + "," + f(ev.distance_au, 4) + ","
+         + std::to_string(ev.n_rings) + "," + std::to_string(ev.n_moons) + ","
+         + f(ev.d_ra_s_hr, 3) + "," + f(ev.d_dec_as_hr, 2) + "," + ev.taxonomy + ","
+         + f(ev.diameter_uncertainty_km, 1) + "," + std::to_string(ev.moon_in_planet_shadow) + ","
+         + f(ev.mag_v_asteroid, 2) + "," + f(ev.mag_r_asteroid, 2) + ",</Object>" + EOL;
+}
 
-    ss << std::setprecision(4);
-    ss << "    <Orbit>" << static_cast<int>(ev.equinox) << ","
-       << in_giro(ev.mean_anomaly_deg) << ","
-       << ev.epoch_year << "," << ev.epoch_month << "," << ev.epoch_day << ","
-       << ev.peri_deg << "," << ev.node_deg << "," << ev.inclination_deg << ","
-       << std::setprecision(5) << ev.eccentricity << "," << ev.semi_major_axis_au << ","
-       << ev.perihelion_au << ","
-       << std::setprecision(2) << ev.h0 << "," << std::setprecision(1) << ev.coeff_log_r
-       << "," << std::setprecision(2) << ev.g_param << "</Orbit>\n";
+std::string OccultationXMLIO::orbit_line(const OccultationEvent& ev) {
+    return "    <Orbit>" + std::to_string(static_cast<int>(ev.equinox)) + "," + f(in_giro(ev.mean_anomaly_deg), 4) + ","
+         + std::to_string(ev.epoch_year) + "," + std::to_string(ev.epoch_month) + "," + std::to_string(ev.epoch_day) + ","
+         + f(ev.peri_deg, 4) + "," + f(ev.node_deg, 4) + "," + f(ev.inclination_deg, 4) + ","
+         + f(ev.eccentricity, 5) + "," + f(ev.semi_major_axis_au, 5) + "," + f(ev.perihelion_au, 5) + ","
+         + f(ev.h0, 2) + "," + f(ev.coeff_log_r, 1) + "," + f(ev.g_param, 2) + "</Orbit>" + EOL;
+}
 
-    ss << std::setprecision(4);
-    ss << "    <Errors>" << std::setprecision(3) << ev.err_path_widths << ","
-       << std::setprecision(4) << ev.err_major_as << "," << ev.err_minor_as << ","
-       << std::setprecision(0) << ev.err_pa_deg << ","
-       << std::setprecision(4) << ev.err_1sigma_as << ","
-       << ev.error_basis << "," << std::setprecision(2) << ev.reliability << ","
-       << ev.duplicate_source << "," << ev.non_gaia_pm << ","
-       << ev.pm_added_from_ucac4 << "</Errors>\n";
+std::string OccultationXMLIO::errors_line(const OccultationEvent& ev) {
+    return "    <Errors>" + f(ev.err_path_widths, 3) + "," + f(ev.err_major_as, 4) + ","
+         + f(ev.err_minor_as, 4) + "," + f(ev.err_pa_deg, 0) + "," + f(ev.err_1sigma_as, 4) + ","
+         + ev.error_basis + "," + f(ev.reliability, 2) + "," + std::to_string(ev.duplicate_source) + ","
+         + std::to_string(ev.non_gaia_pm) + "," + std::to_string(ev.pm_added_from_ucac4) + "</Errors>" + EOL;
+}
 
-    ss << "    <ID>" << ev.event_id << "," << std::setprecision(4)
-       << ev.prediction_mjd << "</ID>\n";
-
-    ss << "  </Event>\n";
-    return ss.str();
+std::string OccultationXMLIO::id_line(const OccultationEvent& ev) {
+    return "    <ID>" + ev.event_id + "," + f(ev.prediction_mjd, 4) + "</ID>" + EOL;
 }
 
 std::vector<std::string> OccultationXMLIO::split_csv(const std::string& csv) {
@@ -294,9 +297,9 @@ std::string OccultationXMLIO::write_string(const std::vector<OccultationEvent>& 
     // No XML declaration: Occult4 and OccultWatcher reject the file when one is
     // present ("The file is not occelmnt XML file"), and Occult4's own output
     // starts straight at <Occultations>.
-    ss << "<Occultations>\n";
+    ss << "<Occultations>" << EOL;
     for (const auto& ev : events) ss << format_event_node(ev);
-    ss << "</Occultations>\n";
+    ss << "</Occultations>" << EOL;
     return ss.str();
 }
 
