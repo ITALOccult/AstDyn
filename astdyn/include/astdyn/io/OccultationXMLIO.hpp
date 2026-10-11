@@ -51,6 +51,13 @@ public:
 private:
     static OccultationEvent parse_event_node(const std::string& event_xml);
     static std::string format_event_node(const OccultationEvent& event);
+    static std::string elements_line(const OccultationEvent& event);
+    static std::string earth_line(const OccultationEvent& event);
+    static std::string star_line(const OccultationEvent& event);
+    static std::string object_line(const OccultationEvent& event);
+    static std::string orbit_line(const OccultationEvent& event);
+    static std::string errors_line(const OccultationEvent& event);
+    static std::string id_line(const OccultationEvent& event);
     static std::vector<std::string> split_csv(const std::string& csv);
 };
 

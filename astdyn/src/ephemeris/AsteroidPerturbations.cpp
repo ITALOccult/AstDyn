@@ -187,9 +187,14 @@ math::Vector3<core::ECLIPJ2000, physics::Distance> AsteroidPerturbations::getPos
             double et = (t.mjd() - 51544.5) * 86400.0;
             
             Eigen::VectorXd state = spk_reader_->getState(naif_id, et);
-            // SPK returns km -> convert to SI meters
+            // SPK states are EQUATORIAL (ICRF), km. Labelled ecliptic without
+            // the rotation, every perturber sat 23.4 deg off its place: on
+            // (3930) the backward propagation of JPL's own orbit missed JPL by
+            // 2718 km in 1949 -- worse than with no perturbers at all.
+            const Eigen::Vector3d pos_ecl_km = coordinates::ReferenceFrame::j2000_to_ecliptic()
+                                             * Eigen::Vector3d(state[0], state[1], state[2]);
             return math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(
-                state[0] * 1000.0, state[1] * 1000.0, state[2] * 1000.0);
+                pos_ecl_km.x() * 1000.0, pos_ecl_km.y() * 1000.0, pos_ecl_km.z() * 1000.0);
             
         } catch (...) {
             // Fallback for some weird cases where only number works
@@ -197,8 +202,10 @@ math::Vector3<core::ECLIPJ2000, physics::Distance> AsteroidPerturbations::getPos
                  int raw_id = asteroid.number;
                  double et = (t.mjd() - 51544.5) * 86400.0;
                  Eigen::VectorXd state = spk_reader_->getState(raw_id, et);
+                 const Eigen::Vector3d pos_ecl_km = coordinates::ReferenceFrame::j2000_to_ecliptic()
+                                                  * Eigen::Vector3d(state[0], state[1], state[2]);
                  return math::Vector3<core::ECLIPJ2000, physics::Distance>::from_si(
-                    state[0] * 1000.0, state[1] * 1000.0, state[2] * 1000.0);
+                    pos_ecl_km.x() * 1000.0, pos_ecl_km.y() * 1000.0, pos_ecl_km.z() * 1000.0);
             } catch (...) { }
         }
     }

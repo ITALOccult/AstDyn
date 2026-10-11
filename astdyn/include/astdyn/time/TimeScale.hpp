@@ -90,7 +90,20 @@ double calendar_to_mjd(int year, int month, int day, double fraction = 0.0);
  * @param leap_seconds Number of leap seconds (default: use current value)
  * @return MJD in TAI scale
  */
-double utc_to_tai(double mjd_utc, int leap_seconds = LEAP_SECONDS_2025);
+double utc_to_tai(double mjd_utc, int leap_seconds);
+
+/**
+ * @brief Convert UTC to TAI with the TAI-UTC valid at that date.
+ *
+ * Leap seconds from 1972, the 1961-1971 rate offsets, and before 1961 the
+ * instant is taken as UT and converted with Delta T.
+ */
+double utc_to_tai(double mjd_utc);
+
+/**
+ * @brief TAI - UTC [s] at a UTC date (before 1961: Delta T - 32.184 s).
+ */
+double tai_minus_utc_seconds(double mjd_utc);
 
 /**
  * @brief Convert TAI to UTC
@@ -101,7 +114,12 @@ double utc_to_tai(double mjd_utc, int leap_seconds = LEAP_SECONDS_2025);
  * @param leap_seconds Number of leap seconds (default: use current value)
  * @return MJD in UTC scale
  */
-double tai_to_utc(double mjd_tai, int leap_seconds = LEAP_SECONDS_2025);
+double tai_to_utc(double mjd_tai, int leap_seconds);
+
+/**
+ * @brief Convert TAI to UTC with the TAI-UTC valid at that date.
+ */
+double tai_to_utc(double mjd_tai);
 
 /**
  * @brief Convert TAI to TT (Terrestrial Time)

@@ -8,6 +8,7 @@
 #ifndef ASTDYN_ORBFITENGINE_HPP
 #define ASTDYN_ORBFITENGINE_HPP
 
+#include "astdyn/observations/NightlyDeweighting.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include <chrono>
 #include "astdyn/propagation/Propagator.hpp"
@@ -50,7 +51,7 @@ struct AstDynConfig {
     // Integrator settings
     IntegratorType integrator_type = IntegratorType::RK4; ///< RK4, RKF78, AAS, etc.
     double initial_step_size = 0.1;                      ///< Initial step size [days]
-    double tolerance = 1e-12;                            ///< Integration tolerance
+    double tolerance = 1e-13;                            ///< Integration tolerance (RKF78: 55 km/18 months at 1e-11)
     double aas_precision = 1e-4;                         ///< Precision metric for AAS integrator (step size control)
 
     // Ephemeris Configuration
@@ -69,6 +70,7 @@ struct AstDynConfig {
     bool fit_enabled = false;                ///< Attiva il fit come parametro di calcolo
     double fit_obs_years = 0.0;              ///< Usa solo le osservazioni degli ultimi N anni (0 = tutte)
     double fit_tolerance = 0.0;              ///< Tolleranza dell'integratore durante il fit (0 = usa quella corrente)
+    bool fit_batch_deweighting = true;       ///< sigma * sqrt(N/4) per N > 4 osservazioni per notte (Veres 2017)
     
     // Close approach settings
     close_approach::CloseApproachSettings ca_settings;
@@ -234,7 +236,9 @@ OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
     TolleranzaTemporanea guardia(propagator_ ? propagator_->get_integrator() : nullptr,
                                  config_.fit_tolerance);
     OrbitFitter<Frame> fitter(ephemeris_, propagator_);
-    fitter.set_corrections(config_.aberrazione_differenziale, config_.light_time_correction);
+    // Astrometric observations: no annual aberration on the computed position,
+    // whatever diffcorr.aberration says -- it would shift every residual by ~20".
+    fitter.set_corrections(false, config_.light_time_correction);
     DifferentialCorrectorSettings dc_settings;
     dc_settings.max_iterations        = config_.max_iterations;
     dc_settings.convergence_tolerance = physics::Distance::from_au(config_.convergence_threshold);
@@ -265,6 +269,11 @@ OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
                       << " osservazioni su " << obs_context_.observations().size() << "\n";
     } else {
         obs_usate = obs_context_.observations();
+    }
+    if (config_.fit_batch_deweighting) {
+        const int inflated = observations::deweight_nightly_batches(obs_usate);
+        if (config_.verbose)
+            std::cout << "Pesi per notte (Veres 2017): " << inflated << " osservazioni deweighted\n";
     }
     if (obs_usate.size() < 6) {
         throw std::runtime_error("Fit: osservazioni insufficienti dopo il filtro (" +

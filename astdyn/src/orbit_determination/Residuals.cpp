@@ -107,7 +107,10 @@ std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
         const double tau_tol_s = 1e-8; // 10ns tolerance
         
         auto base_pos_gcrf = object_pos_gcrf; // Store original heliocentric position
-        
+        const time::EpochTDB t_obs_tdb = time::to_tdb(obs.time);
+        const auto sun_eph = ephemeris_ ? ephemeris_ : std::make_shared<ephemeris::PlanetaryEphemeris>();
+        const Eigen::Vector3d sun_at_obs = sun_eph->getSunBarycentricPosition(t_obs_tdb).to_eigen_si();
+
         for (int iter = 0; iter < max_iter; ++iter) {
             math::Vector3<core::GCRF, physics::Distance> rho_vec = object_pos_gcrf - observer_pos_gcrf;
             double rho_m = rho_vec.norm().to_m();
@@ -117,12 +120,19 @@ std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
             if (iter > 0 && std::abs(tau_new_s - tau.to_seconds()) < tau_tol_s) break;
             
             tau = time::TimeDuration::from_seconds(tau_new_s);
-            // Back-propagate from base position: r(t - tau) = r(t) - v * tau
-            // ESPERIMENTO: velocita' RELATIVA (asteroide - osservatore) invece della
-            // sola velocita' dell'asteroide. Per la nota di Milani (OrbFit aber1)
-            // questo da' la correzione completa "planetaria + stellare".
-            auto vrel_si = object_vel_gcrf.to_eigen_si() + observer_vel_gcrf.to_eigen_si();
-            auto pos_corr_si = base_pos_gcrf.to_eigen_si() - (vrel_si * tau.to_seconds());
+            // r(t - tau) = r(t) - v_ast * tau: the asteroid where it was when the
+            // light left. Only its own velocity: the observer's belongs to
+            // stellar aberration, which an astrometric position does not carry.
+            // (Adding v_obs here and undoing it with the aberration step gave
+            // the right answer only while both were on; one alone was 16".)
+            const Eigen::Vector3d vrel_si = object_vel_gcrf.to_eigen_si();
+            // Both vectors are heliocentric but at two instants, and the Sun moves
+            // ~11 m/s around the barycentre meanwhile: ~20 km over a main-belt
+            // light time, the -12 mas common RA offset against AstDyS on (3830).
+            const auto t_emit = time::EpochTDB::from_mjd(t_obs_tdb.mjd() - tau.to_days());
+            const Eigen::Vector3d sun_motion =
+                sun_eph->getSunBarycentricPosition(t_emit).to_eigen_si() - sun_at_obs;
+            auto pos_corr_si = base_pos_gcrf.to_eigen_si() - (vrel_si * tau.to_seconds()) + sun_motion;
             object_pos_gcrf = math::Vector3<core::GCRF, physics::Distance>::from_si(pos_corr_si.x(), pos_corr_si.y(), pos_corr_si.z());
         }
     }
@@ -179,6 +189,12 @@ std::optional<ObservationResidual> ResidualCalculator<Frame>::compute_residual(
     result.normalized_ra  = result.residual_ra.to_rad()  / sig_ra_proj;
     result.normalized_dec = result.residual_dec.to_rad() / sig_dec_rad;
     
+    if (const auto whitening = whitening_matrix(obs)) {
+        const Eigen::Vector2d z = *whitening * Eigen::Vector2d(result.residual_ra.to_rad(),
+                                                               result.residual_dec.to_rad());
+        result.normalized_ra = z.x();
+        result.normalized_dec = z.y();
+    }
     result.chi_squared = result.normalized_ra * result.normalized_ra +
                         result.normalized_dec * result.normalized_dec;
     
@@ -204,7 +220,7 @@ void ResidualCalculator<Frame>::cartesian_to_radec(
     auto u_sun = p_sun.normalized();
     double cos_elongation = u_sun.dot(eval_dir);
     
-    if (d_sun > 1e6 && cos_elongation < 0.999) { 
+    if (light_deflection_ && d_sun > 1e6 && cos_elongation < 0.999) { 
         // BUG-13: Use derived constant for 2GM/c^2 instead of magic number
         const double TWO_GM_C2 = 2.0 * physics::GravitationalParameter::sun().to_m3_s2() / 
                                 (physics::SpeedOfLight::to_ms() * physics::SpeedOfLight::to_ms());
@@ -247,7 +263,8 @@ std::optional<math::Vector3<core::GCRF, physics::Distance>> ResidualCalculator<F
     
     // earth_state is heliocentric GCRF
     math::Vector3<core::GCRF, physics::Distance> earth_center_vec = earth_state.position;
-    
+    if (obs.space_observer_gcrf) return earth_center_vec + *obs.space_observer_gcrf;
+
     const auto& obs_db = observations::ObservatoryDatabase::getInstance();
     auto obs_info_opt = obs_db.getObservatory(obs.observatory_code);
     if (!obs_info_opt) return earth_center_vec;

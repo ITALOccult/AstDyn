@@ -25,10 +25,15 @@ static bool leap_seconds_loaded = false;
 // ============================================================================
 
 std::tuple<int, int, int, double> mjd_to_calendar(double mjd) {
-    double jd = mjd_to_jd(mjd);
-    
+    // The algorithm wants the Julian Day Number of the CIVIL day: JD starts at
+    // noon, so truncating jd gave the previous day for every instant before
+    // noon UT, and patching that with day+1 produced dates like 32 October.
+    const double jd_plus_half = mjd_to_jd(mjd) + 0.5;
+    const double julian_day_number = std::floor(jd_plus_half);
+    const double fraction = jd_plus_half - julian_day_number;
+
     // Algorithm from Fliegel and van Flandern (1968)
-    int l = static_cast<int>(jd + 68569);
+    int l = static_cast<int>(julian_day_number) + 68569;
     int n = (4 * l) / 146097;
     l = l - (146097 * n + 3) / 4;
     int i = (4000 * (l + 1)) / 1461001;
@@ -38,13 +43,7 @@ std::tuple<int, int, int, double> mjd_to_calendar(double mjd) {
     l = j / 11;
     int month = j + 2 - 12 * l;
     int year = 100 * (n - 49) + i + l;
-    
-    double fraction = jd - std::floor(jd) + 0.5;
-    if (fraction >= 1.0) {
-        fraction -= 1.0;
-        day += 1;
-    }
-    
+
     return std::make_tuple(year, month, day, fraction);
 }
 
@@ -70,6 +69,61 @@ double utc_to_tai(double mjd_utc, int leap_seconds) {
 
 double tai_to_utc(double mjd_tai, int leap_seconds) {
     return mjd_tai - leap_seconds / constants::SECONDS_PER_DAY;
+}
+
+namespace {
+
+constexpr double MJD_1972 = 41317.0;              // integer leap seconds from here
+constexpr double MJD_1961 = 37300.0;              // UTC starts, with rate offsets
+constexpr double DAYS_PER_JULIAN_YEAR = 365.25;
+constexpr double MJD_J2000 = 51544.5;
+
+/// 1961-1971 UTC: TAI-UTC = offset + (MJD - base) * rate  (USNO tai-utc.dat).
+struct UtcRubberSegment { double start_mjd, offset_s, base_mjd, rate_s_per_day; };
+constexpr UtcRubberSegment kUtc1961to1972[] = {
+    {37300.0, 1.4228180, 37300.0, 0.0012960}, {37512.0, 1.3728180, 37300.0, 0.0012960},
+    {37665.0, 1.8458580, 37665.0, 0.0011232}, {38334.0, 1.9458580, 37665.0, 0.0011232},
+    {38395.0, 3.2401300, 38761.0, 0.0012960}, {38486.0, 3.3401300, 38761.0, 0.0012960},
+    {38639.0, 3.4401300, 38761.0, 0.0012960}, {38761.0, 3.5401300, 38761.0, 0.0012960},
+    {38820.0, 3.6401300, 38761.0, 0.0012960}, {38942.0, 3.7401300, 38761.0, 0.0012960},
+    {39004.0, 3.8401300, 38761.0, 0.0012960}, {39126.0, 4.3131700, 39126.0, 0.0025920},
+    {39887.0, 4.2131700, 39126.0, 0.0025920},
+};
+
+/// TT - UT before 1961 (Espenak & Meeus polynomials), for observation times
+/// that were recorded in UT.
+double delta_t_seconds(double year) {
+    if (year >= 1941.0) { const double t = year - 1950.0; return 29.07 + 0.407 * t - t * t / 233.0 + t * t * t / 2547.0; }
+    if (year >= 1920.0) { const double t = year - 1920.0; return 21.20 + t * (0.84493 + t * (-0.0761 + t * 0.0020936)); }
+    if (year >= 1900.0) { const double t = year - 1900.0; return -2.79 + t * (1.494119 + t * (-0.0598939 + t * (0.0061966 - t * 0.000197))); }
+    if (year >= 1860.0) {
+        const double t = year - 1860.0;
+        return 7.62 + t * (0.5737 + t * (-0.251754 + t * (0.01680668 + t * (-0.0004473624 + t / 233174.0))));
+    }
+    return 13.7;   // ~1800-1860: older positions carry arcsecond errors anyway
+}
+
+} // namespace
+
+double tai_minus_utc_seconds(double mjd_utc) {
+    if (mjd_utc >= MJD_1972) return get_leap_seconds(mjd_utc);
+    if (mjd_utc >= MJD_1961) {
+        const UtcRubberSegment* seg = &kUtc1961to1972[0];
+        for (const auto& s : kUtc1961to1972) if (mjd_utc >= s.start_mjd) seg = &s;
+        return seg->offset_s + (mjd_utc - seg->base_mjd) * seg->rate_s_per_day;
+    }
+    const double year = 2000.0 + (mjd_utc - MJD_J2000) / DAYS_PER_JULIAN_YEAR;
+    return delta_t_seconds(year) - TT_MINUS_TAI;
+}
+
+double utc_to_tai(double mjd_utc) {
+    return mjd_utc + tai_minus_utc_seconds(mjd_utc) / constants::SECONDS_PER_DAY;
+}
+
+double tai_to_utc(double mjd_tai) {
+    double mjd_utc = mjd_tai;
+    for (int k = 0; k < 3; ++k) mjd_utc = mjd_tai - tai_minus_utc_seconds(mjd_utc) / constants::SECONDS_PER_DAY;
+    return mjd_utc;
 }
 
 double tai_to_tt(double mjd_tai) {
@@ -425,9 +479,10 @@ bool load_leap_seconds(const std::string& filepath) {
 }
 
 int get_leap_seconds(double mjd_utc) {
-    if (!leap_seconds_loaded) {
-        return LEAP_SECONDS_2025;  // Default
-    }
+    // The table is built in: before, an unloaded table answered 37 s for every
+    // date, and every UTC instant before 2017 was turned into the wrong TT --
+    // 1-2 s for Gaia's 2014-2016 transits, 30-40 s for 1950s plates.
+    if (!leap_seconds_loaded) load_leap_seconds("");
     
     // Find the leap second count for this date
     int leap_seconds = 10;  // Minimum value

@@ -77,3 +77,44 @@ TEST(TimeScaleTest, LeapYears) {
     EXPECT_NEAR(calendar_to_mjd(2004, 2, 29, 0.0), 53064.0, 1e-10); // 2004 is leap year
 }
 
+
+// Before noon UT the old code truncated JD to the previous civil day and then
+// added one without carrying the month: 2026-11-01 01:58 came out as 32 October.
+TEST(TimeScaleTest, CalendarFromMJDBeforeNoonCarriesTheMonth) {
+    const double mjd_nov_1_morning = calendar_to_mjd(2026, 11, 1, 0.0816);
+    auto [year, month, day, fraction] = mjd_to_calendar(mjd_nov_1_morning);
+    EXPECT_EQ(year, 2026);
+    EXPECT_EQ(month, 11);
+    EXPECT_EQ(day, 1);
+    EXPECT_NEAR(fraction, 0.0816, 1e-9);
+}
+
+TEST(TimeScaleTest, CalendarRoundTripAcrossTheDay) {
+    for (double fraction : {0.0, 0.25, 0.4999, 0.5, 0.75, 0.9999}) {
+        const double mjd = calendar_to_mjd(2027, 12, 31, fraction);
+        auto [year, month, day, fraction_back] = mjd_to_calendar(mjd);
+        EXPECT_EQ(year, 2027);
+        EXPECT_EQ(month, 12);
+        EXPECT_EQ(day, 31);
+        EXPECT_NEAR(fraction_back, fraction, 1e-9);
+    }
+}
+
+// TAI-UTC must depend on the date. It was 37 s for every instant, so every
+// observation before 2017 got the wrong TT: 1-2 s for Gaia's 2014-2016
+// transits, 30-40 s for 1950s plates -- 0.3-0.6" on a main-belt asteroid.
+TEST(TimeScaleTest, TaiMinusUtcFollowsTheDate) {
+    EXPECT_NEAR(tai_minus_utc_seconds(58119.0), 37.0, 1e-12);          // 2018
+    EXPECT_NEAR(tai_minus_utc_seconds(57100.0), 35.0, 1e-12);          // 2015-03, before the July leap
+    EXPECT_NEAR(tai_minus_utc_seconds(47900.0), 25.0, 1e-12);          // 1990
+    EXPECT_NEAR(tai_minus_utc_seconds(39000.0), 3.7401300 + (39000.0 - 38761.0) * 0.001296, 1e-9);  // 1965
+    // Before 1961 the instant is UT: TT - UT = Delta T, 29.07 s at 1950.0.
+    const double mjd_1950 = 51544.5 - 50.0 * 365.25;
+    EXPECT_NEAR(tai_minus_utc_seconds(mjd_1950) + TT_MINUS_TAI, 29.07, 1e-6);
+}
+
+TEST(TimeScaleTest, UtcTaiRoundTripBefore1972) {
+    for (double mjd : {33000.0, 38000.0, 41000.0, 47900.0, 58119.0}) {
+        EXPECT_NEAR(tai_to_utc(utc_to_tai(mjd)), mjd, 1e-10) << mjd;
+    }
+}

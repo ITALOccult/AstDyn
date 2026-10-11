@@ -303,69 +303,68 @@ void OccultationLogic::compute_higher_order_motion(
     params.d3eta_dt3 = 6.0 * cy[3];
 }
 
-/// Il Sole e' sotto la soglia in almeno un punto della traccia?
+namespace {
+
+constexpr double EARTH_EQUATORIAL_RADIUS_M = 6378137.0;
+constexpr int TRACK_SAMPLES = 200;
+
+/// A point of the Earth under the shadow axis, t seconds from closest approach.
+struct PuntoTraccia { double lat_deg, lon_deg, star_alt_deg; bool on_earth; };
+
+PuntoTraccia punto_sulla_traccia(const OccultationParameters& params, double t_sec) {
+    const double xi = (params.xi_ca.to_m() + params.dxi_dt.to_ms() * t_sec) / EARTH_EQUATORIAL_RADIUS_M;
+    const double eta = (params.eta_ca.to_m() + params.deta_dt.to_ms() * t_sec) / EARTH_EQUATORIAL_RADIUS_M;
+    const double r2 = xi * xi + eta * eta;
+    if (r2 >= 1.0) return {0.0, 0.0, -90.0, false};
+    const double zeta = std::sqrt(1.0 - r2);
+    const double star_dec_rad = params.substar_lat.to_rad();
+    const double z = eta * std::cos(star_dec_rad) + zeta * std::sin(star_dec_rad);
+    const double yq = -eta * std::sin(star_dec_rad) + zeta * std::cos(star_dec_rad);
+    const double lon_deg = params.substar_lon.to_deg() + std::atan2(xi, yq) * constants::RAD_TO_DEG
+                         - constants::EARTH_ROTATION_DEG_PER_HOUR * t_sec / constants::SECONDS_PER_HOUR;
+    return {std::atan2(z, std::hypot(xi, yq)) * constants::RAD_TO_DEG, lon_deg,
+            std::asin(zeta) * constants::RAD_TO_DEG, true};
+}
+
+double altezza_sole_deg(const OccultationParameters& params, const PuntoTraccia& p, double t_sec) {
+    const double sun_lat_rad = params.subsolar_lat.to_rad();
+    const double sun_lon_deg = params.subsolar_lon.to_deg()
+                             - constants::EARTH_ROTATION_DEG_PER_HOUR * t_sec / constants::SECONDS_PER_HOUR;
+    const double lat_rad = p.lat_deg * constants::DEG_TO_RAD;
+    const double sin_alt = std::sin(lat_rad) * std::sin(sun_lat_rad)
+                         + std::cos(lat_rad) * std::cos(sun_lat_rad)
+                           * std::cos((p.lon_deg - sun_lon_deg) * constants::DEG_TO_RAD);
+    return std::asin(std::clamp(sin_alt, -1.0, 1.0)) * constants::RAD_TO_DEG;
+}
+
+/// Is there a point of the track where the event can actually be observed:
+/// shadow on the Earth, star above min_star_alt_deg, Sun below max_sun_alt_deg?
 ///
-/// Valuta i tre punti che hanno significato geometrico: dove l'asse dell'ombra
-/// entra sul lembo terrestre, il massimo avvicinamento, e dove esce. Gli estremi
-/// risolvono |(xi, eta)| = R_terra, di secondo grado nel moto lineare.
-///
-/// Una traccia d'ombra e' lunga migliaia di chilometri e attraversa spesso il
-/// terminatore: su (4769) Castalia un'occultazione centrale veniva scartata
-/// perche' al centro era giorno, mentre la coda era osservabile dall'Australia.
-static bool sole_sotto_soglia_da_qualche_parte(const OccultationParameters& params,
-                                               double soglia_deg)
-{
-    constexpr double R_TERRA_M = 6378137.0;
-    const double d2r = 3.14159265358979323846 / 180.0;
-
-    const double xi0 = params.xi_ca.to_m(), eta0 = params.eta_ca.to_m();
-    const double vxi = params.dxi_dt.to_ms(), veta = params.deta_dt.to_ms();
-    const double v2 = vxi * vxi + veta * veta;
-    if (v2 <= 0.0) return params.sun_altitude.to_deg() < soglia_deg;
-
-    // |(xi0 + vxi t, eta0 + veta t)| = R  ->  v2 t^2 + 2 b t + c = 0
-    const double b = xi0 * vxi + eta0 * veta;
-    const double c = xi0 * xi0 + eta0 * eta0 - R_TERRA_M * R_TERRA_M;
-    const double disc = b * b - v2 * c;
-    if (disc < 0.0) return false;              // l'ombra non tocca la Terra
-
-    const double rad = std::sqrt(disc);
-    const double t_in = (-b - rad) / v2;       // secondi dal massimo avvicinamento
-    const double t_out = (-b + rad) / v2;
-
-    // altezza del Sole nel punto sotto l'asse a un dato istante
-    auto altezza_sole = [&](double t_sec) -> double {
-        const double xi = xi0 + vxi * t_sec;
-        const double eta = eta0 + veta * t_sec;
-        const double r2 = (xi * xi + eta * eta) / (R_TERRA_M * R_TERRA_M);
-        if (r2 >= 1.0) return 90.0;            // fuori dalla Terra: non conta
-        const double ore = t_sec / 3600.0;
-
-        const double zeta = std::sqrt(1.0 - r2) * R_TERRA_M;
-        const double ds = params.substar_lat.to_rad();
-        const double z  = eta * std::cos(ds) + zeta * std::sin(ds);
-        const double yq = -eta * std::sin(ds) + zeta * std::cos(ds);
-        const double lat = std::atan2(z, std::hypot(xi, yq)) / d2r;
-        const double lon = params.substar_lon.to_deg()
-                         + std::atan2(xi, yq) / d2r - 15.0 * ore;
-
-        // il punto sub-solare ruota con la Terra
-        const double slat = params.subsolar_lat.to_deg();
-        const double slon = params.subsolar_lon.to_deg() - 15.0 * ore;
-        const double cos_z = std::sin(lat * d2r) * std::sin(slat * d2r)
-                           + std::cos(lat * d2r) * std::cos(slat * d2r)
-                             * std::cos((lon - slon) * d2r);
-        return std::asin(std::clamp(cos_z, -1.0, 1.0)) / d2r;
-    };
-
-    // margine interno agli estremi: sul lembo esatto il punto e' degenere
-    // Margine interno agli estremi: sul lembo esatto il punto e' degenere.
-    const double margine = 0.02 * (t_out - t_in);
-    for (double t : {t_in + margine, 0.0, t_out - margine}) {
-        if (altezza_sole(t) < soglia_deg) return true;
+/// The old test looked at the Sun alone, at three points. A shadow axis that
+/// misses the Earth by 1.5 radii (still inside max_shadow_dist) was then judged
+/// at a "centre" that is not on the Earth at all, and 54 events of (3830)
+/// within 5 deg of the Sun survived. A track also often crosses the terminator
+/// -- (4769) Castalia was observable only at its tail -- hence the sampling.
+bool traccia_osservabile(const OccultationParameters& params,
+                         double max_sun_alt_deg, double min_star_alt_deg) {
+    const double speed2 = std::pow(params.dxi_dt.to_ms(), 2) + std::pow(params.deta_dt.to_ms(), 2);
+    if (speed2 <= 0.0) return false;
+    const double b = params.xi_ca.to_m() * params.dxi_dt.to_ms() + params.eta_ca.to_m() * params.deta_dt.to_ms();
+    const double c = std::pow(params.xi_ca.to_m(), 2) + std::pow(params.eta_ca.to_m(), 2)
+                   - EARTH_EQUATORIAL_RADIUS_M * EARTH_EQUATORIAL_RADIUS_M;
+    const double disc = b * b - speed2 * c;
+    if (disc <= 0.0) return false;                       // the shadow misses the Earth
+    const double t_in = (-b - std::sqrt(disc)) / speed2, t_out = (-b + std::sqrt(disc)) / speed2;
+    for (int k = 1; k < TRACK_SAMPLES; ++k) {
+        const double t_sec = t_in + (t_out - t_in) * k / TRACK_SAMPLES;
+        const auto p = punto_sulla_traccia(params, t_sec);
+        if (p.on_earth && p.star_alt_deg >= min_star_alt_deg
+            && altezza_sole_deg(params, p, t_sec) <= max_sun_alt_deg) return true;
     }
     return false;
 }
+
+} // namespace
 
 void OccultationLogic::compute_shadow_velocity(
     OccultationParameters& params,
@@ -587,9 +586,8 @@ void OccultationLogic::evaluate_candidate(
 
         // Un evento si scarta solo se e' giorno lungo TUTTA la traccia utile:
         // al centro puo' essere pieno giorno mentre la coda e' osservabile.
-        if (config.filter_daylight && params.is_daylight
-            && params.sun_altitude.to_deg() > config.min_sun_altitude
-            && !sole_sotto_soglia_da_qualche_parte(params, config.min_sun_altitude)) {
+        if (config.filter_daylight
+            && !traccia_osservabile(params, config.min_sun_altitude, config.min_object_altitude)) {
             if (occ_debug()) std::cerr << "[DBG]       SCARTATO: giorno (sole alt="
                 << params.sun_altitude.to_deg() << " > " << config.min_sun_altitude << ")\n";
             continue;
@@ -713,9 +711,8 @@ void OccultationLogic::evaluate_candidate(
 
         // Un evento si scarta solo se e' giorno lungo TUTTA la traccia utile:
         // al centro puo' essere pieno giorno mentre la coda e' osservabile.
-        if (config.filter_daylight && params.is_daylight
-            && params.sun_altitude.to_deg() > config.min_sun_altitude
-            && !sole_sotto_soglia_da_qualche_parte(params, config.min_sun_altitude)) {
+        if (config.filter_daylight
+            && !traccia_osservabile(params, config.min_sun_altitude, config.min_object_altitude)) {
             continue;
         }
 
@@ -1006,18 +1003,14 @@ void OccultationLogic::apply_uncertainty(
     // months separating it from a NEO event it is not, and the resulting error
     // lands squarely on the quantity being validated. The tensor already exposes
     // a per-step hook for exactly this.
-    // Force model unificato: ForceField in ECLITTICA (integrate_in_ecliptic),
-    // stessa fisica del vecchio PotentialModel di questa sezione: J2 solare OFF
-    // (era model.j2=0), relativita' OFF, asteroidi OFF (solo perturbatori
-    // planetari maggiori). Perturbatori e rotazione eq->ecl sono ora interni a
-    // ForceField::n_body_perturbation; EphemerisRefresh e ASTDYN_PERTURBERS via.
+    // The nominal trajectory uses the SAME forces as the path: with relativity
+    // and the massive asteroids switched off it drifted ~15 km from the path
+    // over 18 months on (3830), as much as the cross-track sigma itself. The
+    // gradients still omit those terms (~1e-8 of the Keplerian one), so the
+    // cost of Phi and Psi is unchanged.
     propagation::PropagatorSettings stt_settings = engine.config().propagator_settings;
+    stt_settings.asteroid_ephemeris_file = engine.config().asteroid_ephemeris_file;
     stt_settings.integrate_in_ecliptic   = true;
-    stt_settings.include_planets         = true;
-    stt_settings.include_moon            = true;
-    stt_settings.include_sun_j2          = false;
-    stt_settings.include_relativity      = false;
-    stt_settings.include_asteroids       = false;
     stt_settings.baricentric_integration = false;
     auto stt_force = std::make_shared<propagation::ForceField>(
         stt_settings, engine.getEphemeris());
@@ -1106,7 +1099,7 @@ void OccultationLogic::apply_uncertainty(
         const double deta = eta_stt - params.eta_ca.to_km();
         const double gap = std::hypot(dxi, deta);
         if (gap > 1.0) {
-            std::cerr << "[scope] STT(AstDyS) vs effemeride(Horizons) nel piano fondamentale: "
+            std::cerr << "[scope] STT vs path (geometrico) nel piano fondamentale: "
                       << gap << " km   (dxi=" << dxi << " deta=" << deta << ")\n";
         }
     }
@@ -1136,9 +1129,16 @@ void OccultationLogic::apply_uncertainty(
     const Vector3d v_ast = x_ast.tail<3>();          // AU/giorno
     Vector3d r_app = r_ast;
     double lt_days = 0.0;
+    const auto sun_ecl_au = [&](time::EpochTDB t) -> Vector3d {
+        return eq2ecl_frame * engine.getEphemeris()->getSunBarycentricPosition(t).to_eigen_si()
+             / (constants::AU * 1000.0);
+    };
+    const Vector3d sun_at_tca = sun_ecl_au(params.t_ca);
     for (int it = 0; it < 4; ++it) {
         lt_days = (r_app - r_obs).norm() / constants::SPEED_OF_LIGHT_AU_PER_DAY;
-        r_app = r_ast - v_ast * lt_days;
+        // heliocentric vectors at two instants: the Sun moves in between
+        const auto t_emit = time::EpochTDB::from_mjd(params.t_ca.mjd() - lt_days);
+        r_app = r_ast - v_ast * lt_days + (sun_ecl_au(t_emit) - sun_at_tca);
     }
 
     // L'asse d'ombra secondo la STT, ora omogeneo con params.
@@ -1158,8 +1158,8 @@ void OccultationLogic::apply_uncertainty(
             std::cerr << "[scope] tempo-luce " << lt_days * 86400.0 << " s ("
                       << (r_app - r_obs).norm() << " AU)   |v| = "
                       << v_ast.norm() * constants::AU / 86400.0 << " km/s\n";
-            std::cerr << "[scope] asse d'ombra: STT/AstDyS (" << xi_stt << ", "
-                      << eta_stt << ") km  vs  effemeride ("
+            std::cerr << "[scope] asse d'ombra: STT (" << xi_stt << ", "
+                      << eta_stt << ") km  vs  path ("
                       << params.xi_ca.to_km() << ", " << params.eta_ca.to_km()
                       << ") km  ->  scarto " << gap << " km"
                       << "   (senza correzione: " << gap_geo << " km)\n";

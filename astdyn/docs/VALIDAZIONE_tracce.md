@@ -1,8 +1,59 @@
 # Validazione delle tracce d'ombra
 
-Aggiornato al 29 luglio 2026. Strumenti: `tools/confronta_tracce.py` per il
+Aggiornato all'11 ottobre 2026. Strumenti: `tools/confronta_tracce.py` per il
 confronto fra predizioni, `tools/verifica_corde.py` per il confronto con le
 osservazioni.
+
+## 11 ottobre 2026: frame, tempo-luce, integratore, riduzione del fit
+
+Campagna su (3830) Trelleborg, ottobre 2026 - dicembre 2027. Ogni difetto e'
+stato misurato contro un riferimento esterno prima di essere corretto.
+
+| difetto | riferimento | effetto | dopo |
+|---------|-------------|---------|------|
+| frame bias FK5->ICRS dentro ECLIPJ2000 | vettori Horizons ICRF/eclittica | 47 km sulla posizione, fino a 52 km sulla traccia | < 1 m |
+| RKF78 a tolleranza 1e-11 (default) | RADAU a 1e-13 | 55 km in 565 giorni | 0.07 km (default 1e-13) |
+| tempo-luce eliocentrico (moto del Sole ignorato) | RA/Dec astrometrica Horizons | 1-2 mas | 0.05 mas |
+| deflessione piena applicata all'asteroide nel fit | RA/Dec astrometrica Horizons | fino a 12 mas | 0.1 mas |
+| sito MPC con doppio schiacciamento | residui AstDyS per osservatorio | ~15 mas, segno dell'emisfero | < 5 mas |
+| precessione-nutazione assente sul sito | catena IAU completa | 11-16 km di sito, 2-5 mas | — |
+| debiasing FCCT14 del .rwo ignorato | residui AstDyS | 0.10" di dispersione | 0.014" RA, 0.005" Dec |
+| osservazioni da satellite (TESS, WISE) scartate | residui AstDyS | 2521 osservazioni perse | lette, concordi entro 8 mas |
+| pesi indipendenti per lotti notturni | soluzione JPL#66 | orbita a 180-265 km da JPL | 68-85 km (Veres 2017) |
+| perturbatori asteroidali dallo SPK non ruotati in eclittica | vettori Horizons 1949-2024 di (3930) | 145 km nel 2015, 2718 km nel 1949 | 2.9 km, 213 km |
+| TAI-UTC fisso a 37 s per ogni data | storia IERS/USNO, Delta T | 1-2 s su Gaia 2014-16, 30-40 s sulle lastre | per data |
+| astrometria Gaia FPR non usata | soluzione JPL#64 di (3930) | fit a 37 km da JPL | <= 9 km con le 472 osservazioni FPR |
+| date prima di mezzogiorno UT (32 ottobre) | calendario | 6 date impossibili su 205 | test di andata e ritorno |
+| filtro diurno valutato fuori dalla Terra | campionamento della traccia | 54 eventi a 2-5 gradi dal Sole | 95 eventi osservabili su 205 |
+| occelmnt: campi vuoti letti con double.Parse | lettore di Occult4 (sorgente) | file rifiutato da Occult4 | test sulle regole del lettore |
+
+Lo scarto diagnostico fra la covarianza propagata (STT) e la traccia, che era
+di 32-52 km su tutti gli eventi, e' sceso a 1-10 km: i primi due difetti ne
+spiegavano quasi tutto, il resto veniva dal modello di forze ridotto della STT,
+ora allineato a quello della traccia.
+
+### Accordo con JPL, a catena corretta
+
+Su (3930) Vasilev, con perturbatori, scala dei tempi e astrometria Gaia FPR, il
+nostro fit e JPL#64 coincidono entro 3.6 mas (<= 9 km sulla traccia) dal 2014 al
+2027, con gli stessi residui: 2.5 mas lungo la scansione Gaia, 0.305" da terra.
+La discrepanza descritta sotto per (3830) era dovuta a questi difetti, non ai
+dati.
+
+### Le soluzioni orbitali non concordano entro le loro incertezze (superato)
+
+Anche corretta la catena, la nostra orbita e quella di JPL distano 25-55 mas in
+RA, 68-85 km sulla traccia, mentre JPL dichiara 3-5 mas a 3 sigma. Le due
+orbite adattano le osservazioni da terra 2018-2026 con lo stesso RMS (0.445" e
+0.450"): i dati non bastano a scegliere. Come su (1216) Askania, le incertezze
+formali sono ottimistiche: per (3830), diametro 17.8 km, l'incertezza realistica
+e' di alcune larghezze della traccia, e un aggiornamento astrometrico prima
+dell'evento resta necessario.
+
+Restano da ripetere, con il codice corretto, il confronto con le corde di
+(316) Goberta e quello con JPL su (1216) Askania.
+
+---
 
 ---
 
@@ -72,12 +123,12 @@ Ogni anello della catena, verificato contro riferimenti esterni:
 | deflessione, parallasse | calcolo per la geometria reale | 0.002 arcsec |
 | tolleranza dell'integratore | 1e-12 contro 1e-14 | invariato |
 
-Una nota metodologica: il confronto con Horizons in modalita' OBSERVER si e'
-rivelato **fuorviante**. Quelle coordinate includono la deflessione
-relativistica, mentre il vettore geocentrico della modalita' VECTORS no: le due
-uscite differiscono di 0.2 arcsec, e confrontare la nostra posizione
-astrometrica con le prime ha portato fuori strada per un'ora. Il confronto va
-fatto sui vettori.
+Una nota metodologica, corretta l'11 ottobre 2026: la RA/Dec "astrometric" di
+Horizons in modalita' OBSERVER **non** include la deflessione relativistica —
+la documentazione di Horizons la descrive corretta per il solo tempo-luce — ed
+e' un riferimento valido. Con gli elementi osculanti JPL di (3830) la nostra
+catena la riproduce entro 0.05 mas su tre date del 2027. I 0.2 arcsec osservati
+a luglio venivano da difetti allora presenti (frame bias, sotto).
 
 ---
 

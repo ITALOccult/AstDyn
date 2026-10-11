@@ -60,6 +60,13 @@ constexpr double MJD2000 = 51544.5;
 /// Seconds per day
 constexpr double SECONDS_PER_DAY = 86400.0;
 
+/// Seconds per hour
+constexpr double SECONDS_PER_HOUR = 3600.0;
+
+/// Mean rotation of the Earth relative to the Sun [deg/h]. Over the minutes a
+/// shadow takes to cross the Earth the sidereal excess (0.04 deg/h) is noise.
+constexpr double EARTH_ROTATION_DEG_PER_HOUR = 15.0;
+
 /// Alias for SECONDS_PER_DAY
 constexpr double DAY = SECONDS_PER_DAY;
 

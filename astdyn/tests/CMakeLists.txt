@@ -14,6 +14,8 @@ add_executable(astdyn_unit_tests
     test_rigorous_validation.cpp
     # test_integrator_comparative.cpp
     test_occultation.cpp
+    test_occelmnt_occult4.cpp
+    test_riduzione_osservazioni.cpp
     test_asteroid_perturbations.cpp
     test_kepler_solver.cpp
     test_stt.cpp

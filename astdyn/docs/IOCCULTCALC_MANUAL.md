@@ -216,11 +216,11 @@ representation, so any setting can be written in either.
 integrator:
   type: RKF78
   step_size: 0.05
-  tolerance: 1.0e-11
+  tolerance: 1.0e-13
 ```
 
 ```json
-{ "integrator": { "type": "RKF78", "step_size": 0.05, "tolerance": 1e-11 } }
+{ "integrator": { "type": "RKF78", "step_size": 0.05, "tolerance": 1e-13 } }
 ```
 
 > **The OrbFit-style braced format is no longer supported.** Files written as
@@ -314,6 +314,12 @@ CSPICE. Being stateless it carries no global buffers, so several integrators can
 query the same kernel concurrently without locking — which is what makes the
 parallel corridor scan possible.
 
+Orbital elements are referred to ECLIPJ2000, which JPL, SPICE and AstDyS define
+as the ICRF rotated about its x axis by the IAU 1976 obliquity, 84381.448″ —
+**without** the FK5→ICRS frame bias. Horizons returns the same vector with the
+x component identical to the bit in the two frames; inserting the bias moved the
+heliocentric position of (3830) by 47 km and its shadow path by up to 50 km.
+
 `Analytical` selects a built-in VSOP87 theory as a fallback when no kernel is
 available. It is accurate to a few arcseconds, against sub-millimetre for DE440,
 so it is suitable for screening but not for prediction.
@@ -336,6 +342,12 @@ physics:
 
 Individual planets can be switched off with `physics.mercury` … `physics.neptune`.
 
+The perturber positions come from the asteroid SPK, whose states are
+equatorial (ICRF) and are rotated into the ecliptic integration frame. Without
+that rotation every perturber sat 23.4° off its place: propagated backwards,
+JPL's own orbit of (3930) missed JPL by 2718 km in 1949 — worse than with no
+perturbers at all. With it: 2.9 km in 2015, 34 km in 2000, 213 km in 1949.
+
 When `physics.asteroids.list` is present and non-empty it **becomes** the
 perturber set: it enables asteroid perturbations and disables the default sets.
 The list you give is the list you use.
@@ -352,7 +364,7 @@ The list you give is the list you use.
 integrator:
   type: RKF78
   step_size: 0.05          # initial step, days
-  tolerance: 1.0e-11
+  tolerance: 1.0e-13
 ```
 
 ### 7.1 Choosing one
@@ -427,10 +439,20 @@ it raises an exception rather than returning meaningless numbers.
 
 ### 7.4 On tolerance
 
-The default is `1e-11`, not `1e-12`. For RKF78 working in AU/day a relative
-tolerance of 1e-12 sits below the arithmetic noise of the method's thirteen
-stages: it is never met, the step collapses to its minimum and integration
-becomes extremely slow. Set something tighter only when a specific case needs it.
+The default is `1e-13`. Measured on (3830) Trelleborg over 565 days, against
+RADAU at 1e-13:
+
+| RKF78 tolerance | position error |
+|-----------------|----------------|
+| 1e-9  | 817 km |
+| 1e-11 | 55 km |
+| 1e-12 | 1.5 km |
+| 1e-13 | 0.07 km |
+
+The 55 km of the old default landed directly on the shadow path, and were as
+large as the 1-sigma cross-track uncertainty. A full 15-month campaign costs 27%
+more at 1e-13 (386 s against 305 s). The earlier warning that 1e-12 made the
+step collapse predates the fix of the integrator deadlock and no longer holds.
 
 ---
 
@@ -462,9 +484,28 @@ builds the design matrix from the state-transition matrix, solves the normal
 equations, and applies the correction through a line search that only accepts
 steps which reduce the RMS.
 
-The observation model includes light-time delay, both planetary and stellar
-aberration, topocentric parallax from the observatory position, and relativistic
-light deflection.
+The computed position is **astrometric**, because the observations are reduced
+against catalogue stars that share the observer's aberration and (almost all of)
+the solar light deflection. The model therefore includes the light-time delay —
+with the barycentric motion of the Sun during the flight of the light — and the
+topocentric parallax, but neither annual aberration nor a full deflection of the
+asteroid. Against JPL Horizons (3830, three dates in 2027, elements and
+astrometric positions from Horizons) it agrees to 0.1 mas; applying the full
+deflection, as it did before, cost up to 12 mas. For this reason
+`diffcorr.aberration` and `diffcorr.light_deflection` do not act on the fit.
+
+Observation times are converted with the TAI−UTC of their own date — leap
+seconds from 1972, the 1961–1971 rate offsets, and before 1961 the time is taken
+as UT and converted with ΔT. A fixed 37 s, as before, put 1–2 s on Gaia's 2014–2016
+transits and 30–40 s on 1950s plates, 0.3–0.6″ on a main-belt asteroid: enough
+to tilt the mean motion of a 77-year fit.
+
+The observations are read with the FCCT14 catalogue debiasing that AstDyS
+publishes in the `.rwo` (§12.2) already subtracted, and satellite observations
+(TESS, WISE, … — the `S`/`s` line pairs) are reduced from the position of the
+spacecraft given in the file. On (3830) this brings 2521 more observations into
+the fit, and our residuals agree with those of AstDyS to 0.014″ in RA and 0.005″
+in Dec over 6057 observations since 2015.
 
 A fit that stops because the line search finds no better step has reached a
 minimum and is reported as **converged** — this is the normal outcome when the
@@ -487,7 +528,41 @@ Measured on 820987, whose observations span 16 years:
 The fit is refused below six observations: six orbital elements cannot be
 determined with fewer constraints than unknowns.
 
-### 8.3 Outlier rejection
+### 8.3 Weights of same-night batches
+
+Observations taken by one observatory in one night share their systematic
+errors, so N of them do not carry N independent pieces of information. With
+`diffcorr.batch_deweighting` (on by default) the sigma of each of the N > 4
+observations of such a batch is multiplied by √(N/4), the scheme of Vereš et al.
+(2017) used by JPL and the MPC.
+
+On (3830) it decides the result. 2425 TESS positions in 20 nights of March 2021,
+up to 144 a night at σ = 0.6″, outweighed every ground observation together:
+the orbit fitted on them, like AstDyS's own, ran 180–265 km on the shadow plane
+away from JPL's. With the batches deweighted the gap falls to 68–85 km on all
+7177 observations; it is 45–68 km if TESS is dropped altogether.
+
+### 8.3bis Gaia astrometry
+
+Gaia's asteroid astrometry (Focused Product Release, table
+`gaiafpr.sso_observation`) is distributed neither by the MPC nor by AstDyS, but
+JPL uses it. Download it next to the `.rwo`:
+
+```bash
+python3 tools/scarica_gaia_sso.py 3930 ~/campaigns/obs   # -> 3930_gaia_fpr.csv
+```
+
+and the fit picks it up from `<observations_dir>/<id>_gaia_fpr.csv`. Each record
+is reduced from Gaia's own position, with its full (α*, δ) covariance: a transit
+measures to ~2 mas along the scan and ~500 mas across it, a correlation of
+−0.99999 that independent sigmas would throw away. The systematic error, common
+to the ~8 CCD observations of a transit, is counted once per transit.
+
+On (3930) Vasilev the fitted orbit with the 472 FPR observations agrees with
+JPL#64 to ≤ 9 km on the shadow plane over 2026–2027; without them it is 37 km
+away, and the published AstDyS orbit 55 km.
+
+### 8.4 Outlier rejection
 
 Observations whose residuals exceed a threshold are rejected. The threshold
 tightens progressively from `outlier_max_sigma` to `outlier_min_sigma` over
@@ -504,7 +579,7 @@ determination:
 | 3 years | 4047 | 695 | 0.776″ |
 | 10 years | 6155 | 708 | 0.634″ |
 
-### 8.4 Covariance and the error ellipse
+### 8.5 Covariance and the error ellipse
 
 With `compute_covariance: true` the formal covariance `(AᵀWA)⁻¹` from the fit
 **replaces** the covariance imported from the AstDyS elements. Orbit and
@@ -528,14 +603,21 @@ agreement expected between two independent determinations of the same quantity.
 > the fit greatly exceeds the quoted sigmas, the resulting ellipse will be
 > optimistic. Compare the two before trusting it on an unfamiliar object.
 
-### 8.5 Observatory positions
+### 8.6 Observatory positions
 
 Topocentric parallax matters: about 4″ at 2.2 AU, far more for near-Earth
 objects. It requires the MPC observatory catalogue (§2).
 
-Some codes carry no catalogue coordinates — `270` (Unistellar Network) and other
-mobile observers give their position per observation. Those still fall back to
-the geocentre. On 433 Eros they account for 832 of 16 324 observations.
+The site is built directly from the catalogue's parallax constants
+(ρ cos φ′, ρ sin φ′ are already geocentric) and rotated to the GCRF with the full
+IAU 2006/2000 chain, precession-nutation included. Treating φ′ as a geodetic
+latitude applied the Earth's flattening twice — ~18 km of site at ±30°, ~15 mas
+on a main-belt asteroid with the sign of the hemisphere.
+
+Some codes carry no catalogue coordinates. Spacecraft (`C51` WISE, `C57` TESS,
+`250` HST …) give their geocentric position in the second line of the record and
+are reduced from it. Roving observers such as `270` (Unistellar Network) still
+fall back to the geocentre. On 433 Eros they account for 832 of 16 324 observations.
 
 ---
 
@@ -672,6 +754,15 @@ occultation:
   use_parallax: true
 ```
 
+With `filter_daylight` an event is kept only if **somewhere on its track** the
+shadow is on the Earth, the star is at least `min_obj_alt` above the horizon and
+the Sun at most `min_sun_alt` — the track is sampled at 200 points, because a
+path often crosses the terminator and is observable only at one end.
+`max_shadow_dist` alone admits axes passing up to 1.57 Earth radii from the
+geocentre: before this test, 54 events of (3830) in December 2027, 2–5° from the
+Sun, survived the old daylight filter, which judged them at a "centre" that was
+not on the Earth at all.
+
 ### Batch robustness
 
 The per-asteroid loop is wrapped so that a body which fails to load or to
@@ -695,8 +786,15 @@ output:
   write_empty: true
 ```
 
-**XML** is compatible with Occult4, carrying the asteroid elements and star
-properties needed for further refinement.
+**XML** is the occelmnt format that Occult4 and OccultWatcher exchange. It is
+written field by field as Occult4's own `OccultationElements.XML_Elements()`
+writes it — same decimals, CRLF line ends, no XML declaration, the trailing
+comma of `<Object>` — and every field that Occult4's reader parses with
+`double.Parse` is always a number: an empty field there is an exception that
+rejects the file. The asteroid's V and R magnitudes follow Occult4's fallback
+(V, V − 0.45); a missing B or R of the star is derived with its relation
+V = (R + 0.54 B) / 1.54. The unit test `test_occelmnt_occult4.cpp` checks the
+output against the rules transcribed from Occult4's reader.
 
 **JSON** is the native format, richer than the XML, and is what the orchestrator
 reads to identify positive detections.
@@ -834,7 +932,7 @@ and a courtesy delay between requests.
 |-----|------|---------|---------|
 | `type` | string | `RK4` | `RK4`, `RKF78`, `GAUSS`, `RADAU`, `AAS`, `GRKN64` |
 | `step_size` | double | 0.1 | initial step, days |
-| `tolerance` | double | 1e-11 | relative error tolerance |
+| `tolerance` | double | 1e-13 | relative error tolerance (§7.4) |
 | `aas_precision` | double | 1e-4 | step-control metric for AAS |
 
 ### ephemeris
@@ -883,8 +981,9 @@ and a courtesy delay between requests.
 | `outlier_min_sigma` | double | 3.0 | final threshold of the ramp |
 | `outlier_ramp_steps` | int | 3 | iterations over which it tightens |
 | `light_time` | bool | true | light-time delay |
-| `aberration` | bool | — | annual stellar aberration |
-| `light_deflection` | bool | — | gravitational light deflection |
+| `batch_deweighting` | bool | true | σ·√(N/4) for N > 4 observations per night and site (§8.3) |
+| `aberration` | bool | — | not used by the fit: astrometric positions (§8.1) |
+| `light_deflection` | bool | — | not used by the fit: astrometric positions (§8.1) |
 
 > `diffcorr.tolerance` is measured to have **no effect** on cost: four orders of
 > magnitude produce no measurable difference, because the expense lies in the
@@ -1045,7 +1144,7 @@ away from where it is drawn — for a small body with a poorly determined orbit 
 can reach the tens.
 
 When `diffcorr.compute_covariance` is on, the ellipse comes from our own fit
-rather than from the imported AstDyS covariance (§8.4).
+rather than from the imported AstDyS covariance (§8.5).
 
 #### `id`
 

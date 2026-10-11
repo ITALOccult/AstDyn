@@ -337,3 +337,18 @@ TEST(ReferenceFrameTest, FrameTypeToString) {
     EXPECT_EQ(frame_type_to_string(FrameType::ITRF), "ITRF");
 }
 
+
+// JPL Horizons, (3830) Trelleborg heliocentric at JD 2461500.5 TDB, same vector
+// requested in REF_PLANE=FRAME (ICRF) and REF_PLANE=ECLIPTIC. x is identical to
+// the bit: the JPL ecliptic is the ICRF rotated about x, with no frame bias.
+// With the FK5->ICRS bias inserted this vector came out 47 km off.
+TEST(ReferenceFrameTest, GcrfToEclipJ2000MatchesJplWithoutFrameBias) {
+    const double au_m = AU * 1000.0;
+    const auto icrf = math::Vector3<core::GCRF, physics::Distance>::from_si(
+        -2.346263627969152 * au_m, -1.619451541115787 * au_m, -1.050121180687752 * au_m);
+    const Eigen::Vector3d jpl_ecliptic_au(-2.346263627969152, -1.903531956001864, -0.3192865180853305);
+
+    const Eigen::Vector3d ours_au =
+        ReferenceFrame::transform_pos<core::GCRF, core::ECLIPJ2000>(icrf).to_eigen_si() / au_m;
+    EXPECT_LT((ours_au - jpl_ecliptic_au).norm() * au_m, 1.0);   // metres
+}

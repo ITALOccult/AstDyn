@@ -20,6 +20,8 @@
 #include <astdyn/observations/ObservatoryDatabase.hpp>
 #include <astdyn/observations/RWOReader.hpp>
 #include <astdyn/orbit_determination/Residuals.hpp>
+#include <astdyn/ephemeris/AsteroidPerturbations.hpp>
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <cmath>
@@ -266,4 +268,29 @@ TEST(ValidazioneEsterna, SABA4RifiutatoEsplicitamente) {
     AstDynConfig c = e.config();
     c.integrator_type = IntegratorType::SABA4;
     EXPECT_THROW(e.set_config(c), std::runtime_error);
+}
+
+// ===========================================================================
+// Perturbatori asteroidali: lo SPK e' equatoriale e va ruotato in eclittica.
+// Etichettato eclittico senza rotazione, ogni perturbatore stava 23.4 gradi
+// fuori posto: la propagazione all'indietro dell'orbita JPL di (3930) mancava
+// JPL di 2718 km nel 1949, peggio che senza perturbatori.
+// ===========================================================================
+
+TEST(ValidazioneEsterna, CerereDalloSPKInEclitticaComeJPL) {
+    const char* spk = std::getenv("ASTDYN_ASTEROID_SPK");
+    if (!spk || !file_esiste(spk)) GTEST_SKIP() << "ASTDYN_ASTEROID_SPK non impostata";
+    ephemeris::AsteroidPerturbations perturbatori;
+    perturbatori.loadAstDynDefaultSet();
+    perturbatori.loadSPK(spk);
+    const auto& elenco = perturbatori.getAsteroids();
+    const auto cerere = std::find_if(elenco.begin(), elenco.end(), [](const auto& a) { return a.naif_id == 2000001; });
+    ASSERT_NE(cerere, elenco.end());
+    // Horizons, (1) Ceres eliocentrico, eclittica J2000, JD 2451545.0 TDB [km]
+    const Eigen::Vector3d jpl_km(-3.559423585024965E+08, 1.190030175899910E+08, 6.926464763213266E+07);
+    const Eigen::Vector3d nostro_km =
+        perturbatori.getPosition(*cerere, time::EpochTDB::from_jd(2451545.0)).to_eigen_si() / 1000.0;
+    // 8 km misurati: sb441-n16 porta la soluzione di Cerere del 2021, Horizons
+    // quella attuale. L'errore di frame valeva ~1.5e8 km.
+    EXPECT_LT((nostro_km - jpl_km).norm(), 50.0) << "scarto " << (nostro_km - jpl_km).norm() << " km";
 }

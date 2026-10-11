@@ -248,11 +248,18 @@ private:
         }
         auto batch = stm_computer_->compute_batch(s, times, positions);
         for (int i=0; i<n; ++i) {
-            dm.A.template block<2,6>(2*i, 0) = batch[i].partial_radec * batch[i].phi;
-            dm.b[2*i] = res[dm.valid_indices[i]].residual_ra.to_rad();
-            dm.b[2*i+1] = res[dm.valid_indices[i]].residual_dec.to_rad();
-            dm.weights[2*i] = res[dm.valid_indices[i]].weight_ra;
-            dm.weights[2*i+1] = res[dm.valid_indices[i]].weight_dec;
+            const auto& r = res[dm.valid_indices[i]];
+            Eigen::Matrix<double, 2, 6> rows = batch[i].partial_radec * batch[i].phi;
+            Eigen::Vector2d residual(r.residual_ra.to_rad(), r.residual_dec.to_rad());
+            Eigen::Vector2d weight(r.weight_ra, r.weight_dec);
+            if (const auto whitening = whitening_matrix(obs[dm.valid_indices[i]])) {
+                rows = *whitening * rows;
+                residual = *whitening * residual;
+                weight = Eigen::Vector2d::Ones();
+            }
+            dm.A.template block<2,6>(2*i, 0) = rows;
+            dm.b.template segment<2>(2*i) = residual;
+            dm.weights.template segment<2>(2*i) = weight;
         }
         return dm;
     }

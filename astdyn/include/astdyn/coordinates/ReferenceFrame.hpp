@@ -310,11 +310,12 @@ public:
         
         // Chain transformations through J2000
         // Example: ICRS → ECLIPTIC = ICRS → J2000 → ECLIPTIC
+        // ICRS <-> ECLIPTIC: pure obliquity rotation, see get_rotation<GCRF, ECLIPJ2000>.
         if (from == FrameType::ICRS && to == FrameType::ECLIPTIC) {
-            return j2000_to_ecliptic(t) * icrs_to_j2000();
+            return j2000_to_ecliptic(t);
         }
         if (from == FrameType::ECLIPTIC && to == FrameType::ICRS) {
-            return j2000_to_icrs() * ecliptic_to_j2000(t);
+            return ecliptic_to_j2000(t);
         }
         if (from == FrameType::ICRS && to == FrameType::ITRF) {
             return j2000_to_itrf_simple(time::EpochUTC::from_mjd(t.mjd())) * icrs_to_j2000();
@@ -459,13 +460,17 @@ math::RotationMatrix<core::ITRF, core::ITRF> ReferenceFrame::get_rotation<core::
 template<> inline
 math::RotationMatrix<core::ECLIPJ2000, core::GCRF> ReferenceFrame::get_rotation<core::ECLIPJ2000, core::GCRF>(time::EpochTDB) {
     // ECLIPJ2000 is the Mean Ecliptic of J2000.0. It MUST NOT depend on the current epoch t.
-    return math::RotationMatrix<core::ECLIPJ2000, core::GCRF>::from_eigen(
-        j2000_to_icrs() * ecliptic_to_j2000()); // Uses default J2000 epoch inside
+    // ECLIPJ2000 is the ICRF rotated about x by the IAU 1976 obliquity, with NO
+    // frame bias: that is how JPL, SPICE and AstDyS define the plane their
+    // elements refer to. Horizons gives x identical to the bit in both frames
+    // (3830 Trelleborg, JD 2461500.5); inserting the FK5->ICRS bias here moved
+    // its heliocentric position by 47 km and the shadow path by up to 50 km.
+    return math::RotationMatrix<core::ECLIPJ2000, core::GCRF>::from_eigen(ecliptic_to_j2000());
 }
 template<> inline
 math::RotationMatrix<core::GCRF, core::ECLIPJ2000> ReferenceFrame::get_rotation<core::GCRF, core::ECLIPJ2000>(time::EpochTDB) {
-    return math::RotationMatrix<core::GCRF, core::ECLIPJ2000>::from_eigen(
-        j2000_to_ecliptic() * icrs_to_j2000()); // Uses default J2000 epoch inside
+    // No frame bias: see get_rotation<ECLIPJ2000, GCRF>.
+    return math::RotationMatrix<core::GCRF, core::ECLIPJ2000>::from_eigen(j2000_to_ecliptic());
 }
 
 // --- GCRF ↔ ITRF ---
