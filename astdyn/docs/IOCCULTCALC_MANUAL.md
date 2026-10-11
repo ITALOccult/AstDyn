@@ -542,6 +542,20 @@ the orbit fitted on them, like AstDyS's own, ran 180–265 km on the shadow plan
 away from JPL's. With the batches deweighted the gap falls to 68–85 km on all
 7177 observations; it is 45–68 km if TESS is dropped altogether.
 
+### 8.3ter Weights per observatory
+
+With `diffcorr.station_weights` (on by default) the fit runs twice: after the
+first pass the sigmas of each observatory with at least 20 observations are
+scaled so that its normalised residuals have unit spread — a robust variance
+component, median(z²)/0.455, clipped to [0.5, 10]. This is what a station table
+such as Vereš et al. (2017) encodes, measured on the object's own data. Gaia
+observations keep their own covariance.
+
+On (316) Goberta it moves the orbit 2 mas towards JPL's (16 → 14 mas at the
+July 2026 event); on (3930) it changes nothing measurable. The rest of the
+Goberta difference is the catalogue debiasing: AstDyS supplies FCCT14, JPL uses
+Eggl et al. (2020).
+
 ### 8.3bis Gaia astrometry
 
 Gaia's asteroid astrometry (Focused Product Release, table
@@ -982,6 +996,7 @@ and a courtesy delay between requests.
 | `outlier_ramp_steps` | int | 3 | iterations over which it tightens |
 | `light_time` | bool | true | light-time delay |
 | `batch_deweighting` | bool | true | σ·√(N/4) for N > 4 observations per night and site (§8.3) |
+| `station_weights` | bool | true | second pass with per-observatory weights from the residuals (§8.3ter) |
 | `aberration` | bool | — | not used by the fit: astrometric positions (§8.1) |
 | `light_deflection` | bool | — | not used by the fit: astrometric positions (§8.1) |
 

@@ -9,6 +9,7 @@
 #define ASTDYN_ORBFITENGINE_HPP
 
 #include "astdyn/observations/NightlyDeweighting.hpp"
+#include "astdyn/orbit_determination/StationWeights.hpp"
 #include "astdyn/core/physics_state.hpp"
 #include <chrono>
 #include "astdyn/propagation/Propagator.hpp"
@@ -71,6 +72,7 @@ struct AstDynConfig {
     double fit_obs_years = 0.0;              ///< Usa solo le osservazioni degli ultimi N anni (0 = tutte)
     double fit_tolerance = 0.0;              ///< Tolleranza dell'integratore durante il fit (0 = usa quella corrente)
     bool fit_batch_deweighting = true;       ///< sigma * sqrt(N/4) per N > 4 osservazioni per notte (Veres 2017)
+    bool fit_station_weights = true;         ///< secondo passaggio con pesi per stazione dai residui
     
     // Close approach settings
     close_approach::CloseApproachSettings ca_settings;
@@ -281,6 +283,17 @@ OrbitDeterminationResult AstDynEngine::run_fit_in_frame() {
             "i sei elementi orbitali");
     }
     auto result_dc = fitter.fit(obs_usate, initial_state, dc_settings);
+    if (config_.fit_station_weights && result_dc.converged) {
+        // Second pass with each observatory weighted by the spread of its own
+        // residuals -- what a station table (Veres 2017) encodes, measured here.
+        const auto factors = station_sigma_factors(result_dc.residuals);
+        const int rescaled = apply_station_factors(obs_usate, factors);
+        if (config_.verbose)
+            std::cout << "Pesi per stazione: " << factors.size() << " osservatori, "
+                      << rescaled << " osservazioni ripesate\n";
+        auto second = fitter.fit(obs_usate, result_dc.final_state, dc_settings);
+        if (second.converged) result_dc = std::move(second);
+    }
     physics::CartesianStateTyped<core::ECLIPJ2000> final_ecl;
     if constexpr (std::is_same_v<Frame, core::ECLIPJ2000>) {
         final_ecl = result_dc.final_state;
