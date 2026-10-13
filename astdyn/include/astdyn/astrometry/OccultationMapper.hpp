@@ -37,6 +37,9 @@ struct OccultationPath {
     std::vector<GeoPoint> sigma1_south;    ///< Southern 1-sigma boundary (shadow + uncertainty)
     std::vector<TimeMarker> markers;       ///< Time markers (TCA, +/- sigma)
     physics::Distance shadow_width;        ///< Width of the asteroid shadow
+    /// Instant of closest approach: the day/night terminator of the map is
+    /// drawn for it (it was a fixed date, 2026-03-28, on every map).
+    std::optional<time::EpochTDB> tca;
 };
 
 /**
