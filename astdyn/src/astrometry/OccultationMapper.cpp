@@ -2,6 +2,8 @@
  * @file OccultationMapper.cpp
  */
 
+#include <algorithm>
+#include <sstream>
 #include "astdyn/astrometry/OccultationMapper.hpp"
 #include "astdyn/core/Constants.hpp"
 #include "astdyn/time/TimeScale.hpp"
@@ -58,6 +60,7 @@ OccultationPath OccultationMapper::compute_path(
     std::shared_ptr<astdyn::ephemeris::PlanetaryEphemeris> ephem, const time::TimeDuration& duration) 
 {
     OccultationPath path;
+    path.tca = params.t_ca;
     path.shadow_width = asteroid_diameter;
     const int steps = 600;
     time::TimeDuration dt = duration / static_cast<double>(steps);
@@ -255,6 +258,48 @@ std::vector<GeoPoint> OccultationMapper::compute_terminator(const time::EpochTDB
     return points;
 }
 
+namespace {
+
+/// Two consecutive track points this far apart in longitude are not joined:
+/// the track crossed the antimeridian, or passed near a pole where longitude
+/// sweeps half the globe in a few km. Joined, they drew lines across the map.
+constexpr double MAX_LON_STEP_DEG = 90.0;
+
+bool longitude_jump(const GeoPoint& a, const GeoPoint& b) {
+    return std::abs(a.lon.to_deg() - b.lon.to_deg()) > MAX_LON_STEP_DEG;
+}
+
+std::vector<std::vector<GeoPoint>> continuous_segments(const std::vector<GeoPoint>& pts) {
+    std::vector<std::vector<GeoPoint>> segments;
+    for (size_t k = 0; k < pts.size(); ++k) {
+        if (k == 0 || longitude_jump(pts[k - 1], pts[k])) segments.emplace_back();
+        segments.back().push_back(pts[k]);
+    }
+    return segments;
+}
+
+std::string svg_xy(const GeoPoint& p) {
+    std::ostringstream o;
+    o << p.lon.to_deg() * 10.0 << "," << -p.lat.to_deg() * 10.0;
+    return o.str();
+}
+
+/// Band between two boundaries as quadrilaterals, skipping those that would
+/// straddle a longitude jump.
+std::string band_path(const std::vector<GeoPoint>& north, const std::vector<GeoPoint>& south) {
+    std::string d;
+    for (size_t k = 0; k + 1 < north.size() && k + 1 < south.size(); ++k) {
+        const bool broken = longitude_jump(north[k], north[k + 1]) || longitude_jump(south[k], south[k + 1])
+                         || longitude_jump(north[k], south[k]) || longitude_jump(north[k + 1], south[k + 1]);
+        if (broken) continue;
+        d += "M " + svg_xy(north[k]) + " L " + svg_xy(north[k + 1]) + " L " + svg_xy(south[k + 1])
+           + " L " + svg_xy(south[k]) + " Z ";
+    }
+    return d;
+}
+
+} // namespace
+
 void OccultationMapper::export_global_svg(
     const std::vector<OccultationPath>& paths,
     const std::vector<std::string>& labels,
@@ -270,8 +315,11 @@ void OccultationMapper::export_global_svg(
     // Dynamic ViewBox
     double vw = 3600.0 / zoom;
     double vh = 1800.0 / zoom;
+    // Keep the window inside the map: a track near a pole centred it beyond 90 deg.
+    const double half_height_deg = vh / 20.0;
+    const double lat_deg = std::clamp(center_lat.to_deg(), -90.0 + half_height_deg, 90.0 - half_height_deg);
     double vx = center_lon.to_deg() * 10.0 - vw / 2.0;
-    double vy = -center_lat.to_deg() * 10.0 - vh / 2.0;
+    double vy = -lat_deg * 10.0 - vh / 2.0;
 
     // SVG Header
     ofs << "<svg viewBox=\"" << vx << " " << vy << " " << vw << " " << vh << "\" xmlns=\"http://www.w3.org/2000/svg\" style=\"background-color:#f8fafc; font-family: 'Outfit', 'Inter', sans-serif;\">\n";
@@ -331,10 +379,12 @@ void OccultationMapper::export_global_svg(
     ofs << "  </g>\n";
 
     // 4. Day/Night Terminator
-    auto term_pts = compute_terminator(time::EpochTDB::from_jd(2461121.5), ephem);
-    if (!term_pts.empty()) {
+    // Only a single-event map has one instant to draw the terminator for.
+    const auto term_pts = (paths.size() == 1 && paths[0].tca)
+                        ? compute_terminator(*paths[0].tca, ephem) : std::vector<GeoPoint>{};
+    for (const auto& seg : continuous_segments(term_pts)) {
         ofs << "  <polyline points=\"";
-        for (const auto& pt : term_pts) ofs << lon_to_svg(pt.lon.to_deg()) << "," << lat_to_svg(pt.lat.to_deg()) << " ";
+        for (const auto& pt : seg) ofs << svg_xy(pt) << " ";
         ofs << "\" fill=\"none\" stroke=\"#facc15\" stroke-width=\"" << 6.0 / zoom << "\" stroke-dasharray=\"" << 20.0/zoom << "," << 15.0/zoom << "\" opacity=\"0.6\" />\n";
     }
 
@@ -343,31 +393,20 @@ void OccultationMapper::export_global_svg(
         const auto& p = paths[i];
         std::string color = (i < colors.size()) ? colors[i] : "#ffffff";
         
-        // --- 1-Sigma Uncertainty Region ---
-        if (!p.sigma1_north.empty() && p.sigma1_north.size() == p.sigma1_south.size()) {
-            ofs << "  <path fill=\"" << color << "\" fill-opacity=\"0.12\" d=\"M ";
-            for (const auto& pt : p.sigma1_north) ofs << lon_to_svg(pt.lon.to_deg()) << "," << lat_to_svg(pt.lat.to_deg()) << " ";
-            for (auto it = p.sigma1_south.rbegin(); it != p.sigma1_south.rend(); ++it) 
-                ofs << "L " << lon_to_svg(it->lon.to_deg()) << "," << lat_to_svg(it->lat.to_deg()) << " ";
-            ofs << "Z\" />\n";
-        }
-
-        // Shadow Zone (Nominal)
-        if (!p.shadow_north.empty() && p.shadow_north.size() == p.shadow_south.size()) {
-            ofs << "  <path fill=\"url(#grad" << i << ")\" fill-opacity=\"0.7\" d=\"M ";
-            for (const auto& pt : p.shadow_north) ofs << lon_to_svg(pt.lon.to_deg()) << "," << lat_to_svg(pt.lat.to_deg()) << " ";
-            for (auto it = p.shadow_south.rbegin(); it != p.shadow_south.rend(); ++it) 
-                ofs << "L " << lon_to_svg(it->lon.to_deg()) << "," << lat_to_svg(it->lat.to_deg()) << " ";
-            ofs << "Z\" />\n";
-        }
+        // --- 1-Sigma Uncertainty Region and nominal shadow ---
+        if (!p.sigma1_north.empty() && p.sigma1_north.size() == p.sigma1_south.size())
+            ofs << "  <path fill=\"" << color << "\" fill-opacity=\"0.12\" d=\"" << band_path(p.sigma1_north, p.sigma1_south) << "\" />\n";
+        if (!p.shadow_north.empty() && p.shadow_north.size() == p.shadow_south.size())
+            ofs << "  <path fill=\"url(#grad" << i << ")\" fill-opacity=\"0.7\" d=\"" << band_path(p.shadow_north, p.shadow_south) << "\" />\n";
 
         auto draw_line = [&](const std::vector<GeoPoint>& pts, const std::string& color, double width, double op = 1.0, bool dashed = false) {
-            if (pts.empty()) return;
-            ofs << "  <polyline points=\"";
-            for (const auto& pt : pts) ofs << lon_to_svg(pt.lon.to_deg()) << "," << lat_to_svg(pt.lat.to_deg()) << " ";
-            ofs << "\" fill=\"none\" stroke=\"" << color << "\" stroke-width=\"" << width / zoom << "\" stroke-linecap=\"round\" ";
-            if (dashed) ofs << "stroke-dasharray=\"" << 20.0/zoom << "," << 20.0/zoom << "\" ";
-            ofs << "opacity=\"" << op << "\" />\n";
+            for (const auto& seg : continuous_segments(pts)) {
+                ofs << "  <polyline points=\"";
+                for (const auto& pt : seg) ofs << svg_xy(pt) << " ";
+                ofs << "\" fill=\"none\" stroke=\"" << color << "\" stroke-width=\"" << width / zoom << "\" stroke-linecap=\"round\" ";
+                if (dashed) ofs << "stroke-dasharray=\"" << 20.0/zoom << "," << 20.0/zoom << "\" ";
+                ofs << "opacity=\"" << op << "\" />\n";
+            }
         };
 
         draw_line(p.sigma1_north, color, 3, 0.4, true);
