@@ -13,6 +13,7 @@
 #include "astdyn/astrometry/OccultationMapper.hpp"
 #include "astdyn/io/HorizonsClient.hpp"
 #include "astdyn/catalog/GaiaDR3Catalog.hpp"
+#include "astdyn/catalog/GaiaToJohnson.hpp"
 #include "astdyn/ephemeris/PlanetaryEphemeris.hpp"
 #include "astdyn/ephemeris/DE441Provider.hpp"
 #include "astdyn/astrometry/OccultationEvent.hpp"
@@ -206,6 +207,32 @@ static std::string denominazione_posizionale(double ra_ore, double dec_gradi) {
 /// Valore che Occult4 usa per una magnitudine non nota.
 constexpr double kMagAssente = 99.0;
 
+/// G, BP e RP della stella: dal catalogo se le ha, altrimenti dall'archivio
+/// Gaia (il nostro estratto SQLite porta solo la G).
+catalog::StarPhotometry fotometria_gaia(const catalog::Star& stella) {
+    catalog::StarPhotometry fotometria{stella.g_mag, stella.bp_mag, stella.rp_mag};
+    if (magnitudine_disponibile(fotometria.bp_mag) && magnitudine_disponibile(fotometria.rp_mag))
+        return fotometria;
+    if (auto da_archivio = catalog::GaiaDR3Catalog::instance().fetch_photometry(stella.source_id))
+        return *da_archivio;
+    return fotometria;
+}
+
+/// Occult4 vuole V e R di Johnson-Cousins, non G/BP/RP: senza colore la G resta
+/// il surrogato di V. La B si lascia assente: lo scrittore la ricava da V e R
+/// con la relazione di Occult4, come fa Occult4 stesso per le stelle Gaia.
+void assegna_magnitudini_johnson(const catalog::Star& stella, OccultationEvent& ev) {
+    const auto fotometria = fotometria_gaia(stella);
+    ev.mag_b = kMagAssente;
+    ev.mag_v = magnitudine_disponibile(fotometria.g_mag) ? fotometria.g_mag : kMagAssente;
+    ev.mag_r = kMagAssente;
+    if (!magnitudine_disponibile(fotometria.g_mag) || !magnitudine_disponibile(fotometria.bp_mag)
+        || !magnitudine_disponibile(fotometria.rp_mag)) return;
+    const double bp_rp_mag = fotometria.bp_mag - fotometria.rp_mag;
+    if (auto v = catalog::johnson_v_from_gaia(fotometria.g_mag, bp_rp_mag)) ev.mag_v = *v;
+    if (auto r = catalog::cousins_r_from_gaia(fotometria.g_mag, bp_rp_mag)) ev.mag_r = *r;
+}
+
 OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std::string& ast_id,
                                     const physics::KeplerianStateTyped<core::ECLIPJ2000>& el,
                                     double diameter_km, double h_mag,
@@ -266,11 +293,8 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     // Identificativo posizionale: Occult4 non conosce i source_id di Gaia.
     // Il source_id resta nel JSON nativo, dove non crea problemi.
     ev.star_id = denominazione_posizionale(ev.star_ra_h, ev.star_dec_deg);
-    // Gaia BP/G/RP sono i surrogati piu' vicini a B/V/R. Il catalogo puo'
-    // fornirne solo alcune: quelle assenti si dichiarano, non si azzerano.
-    ev.mag_b = magnitudine_disponibile(cand.star.bp_mag) ? cand.star.bp_mag : kMagAssente;
-    ev.mag_v = magnitudine_disponibile(cand.star.g_mag)  ? cand.star.g_mag  : kMagAssente;
-    ev.mag_r = magnitudine_disponibile(cand.star.rp_mag) ? cand.star.rp_mag : kMagAssente;
+    ev.gaia_source_id = std::to_string(cand.star.source_id);
+    assegna_magnitudini_johnson(cand.star, ev);
     ev.star_diameter_mas = 0.0;   // not modelled
     ev.double_star_code  = 0;
     ev.k2_flag           = "";
@@ -394,8 +418,9 @@ OccultationEvent candidate_to_event(const OccultationCandidate& cand, const std:
     // ha RUWE ~1).
     ev.reliability = (cand.star.ruwe > 0.0) ? cand.star.ruwe : -1.0;
     ev.duplicate_source    = -1;
-    ev.non_gaia_pm         = -1;
-    ev.pm_added_from_ucac4 = -1;
+    // Il moto proprio viene sempre da Gaia DR3 e mai da UCAC4: lo sappiamo.
+    ev.non_gaia_pm         = 0;
+    ev.pm_added_from_ucac4 = 0;
 
     // L'indice di nonlinearita' e' una quantita' SCOPE, non del formato occelmnt:
     // viene riportato nel JSON nativo, in un campo proprio. Metterlo nella stringa

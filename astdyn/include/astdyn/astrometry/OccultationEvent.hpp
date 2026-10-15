@@ -62,6 +62,8 @@ struct OccultationEvent {
 
     // ---- <Star> -----------------------------------------------------------
     std::string star_id;
+    /// Gaia DR3 source_id: not part of occelmnt, written only to the native JSON.
+    std::string gaia_source_id;
     /// BCRS: ICRS frame, epoch of the event (proper motion applied), no parallax.
     double star_ra_h = 0.0;
     double star_dec_deg = 0.0;

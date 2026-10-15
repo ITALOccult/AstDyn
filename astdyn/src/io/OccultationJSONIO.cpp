@@ -41,6 +41,7 @@ static json event_to_json(const OccultationEvent& ev) {
     // ---- <Star> -----------------------------------------------------------
     j["star"] = {
         {"id", ev.star_id},
+        {"gaia_source_id", ev.gaia_source_id},
         {"ra_h", ev.star_ra_h},
         {"dec_deg", ev.star_dec_deg},
         {"mag_b", ev.mag_b},

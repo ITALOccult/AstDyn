@@ -80,6 +80,13 @@ struct StarAstrometricErrors {
     double parallax_pmra_corr = 0.0, parallax_pmdec_corr = 0.0, pmra_pmdec_corr = 0.0;
 };
 
+/// Gaia DR3 broad-band photometry of one star, in magnitudes.
+struct StarPhotometry {
+    double g_mag  = 0.0;
+    double bp_mag = 0.0;
+    double rp_mag = 0.0;
+};
+
 // ============================================================================
 // GaiaDR3Catalog — main API
 // ============================================================================
@@ -181,6 +188,15 @@ public:
      */
     [[nodiscard]] std::optional<StarAstrometricErrors>
     fetch_astrometric_errors(int64_t source_id) const;
+
+    /**
+     * @brief Gaia G, BP and RP for one star.
+     *
+     * The local SQLite extract stores G only, but Occult4 and OccultWatcher
+     * need colours for Johnson V and R. Same path as the errors: local cache
+     * first, then one archive query by source_id.
+     */
+    [[nodiscard]] std::optional<StarPhotometry> fetch_photometry(int64_t source_id) const;
 
     // -----------------------------------------------------------------------
     // Diagnostics
