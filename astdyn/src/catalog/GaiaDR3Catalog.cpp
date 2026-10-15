@@ -344,7 +344,9 @@ sqlite3* open_error_cache() {
         " params_solved INTEGER,"
         " c_ra_dec REAL, c_ra_plx REAL, c_ra_pmra REAL, c_ra_pmdec REAL,"
         " c_dec_plx REAL, c_dec_pmra REAL, c_dec_pmdec REAL,"
-        " c_plx_pmra REAL, c_plx_pmdec REAL, c_pmra_pmdec REAL);";
+        " c_plx_pmra REAL, c_plx_pmdec REAL, c_pmra_pmdec REAL);"
+        "CREATE TABLE IF NOT EXISTS star_photometry ("
+        " sid INTEGER PRIMARY KEY, g_mag REAL, bp_mag REAL, rp_mag REAL);";
     sqlite3_exec(db, schema, nullptr, nullptr, nullptr);
     return db;
 }
@@ -453,6 +455,64 @@ GaiaDR3Catalog::fetch_astrometric_errors(int64_t source_id) const {
     cache_write(cache, source_id, e);
     if (cache) sqlite3_close(cache);
     return e;
+}
+
+// ============================================================================
+// Photometry: the local extract carries G only; BP and RP come from the archive
+// ============================================================================
+
+namespace {
+
+std::optional<StarPhotometry> photometry_cache_read(sqlite3* db, int64_t sid) {
+    if (!db) return std::nullopt;
+    const char* sql = "SELECT g_mag,bp_mag,rp_mag FROM star_photometry WHERE sid=?;";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) return std::nullopt;
+    sqlite3_bind_int64(st, 1, sid);
+    std::optional<StarPhotometry> out;
+    if (sqlite3_step(st) == SQLITE_ROW)
+        out = StarPhotometry{sqlite3_column_double(st, 0), sqlite3_column_double(st, 1),
+                             sqlite3_column_double(st, 2)};
+    sqlite3_finalize(st);
+    return out;
+}
+
+void photometry_cache_write(sqlite3* db, int64_t sid, const StarPhotometry& p) {
+    if (!db) return;
+    const char* sql = "INSERT OR REPLACE INTO star_photometry VALUES(?,?,?,?);";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) return;
+    sqlite3_bind_int64(st, 1, sid);
+    sqlite3_bind_double(st, 2, p.g_mag);
+    sqlite3_bind_double(st, 3, p.bp_mag);
+    sqlite3_bind_double(st, 4, p.rp_mag);
+    sqlite3_step(st);
+    sqlite3_finalize(st);
+}
+
+std::optional<StarPhotometry> photometry_from_archive(int64_t source_id) {
+    try {
+        ioc::gaia::GaiaClient client(ioc::gaia::GaiaRelease::DR3);
+        auto rows = client.queryBySourceIds({source_id});
+        if (rows.empty()) return std::nullopt;
+        const auto& s = rows.front();
+        return StarPhotometry{s.phot_g_mean_mag, s.phot_bp_mean_mag, s.phot_rp_mean_mag};
+    } catch (const std::exception&) {
+        return std::nullopt;  // offline and not cached: honest failure
+    }
+}
+
+} // namespace
+
+std::optional<StarPhotometry> GaiaDR3Catalog::fetch_photometry(int64_t source_id) const {
+    sqlite3* cache = open_error_cache();
+    auto photometry = photometry_cache_read(cache, source_id);
+    if (!photometry) {
+        photometry = photometry_from_archive(source_id);
+        if (photometry) photometry_cache_write(cache, source_id, *photometry);
+    }
+    if (cache) sqlite3_close(cache);
+    return photometry;
 }
 
 } // namespace astdyn::catalog
