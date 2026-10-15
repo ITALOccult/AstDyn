@@ -41,6 +41,19 @@ std::vector<std::string> split(const std::string& csv) {
     return out;
 }
 
+/// The <Errors> path-width field is stored with an offset of one: Occult4
+/// writes 60.015 for the 59.015 its page shows, and OccultWatcher Cloud shows
+/// our unshifted 0.020 as -0.980. Zero stays zero: it means "not computed".
+constexpr double OCCELMNT_PATH_WIDTH_OFFSET = 1.0;
+
+double path_widths_record(double path_widths) {
+    return path_widths > 0.0 ? path_widths + OCCELMNT_PATH_WIDTH_OFFSET : 0.0;
+}
+
+double path_widths_from_record(double record) {
+    return record > 0.0 ? record - OCCELMNT_PATH_WIDTH_OFFSET : 0.0;
+}
+
 /// Field @p i as a double, or @p fallback when missing or unparsable.
 double num(const std::vector<std::string>& f, size_t i, double fallback = 0.0) {
     if (i >= f.size() || f[i].empty()) return fallback;
@@ -145,7 +158,7 @@ OccultationEvent OccultationXMLIO::parse_event_node(const std::string& xml) {
     }
     {   // <Errors>
         const auto f = split(extract_tag(xml, "Errors"));
-        ev.err_path_widths = num(f, 0);
+        ev.err_path_widths = path_widths_from_record(num(f, 0));
         ev.err_major_as    = num(f, 1);
         ev.err_minor_as    = num(f, 2);
         ev.err_pa_deg      = num(f, 3);
@@ -257,7 +270,7 @@ std::string OccultationXMLIO::orbit_line(const OccultationEvent& ev) {
 }
 
 std::string OccultationXMLIO::errors_line(const OccultationEvent& ev) {
-    return "    <Errors>" + f(ev.err_path_widths, 3) + "," + f(ev.err_major_as, 4) + ","
+    return "    <Errors>" + f(path_widths_record(ev.err_path_widths), 3) + "," + f(ev.err_major_as, 4) + ","
          + f(ev.err_minor_as, 4) + "," + f(ev.err_pa_deg, 0) + "," + f(ev.err_1sigma_as, 4) + ","
          + ev.error_basis + "," + f(ev.reliability, 2) + "," + std::to_string(ev.duplicate_source) + ","
          + std::to_string(ev.non_gaia_pm) + "," + std::to_string(ev.pm_added_from_ucac4) + "</Errors>" + EOL;

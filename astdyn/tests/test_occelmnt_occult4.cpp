@@ -155,6 +155,19 @@ TEST(Occelmnt, MissingBlueMagnitudeDerivedWithOccult4Relation) {
     EXPECT_NE(xml.find(",10.68,9.59,9.00,"), std::string::npos) << xml;
 }
 
+TEST(Occelmnt, PathErrorRecordCarriesOccult4OffsetOfOne) {
+    auto ev = complete_event();
+    ev.err_path_widths = 0.020;                    // OWC showed it as -0.980 without the offset
+    const std::string xml = OccultationXMLIO::write_string({ev});
+    EXPECT_NE(xml.find("<Errors>1.020,"), std::string::npos) << xml;
+    EXPECT_NEAR(OccultationXMLIO::read_string(xml)[0].err_path_widths, 0.020, 1e-9);
+}
+
+TEST(Occelmnt, UncomputedPathErrorStaysZero) {
+    const std::string xml = OccultationXMLIO::write_string({worst_case_event()});
+    EXPECT_NE(xml.find("<Errors>0.000,"), std::string::npos) << xml;
+}
+
 TEST(Occelmnt, RoundTripKeepsTheGeometry) {
     const auto back = OccultationXMLIO::read_string(OccultationXMLIO::write_string({complete_event()}));
     ASSERT_EQ(back.size(), 1u);
